@@ -632,6 +632,36 @@ function playFuse(e, len) {                 // the kamikaze's fizzing fuse
   const g = actx.createGain(); g.gain.setValueAtTime(0.15, t); g.gain.linearRampToValueAtTime(0.5, t + len);
   src.connect(hp); hp.connect(g); g.connect(out); src.start(t, Math.random() * 0.3); src.stop(t + len);
 }
+// a ragged scream when the light first catches one: a rasping sawtooth pushed through two vocal formants
+let shaper = null;
+function playScream(e) {
+  if (!actx || !noiseBuf) return;
+  const t = actx.currentTime; if (t - (monLast.scream || 0) < 0.14) return;
+  const near = monNear(e, 650); if (near <= 0.02) return;
+  monLast.scream = t;
+  if (!shaper) { shaper = actx.createWaveShaper(); const c = new Float32Array(256); for (let i = 0; i < 256; i++) { const x = i / 128 - 1; c[i] = Math.tanh(3 * x); } shaper.curve = c; shaper.connect(sfxGain); }
+  const out = monOut(e.x, e.y, 0.18 + 0.4 * near);
+  const base = 300 * MON_PITCH[e.type] * (0.88 + Math.random() * 0.3), len = 0.55 + Math.random() * 0.4;
+  const o = actx.createOscillator(); o.type = 'sawtooth';
+  o.frequency.setValueAtTime(base * 0.75, t); o.frequency.exponentialRampToValueAtTime(base * 1.8, t + 0.07); o.frequency.exponentialRampToValueAtTime(base * 1.05, t + len);
+  const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = 22 + Math.random() * 16; lg.gain.value = base * 0.07;
+  lfo.connect(lg); lg.connect(o.frequency);
+  const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.55, t + 0.04);
+  g.gain.setValueAtTime(0.55, t + len * 0.55); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  for (const [f, q, v] of [[850, 5, 1], [2300, 7, 0.6]]) {
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * (0.9 + Math.random() * 0.2); bp.Q.value = q;
+    const bg = actx.createGain(); bg.gain.value = v; o.connect(bp); bp.connect(bg); bg.connect(g);
+  }
+  const n = actx.createBufferSource(); n.buffer = noiseBuf; const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500;
+  const ng = actx.createGain(); ng.gain.value = 0.25; n.connect(hp); hp.connect(ng); ng.connect(g);
+  g.connect(out);
+  o.start(t); lfo.start(t); n.start(t, Math.random() * 0.3); o.stop(t + len + 0.02); lfo.stop(t + len + 0.02); n.stop(t + len + 0.02);
+}
+function playHeartbeat(k) {       // lub-dub, louder the closer they are
+  if (!actx) return;
+  const t = actx.currentTime;
+  boomAt(t, 70, 38, 0.14, 0.3 + 0.45 * k, sfxGain); boomAt(t + 0.17, 62, 36, 0.12, 0.22 + 0.35 * k, sfxGain);
+}
 function playBlast(x, y) {
   if (!actx || !noiseBuf) return;
   const t = actx.currentTime, near = Math.max(0, 1 - Math.hypot(x - S.p.x, y - S.p.y) / 800);
@@ -846,8 +876,12 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
   const Fx = Math.cos(a), Fy = Math.sin(a), Rx = -Math.sin(a), Ry = Math.cos(a) * 0.5;
   const P = (f, r, h) => [bx + (f * Fx + r * Rx) * Zs, by + (f * Fy + r * Ry - h) * Zs];
   const rightNear = Ry > 0, facingUs = Fy > 0.1;
-  const bob = Math.abs(Math.cos(ph)) * 2.2, lean = 3.2, stride = 9.5;
-  const hipH = 16.5 + bob, shH = 30 + bob, headH = 36 + bob, twist = Math.sin(ph) * 1;
+  const pain = opt ? opt.pain || 0 : 0, reach = opt ? opt.reach || 0 : 0, kneel = opt ? opt.kneel || 0 : 0;
+  const now = performance.now() / 1000, thr = pain * (Math.sin(now * 31 + ph * 7) + 0.6 * Math.sin(now * 53 + ph * 3));   // thrashing in the light
+  const bob = Math.abs(Math.cos(ph)) * 2.2, lean = 3.2 + 3.5 * reach - 7 * pain + (opt ? opt.leanAdd || 0 : 0) + 7 * kneel, stride = 9.5;
+  const drop = 2.5 * pain + 11 * kneel;          // knees buckle in the light; drop to the ground as they die
+  const hipH = 16.5 + bob - drop, shH = 30 + bob - drop * 1.25, headH = 36 + bob - drop * 1.3 + pain * 0.8, twist = Math.sin(ph) * 1 + thr * 1.4;
+  const mixP = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
   const leg = (side, off) => {
     const sn = Math.sin(ph + off), cs = Math.cos(ph + off), lift = Math.max(0, cs) * 4.5;
     const hip = [twist * side * 0.6, side * 2.6, hipH], foot = [sn * stride, side * 2.2, lift];
@@ -856,7 +890,17 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
   const arm = (side, off) => {                                   // bent arms pumping against the legs
     const sw = Math.sin(ph + off) * 6.5;
     const sh = [lean * 0.5 - twist * side * 0.6, side * 5.2, shH - 1];
-    return [sh, [sh[0] + sw * 0.5 - 1, side * 5.6, shH - 7], [sh[0] + sw + 2, side * 4.6, shH - 9 + Math.max(0, sw) * 0.4]];
+    let el = [sh[0] + sw * 0.5 - 1, side * 5.6, shH - 7], ha = [sh[0] + sw + 2, side * 4.6, shH - 9 + Math.max(0, sw) * 0.4];
+    if (reach > 0) {                                             // arms out, grabbing for you
+      el = mixP(el, [sh[0] + 6, side * 5, shH - 1], reach);
+      ha = mixP(ha, [sh[0] + 12.5, side * 4, shH + 0.5 + Math.sin(now * 9 + side) * 1.2], reach);
+    }
+    if (pain > 0) {                                              // arms thrown up over the face against the light, clawing
+      const cl = Math.sin(now * 24 + side * 2 + ph) * 2.2;
+      el = mixP(el, [sh[0] + 3.5, side * 7.5, shH + 5 + cl * 0.5], pain);
+      ha = mixP(ha, [sh[0] + 5.5 + cl, side * 2.2, headH + 3.5 - cl], pain);
+    }
+    return [sh, el, ha];
   };
   const L = leg(-1, Math.PI), Rg = leg(1, 0), LA = arm(-1, 0), RA = arm(1, Math.PI);
   let OUT = false;                        // dark outline pass first so the pale figure stands off the lit ground
@@ -878,7 +922,7 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
   slab([[twist * -0.5, -4.2, hipH - 2], [twist * 0.5, 4.2, hipH - 2], [lt + twist * 0.6, 6, shH], [lt, 4, shH + 1.6], [lt, -4, shH + 1.6], [lt - twist * 0.6, -6, shH]]);
   slab([[-2.8, 0, hipH - 2], [2.8, 0, hipH - 2], [lt + 3.1, 0, shH - 1], [lt + 2.2, 0, shH + 1.4], [lt - 2.6, 0, shH + 1.4], [lt - 3.3, 0, shH - 1]]);
   line([[lt, 0, shH + 1], [lt + 0.6, 0, headH - 2.5]], 2.4, BODY);
-  const [hx, hy] = P(lt + 1, 0, headH);
+  const [hx, hy] = P(lt + 1 + thr * 0.8, thr * 0.6, headH);
   c.beginPath(); c.ellipse(hx, hy, 3.9 * Zs, 4.3 * Zs, 0, 0, 7);
   if (OUT) { c.strokeStyle = EDGE; c.lineWidth = 1.8 * Zs; c.stroke(); } else { c.fillStyle = pal ? pal.head : red ? '#e03a3a' : '#e4e4de'; c.fill(); }
   if (facingUs && !OUT) { const [fx, fy] = P(lt + 3.4, 0, headH - 0.3); c.fillStyle = pal ? pal.face : red ? '#6e1010' : '#8f8f89'; c.beginPath(); c.ellipse(fx, fy, (1.2 + 1.6 * Math.max(0, Fy)) * Zs, 1.8 * Zs, 0, 0, 7); c.fill(); }
@@ -1464,7 +1508,20 @@ function drawFilm() {
 const litMemo = new Map();
 let frameDt = 1 / 60;
 
+// ---- game feel: camera shake (trauma that decays) and hit-stop (a few frozen frames on big hits) ----
+function addShake(a) { S.trauma = Math.min(1, (S.trauma || 0) + a); }
+function hitStop(t) { S.hitstop = Math.max(S.hitstop || 0, t); }
 function render() {
+  const tr = S.trauma || 0; let shx = 0, shy = 0;
+  if (tr > 0.002) {
+    const m = 17 * tr * tr, t = performance.now() / 1000;
+    [shx, shy] = screenDirToWorld(m * (Math.sin(t * 67.3) + Math.sin(t * 41.1 + 1)) * 0.5, m * (Math.sin(t * 59.7 + 2) + Math.sin(t * 37.9 + 3)) * 0.5);
+    S.cam.x += shx; S.cam.y += shy;
+  }
+  S.trauma = Math.max(0, tr - frameDt * 1.6);
+  try { renderScene(); } finally { S.cam.x -= shx; S.cam.y -= shy; }
+}
+function renderScene() {
   HALF = S.mode === 'survive' ? rgHalf() : BASE_HALF;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, W, H);
@@ -1762,7 +1819,7 @@ function rgSpawnGap(w) { return Math.max(0.3, 1.1 - 0.05 * w); }      // seconds
 function haloR() { return lv('halo') ? 55 + 22 * (lv('halo') - 1) : 0; }
 
 function newRun() {
-  return { wave: 0, hp: 3, maxHp: 3, kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [], shells: [], blasts: [],
+  return { wave: 0, hp: 3, maxHp: 3, kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [], shells: [], blasts: [], embers: [], dying: [], beatT: 0, beatFx: 0,
     inv: 0, adren: 0, hurtFx: 0, strobeT: 4, strobeFx: 0, echoT: 2, flareT: 5, walked: 0, phase: 'fight', waveTotal: 0, waveKills: 0, deadT: 0 };
 }
 function sfx(rate, gain, type, freq, len = 0.25) {
@@ -1830,6 +1887,8 @@ function shove(e, amt) { const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypo
 function hurt(e) {
   const rg = S.rg;
   rg.hp--; rg.inv = 1.2 + 0.6 * lv('phantom'); rg.hurtFx = 1;
+  addShake(0.75); hitStop(0.11);
+  { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }   // knocked back
   if (lv('adrenaline')) rg.adren = 1.5 + 0.8 * lv('adrenaline');
   shove(e, 90);
   if (lv('salt')) { const R = 110 + 40 * lv('salt'); for (const o of rg.enemies) if (dist2(o, S.p) < R) shove(o, 150); rg.echoes.push({ r: 0, salt: true }); }
@@ -1839,6 +1898,9 @@ function hurt(e) {
 function killFoe(e) {
   const rg = S.rg;
   e.dead = true; rg.kills++; rg.waveKills++;
+  rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0 });   // it drops to its knees and crumbles
+  for (let i = 0; i < 14 * FOES[e.type].h / 38; i++) rg.embers.push({ x: e.x, y: e.y, z: Math.random() * FOES[e.type].h, vz: 30 + Math.random() * 70, vx: (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, life: 0.5 + Math.random() * 0.8, ember: true });
+  if (e.type === 'tall') { addShake(0.5); hitStop(0.08); } else addShake(e.type === 'brute' ? 0.2 : 0.07);
   ashBurst(e.x, e.y, e.type === 'tall' ? 70 : e.type === 'brute' ? 36 : 22, FOES[e.type].h * 0.8);
   burnPeak(e); playMonDeath(e);
   if (lv('chain')) {
@@ -1894,6 +1956,8 @@ function fireShell(e) {
   rg.shells.push({ x0: e.x, y0: e.y, x: e.x, y: e.y, tx, ty, t: 0, T: BOMB_FLIGHT, apex: 150 + dd * 0.35, trail: [] });
   rg.blasts.push({ x: e.x, y: e.y, t: 0, life: 0.25, r: 70, muzzle: true });
   playMortarLaunch(e, BOMB_FLIGHT);
+  e.kick = 1; shove(e, 5);                // recoil
+  addShake(0.12 * monNear(e, 500));
 }
 function shellHeight(s) { const u = s.t / s.T; return 4 * s.apex * u * (1 - u); }
 function updateShells(dt) {
@@ -1907,6 +1971,7 @@ function updateShells(dt) {
       s.done = true;
       rg.blasts.push({ x: s.tx, y: s.ty, t: 0, life: 0.55, r: 130 });
       ashBurst(s.tx, s.ty, 24, 8); playBlast(s.tx, s.ty);
+      addShake(0.6 * Math.max(0.2, 1 - Math.hypot(p.x - s.tx, p.y - s.ty) / 450));
       if (Math.hypot(p.x - s.tx, p.y - s.ty) < BOMB_R && rg.inv <= 0 && rg.phase === 'fight') hurt({ x: s.tx, y: s.ty });
       const dmg = 1.2 * (1 + 0.09 * (rg.wave - 1));   // enough to finish a shade; shades lured into the ring pay for it
       for (const o of rg.enemies) if (!o.dead && dist2(o, { x: s.tx, y: s.ty }) < BOMB_R + FOES[o.type].w * 0.5) { o.hp -= dmg; o.jit = 1; }
@@ -1935,6 +2000,7 @@ function laserStep(e, sp, d, dt) {
       const t = Math.max(0, Math.min(LASER_LEN, (o.x - e.x) * ux + (o.y - e.y) * uy));
       return Math.hypot(e.x + ux * t - o.x, e.y + uy * t - o.y);
     };
+    S.trauma = Math.max(S.trauma || 0, 0.12 + 0.18 * monNear(e, 500));   // the ground hums while it fires
     if (onBeam(p) < LASER_HIT && rg.inv <= 0 && rg.phase === 'fight') hurt({ x: e.x, y: e.y });
     for (const o of rg.enemies) if (o !== e && !o.dead && onBeam(o) < LASER_HIT + FOES[o.type].w * 0.5) { o.hp -= 1.6 * dt * (1 + 0.09 * (rg.wave - 1)); o.jit = 1; }
     if ((e.st -= dt) <= 0) { e.ai = 'cool'; e.st = 1.8 + Math.random() * 0.8; }
@@ -1957,12 +2023,14 @@ function kamikazeBurst(e) {
   e.dead = true; e.hp = 0; rg.waveKills++;
   rg.blasts.push({ x: e.x, y: e.y, t: 0, life: 0.5, r: 120, col: 'yellow' });
   ashBurst(e.x, e.y, 26, 12); playBlast(e.x, e.y);
+  addShake(0.55 * Math.max(0.2, 1 - Math.hypot(p.x - e.x, p.y - e.y) / 400));
   if (Math.hypot(p.x - e.x, p.y - e.y) < KAMI_R && rg.inv <= 0 && rg.phase === 'fight') hurt({ x: e.x, y: e.y });
   const dmg = 1.2 * (1 + 0.09 * (rg.wave - 1));
   for (const o of rg.enemies) if (!o.dead && dist2(o, e) < KAMI_R + FOES[o.type].w * 0.5) { o.hp -= dmg; o.jit = 1; }
 }
-function chase(e, sp, d, dt) {      // plain walk straight at you, with footsteps
+function chase(e, sp, d, dt) {      // plain walk straight at you, with footsteps; the last few steps are a lunge
   const p = S.p;
+  if (!e.lit && d < 60 && e.type !== 'kamikaze') sp *= 1.7;
   if (sp > 0 && d > 4) {
     const stride = Math.floor(e.phase / Math.PI);
     e.x += (p.x - e.x) / d * sp * dt; e.y += (p.y - e.y) / d * sp * dt; e.phase += dt * sp * 0.25;
@@ -1982,7 +2050,7 @@ function fireFlare() {
 function endWave() {
   const rg = S.rg;
   for (const e of rg.enemies) ashBurst(e.x, e.y, 10, FOES[e.type].h * 0.6);
-  rg.enemies = []; rg.flares = []; rg.shells = []; rg.blasts = [];
+  rg.enemies = []; rg.flares = []; rg.shells = []; rg.blasts = []; rg.embers = [];
   rg.phase = 'dawn'; rg.dawnT = 1.6; S.rounds = rg.wave;
   S.msg = { text: 'Dawn', sub: `Wave ${rg.wave} survived`, t: 0 };
   submitScore('survive', rg.wave);
@@ -2056,6 +2124,21 @@ function updateSurvive(dt) {
     e.hp -= dmg * dt;
     e.dps = e.burning ? e.dps + (dmg - e.dps) * Math.min(1, dt * 6) : dmg; e.burning = dmg > 0;
     e.jit = dmg > 0 ? 1 : Math.max(0, e.jit - dt * 4);
+    // pain: it recoils, thrashes and screams while the light burns it; frozen but cowering in harmless light
+    const painTo = dmg > 0 ? 1 : e.lit ? 0.35 : 0;
+    if (dmg > 0 && (e.scream || 0) <= 0 && (e.pain || 0) < 0.5) { playScream(e); e.scream = 2.2 + Math.random() * 2; }
+    e.scream = (e.scream || 0) - dt;
+    e.pain = (e.pain || 0) + (painTo - (e.pain || 0)) * Math.min(1, dt * (painTo > (e.pain || 0) ? 14 : 4));
+    if (dmg > 0) {
+      if (!(e.type === 'kamikaze' && e.ai === 'fuse')) { e.x -= dx / d * 11 * dt * e.pain; e.y -= dy / d * 11 * dt * e.pain; }   // staggers back from the light
+      const burnt = 1 - Math.max(0, e.hp) / e.maxHp, sc = f.h / 38;
+      if (rg.embers.length < 320 && Math.random() < dt * (16 + 20 * burnt) * sc) rg.embers.push({ x: e.x + (Math.random() - 0.5) * f.w, y: e.y + (Math.random() - 0.5) * f.w, z: Math.random() * f.h * 0.9, vz: 25 + Math.random() * 40, vx: (Math.random() - 0.5) * 20, vy: (Math.random() - 0.5) * 20, life: 0.5 + Math.random() * 0.6, ember: true });
+      if (rg.embers.length < 320 && Math.random() < dt * (7 + 10 * burnt) * sc) rg.embers.push({ x: e.x, y: e.y, z: f.h * (0.5 + Math.random() * 0.5), vz: 18 + Math.random() * 14, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 0.9 + Math.random() * 0.7, r: 2 + Math.random() * 3 });
+    }
+    // reaching for you when close in the dark
+    const reachTo = e.type === 'kamikaze' ? (e.ai === 'run' ? 1 : 0.4) : (!e.lit && d < 140 && !NO_TOUCH[e.type] && !(e.type === 'laser' && e.ai !== 'move')) ? 1 : 0;
+    e.reach = (e.reach || 0) + (reachTo - (e.reach || 0)) * Math.min(1, dt * 6);
+    e.kick = Math.max(0, (e.kick || 0) - dt * 4);
     if (d > 700 && !e.lit) { const at = spawnSpot(); e.x = at.x; e.y = at.y; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
     let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (e.lit) sp *= f.lightSp;
@@ -2069,6 +2152,18 @@ function updateSurvive(dt) {
   }
   updateShells(dt);
   for (const e of rg.enemies) if (e.hp <= 0 && !e.dead) killFoe(e);
+  // heartbeat: something unseen is close
+  let nd = 1e9; for (const e of rg.enemies) if (!e.dead && !e.lit) nd = Math.min(nd, dist2(e, p));
+  rg.beatFx = Math.max(0, rg.beatFx - dt * 2.5);
+  if (nd < 170) {
+    const k = Math.min(1, (170 - nd) / 130);
+    rg.beatT -= dt;
+    if (rg.beatT <= 0) { playHeartbeat(k); rg.beatT = 1.05 - 0.6 * k; rg.beatFx = 0.4 + 0.6 * k; }
+  } else rg.beatT = Math.min(rg.beatT, 0.3);
+  for (const m of rg.embers) { m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt; m.life -= dt; if (m.r) m.r += dt * 5; }
+  rg.embers = rg.embers.filter(m => m.life > 0);
+  for (const g of rg.dying) g.t += dt;
+  rg.dying = rg.dying.filter(g => g.t < 0.8);
   rg.enemies = rg.enemies.filter(e => !e.dead);
   if (rg.phase === 'fight' && rg.toSpawn <= 0 && rg.enemies.length === 0) endWave();
 }
@@ -2157,10 +2252,13 @@ function foeHead(e) {                         // the head on screen, for the eye
 }
 function drawShade(e) {
   const f = FOES[e.type], [sx0, sy] = toScreen(e.x, e.y);
-  const burn = 1 - Math.max(0, e.hp) / e.maxHp, jx = e.jit ? (Math.random() - 0.5) * 3 * Z * (0.4 + burn) : 0, sx = sx0 + jx;
-  const pal = foePalette(burn);
+  const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, fuse = e.type === 'kamikaze' && e.ai === 'fuse';
+  const jx = (e.jit ? (Math.random() - 0.5) * 3 * Z * (0.4 + burn) : 0) + (Math.random() - 0.5) * Z * (4 * pain + (fuse ? 5 : 0)), sx = sx0 + jx;
+  const pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())));   // flickers hotter while it burns
   e.dirFace = foeDir(e);
-  drawQuarry({ x: e.x, y: e.y, dir: e.dirFace, phase: e.phase, state: 'run', t: 0 }, ctx, false, { scale: foeScale(e), jx, pal });
+  const leanAdd = -6 * (e.kick || 0) + (e.type === 'laser' && e.ai === 'fire' ? -2.5 : 0) + (fuse ? -3 : 0);
+  drawQuarry({ x: e.x, y: e.y, dir: e.dirFace, phase: e.phase, state: 'run', t: 0 }, ctx, false,
+    { scale: foeScale(e) * (fuse ? 1 + 0.08 * Math.sin(S.t * 40) : 1), jx, pal, pain, reach: e.reach || 0, leanAdd });
   const h = f.h * Z, w = f.w * Z, fc = e.face || 1;
   ctx.fillStyle = ctx.strokeStyle = pal.near; ctx.lineCap = 'round';
   if (e.type === 'laser' && e.ai !== 'move') {                    // arm raised, pointing down its line of fire
@@ -2269,6 +2367,25 @@ function drawSurviveFx(bx, by, br) {
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gx, hy, 110 * Z, 0, 7); ctx.fill();
     ctx.fillStyle = 'rgba(255,225,200,1)'; ctx.beginPath(); ctx.arc(gx, hy, 3 * Z, 0, 7); ctx.fill();
   }
+  // the dying: dropping to their knees, white-hot, crumbling away
+  for (const g of rg.dying) {
+    const k = g.t / 0.8, sc = FOES[g.type].h / 38;
+    ctx.save(); ctx.globalAlpha = k < 0.45 ? 1 : Math.max(0, 1 - (k - 0.45) / 0.55);
+    drawQuarry({ x: g.x, y: g.y, dir: g.dir, phase: g.phase, state: 'run', t: 0 }, ctx, false,
+      { scale: sc * (1 - 0.15 * k), jx: (Math.random() - 0.5) * 4 * Z * (1 - k), pal: foePalette(1), pain: 1 - k * 0.6, kneel: Math.min(1, k * 2.2) });
+    if (g.t < 0.12) {                        // flash as the light finishes it
+      const [x, y] = toScreen(g.x, g.y), r = 26 * Z * sc, gg = ctx.createRadialGradient(x, y - 18 * Z * sc, 0, x, y - 18 * Z * sc, r);
+      gg.addColorStop(0, `rgba(255,240,210,${0.9 * (1 - g.t / 0.12)})`); gg.addColorStop(1, 'rgba(255,160,60,0)');
+      ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, y - 18 * Z * sc, r, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // smoke and embers coming off whatever is burning
+  for (const m of rg.embers) {
+    const [x, y] = toScreen(m.x, m.y), yy = y - m.z * Z;
+    if (m.ember) { ctx.fillStyle = `rgba(255,${140 + Math.round(80 * Math.min(1, m.life))},60,${Math.min(1, m.life * 1.6)})`; ctx.fillRect(x, yy, 1.8 * Z, 1.8 * Z); }
+    else { ctx.fillStyle = `rgba(60,55,50,${0.28 * Math.min(1, m.life)})`; ctx.beginPath(); ctx.arc(x, yy, m.r * Z, 0, 7); ctx.fill(); }
+  }
   // echo reveals: faint outlines of what is out there
   ctx.save();
   for (const e of rg.enemies) {
@@ -2314,6 +2431,11 @@ function drawSurviveFx(bx, by, br) {
     ctx.closePath(); ctx.fill();
   }
   // hit: the edges bleed red
+  if (rg.beatFx > 0.02 && rg.phase === 'fight') {      // the edges pulse with your heartbeat when something is close
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) / 2);
+    g.addColorStop(0, 'rgba(90,0,0,0)'); g.addColorStop(1, `rgba(90,0,0,${0.3 * rg.beatFx})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
   if (rg.hurtFx > 0) {
     const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) / 2);
     g.addColorStop(0, 'rgba(160,20,20,0)'); g.addColorStop(1, `rgba(160,20,20,${0.55 * rg.hurtFx})`);
@@ -2423,7 +2545,7 @@ function frame(now) {
   const raw = (now - last) / 1000;
   const dt = Math.min(0.05, raw); last = now; frameDt = dt;
   watchSpeed(raw);
-  if (S.running) update(dt); else S.t += dt;
+  if (S.running) { if (S.hitstop > 0) S.hitstop -= raw; else update(dt); } else S.t += dt;
   burnAudio();
   render();
   requestAnimationFrame(frame);
