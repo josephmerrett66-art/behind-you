@@ -100,7 +100,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
     <dl class="modelist">
       <dt>Chase</dt><dd>Stop to search with a fading torch, then run blind for eight seconds while they flee. Two red trails show where they went. Miss them once and they're gone.</dd>
       <dt>Blink</dt><dd>No running. Two seconds of dark, then the torch comes on somewhere new with them hidden nearby. Find them before the light fades.</dd>
-      <dt>Nightfall</dt><dd>Survive waves of shades. They only move in the dark and freeze in your light; hold the beam on them and they burn. Pick an upgrade after every wave.</dd>
+      <dt>Nightfall</dt><dd>Survive waves of shades. They only move in the dark and freeze in your light; hold the beam on them and they burn. Burn every shade to clear the wave; each wave brings more. Pick an upgrade after every wave.</dd>
       <dt>Free roam</dt><dd>No goals. Walk the woods with rabbits, birds and fireflies.</dd>
     </dl>
     <div class="controls">
@@ -1524,7 +1524,7 @@ resumeBtn.addEventListener('click', () => { overlay.hidden = true; menuBtn.hidde
 
 // ================= NIGHTFALL: the roguelike survival mode =================
 // Shades creep toward you in the dark and freeze in any light. Hold the torch on them and they burn.
-// Survive each wave until dawn, then pick an upgrade.
+// Burn every shade in a wave to reach dawn, then pick an upgrade. Each wave sends more.
 
 const RARITY = {
   common: { label: 'Common', w: 62 },
@@ -1563,7 +1563,7 @@ const UPGRADES = [
   { id: 'scar', r: 'common', max: 2, tag: 'Allies', name: 'Scorch Marks', desc: 'Once lit, a shade moves 20% slower for good.' },
   { id: 'wildfire', r: 'legendary', max: 1, tag: 'Allies', name: 'Wildfire', desc: 'Every burst is twice the size, and each kill may launch a flare on its own.' },
   // fate
-  { id: 'dawn', r: 'common', max: 3, tag: 'Fate', name: 'Early Dawn', desc: 'Waves end 3 seconds sooner.' },
+  { id: 'dawn', r: 'common', max: 3, tag: 'Fate', name: 'Early Dawn', desc: 'Every wave sends 10% fewer shades.' },
   { id: 'luck', r: 'common', max: 3, tag: 'Fate', name: 'Rabbit Foot', desc: 'Rare and legendary cards turn up more often.' },
   { id: 'reroll', r: 'common', max: 99, tag: 'Fate', name: 'Loose Change', desc: 'Two more rerolls for future picks.' },
   { id: 'fourth', r: 'rare', max: 2, tag: 'Fate', name: 'Keen Eye', desc: 'See one more card at every pick.' },
@@ -1585,12 +1585,15 @@ function rgRange() { return Math.min(1.35, 0.62 * (1 + 0.15 * lv('throw')) * (lv
 function rgBurn() { return 1.05 * (1 + 0.25 * lv('filament')) * Math.pow(1.8, lv('focus')) * (lv('sun') ? 1.4 : 1) * (lastHeart() ? 2 : 1); }
 function rgSpeed() { return 1.4 * (1 + 0.12 * lv('boots')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
 function rgDarkAlpha() { return 1 - 0.08 * lv('owl'); }
-function rgWaveLen(w) { return Math.max(18, 30 + Math.min(w, 8) * 1.5 - 3 * lv('dawn')); }
+// Wave size: how many shades must burn before dawn. 11, 14, 18, 22, 28 ... 58 at wave 10, 98 at wave 15.
+function rgWaveCount(w) { return Math.max(6, Math.round((8 + 3 * w + 0.2 * w * w) * (1 - 0.1 * lv('dawn')))); }
+function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
+function rgSpawnGap(w) { return Math.max(0.3, 1.1 - 0.05 * w); }      // seconds between spawns
 function haloR() { return lv('halo') ? 55 + 22 * (lv('halo') - 1) : 0; }
 
 function newRun() {
   return { wave: 0, hp: 3, maxHp: 3, kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [],
-    inv: 0, adren: 0, hurtFx: 0, strobeT: 4, strobeFx: 0, echoT: 2, flareT: 5, walked: 0, phase: 'fight', waveT: 0, waveLen: 30, deadT: 0 };
+    inv: 0, adren: 0, hurtFx: 0, strobeT: 4, strobeFx: 0, echoT: 2, flareT: 5, walked: 0, phase: 'fight', waveTotal: 0, waveKills: 0, deadT: 0 };
 }
 function sfx(rate, gain, type, freq, len = 0.25) {
   if (!actx || !stepBuf) return;
@@ -1606,20 +1609,25 @@ function pickFoe() {
   if (w >= 3 && r < 0.42) return 'stalker';
   return 'shade';
 }
+// Vampire Survivors style: shades appear on a ring all around you, weighted toward where you are running,
+// so running away never leaves the whole wave stacked up behind you.
+function spawnSpot() {
+  const p = S.p, mv = Math.hypot(p.vx, p.vy);
+  const a = mv > 20 && Math.random() < 0.6 ? Math.atan2(p.vy, p.vx) + (Math.random() - 0.5) * 2.4 : Math.random() * Math.PI * 2;
+  const d = 400 + Math.random() * 160;   // past the end of the beam (RANGE), so nothing pops into existence in the light
+  return { x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d };
+}
 function spawnFoe(type) {
-  const rg = S.rg, behind = Math.random() < 0.65;
-  let a = behind ? S.aimW + Math.PI + (Math.random() - 0.5) * 2.2 : Math.random() * Math.PI * 2;
-  if (Math.abs(angDiff(a, S.aimW)) < HALF + 0.35) a += Math.PI;          // never pop into existence inside the beam
-  const d = 400 + Math.random() * 160, f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
-  rg.enemies.push({ kind: 'shade', type, x: S.p.x + Math.cos(a) * d, y: S.p.y + Math.sin(a) * d, hp, maxHp: hp,
+  const rg = S.rg, at = spawnSpot(), f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
+  rg.enemies.push({ kind: 'shade', type, x: at.x, y: at.y, hp, maxHp: hp,
     beam: 0, lit: false, after: 0, scarred: false, blink: Math.random() * 4, jit: 0, reveal: 0, fly: 0, flare: 0, phase: Math.random() * 6, face: 1 });
 }
 function startWave() {
   const rg = S.rg;
-  rg.wave++; rg.waveLen = rgWaveLen(rg.wave); rg.waveT = rg.waveLen; rg.phase = 'fight';
-  rg.toSpawn = 7 + rg.wave * 4; rg.spawnGap = rg.waveLen * 0.82 / rg.toSpawn; rg.spawnT = 0.8;
+  rg.wave++; rg.phase = 'fight'; rg.waveKills = 0;
+  rg.waveTotal = rg.toSpawn = rgWaveCount(rg.wave); rg.spawnGap = rgSpawnGap(rg.wave); rg.spawnT = 0.8;
   if (lv('wind')) rg.hp = Math.min(rg.maxHp, rg.hp + 1);
-  if (rg.wave % 5 === 0) { spawnFoe('tall'); S.msg = { text: 'Wave ' + rg.wave, sub: 'Something tall is coming', t: 0 }; }
+  if (rg.wave % 5 === 0) { spawnFoe('tall'); rg.waveTotal++; S.msg = { text: 'Wave ' + rg.wave, sub: 'Something tall is coming', t: 0 }; }
   else S.msg = { text: 'Wave ' + rg.wave, t: 0 };
 }
 function ashBurst(x, y, n, hgt = 20) {
@@ -1640,7 +1648,7 @@ function hurt(e) {
 }
 function killFoe(e) {
   const rg = S.rg;
-  e.dead = true; rg.kills++;
+  e.dead = true; rg.kills++; rg.waveKills++;
   ashBurst(e.x, e.y, e.type === 'tall' ? 70 : e.type === 'brute' ? 36 : 22, FOES[e.type].h * 0.8);
   sfx(2.2 + Math.random() * 0.6, 0.35, 'highpass', 1400, 0.18);
   if (lv('chain')) {
@@ -1682,10 +1690,10 @@ function updateSurvive(dt) {
   if (rg.phase === 'dead') { rg.deadT += dt; if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
   if (rg.phase === 'dawn') { rg.dawnT -= dt; if (rg.dawnT <= 0) openPicker(); return; }
   if (rg.phase !== 'fight') return;
-  rg.waveT -= dt; rg.inv -= dt; rg.adren -= dt;
+  rg.inv -= dt; rg.adren -= dt;
 
   rg.spawnT -= dt;
-  if (rg.toSpawn > 0 && rg.spawnT <= 0) {
+  if (rg.toSpawn > 0 && rg.spawnT <= 0 && rg.enemies.length < rgMaxAlive(rg.wave)) {
     const n = rg.wave > 6 && Math.random() < 0.3 ? 2 : 1;
     for (let i = 0; i < n && rg.toSpawn > 0; i++, rg.toSpawn--) spawnFoe(pickFoe());
     rg.spawnT = rg.spawnGap * (0.6 + Math.random() * 0.8);
@@ -1734,6 +1742,7 @@ function updateSurvive(dt) {
     if (e.fly) dmg += 1.5;
     e.hp -= dmg * dt;
     e.jit = dmg > 0 ? 1 : Math.max(0, e.jit - dt * 4);
+    if (d > 700 && !e.lit) { const at = spawnSpot(); e.x = at.x; e.y = at.y; continue; }   // left far behind: bring it back around you
     let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (e.lit) sp *= f.lightSp;
     if (sp > 0 && d > 4) {
@@ -1748,7 +1757,7 @@ function updateSurvive(dt) {
   }
   for (const e of rg.enemies) if (e.hp <= 0 && !e.dead) killFoe(e);
   rg.enemies = rg.enemies.filter(e => !e.dead);
-  if (rg.phase === 'fight' && rg.waveT <= 0) endWave();
+  if (rg.phase === 'fight' && rg.toSpawn <= 0 && rg.enemies.length === 0) endWave();
 }
 function fireflyPositions() {
   const n = 2 * lv('fireflies'), out = [];
@@ -1912,7 +1921,9 @@ function drawSurviveHud(top) {
   ctx.fillStyle = 'rgba(239,239,234,0.4)';
   ctx.fillText(`${rg.kills} BURNED · BEST ${bests.survive || 0}`, 16, 54 + top);
   if (rg.phase === 'fight') {
-    const w = 120, f = Math.max(0, rg.waveT / rg.waveLen);
+    const w = 120, left = Math.max(0, rg.waveTotal - rg.waveKills), f = rg.waveTotal ? left / rg.waveTotal : 0;
+    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(239,239,234,0.55)';
+    ctx.fillText(`${left} LEFT`, W / 2, 16 + top); ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(239,239,234,0.15)'; ctx.fillRect(W / 2 - w / 2, 34 + top, w, 3);
     ctx.fillStyle = 'rgba(239,239,234,0.55)'; ctx.fillRect(W / 2 - w / 2, 34 + top, w * f, 3);
   }
