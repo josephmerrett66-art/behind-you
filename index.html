@@ -490,7 +490,7 @@ const MON_WAV = {
 const mon = {};
 const BURN_PEAK = 0.42;       // seconds into the burn recording where it hits full force: the shade dies right there
 const BURN_MAX = 6, GRAIN = 0.09, HOP = 0.045;   // at most 6 burning at once are heard; the hiss is stretched from overlapping grains
-const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05 };   // bigger things sound lower
+const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05, laser: 0.95, kamikaze: 1.3 };   // bigger things sound lower
 const burnVoices = new Set(), monLast = { death: 0, small: 0 };
 let hann = null;
 function monOut(x, y, gain) {       // a gain node panned toward where the monster is on screen
@@ -600,6 +600,37 @@ function playMortarLaunch(e, flight) {
   o.type = 'sine'; o.frequency.setValueAtTime(1500, w0); o.frequency.exponentialRampToValueAtTime(620, w1);
   g.gain.setValueAtTime(0, t); g.gain.setValueAtTime(0.001, w0); g.gain.exponentialRampToValueAtTime(0.07, w1 - 0.05); g.gain.linearRampToValueAtTime(0, w1);
   o.connect(g); g.connect(sfxGain); o.start(w0); o.stop(w1 + 0.02);
+}
+function playLaserCharge(e, len) {          // a rising whine while the aim dots flash
+  if (!actx) return;
+  const t = actx.currentTime, out = monOut(e.x, e.y, 0.12 + 0.18 * monNear(e, 600));
+  const o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(900, t + len);
+  lp.type = 'lowpass'; lp.frequency.value = 1400;
+  g.gain.setValueAtTime(0.001, t); g.gain.exponentialRampToValueAtTime(0.5, t + len); g.gain.linearRampToValueAtTime(0, t + len + 0.03);
+  o.connect(lp); lp.connect(g); g.connect(out); o.start(t); o.stop(t + len + 0.05);
+  e.chargeSnd = o;
+}
+function playLaserFire(e, len) {            // a harsh electric buzz for as long as the beam lasts
+  if (!actx || !noiseBuf) return;
+  const t = actx.currentTime, out = monOut(e.x, e.y, 0.25 + 0.35 * monNear(e, 600));
+  for (const f of [110, 221]) {
+    const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sawtooth'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.25, t); g.gain.setValueAtTime(0.25, t + len - 0.08); g.gain.linearRampToValueAtTime(0, t + len);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + len + 0.02);
+  }
+  const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 1.5;
+  const g = actx.createGain(); g.gain.setValueAtTime(0.35, t); g.gain.linearRampToValueAtTime(0, t + len);
+  src.connect(bp); bp.connect(g); g.connect(out); src.start(t); src.stop(t + len + 0.02);
+}
+function playFuse(e, len) {                 // the kamikaze's fizzing fuse
+  if (!actx || !noiseBuf) return;
+  const t = actx.currentTime, out = monOut(e.x, e.y, 0.3 + 0.4 * monNear(e, 500));
+  const src = actx.createBufferSource(); src.buffer = noiseBuf;
+  const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(3000, t); hp.frequency.linearRampToValueAtTime(6000, t + len);
+  const g = actx.createGain(); g.gain.setValueAtTime(0.15, t); g.gain.linearRampToValueAtTime(0.5, t + len);
+  src.connect(hp); hp.connect(g); g.connect(out); src.start(t, Math.random() * 0.3); src.stop(t + len);
 }
 function playBlast(x, y) {
   if (!actx || !noiseBuf) return;
@@ -1711,6 +1742,8 @@ const FOES = {
   brute:   { hp: 3.2,  sp: 24, lightSp: 0.35, h: 48, w: 20 },
   tall:    { hp: 12,   sp: 28, lightSp: 0.25, h: 80, w: 14 },
   bomber:  { hp: 1.6,  sp: 40, lightSp: 0,    h: 32, w: 16 },
+  laser:   { hp: 1.3,  sp: 34, lightSp: 0,    h: 40, w: 11 },
+  kamikaze:{ hp: 0.5,  sp: 84, lightSp: 0,    h: 26, w: 11 },
 };
 
 const lv = id => (S.rg && S.rg.up[id]) || 0;
@@ -1721,8 +1754,8 @@ function rgRange() { return Math.min(1.35, 0.62 * (1 + 0.15 * lv('throw')) * (lv
 function rgBurn() { return 1.05 * (1 + 0.25 * lv('filament')) * Math.pow(1.8, lv('focus')) * (lv('sun') ? 1.4 : 1) * (lastHeart() ? 2 : 1); }
 function rgSpeed() { return 1.4 * (1 + 0.12 * lv('boots')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
 function rgDarkAlpha() { return 1 - 0.08 * lv('owl'); }
-// Wave size: how many shades must burn before dawn. 11, 14, 18, 22, 28 ... 58 at wave 10, 98 at wave 15.
-function rgWaveCount(w) { return Math.max(6, Math.round((8 + 3 * w + 0.2 * w * w) * (1 - 0.1 * lv('dawn')))); }
+// Wave size: how many shades must burn before dawn. 11, 14, 17, 21, 25 ... 50 at wave 10, 83 at wave 15.
+function rgWaveCount(w) { return Math.max(6, Math.round((8 + 2.6 * w + 0.16 * w * w) * (1 - 0.1 * lv('dawn')))); }
 function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
 function rgSpawnGap(w) { return Math.max(0.3, 1.1 - 0.05 * w); }      // seconds between spawns
 function haloR() { return lv('halo') ? 55 + 22 * (lv('halo') - 1) : 0; }
@@ -1741,17 +1774,21 @@ function sfx(rate, gain, type, freq, len = 0.25) {
 }
 // What can spawn, from which wave, how often (weights), and how many of it may be out at once.
 // A new enemy type is one more row here (plus its look and, if it needs one, its own behaviour).
+// Plain shades thin out wave by wave so the mix gets more varied, not just bigger.
 const SPAWNS = [
-  { type: 'shade',   from: 1, weight: 58 },
-  { type: 'stalker', from: 3, weight: 36 },
-  { type: 'bomber',  from: 4, weight: 12, max: w => Math.min(4, 2 + Math.floor((w - 4) / 4)) },
-  { type: 'brute',   from: 5, weight: 18 },
+  { type: 'shade',    from: 1, weight: w => Math.max(16, 64 - 6 * w) },
+  { type: 'kamikaze', from: 2, weight: 12, max: w => 2 + Math.floor(w / 3) },
+  { type: 'stalker',  from: 3, weight: 15 },
+  { type: 'bomber',   from: 3, weight: 15, max: w => Math.min(6, 2 + Math.floor((w - 3) / 2)) },
+  { type: 'laser',    from: 4, weight: 14, max: w => Math.min(6, 2 + Math.floor((w - 4) / 2)) },
+  { type: 'brute',    from: 5, weight: 10 },
 ];
+const spawnWeight = (s, w) => typeof s.weight === 'function' ? s.weight(w) : s.weight;
 function pickFoe() {
   const w = S.rg.wave;
   const ok = SPAWNS.filter(s => w >= s.from && (!s.max || S.rg.enemies.filter(e => e.type === s.type).length < s.max(w)));
-  let r = Math.random() * ok.reduce((a, s) => a + s.weight, 0);
-  for (const s of ok) if ((r -= s.weight) < 0) return s.type;
+  let r = Math.random() * ok.reduce((a, s) => a + spawnWeight(s, w), 0);
+  for (const s of ok) if ((r -= spawnWeight(s, w)) < 0) return s.type;
   return 'shade';
 }
 // Vampire Survivors style: shades appear on a ring all around you, weighted toward where you are running,
@@ -1766,7 +1803,10 @@ function spawnFoe(type) {
   const rg = S.rg, at = spawnSpot(), f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
   rg.enemies.push({ kind: 'shade', type, x: at.x, y: at.y, hp, maxHp: hp,
     beam: 0, lit: false, after: 0, scarred: false, blink: Math.random() * 4, jit: 0, reveal: 0, fly: 0, flare: 0, phase: Math.random() * 6, face: 1 });
-  if (type === 'bomber') bomberReset(rg.enemies[rg.enemies.length - 1]);
+  const e = rg.enemies[rg.enemies.length - 1];
+  if (type === 'bomber') bomberReset(e);
+  if (type === 'laser') { e.ai = 'move'; e.st = 0; e.want = 170 + Math.random() * 60; }
+  if (type === 'kamikaze') e.ai = 'run';
 }
 function startWave() {
   const rg = S.rg;
@@ -1774,7 +1814,9 @@ function startWave() {
   rg.waveTotal = rg.toSpawn = rgWaveCount(rg.wave); rg.spawnGap = rgSpawnGap(rg.wave); rg.spawnT = 0.8;
   if (lv('wind')) rg.hp = Math.min(rg.maxHp, rg.hp + 1);
   if (rg.wave % 5 === 0) { spawnFoe('tall'); rg.waveTotal++; S.msg = { text: 'Wave ' + rg.wave, sub: 'Something tall is coming', t: 0 }; }
-  else if (rg.wave === 4) S.msg = { text: 'Wave 4', sub: 'Watch the sky for red', t: 0 };
+  else if (rg.wave === 2) S.msg = { text: 'Wave 2', sub: 'The yellow ones burst', t: 0 };
+  else if (rg.wave === 3) S.msg = { text: 'Wave 3', sub: 'Watch the sky for red', t: 0 };
+  else if (rg.wave === 4) S.msg = { text: 'Wave 4', sub: 'When blue dots flash, move', t: 0 };
   else S.msg = { text: 'Wave ' + rg.wave, t: 0 };
 }
 function ashBurst(x, y, n, hgt = 20) {
@@ -1873,6 +1915,62 @@ function updateShells(dt) {
   for (const b of rg.blasts) b.t += dt;
   rg.blasts = rg.blasts.filter(b => b.t < b.life);
 }
+// ---- the laser: walks in, stops, flashes a dotted line where it's aiming, then fires a blue beam down it for a second ----
+const LASER_AIM = 1.1, LASER_FIRE = 1.0, LASER_LEN = 460, LASER_HIT = 11;
+function laserStep(e, sp, d, dt) {
+  const p = S.p, rg = S.rg;
+  if (e.ai === 'move') {
+    if (d > e.want) chase(e, sp, d, dt);
+    else if (!e.lit) { e.ai = 'aim'; e.st = LASER_AIM; e.dir = Math.atan2(p.y - e.y, p.x - e.x); playLaserCharge(e, LASER_AIM); }
+    return;
+  }
+  if (e.ai === 'aim') {
+    if (e.lit) { e.ai = 'cool'; e.st = 0.8; if (e.chargeSnd) try { e.chargeSnd.stop(); } catch (err) {} return; }   // light on it spoils the shot
+    if ((e.st -= dt) <= 0) { e.ai = 'fire'; e.st = LASER_FIRE; playLaserFire(e, LASER_FIRE); }
+    return;
+  }
+  if (e.ai === 'fire') {            // committed: the beam runs its full second whatever happens
+    const ux = Math.cos(e.dir), uy = Math.sin(e.dir), onBeam = o => {
+      const t = Math.max(0, Math.min(LASER_LEN, (o.x - e.x) * ux + (o.y - e.y) * uy));
+      return Math.hypot(e.x + ux * t - o.x, e.y + uy * t - o.y);
+    };
+    if (onBeam(p) < LASER_HIT && rg.inv <= 0 && rg.phase === 'fight') hurt({ x: e.x, y: e.y });
+    for (const o of rg.enemies) if (o !== e && !o.dead && onBeam(o) < LASER_HIT + FOES[o.type].w * 0.5) { o.hp -= 1.6 * dt * (1 + 0.09 * (rg.wave - 1)); o.jit = 1; }
+    if ((e.st -= dt) <= 0) { e.ai = 'cool'; e.st = 1.8 + Math.random() * 0.8; }
+    return;
+  }
+  if ((e.st -= dt) <= 0) e.ai = 'move';   // cooling down
+}
+// ---- the kamikaze: sprints at you, stops, fizzes, and bursts in yellow ----
+const KAMI_FUSE = 0.5, KAMI_R = 62;
+function kamikazeStep(e, sp, d, dt) {
+  if (e.ai === 'run') {
+    if (d < 42 && !e.lit) { e.ai = 'fuse'; e.st = KAMI_FUSE; playFuse(e, KAMI_FUSE); }
+    else chase(e, sp, d, dt);
+    return;
+  }
+  if ((e.st -= dt) <= 0) kamikazeBurst(e);   // once lit, the fuse can't be stopped
+}
+function kamikazeBurst(e) {
+  const rg = S.rg, p = S.p;
+  e.dead = true; e.hp = 0; rg.waveKills++;
+  rg.blasts.push({ x: e.x, y: e.y, t: 0, life: 0.5, r: 120, col: 'yellow' });
+  ashBurst(e.x, e.y, 26, 12); playBlast(e.x, e.y);
+  if (Math.hypot(p.x - e.x, p.y - e.y) < KAMI_R && rg.inv <= 0 && rg.phase === 'fight') hurt({ x: e.x, y: e.y });
+  const dmg = 1.2 * (1 + 0.09 * (rg.wave - 1));
+  for (const o of rg.enemies) if (!o.dead && dist2(o, e) < KAMI_R + FOES[o.type].w * 0.5) { o.hp -= dmg; o.jit = 1; }
+}
+function chase(e, sp, d, dt) {      // plain walk straight at you, with footsteps
+  const p = S.p;
+  if (sp > 0 && d > 4) {
+    const stride = Math.floor(e.phase / Math.PI);
+    e.x += (p.x - e.x) / d * sp * dt; e.y += (p.y - e.y) / d * sp * dt; e.phase += dt * sp * 0.25;
+    if (Math.floor(e.phase / Math.PI) > stride) playMonStep(e);
+  }
+  const [sx0] = toScreen(e.x, e.y), [sx1] = toScreen(p.x, p.y); e.face = sx1 > sx0 ? 1 : -1;
+}
+const FOE_AI = { bomber: bomberStep, laser: laserStep, kamikaze: kamikazeStep };
+const NO_TOUCH = { bomber: 1, kamikaze: 1 };   // these hurt you their own way, not by touch
 function fireFlare() {
   const rg = S.rg; let best = null, bd = 1e9;
   for (const e of rg.enemies) { if (e.dead) continue; const d = dist2(e, S.p) + (e.lit ? 600 : 0); if (d < bd) { bd = d; best = e; } }
@@ -1957,21 +2055,16 @@ function updateSurvive(dt) {
     e.hp -= dmg * dt;
     e.dps = e.burning ? e.dps + (dmg - e.dps) * Math.min(1, dt * 6) : dmg; e.burning = dmg > 0;
     e.jit = dmg > 0 ? 1 : Math.max(0, e.jit - dt * 4);
-    if (d > 700 && !e.lit) { const at = spawnSpot(); e.x = at.x; e.y = at.y; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } continue; }   // left far behind: bring it back around you
+    if (d > 700 && !e.lit) { const at = spawnSpot(); e.x = at.x; e.y = at.y; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
     let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (e.lit) sp *= f.lightSp;
-    if (e.type === 'bomber') bomberStep(e, sp, d, dt);
-    else if (sp > 0 && d > 4) {
-      const stride = Math.floor(e.phase / Math.PI);
-      e.x += dx / d * sp * dt; e.y += dy / d * sp * dt; e.phase += dt * sp * 0.25;
-      if (Math.floor(e.phase / Math.PI) > stride) playMonStep(e);
-      const [sx0] = toScreen(e.x, e.y), [sx1] = toScreen(p.x, p.y); e.face = sx1 > sx0 ? 1 : -1;
-    }
+    if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
+    else chase(e, sp, d, dt);
     for (const o of propsNear(e.x, e.y, 40)) {
       const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy), min = o.r * o.s + f.w * 0.5;
       if (od < min && od > 0) { e.x = o.x + ox / od * min; e.y = o.y + oy / od * min; }
     }
-    if (e.type !== 'bomber' && d < 14 + f.w * 0.45 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
+    if (!NO_TOUCH[e.type] && !e.dead && d < 14 + f.w * 0.45 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
   }
   updateShells(dt);
   for (const e of rg.enemies) if (e.hp <= 0 && !e.dead) killFoe(e);
@@ -2012,6 +2105,13 @@ function cutSurviveLights(bx, by, br) {
   for (const f of fireflyPositions()) hole(f.x, f.y, 20, 0.6 * f.on);
   for (const s of rg.shells) hole(s.x, s.y, 70, 0.35 + 0.35 * (1 - shellHeight(s) / s.apex));   // the shell lights the ground under it as it passes
   for (const b of rg.blasts) hole(b.x, b.y, b.r, 0.95 * (1 - b.t / b.life));
+  for (const e of rg.enemies) {
+    if (e.type === 'laser' && e.ai === 'fire') {    // the beam lights the ground it crosses
+      const ux = Math.cos(e.dir), uy = Math.sin(e.dir);
+      for (let t = 20; t < LASER_LEN; t += 55) hole(e.x + ux * t, e.y + uy * t, 42, 0.55);
+    }
+    if (e.type === 'kamikaze' && e.ai === 'fuse') hole(e.x, e.y, 45, 0.5 + 0.3 * Math.sin(S.t * 40));
+  }
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 function surviveLight(bx, by, br, casters, lx, ly) {
@@ -2035,6 +2135,8 @@ function surviveLight(bx, by, br, casters, lx, ly) {
     e.beam = k;
   }
 }
+const HUNCH = { stalker: 0.35, bomber: 0.2, kamikaze: 0.45 };
+const EYES = { tall: '210,40,40', laser: '90,170,255', kamikaze: '255,215,60' };   // each kind has its colour
 function drawShade(e) {
   const f = FOES[e.type], [sx0, sy] = toScreen(e.x, e.y);
   const burn = 1 - Math.max(0, e.hp) / e.maxHp;
@@ -2047,7 +2149,7 @@ function drawShade(e) {
   ctx.moveTo(sx - w * 0.25, sy - h * 0.35); ctx.lineTo(sx - w * 0.32 + sway, sy);
   ctx.moveTo(sx + w * 0.25, sy - h * 0.35); ctx.lineTo(sx + w * 0.32 - sway, sy);
   ctx.stroke();
-  const hunch = e.type === 'stalker' ? fc * w * 0.35 : e.type === 'bomber' ? fc * w * 0.2 : 0;
+  const hunch = HUNCH[e.type] ? fc * w * HUNCH[e.type] : 0;
   ctx.beginPath();
   ctx.moveTo(sx - w * 0.55, sy - h * 0.3);
   ctx.quadraticCurveTo(sx - w * 0.75 + hunch, sy - h * 0.72, sx - w * 0.18 + hunch, sy - h * 0.88);
@@ -2062,6 +2164,11 @@ function drawShade(e) {
     ctx.moveTo(sx - w * 0.5, sy - h * 0.8); ctx.quadraticCurveTo(sx - w * 0.95, sy - h * 0.45, sx - w * 0.7 - sway, sy - h * reach);
     ctx.moveTo(sx + w * 0.5, sy - h * 0.8); ctx.quadraticCurveTo(sx + w * 0.95, sy - h * 0.45, sx + w * 0.7 + sway, sy - h * reach);
     ctx.stroke();
+  }
+  if (e.type === 'laser' && e.ai !== 'move') {                    // arm raised, pointing down its line of fire
+    const [ax, ay] = toScreen(e.x + Math.cos(e.dir) * 30, e.y + Math.sin(e.dir) * 30), cy = sy - h * 0.65, dl = Math.hypot(ax - sx, ay - sy) || 1;
+    ctx.lineWidth = Math.max(1.5, w * 0.22);
+    ctx.beginPath(); ctx.moveTo(sx, cy); ctx.lineTo(sx + (ax - sx) / dl * w * 1.4, cy + (ay - sy) / dl * w * 1.4); ctx.stroke();
   }
   if (e.type === 'bomber') {                                        // the mortar tube: slung on its back, or planted in front of it
     const k = e.tube || 0, [b, m] = mortarEnds(e, sx, sy, w, h, fc);
@@ -2084,8 +2191,8 @@ function drawSurviveFx(bx, by, br) {
     let a = lv('dread') ? 0.9 : Math.pow(Math.max(0, 1 - d / 240), 1.3) * 0.95;
     if (e.lit) a = 1;
     if (e.blink < 0 || a < 0.02) continue;
-    const [sx, sy0] = toScreen(e.x, e.y), hy = sy0 - f.h * 0.93 * Z, gap = f.w * 0.13 * Z + 1.2, ox = (e.face || 1) * f.w * 0.08 * Z + (e.type === 'stalker' ? (e.face || 1) * f.w * 0.35 * Z : e.type === 'bomber' ? (e.face || 1) * f.w * 0.2 * Z : 0);
-    ctx.fillStyle = e.type === 'tall' ? `rgba(210,40,40,${a})` : `rgba(239,239,234,${a})`;
+    const [sx, sy0] = toScreen(e.x, e.y), hy = sy0 - f.h * 0.93 * Z, gap = f.w * 0.13 * Z + 1.2, ox = (e.face || 1) * f.w * (0.08 + (HUNCH[e.type] || 0)) * Z;
+    ctx.fillStyle = `rgba(${EYES[e.type] || '239,239,234'},${a})`;
     const r = (e.type === 'tall' ? 1.8 : 1.3) * Z;
     ctx.beginPath(); ctx.arc(sx + ox - gap, hy, r, 0, 7); ctx.arc(sx + ox + gap, hy, r, 0, 7); ctx.fill();
   }
@@ -2097,6 +2204,37 @@ function drawSurviveFx(bx, by, br) {
     const g = ctx.createRadialGradient(m[0], m[1], 0, m[0], m[1], 7 * Z);
     g.addColorStop(0, `rgba(255,90,50,${a})`); g.addColorStop(1, 'rgba(255,60,30,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(m[0], m[1], 7 * Z, 0, 7); ctx.fill();
+  }
+  // lasers: flashing blue dots down the line while it charges, then the beam itself
+  for (const e of rg.enemies) {
+    if (e.type !== 'laser' || (e.ai !== 'aim' && e.ai !== 'fire')) continue;
+    const ux = Math.cos(e.dir), uy = Math.sin(e.dir), lift = FOES.laser.h * 0.65 * Z;
+    if (e.ai === 'aim') {
+      const k = 1 - e.st / LASER_AIM, on = Math.sin(S.t * (14 + 20 * k)) > -0.2;
+      if (!on) continue;
+      for (let t = 18; t < LASER_LEN; t += 18) {
+        const [x, y] = toScreen(e.x + ux * t, e.y + uy * t);
+        ctx.fillStyle = `rgba(60,140,255,${0.2 + 0.25 * k})`; ctx.beginPath(); ctx.arc(x, y - lift, (4 + 3 * k) * Z, 0, 7); ctx.fill();
+        ctx.fillStyle = `rgba(170,215,255,${0.6 + 0.4 * k})`; ctx.beginPath(); ctx.arc(x, y - lift, (1.8 + 1.2 * k) * Z, 0, 7); ctx.fill();
+      }
+    } else {
+      const [x0, y0] = toScreen(e.x + ux * 8, e.y + uy * 8), [x1, y1] = toScreen(e.x + ux * LASER_LEN, e.y + uy * LASER_LEN);
+      const fl = 0.85 + 0.15 * Math.random(), fade = Math.min(1, e.st / 0.15);
+      ctx.save(); ctx.lineCap = 'round';
+      for (const [wd, col] of [[16, `rgba(40,110,255,${0.18 * fade})`], [7, `rgba(80,160,255,${0.6 * fade * fl})`], [2.5, `rgba(225,240,255,${fade})`]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = wd * Z; ctx.beginPath(); ctx.moveTo(x0, y0 - lift); ctx.lineTo(x1, y1 - lift); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  // kamikazes: a yellow glow in the chest, flaring as the fuse burns
+  for (const e of rg.enemies) {
+    if (e.type !== 'kamikaze') continue;
+    const [x, y0] = toScreen(e.x, e.y), y = y0 - FOES.kamikaze.h * 0.5 * Z, fuse = e.ai === 'fuse';
+    const a = fuse ? 0.6 + 0.4 * Math.sin(S.t * 45) : 0.22 + 0.08 * Math.sin(S.t * 6 + e.phase), r = (fuse ? 16 : 7) * Z;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(255,235,120,${a})`); g.addColorStop(1, 'rgba(255,200,40,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
   }
   // landing zones: a red ring on the ground that fills in as the shell comes down
   ctx.save(); worldMatrix(ctx, DPR);
@@ -2112,7 +2250,8 @@ function drawSurviveFx(bx, by, br) {
   for (const b of rg.blasts) {
     const [x, y] = toScreen(b.x, b.y), k = 1 - b.t / b.life, r = b.r * Z * (b.muzzle ? 0.5 : 0.6 + 0.4 * (b.t / b.life));
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(255,${b.muzzle ? 120 : 170},90,${0.8 * k})`); g.addColorStop(0.4, `rgba(230,50,25,${0.45 * k})`); g.addColorStop(1, 'rgba(200,20,10,0)');
+    if (b.col === 'yellow') { g.addColorStop(0, `rgba(255,250,200,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,210,40,${0.55 * k})`); g.addColorStop(1, 'rgba(240,170,0,0)'); }
+    else { g.addColorStop(0, `rgba(255,${b.muzzle ? 120 : 170},90,${0.8 * k})`); g.addColorStop(0.4, `rgba(230,50,25,${0.45 * k})`); g.addColorStop(1, 'rgba(200,20,10,0)'); }
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
   }
   // shells in the air: a red glow that lights up the sky round it, and an ember trail
