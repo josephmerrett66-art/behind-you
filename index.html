@@ -15,6 +15,7 @@
   --ash: #8a8a8a;
   --bone: #efefea;
   --smoke: rgba(5,5,5,0.82);
+  --blood: #c42a2a;
   --display: "Major Mono Display", "Courier New", monospace;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   color-scheme: dark;
@@ -52,6 +53,24 @@ p.small { font-size: 0.82rem; }
 #boardList li .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #boardList li.me { color: var(--bone); }
 #boardList li .sc { color: var(--bone); }
+#picker { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding-inline: 16px; padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); background: rgba(5,5,5,0.88); }
+.pick { margin-block: auto; width: 100%; max-width: 46rem; display: grid; gap: 1rem; }
+.pick h2 { margin: 0; font: 400 clamp(1.8rem, 7vw, 2.6rem) var(--display); }
+.eyebrow { margin: 0; text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem; color: var(--ash); }
+#cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.75rem; }
+.card-up { all: unset; box-sizing: border-box; cursor: pointer; display: grid; align-content: start; gap: 0.55rem; padding: 1rem; min-height: 10.5rem; border: 1px solid rgba(138,138,138,0.4); background: rgba(22,22,21,0.95); font-family: var(--mono); color: var(--bone); transition: transform 0.12s, border-color 0.12s; }
+.card-up:hover, .card-up:focus-visible { border-color: var(--bone); transform: translateY(-2px); outline: none; }
+.card-up .rar { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); }
+.card-up .nm { font: 400 1.12rem/1.2 var(--display); }
+.card-up .ds { font-size: 0.82rem; line-height: 1.45; color: var(--ash); }
+.card-up .lv { font-size: 0.68rem; letter-spacing: 0.06em; color: rgba(138,138,138,0.8); }
+.card-up.rare { border-color: rgba(239,239,234,0.75); background: rgba(34,34,32,0.95); }
+.card-up.rare .rar span:first-child { color: var(--bone); }
+.card-up.legendary { border-color: var(--blood); box-shadow: inset 0 0 0 1px var(--blood), 0 0 28px rgba(196,42,42,0.28); }
+.card-up.legendary .rar span:first-child { color: #e05050; }
+.pickfoot { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.pickfoot p { margin: 0; flex: 1 1 14rem; min-width: 0; }
+#reroll:disabled { opacity: 0.35; cursor: default; }
 button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 </style>
 
@@ -59,6 +78,14 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 <button id="torch" hidden aria-pressed="true">Torch</button>
 <button id="sound" hidden>Sound on</button>
 <button id="menu" hidden>Menu</button>
+<div id="picker" hidden>
+  <div class="pick">
+    <p class="eyebrow" id="pickEyebrow"></p>
+    <h2>Choose one</h2>
+    <div id="cards"></div>
+    <div class="pickfoot"><button id="reroll" class="alt">Reroll</button><p id="owned" class="small"></p></div>
+  </div>
+</div>
 <div id="overlay">
   <div class="card">
     <h1>behind you</h1>
@@ -68,11 +95,13 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
       <button id="start" class="alt">Chase</button>
       <button id="start2" class="alt">Blink</button>
       <button id="start3" class="alt">Free roam</button>
+      <button id="start4" class="alt">Nightfall</button>
     </div>
     <dl class="modelist">
       <dt>Chase</dt><dd>Stop to search with a fading torch, then run blind for eight seconds while they flee. Two red trails show where they went. Miss them once and they're gone.</dd>
       <dt>Blink</dt><dd>No running. Two seconds of dark, then the torch comes on somewhere new with them hidden nearby. Find them before the light fades.</dd>
-      <dt>Free roam</dt><dd>No goals. Walk the woods with rabbits, birds, campfires and lanterns.</dd>
+      <dt>Nightfall</dt><dd>Survive waves of shades. They only move in the dark and freeze in your light; hold the beam on them and they burn. Pick an upgrade after every wave.</dd>
+      <dt>Free roam</dt><dd>No goals. Walk the woods with rabbits, birds and fireflies.</dd>
     </dl>
     <div class="controls">
       <span>Phone</span><span>Right thumb aims. Left thumb walks, or sets off early in Chase.</span>
@@ -84,6 +113,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
         <div class="tabs" role="group" aria-label="Leaderboard mode">
           <button class="tab" data-mode="chase" aria-pressed="true">Chase</button>
           <button class="tab" data-mode="blink" aria-pressed="false">Blink</button>
+          <button class="tab" data-mode="survive" aria-pressed="false">Nightfall</button>
         </div>
       </div>
       <ol id="boardList"></ol>
@@ -124,7 +154,8 @@ function resize() {
 window.addEventListener('resize', resize); resize();
 
 // ---- tuning ----
-const RANGE = 330, HALF = 0.38, WALK = 46, RUN = 95, ACCEL = 9, T = 48;
+const RANGE = 330, BASE_HALF = 0.38, WALK = 46, RUN = 95, ACCEL = 9, T = 48;
+let HALF = BASE_HALF;   // beam half-width; upgrades change it in Nightfall
 
 let S;
 function reset() {
@@ -179,7 +210,7 @@ function moveInput() {
     if (s.side === 'aim' && m > 12) S.aim = Math.atan2(s.y - s.oy, s.x - s.ox);
   }
   // dash rule: pressing go starts a 4 second run you can't stop; you can still steer with the torch
-  if (S.running && S.mode !== 'free') {            // free roam: plain walking, hold to walk, drag further to run
+  if (S.running && S.mode !== 'free' && S.mode !== 'survive') {            // free roam: plain walking, hold to walk, drag further to run
     if (!go) S.needRelease = false;
     if (S.mode === 'blink') go = false;
     else if (S.dash <= 0 && go && !S.needRelease && !S.over && S.torchLvl > 0.6) { S.needRelease = true; startDash(); }
@@ -188,7 +219,7 @@ function moveInput() {
   if (!go) return [0, 0, 0];
   // equal speed on screen in every direction (the iso view squashes up/down, so the world step is scaled to match)
   const [wx, wy] = screenDirToWorld(Math.cos(S.aim) * K() * 1.1, Math.sin(S.aim) * K() * 1.1);
-  return [wx, wy, speed];
+  return [wx, wy, speed * (S.mode === 'survive' ? rgSpeed() : 1)];
 }
 
 function viewR() { return Math.hypot(W, H * 2) / K() * 0.6; }
@@ -212,8 +243,7 @@ function chunkLights(ci, cj) {
   if (ci || cj) {
     const h = hash(ci * 13.1 + 5, cj * 7.7 - 2);
     const x = ci * C + 80 + hash(ci + 3.3, cj) * (C - 160), y = cj * C + 80 + hash(ci, cj + 8.8) * (C - 160);
-    if (h < 0.2) out.push({ kind: 'fire', x, y, r: 16, s: 1, seed: h * 100 });
-    else if (h < 0.42) out.push({ kind: 'lamp', x, y, r: 5, s: 1, seed: h * 100 });
+    // campfires and lantern posts removed; only fireflies remain
     if (hash(ci - 9, cj + 4) < 0.3) {
       const fx = ci * C + C / 2 + (hash(cj, ci - 1) - 0.5) * C * 0.6, fy = cj * C + C / 2 + (hash(ci + 1, cj - 2) - 0.5) * C * 0.6;
       out.push({ kind: 'flies', x: fx, y: fy, seed: hash(ci, cj) * 50 });
@@ -618,6 +648,7 @@ function updateBlink(dt) {
 }
 function updateRounds(dt) {
   if (!S.mode || S.mode === 'free') return;
+  if (S.mode === 'survive') return updateSurvive(dt);
   if (S.mode === 'blink') {
     if (S.over) {
       S.overT += dt;
@@ -708,7 +739,8 @@ function update(dt) {
 
   { const [wx, wy] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)); S.aimW = Math.atan2(wy, wx); }
   // camera leads toward the torch, so the player sits opposite the beam and the beam gets the screen
-  const [lx, ly] = screenDirToWorld(Math.cos(S.aim) * W * 0.32, Math.sin(S.aim) * H * 0.3);
+  const lead = S.mode === 'survive' ? 0.4 : 1;   // Nightfall keeps you nearer the middle so you can see what is behind you
+  const [lx, ly] = screenDirToWorld(Math.cos(S.aim) * W * 0.32 * lead, Math.sin(S.aim) * H * 0.3 * lead);
   const ck = 1 - Math.exp(-3 * dt);
   S.cam.x += (p.x + lx - S.cam.x) * ck; S.cam.y += (p.y + ly - S.cam.y) * ck;
 
@@ -753,7 +785,7 @@ function update(dt) {
   }
   // trial: the torch only shines while you stand still
   if (screenSpeed(p) > 4) S.stillT = 0; else S.stillT = (S.stillT || 0) + dt;
-  const want = S.mode === 'free' ? S.torchOn : S.mode === 'blink' ? S.torchOn && (S.blinkPhase === 'look' || S.blinkPhase === 'found') : S.torchOn && S.stillT > 0.25;
+  const want = S.mode === 'free' || S.mode === 'survive' ? S.torchOn : S.mode === 'blink' ? S.torchOn && (S.blinkPhase === 'look' || S.blinkPhase === 'found') : S.torchOn && S.stillT > 0.25;
   if (want !== !!S.wasLit) { S.wasLit = want; S.torchOnT = 0; playClick(want); }
   if (want) {
     S.torchOnT += dt;
@@ -1149,7 +1181,7 @@ function drawTargetFlash() {
 
 // how much charge is left this stop: 1 when the light comes on, easing down to 0 as time runs out
 function torchFade() {
-  if (S.mode === 'free' || S.dash > 0 || S.over || !S.lookMax || S.blinkPhase === 'found') return 1;
+  if (S.mode === 'free' || S.mode === 'survive' || S.dash > 0 || S.over || !S.lookMax || S.blinkPhase === 'found') return 1;
   const f = Math.max(0, Math.min(1, S.look / S.lookMax));
   return Math.sqrt(f);          // stays strong for a while, then fades faster near the end
 }
@@ -1157,6 +1189,7 @@ function torchFade() {
 function drawHud() {
   const top = SAFE_TOP;
   if (!S.mode || S.mode === 'free') return;
+  if (S.mode === 'survive') drawSurviveHud(top); else {
   ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(239,239,234,0.7)';
   ctx.fillText(`ROUND ${S.rounds}`, 16, 16 + top);
@@ -1171,6 +1204,7 @@ function drawHud() {
     const w = 120, f = Math.max(0, S.dash / DASH);
     ctx.fillStyle = 'rgba(239,239,234,0.15)'; ctx.fillRect(W / 2 - w / 2, 34 + top, w, 3);
     ctx.fillStyle = 'rgba(239,239,234,0.55)'; ctx.fillRect(W / 2 - w / 2, 34 + top, w * f, 3);
+  }
   }
   if (S.msg) {
     const a = Math.min(1, S.msg.t * 3) * Math.max(0, 1 - Math.max(0, S.msg.t - 1.4) * 1.5);
@@ -1264,14 +1298,15 @@ const litMemo = new Map();
 let frameDt = 1 / 60;
 
 function render() {
+  HALF = S.mode === 'survive' ? rgHalf() : BASE_HALF;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, W, H);
   drawGround();
 
   const lights = lightsNear(S.cam.x, S.cam.y, viewR() + 200);
-  const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : []).map(o => ({ o, k: o.x + o.y }));
+  const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : []).map(o => ({ o, k: o.x + o.y }));
   items.sort((a, b) => a.k - b.k);
-  for (const it of items) it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : drawProp(it.o);
+  for (const it of items) it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
 
@@ -1281,13 +1316,14 @@ function render() {
   dctx.fillStyle = '#050505'; dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
   // beam is drawn in screen space so its width and length never change with direction
-  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * flicker() * (0.2 + 0.8 * torchFade()); // beam starts at the torch lens and reaches most of the way across the screen
+  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * flicker() * (0.2 + 0.8 * torchFade()) * (S.mode === 'survive' ? rgRange() : 1); // beam starts at the torch lens and reaches most of the way across the screen
   let grad = dctx.createRadialGradient(bx, by, 0, bx, by, br);
   grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(0.7, 'rgba(0,0,0,0.9)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
   dctx.fillStyle = grad; dctx.globalAlpha = S.torchLvl * (0.55 + 0.45 * torchFade());
   dctx.beginPath(); dctx.moveTo(bx, by);
   for (let t = -HALF; t <= HALF + 0.001; t += HALF / 16) dctx.lineTo(bx + Math.cos(S.aim + t) * br, by + Math.sin(S.aim + t) * br);
   dctx.closePath(); dctx.fill(); dctx.globalAlpha = 1;
+  if (S.mode === 'survive') cutSurviveLights(bx, by, br);
 
   // shadows: everything behind an obstacle (seen from the torch) goes back to dark
   const lx = S.p.x + Math.cos(S.aimW) * 6, ly = S.p.y + Math.sin(S.aimW) * 6;
@@ -1354,12 +1390,15 @@ function render() {
   }
   applyWorldLights(lights, items);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = S.mode === 'survive' ? rgDarkAlpha() : 1;
   ctx.drawImage(dark, 0, 0);
+  ctx.globalAlpha = 1;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   drawLightGlow(lights);
   drawEyeshine(bx, by, br, casters, lx, ly);
   if (S.q && S.q.lit) { ctx.save(); ctx.globalAlpha = Math.max(0, S.q.fall) * S.torchLvl; drawQuarry(S.q); ctx.restore(); }
   drawPlayer(); // drawn over the dark so the whole figure stays readable
+  if (S.mode === 'survive') { surviveLight(bx, by, br, casters, lx, ly); drawSurviveFx(bx, by, br); }
 
   if (S.q) {                                   // is the creature inside the beam, with nothing in the way?
     const q = S.q, [qx, qy] = toScreen(q.x, q.y), d = Math.hypot(qx - bx, qy - by);
@@ -1407,9 +1446,9 @@ function setSound(on) {
 }
 soundBtn.addEventListener('click', () => setSound(!soundOn));
 // ---- personal bests and the shared leaderboard ----
-const bests = { chase: 0, blink: 0 };
-try { const saved = JSON.parse(localStorage.getItem('behind-you-bests') || '{}'); bests.chase = saved.chase || 0; bests.blink = saved.blink || 0; } catch (e) {}
-let lb = { db: null, user: null, uid: null, rows: { chase: [], blink: [] }, mine: null, canSave: true, tab: 'chase' };
+const bests = { chase: 0, blink: 0, survive: 0 };
+try { const saved = JSON.parse(localStorage.getItem('behind-you-bests') || '{}'); bests.chase = saved.chase || 0; bests.blink = saved.blink || 0; bests.survive = saved.survive || 0; } catch (e) {}
+let lb = { db: null, user: null, uid: null, rows: { chase: [], blink: [], survive: [] }, mine: null, canSave: true, tab: 'chase' };
 async function initBoard() {
   const use = window.claude && window.claude.use;
   if (!use) { renderBoard(); return; }
@@ -1417,14 +1456,14 @@ async function initBoard() {
   lb.db = db; lb.user = user;
   if (user) lb.uid = await user.id();
   if (!db) { renderBoard(); return; }
-  for (const mode of ['chase', 'blink']) {
+  for (const mode of ['chase', 'blink', 'survive']) {
     db.collection('scores').where(mode, '>', 0).orderBy(mode, 'desc').limit(10).onSnapshot(
       snap => { lb.rows[mode] = snap.docs.map(d => ({ id: d.id, score: d.data()[mode] || 0 })); renderBoard(); },
       () => { lb.rows[mode] = []; renderBoard(); });
   }
   if (lb.uid) db.collection('scores').doc(lb.uid).onSnapshot(d => {
     lb.mine = d.exists ? d.data() : null;
-    if (lb.mine) { bests.chase = Math.max(bests.chase, lb.mine.chase || 0); bests.blink = Math.max(bests.blink, lb.mine.blink || 0); }
+    if (lb.mine) { bests.chase = Math.max(bests.chase, lb.mine.chase || 0); bests.blink = Math.max(bests.blink, lb.mine.blink || 0); bests.survive = Math.max(bests.survive, lb.mine.survive || 0); }
     renderBoard();
   }, () => {});
   if (user) { const w = await user.can('data.write'); if (w === false) lb.canSave = false; }
@@ -1457,7 +1496,7 @@ function submitScore(mode, score) {
     try { localStorage.setItem('behind-you-bests', JSON.stringify(bests)); } catch (e) {}
   }
   if (lb.db && lb.uid && lb.canSave && score > ((lb.mine && lb.mine[mode]) || 0)) {
-    const body = { chase: (lb.mine && lb.mine.chase) || 0, blink: (lb.mine && lb.mine.blink) || 0 };
+    const body = { chase: (lb.mine && lb.mine.chase) || 0, blink: (lb.mine && lb.mine.blink) || 0, survive: (lb.mine && lb.mine.survive) || 0 };
     body[mode] = score;
     lb.db.collection('scores').doc(lb.uid).set(body).catch(e => { if (e && e.code === 'invalid_argument') lb.canSave = false; renderBoard(); });
   }
@@ -1473,19 +1512,468 @@ initBoard();
 // ---- menu: pause, switch mode, see scores ----
 const menuBtn = document.getElementById('menu'), resumeBtn = document.getElementById('resume');
 function openMenu() {
-  if (S.mode && S.mode !== 'free' && S.rounds > 0 && !S.over) submitScore(S.mode, S.rounds);   // bank the run so far
+  if (S.mode && S.mode !== 'free' && S.mode !== 'survive' && S.rounds > 0 && !S.over) submitScore(S.mode, S.rounds);   // bank the run so far
   S.running = false; overlay.hidden = false; menuBtn.hidden = true;
-  resumeBtn.hidden = !S.mode; lb.tab = S.mode === 'blink' ? 'blink' : 'chase';
+  resumeBtn.hidden = !S.mode; lb.tab = S.mode === 'blink' || S.mode === 'survive' ? S.mode : 'chase';
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-pressed', t.dataset.mode === lb.tab ? 'true' : 'false'));
   renderBoard();
 }
 menuBtn.addEventListener('click', openMenu);
-addEventListener('keydown', e => { if (e.key === 'Escape' && S.mode) (overlay.hidden ? openMenu() : resumeBtn.click()); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && S.mode && picker.hidden) (overlay.hidden ? openMenu() : resumeBtn.click()); });
 resumeBtn.addEventListener('click', () => { overlay.hidden = true; menuBtn.hidden = false; S.running = true; last = performance.now(); });
+
+// ================= NIGHTFALL: the roguelike survival mode =================
+// Shades creep toward you in the dark and freeze in any light. Hold the torch on them and they burn.
+// Survive each wave until dawn, then pick an upgrade.
+
+const RARITY = {
+  common: { label: 'Common', w: 62 },
+  rare: { label: 'Rare', w: 30 },
+  legendary: { label: 'Legendary', w: 8 },
+};
+const UPGRADES = [
+  // torch
+  { id: 'lens', r: 'common', max: 5, tag: 'Torch', name: 'Wide Lens', desc: 'Your beam is 18% wider.' },
+  { id: 'throw', r: 'common', max: 5, tag: 'Torch', name: 'Long Throw', desc: 'Your beam reaches 15% further.' },
+  { id: 'filament', r: 'common', max: 6, tag: 'Torch', name: 'Hot Filament', desc: 'Shades burn 25% faster.' },
+  { id: 'afterglow', r: 'common', max: 3, tag: 'Torch', name: 'Afterglow', desc: 'Shades keep smouldering for a moment after the beam leaves them.' },
+  { id: 'focus', r: 'rare', max: 2, tag: 'Torch', name: 'Pinhole Focus', desc: 'Beam 30% narrower, but it burns 80% hotter.' },
+  { id: 'strobe', r: 'rare', max: 3, tag: 'Torch', name: 'Strobe', desc: 'Every few seconds your beam pulses white, tearing 40% off everything in it.' },
+  { id: 'halo', r: 'rare', max: 3, tag: 'Torch', name: 'Lantern Halo', desc: 'A ring of light around you freezes anything that gets close.' },
+  { id: 'rear', r: 'legendary', max: 1, tag: 'Torch', name: 'Eyes in the Back of Your Head', desc: 'A second, shorter beam shines behind you and burns too.' },
+  { id: 'sun', r: 'legendary', max: 1, tag: 'Torch', name: 'Midnight Sun', desc: 'Beam 40% wider, 40% longer and 40% hotter.' },
+  // body
+  { id: 'coat', r: 'common', max: 4, tag: 'Body', name: 'Thick Coat', desc: 'One more heart, and heal one.' },
+  { id: 'boots', r: 'common', max: 4, tag: 'Body', name: 'Trail Boots', desc: 'Move 12% faster.' },
+  { id: 'wind', r: 'common', max: 1, tag: 'Body', name: 'Second Wind', desc: 'Heal one heart at the start of every wave.' },
+  { id: 'phantom', r: 'common', max: 2, tag: 'Body', name: 'Cold Sweat', desc: 'Stay untouchable for longer after a hit.' },
+  { id: 'adrenaline', r: 'rare', max: 2, tag: 'Body', name: 'Adrenaline', desc: 'Getting hit gives you a sharp burst of speed.' },
+  { id: 'salt', r: 'rare', max: 2, tag: 'Body', name: 'Salt Pockets', desc: 'When something reaches you, a spray of salt blasts every nearby shade back.' },
+  { id: 'feast', r: 'rare', max: 2, tag: 'Body', name: 'Ember Heart', desc: 'Every 20 shades you burn heals a heart. Second level: every 14.' },
+  { id: 'lastlight', r: 'legendary', max: 1, tag: 'Body', name: 'Last Light', desc: 'On your final heart, your beam is 50% wider and burns twice as hot.' },
+  // senses
+  { id: 'dread', r: 'rare', max: 1, tag: 'Senses', name: 'Dread Sense', desc: 'See their eyes in the dark from any distance.' },
+  { id: 'echo', r: 'rare', max: 2, tag: 'Senses', name: 'Echo', desc: 'A pulse rolls out from you every few seconds, outlining anything hiding in the dark.' },
+  { id: 'owl', r: 'common', max: 3, tag: 'Senses', name: 'Owl Eyes', desc: 'The dark thins a little. Shapes show faintly.' },
+  // allies
+  { id: 'fireflies', r: 'rare', max: 4, tag: 'Allies', name: 'Firefly Swarm', desc: 'Two fireflies orbit you, burning anything they touch.' },
+  { id: 'candles', r: 'rare', max: 2, tag: 'Allies', name: 'Candle Trail', desc: 'You drop candles as you walk. Their light freezes shades.' },
+  { id: 'flare', r: 'rare', max: 3, tag: 'Allies', name: 'Flare Gun', desc: 'Fires a flare at the nearest shade lurking in the dark, burning all around it.' },
+  { id: 'chain', r: 'rare', max: 3, tag: 'Allies', name: 'Chain Ignition', desc: 'Burned shades burst, scorching the ones beside them.' },
+  { id: 'scar', r: 'common', max: 2, tag: 'Allies', name: 'Scorch Marks', desc: 'Once lit, a shade moves 20% slower for good.' },
+  { id: 'wildfire', r: 'legendary', max: 1, tag: 'Allies', name: 'Wildfire', desc: 'Every burst is twice the size, and each kill may launch a flare on its own.' },
+  // fate
+  { id: 'dawn', r: 'common', max: 3, tag: 'Fate', name: 'Early Dawn', desc: 'Waves end 3 seconds sooner.' },
+  { id: 'luck', r: 'common', max: 3, tag: 'Fate', name: 'Rabbit Foot', desc: 'Rare and legendary cards turn up more often.' },
+  { id: 'reroll', r: 'common', max: 99, tag: 'Fate', name: 'Loose Change', desc: 'Two more rerolls for future picks.' },
+  { id: 'fourth', r: 'rare', max: 2, tag: 'Fate', name: 'Keen Eye', desc: 'See one more card at every pick.' },
+];
+const UP = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
+
+const FOES = {
+  shade:   { hp: 1,    sp: 36, lightSp: 0,    h: 38, w: 13 },
+  stalker: { hp: 0.55, sp: 72, lightSp: 0,    h: 30, w: 10 },
+  brute:   { hp: 3.2,  sp: 24, lightSp: 0.35, h: 48, w: 20 },
+  tall:    { hp: 12,   sp: 28, lightSp: 0.25, h: 80, w: 14 },
+};
+
+const lv = id => (S.rg && S.rg.up[id]) || 0;
+const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const lastHeart = () => lv('lastlight') && S.rg.hp === 1;
+function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.18 * lv('lens')) * Math.pow(0.7, lv('focus')) * (lv('sun') ? 1.4 : 1) * (lastHeart() ? 1.5 : 1)); }
+function rgRange() { return Math.min(1.35, 0.62 * (1 + 0.15 * lv('throw')) * (lv('sun') ? 1.4 : 1)); }
+function rgBurn() { return 1.05 * (1 + 0.25 * lv('filament')) * Math.pow(1.8, lv('focus')) * (lv('sun') ? 1.4 : 1) * (lastHeart() ? 2 : 1); }
+function rgSpeed() { return 1.4 * (1 + 0.12 * lv('boots')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
+function rgDarkAlpha() { return 1 - 0.08 * lv('owl'); }
+function rgWaveLen(w) { return Math.max(18, 30 + Math.min(w, 8) * 1.5 - 3 * lv('dawn')); }
+function haloR() { return lv('halo') ? 55 + 22 * (lv('halo') - 1) : 0; }
+
+function newRun() {
+  return { wave: 0, hp: 3, maxHp: 3, kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [],
+    inv: 0, adren: 0, hurtFx: 0, strobeT: 4, strobeFx: 0, echoT: 2, flareT: 5, walked: 0, phase: 'fight', waveT: 0, waveLen: 30, deadT: 0 };
+}
+function sfx(rate, gain, type, freq, len = 0.25) {
+  if (!actx || !stepBuf) return;
+  const src = actx.createBufferSource(); src.buffer = stepBuf; src.playbackRate.value = rate;
+  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = actx.createGain(), t = actx.currentTime;
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  src.connect(f); f.connect(g); g.connect(sfxGain); src.start(t); src.stop(t + len + 0.02);
+}
+function pickFoe() {
+  const w = S.rg.wave, r = Math.random();
+  if (w >= 5 && r < 0.14) return 'brute';
+  if (w >= 3 && r < 0.42) return 'stalker';
+  return 'shade';
+}
+function spawnFoe(type) {
+  const rg = S.rg, behind = Math.random() < 0.65;
+  let a = behind ? S.aimW + Math.PI + (Math.random() - 0.5) * 2.2 : Math.random() * Math.PI * 2;
+  if (Math.abs(angDiff(a, S.aimW)) < HALF + 0.35) a += Math.PI;          // never pop into existence inside the beam
+  const d = 400 + Math.random() * 160, f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
+  rg.enemies.push({ kind: 'shade', type, x: S.p.x + Math.cos(a) * d, y: S.p.y + Math.sin(a) * d, hp, maxHp: hp,
+    beam: 0, lit: false, after: 0, scarred: false, blink: Math.random() * 4, jit: 0, reveal: 0, fly: 0, flare: 0, phase: Math.random() * 6, face: 1 });
+}
+function startWave() {
+  const rg = S.rg;
+  rg.wave++; rg.waveLen = rgWaveLen(rg.wave); rg.waveT = rg.waveLen; rg.phase = 'fight';
+  rg.toSpawn = 7 + rg.wave * 4; rg.spawnGap = rg.waveLen * 0.82 / rg.toSpawn; rg.spawnT = 0.8;
+  if (lv('wind')) rg.hp = Math.min(rg.maxHp, rg.hp + 1);
+  if (rg.wave % 5 === 0) { spawnFoe('tall'); S.msg = { text: 'Wave ' + rg.wave, sub: 'Something tall is coming', t: 0 }; }
+  else S.msg = { text: 'Wave ' + rg.wave, t: 0 };
+}
+function ashBurst(x, y, n, hgt = 20) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = 20 + Math.random() * 70;
+    S.rg.ash.push({ x, y, z: Math.random() * hgt, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 30 + Math.random() * 60, life: 0.6 + Math.random() * 0.8 });
+  }
+}
+function shove(e, amt) { const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypot(dx, dy) || 1; e.x += dx / d * amt; e.y += dy / d * amt; }
+function hurt(e) {
+  const rg = S.rg;
+  rg.hp--; rg.inv = 1.2 + 0.6 * lv('phantom'); rg.hurtFx = 1;
+  if (lv('adrenaline')) rg.adren = 1.5 + 0.8 * lv('adrenaline');
+  shove(e, 90);
+  if (lv('salt')) { const R = 110 + 40 * lv('salt'); for (const o of rg.enemies) if (dist2(o, S.p) < R) shove(o, 150); rg.echoes.push({ r: 0, salt: true }); }
+  sfx(0.45, 0.9, 'lowpass', 500, 0.35);
+  if (rg.hp <= 0) nightOver();
+}
+function killFoe(e) {
+  const rg = S.rg;
+  e.dead = true; rg.kills++;
+  ashBurst(e.x, e.y, e.type === 'tall' ? 70 : e.type === 'brute' ? 36 : 22, FOES[e.type].h * 0.8);
+  sfx(2.2 + Math.random() * 0.6, 0.35, 'highpass', 1400, 0.18);
+  if (lv('chain')) {
+    const R = (55 + 15 * lv('chain')) * (lv('wildfire') ? 2 : 1);
+    for (const o of rg.enemies) if (!o.dead && o !== e && dist2(o, e) < R) o.hp -= 0.35 * lv('chain');
+    rg.echoes.push({ r: 0, x: e.x, y: e.y, max: R, burst: true });
+  }
+  if (lv('wildfire') && Math.random() < 0.25) fireFlare();
+  if (lv('feast')) { const n = lv('feast') > 1 ? 14 : 20; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp++; S.msg = { text: '+1 heart', t: 0, short: true }; } }
+}
+function fireFlare() {
+  const rg = S.rg; let best = null, bd = 1e9;
+  for (const e of rg.enemies) { if (e.dead) continue; const d = dist2(e, S.p) + (e.lit ? 600 : 0); if (d < bd) { bd = d; best = e; } }
+  if (!best) return;
+  rg.flares.push({ x: best.x, y: best.y, r: 95, life: 4, t: 0 });
+  sfx(0.7, 0.5, 'bandpass', 1200, 0.4);
+}
+function endWave() {
+  const rg = S.rg;
+  for (const e of rg.enemies) ashBurst(e.x, e.y, 10, FOES[e.type].h * 0.6);
+  rg.enemies = []; rg.flares = [];
+  rg.phase = 'dawn'; rg.dawnT = 1.6; S.rounds = rg.wave;
+  S.msg = { text: 'Dawn', sub: `Wave ${rg.wave} survived`, t: 0 };
+  submitScore('survive', rg.wave);
+}
+function nightOver() {
+  const rg = S.rg;
+  rg.phase = 'dead'; rg.deadT = 0;
+  submitScore('survive', rg.wave - 1);
+  S.msg = { text: 'The night took you', sub: `Survived ${rg.wave - 1} wave${rg.wave === 2 ? '' : 's'} · ${rg.kills} burned`, t: 0 };
+}
+
+function updateSurvive(dt) {
+  const rg = S.rg, p = S.p;
+  if (!rg) return;
+  for (const a of rg.ash) { a.x += a.vx * dt; a.y += a.vy * dt; a.z += a.vz * dt; a.vz -= 60 * dt; a.vx *= 0.97; a.vy *= 0.97; a.life -= dt; }
+  rg.ash = rg.ash.filter(a => a.life > 0);
+  rg.hurtFx = Math.max(0, rg.hurtFx - dt * 1.8); rg.strobeFx = Math.max(0, rg.strobeFx - dt);
+  if (rg.phase === 'dead') { rg.deadT += dt; if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
+  if (rg.phase === 'dawn') { rg.dawnT -= dt; if (rg.dawnT <= 0) openPicker(); return; }
+  if (rg.phase !== 'fight') return;
+  rg.waveT -= dt; rg.inv -= dt; rg.adren -= dt;
+
+  rg.spawnT -= dt;
+  if (rg.toSpawn > 0 && rg.spawnT <= 0) {
+    const n = rg.wave > 6 && Math.random() < 0.3 ? 2 : 1;
+    for (let i = 0; i < n && rg.toSpawn > 0; i++, rg.toSpawn--) spawnFoe(pickFoe());
+    rg.spawnT = rg.spawnGap * (0.6 + Math.random() * 0.8);
+  }
+
+  // candles dropped as you walk
+  rg.walked += Math.hypot(p.vx, p.vy) * dt;
+  if (lv('candles') && rg.walked > 70) { rg.walked = 0; rg.candles.push({ x: p.x, y: p.y, life: 5 + 2.5 * (lv('candles') - 1), seed: Math.random() * 9 }); if (rg.candles.length > 14) rg.candles.shift(); }
+  for (const c of rg.candles) c.life -= dt;
+  rg.candles = rg.candles.filter(c => c.life > 0);
+  // flares
+  if (lv('flare')) { rg.flareT -= dt; if (rg.flareT <= 0) { rg.flareT = 11 - 2 * (lv('flare') - 1); fireFlare(); } }
+  for (const f of rg.flares) { f.life -= dt; f.t += dt; }
+  rg.flares = rg.flares.filter(f => f.life > 0);
+  // echo pulses and bursts
+  if (lv('echo')) { rg.echoT -= dt; if (rg.echoT <= 0) { rg.echoT = 4.5 - 0.9 * (lv('echo') - 1); rg.echoes.push({ r: 0 }); sfx(0.35, 0.25, 'lowpass', 300, 0.6); } }
+  for (const ec of rg.echoes) {
+    ec.r += (ec.burst ? 380 : 520) * dt;
+    if (!ec.burst && !ec.salt) for (const e of rg.enemies) if (Math.abs(dist2(e, p) - ec.r) < 30) e.reveal = 1;
+  }
+  rg.echoes = rg.echoes.filter(ec => ec.r < (ec.max || (ec.salt ? 200 : viewR())));
+  // strobe
+  if (lv('strobe')) {
+    rg.strobeT -= dt;
+    if (rg.strobeT <= 0) {
+      rg.strobeT = 6.5 - 1.2 * (lv('strobe') - 1); rg.strobeFx = 0.2;
+      for (const e of rg.enemies) if (e.beam > 0) e.hp -= 0.4 * e.maxHp;
+      sfx(3, 0.35, 'highpass', 2500, 0.12);
+    }
+  }
+  // fireflies
+  const flies = fireflyPositions();
+  const hr = haloR(), burn = rgBurn();
+  for (const e of rg.enemies) {
+    const f = FOES[e.type], dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
+    e.blink -= dt; if (e.blink < -0.12) e.blink = 1.5 + Math.random() * 4;
+    e.reveal = Math.max(0, e.reveal - dt);
+    e.fly = flies.some(fl => Math.hypot(fl.x - e.x, fl.y - e.y) < 18) ? 1 : 0;
+    e.flare = rg.flares.some(fl => dist2(fl, e) < fl.r) ? 1 : 0;
+    const worldLit = (hr && d < hr) || e.flare || rg.candles.some(c => dist2(c, e) < 55);
+    e.lit = e.beam > 0 || !!worldLit;
+    let dmg = 0;
+    if (e.beam > 0) { dmg += burn * e.beam; e.after = 0.6 * lv('afterglow'); if (lv('scar')) e.scarred = true; }
+    else if (e.after > 0) { e.after -= dt; dmg += burn * 0.6; }
+    if (e.flare) dmg += 0.9;
+    if (e.fly) dmg += 1.5;
+    e.hp -= dmg * dt;
+    e.jit = dmg > 0 ? 1 : Math.max(0, e.jit - dt * 4);
+    let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
+    if (e.lit) sp *= f.lightSp;
+    if (sp > 0 && d > 4) {
+      e.x += dx / d * sp * dt; e.y += dy / d * sp * dt; e.phase += dt * sp * 0.25;
+      const [sx0] = toScreen(e.x, e.y), [sx1] = toScreen(p.x, p.y); e.face = sx1 > sx0 ? 1 : -1;
+    }
+    for (const o of propsNear(e.x, e.y, 40)) {
+      const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy), min = o.r * o.s + f.w * 0.5;
+      if (od < min && od > 0) { e.x = o.x + ox / od * min; e.y = o.y + oy / od * min; }
+    }
+    if (d < 14 + f.w * 0.45 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
+  }
+  for (const e of rg.enemies) if (e.hp <= 0 && !e.dead) killFoe(e);
+  rg.enemies = rg.enemies.filter(e => !e.dead);
+  if (rg.phase === 'fight' && rg.waveT <= 0) endWave();
+}
+function fireflyPositions() {
+  const n = 2 * lv('fireflies'), out = [];
+  for (let i = 0; i < n; i++) {
+    const a = S.t * 2.2 + i / n * Math.PI * 2, r = 50 + 8 * Math.sin(S.t * 3 + i);
+    out.push({ x: S.p.x + Math.cos(a) * r, y: S.p.y + Math.sin(a) * r, on: 0.6 + 0.4 * Math.sin(S.t * 7 + i * 2) });
+  }
+  return out;
+}
+
+// ---- light: which shades are in the beam (screen space), plus the extra holes in the dark ----
+function cutSurviveLights(bx, by, br) {
+  const rg = S.rg; if (!rg) return;
+  dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  dctx.globalCompositeOperation = 'destination-out';
+  if (lv('rear') && S.torchLvl > 0.5) {
+    const rb = br * 0.55, rh = HALF * 0.85, ra = S.aim + Math.PI, [px, py] = toScreen(S.p.x, S.p.y), oy = py - 22 * Z;
+    const g = dctx.createRadialGradient(px, oy, 0, px, oy, rb);
+    g.addColorStop(0, 'rgba(0,0,0,0.9)'); g.addColorStop(0.7, 'rgba(0,0,0,0.75)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = g; dctx.beginPath(); dctx.moveTo(px, oy);
+    for (let t = -rh; t <= rh + 0.001; t += rh / 12) dctx.lineTo(px + Math.cos(ra + t) * rb, oy + Math.sin(ra + t) * rb);
+    dctx.closePath(); dctx.fill();
+  }
+  worldMatrix(dctx, DPR);
+  const hole = (x, y, r, a) => {
+    const g = dctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.55, `rgba(0,0,0,${a * 0.7})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = g; dctx.beginPath(); dctx.arc(x, y, r, 0, 7); dctx.fill();
+  };
+  const hr = haloR(); if (hr) hole(S.p.x, S.p.y, hr * 1.25, 0.8);
+  for (const c of rg.candles) hole(c.x, c.y, 60 * (0.95 + 0.05 * Math.sin(S.t * 9 + c.seed)), 0.85 * Math.min(1, c.life));
+  for (const f of rg.flares) hole(f.x, f.y, f.r * Math.min(1, f.t * 5) * (1 + (Math.random() - 0.5) * 0.06), 0.95 * Math.min(1, f.life));
+  for (const f of fireflyPositions()) hole(f.x, f.y, 20, 0.6 * f.on);
+  dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+function surviveLight(bx, by, br, casters, lx, ly) {
+  const rg = S.rg; if (!rg) return;
+  const on = S.torchLvl > 0.6, [px, py] = toScreen(S.p.x, S.p.y);
+  for (const e of rg.enemies) {
+    const f = FOES[e.type], [sx, sy0] = toScreen(e.x, e.y), sy = sy0 - f.h * 0.5 * Z;
+    let k = 0;
+    if (on) {
+      const d = Math.hypot(sx - bx, sy - by), off = Math.abs(angDiff(Math.atan2(sy - by, sx - bx), S.aim));
+      if (d < br * 0.95 && off < HALF) {
+        const ed = Math.hypot(e.x - lx, e.y - ly), eth = Math.atan2(e.y - ly, e.x - lx);
+        const hidden = casters.some(c => c.d < ed && Math.abs(angDiff(eth, c.th)) < Math.asin(Math.min(1, c.r / c.d)));
+        if (!hidden) k = 1 - 0.5 * d / br;
+      }
+      if (!k && lv('rear')) {
+        const rb = br * 0.55, oy = py - 22 * Z, d2 = Math.hypot(sx - px, sy - oy), off2 = Math.abs(angDiff(Math.atan2(sy - oy, sx - px), S.aim + Math.PI));
+        if (d2 < rb * 0.95 && off2 < HALF * 0.85) k = 0.8 * (1 - 0.5 * d2 / rb);
+      }
+    }
+    e.beam = k;
+  }
+}
+function drawShade(e) {
+  const f = FOES[e.type], [sx0, sy] = toScreen(e.x, e.y);
+  const burn = 1 - Math.max(0, e.hp) / e.maxHp;
+  const sx = sx0 + (e.jit ? (Math.random() - 0.5) * 3 * Z * (0.4 + burn) : 0);
+  const h = f.h * Z, w = f.w * Z, g = Math.round(18 + burn * 190), col = `rgb(${g},${g},${Math.max(0, g - 3)})`;
+  const sway = Math.sin(e.phase) * 1.6 * Z, fc = e.face || 1;
+  ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(1.5, w * 0.26);
+  ctx.beginPath();
+  ctx.moveTo(sx - w * 0.25, sy - h * 0.35); ctx.lineTo(sx - w * 0.32 + sway, sy);
+  ctx.moveTo(sx + w * 0.25, sy - h * 0.35); ctx.lineTo(sx + w * 0.32 - sway, sy);
+  ctx.stroke();
+  const hunch = e.type === 'stalker' ? fc * w * 0.35 : 0;
+  ctx.beginPath();
+  ctx.moveTo(sx - w * 0.55, sy - h * 0.3);
+  ctx.quadraticCurveTo(sx - w * 0.75 + hunch, sy - h * 0.72, sx - w * 0.18 + hunch, sy - h * 0.88);
+  ctx.lineTo(sx + w * 0.18 + hunch, sy - h * 0.88);
+  ctx.quadraticCurveTo(sx + w * 0.75 + hunch, sy - h * 0.72, sx + w * 0.55, sy - h * 0.3);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(sx + hunch + fc * w * 0.08, sy - h * 0.93, w * 0.3, Math.max(w * 0.3, h * 0.075), 0, 0, 7); ctx.fill();
+  if (e.type === 'tall' || e.type === 'brute') {                 // long hanging arms
+    ctx.lineWidth = Math.max(1.5, w * (e.type === 'tall' ? 0.14 : 0.22));
+    const reach = e.type === 'tall' ? 0.12 : 0.4;
+    ctx.beginPath();
+    ctx.moveTo(sx - w * 0.5, sy - h * 0.8); ctx.quadraticCurveTo(sx - w * 0.95, sy - h * 0.45, sx - w * 0.7 - sway, sy - h * reach);
+    ctx.moveTo(sx + w * 0.5, sy - h * 0.8); ctx.quadraticCurveTo(sx + w * 0.95, sy - h * 0.45, sx + w * 0.7 + sway, sy - h * reach);
+    ctx.stroke();
+  }
+}
+function drawSurviveFx(bx, by, br) {
+  const rg = S.rg; if (!rg) return;
+  const [px, py] = toScreen(S.p.x, S.p.y);
+  // eyes: always visible close by, from anywhere with Dread Sense
+  for (const e of rg.enemies) {
+    const f = FOES[e.type], d = dist2(e, S.p);
+    let a = lv('dread') ? 0.9 : Math.pow(Math.max(0, 1 - d / 240), 1.3) * 0.95;
+    if (e.lit) a = 1;
+    if (e.blink < 0 || a < 0.02) continue;
+    const [sx, sy0] = toScreen(e.x, e.y), hy = sy0 - f.h * 0.93 * Z, gap = f.w * 0.13 * Z + 1.2, ox = (e.face || 1) * f.w * 0.08 * Z + (e.type === 'stalker' ? (e.face || 1) * f.w * 0.35 * Z : 0);
+    ctx.fillStyle = e.type === 'tall' ? `rgba(210,40,40,${a})` : `rgba(239,239,234,${a})`;
+    const r = (e.type === 'tall' ? 1.8 : 1.3) * Z;
+    ctx.beginPath(); ctx.arc(sx + ox - gap, hy, r, 0, 7); ctx.arc(sx + ox + gap, hy, r, 0, 7); ctx.fill();
+  }
+  // echo reveals: faint outlines of what is out there
+  ctx.save();
+  for (const e of rg.enemies) {
+    if (e.reveal <= 0 || e.lit) continue;
+    ctx.globalAlpha = 0.45 * e.reveal; drawShade(e);
+  }
+  ctx.restore();
+  // pulses
+  ctx.save(); worldMatrix(ctx, DPR);
+  for (const ec of rg.echoes) {
+    const cx = ec.x ?? S.p.x, cy = ec.y ?? S.p.y, max = ec.max || (ec.salt ? 200 : viewR());
+    ctx.strokeStyle = ec.burst ? `rgba(239,200,160,${0.6 * (1 - ec.r / max)})` : `rgba(239,239,234,${(ec.salt ? 0.6 : 0.25) * (1 - ec.r / max)})`;
+    ctx.lineWidth = ec.burst ? 4 : 2.5; ctx.beginPath(); ctx.arc(cx, cy, ec.r, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+  // candle flames, flare cores, fireflies
+  for (const c of rg.candles) {
+    const [cx, cy] = toScreen(c.x, c.y);
+    ctx.fillStyle = '#d8d8d0'; ctx.fillRect(cx - 1.5 * Z, cy - 6 * Z, 3 * Z, 6 * Z);
+    ctx.fillStyle = `rgba(250,250,245,${Math.min(1, c.life)})`;
+    ctx.beginPath(); ctx.ellipse(cx, cy - 8.5 * Z + Math.sin(S.t * 11 + c.seed) * 0.4 * Z, 1.3 * Z, 2.6 * Z, 0, 0, 7); ctx.fill();
+  }
+  for (const f of rg.flares) {
+    const [fx, fy] = toScreen(f.x, f.y), a = Math.min(1, f.life);
+    const g = ctx.createRadialGradient(fx, fy - 4 * Z, 0, fx, fy - 4 * Z, 22 * Z);
+    g.addColorStop(0, `rgba(255,250,240,${a})`); g.addColorStop(1, 'rgba(255,250,240,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fx, fy - 4 * Z, 22 * Z, 0, 7); ctx.fill();
+  }
+  for (const f of fireflyPositions()) {
+    const [fx, fy] = toScreen(f.x, f.y);
+    ctx.fillStyle = `rgba(245,245,235,${0.4 + 0.6 * f.on})`; ctx.beginPath(); ctx.arc(fx, fy - 18 * Z, 1.9 * Z, 0, 7); ctx.fill();
+  }
+  // ash from burned shades
+  for (const a of rg.ash) {
+    const [ax, ay] = toScreen(a.x, a.y);
+    ctx.fillStyle = `rgba(235,230,220,${Math.min(1, a.life * 1.5)})`; ctx.fillRect(ax, ay - a.z * Z, 1.8 * Z, 1.8 * Z);
+  }
+  // strobe pulse
+  if (rg.strobeFx > 0) {
+    ctx.fillStyle = `rgba(255,255,250,${0.35 * rg.strobeFx / 0.2})`;
+    ctx.beginPath(); ctx.moveTo(bx, by);
+    for (let t = -HALF; t <= HALF + 0.001; t += HALF / 12) ctx.lineTo(bx + Math.cos(S.aim + t) * br, by + Math.sin(S.aim + t) * br);
+    ctx.closePath(); ctx.fill();
+  }
+  // hit: the edges bleed red
+  if (rg.hurtFx > 0) {
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) / 2);
+    g.addColorStop(0, 'rgba(160,20,20,0)'); g.addColorStop(1, `rgba(160,20,20,${0.55 * rg.hurtFx})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+}
+function drawSurviveHud(top) {
+  const rg = S.rg; if (!rg) return;
+  ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(239,239,234,0.75)';
+  ctx.fillText(`WAVE ${rg.wave}`, 16, 16 + top);
+  for (let i = 0; i < rg.maxHp; i++) {
+    const x = 16 + i * 15, y = 37 + top;
+    if (i < rg.hp) { ctx.fillStyle = lastHeart() ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fillRect(x, y, 10, 10); }
+    else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, 9, 9); }
+  }
+  ctx.fillStyle = 'rgba(239,239,234,0.4)';
+  ctx.fillText(`${rg.kills} BURNED · BEST ${bests.survive || 0}`, 16, 54 + top);
+  if (rg.phase === 'fight') {
+    const w = 120, f = Math.max(0, rg.waveT / rg.waveLen);
+    ctx.fillStyle = 'rgba(239,239,234,0.15)'; ctx.fillRect(W / 2 - w / 2, 34 + top, w, 3);
+    ctx.fillStyle = 'rgba(239,239,234,0.55)'; ctx.fillRect(W / 2 - w / 2, 34 + top, w * f, 3);
+  }
+}
+
+// ---- upgrade picks between waves ----
+const picker = document.getElementById('picker'), cardsEl = document.getElementById('cards'), rerollBtn = document.getElementById('reroll');
+function drawCards() {
+  const rg = S.rg, luck = lv('luck'), n = 3 + lv('fourth');
+  const wts = { common: 62 - 12 * luck, rare: 30 + 7 * luck, legendary: 8 + 5 * luck };
+  const pool = UPGRADES.filter(u => (rg.up[u.id] || 0) < u.max), picks = [];
+  while (picks.length < n && pool.length) {
+    let total = pool.reduce((s, u) => s + wts[u.r], 0), r = Math.random() * total, i = 0;
+    for (; i < pool.length - 1; i++) { r -= wts[pool[i].r]; if (r <= 0) break; }
+    picks.push(pool.splice(i, 1)[0]);
+  }
+  return picks;
+}
+function renderPicker(picks) {
+  const rg = S.rg;
+  document.getElementById('pickEyebrow').textContent = `Wave ${rg.wave} survived · ${rg.hp}/${rg.maxHp} hearts`;
+  cardsEl.replaceChildren(...picks.map(u => {
+    const b = document.createElement('button'), have = rg.up[u.id] || 0;
+    b.className = 'card-up ' + u.r; b.type = 'button';
+    const top = document.createElement('span'); top.className = 'rar';
+    const r1 = document.createElement('span'); r1.textContent = RARITY[u.r].label;
+    const r2 = document.createElement('span'); r2.textContent = u.tag; top.append(r1, r2);
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = u.name;
+    const ds = document.createElement('span'); ds.className = 'ds'; ds.textContent = u.desc;
+    const lvl = document.createElement('span'); lvl.className = 'lv';
+    lvl.textContent = u.max === 1 ? 'Unique' : u.max > 50 ? (have ? `Taken ${have}×` : 'Stackable') : have ? `Level ${have} → ${have + 1} of ${u.max}` : `New · stacks to ${u.max}`;
+    b.append(top, nm, ds, lvl);
+    b.addEventListener('click', () => choose(u.id));
+    return b;
+  }));
+  rerollBtn.textContent = `Reroll (${rg.rerolls})`;
+  rerollBtn.disabled = rg.rerolls <= 0;
+  const owned = Object.entries(rg.up).filter(([, n]) => n > 0).map(([id, n]) => UP[id].name + (n > 1 ? ' ' + n : ''));
+  document.getElementById('owned').textContent = owned.length ? 'Carrying: ' + owned.join(' · ') : 'Nothing yet. Pick your first.';
+}
+function openPicker() {
+  const rg = S.rg;
+  rg.phase = 'pick'; S.running = false; menuBtn.hidden = true;
+  picker.hidden = false; renderPicker(drawCards());
+  const first = cardsEl.querySelector('button'); if (first) first.focus({ preventScroll: true });
+}
+function choose(id) {
+  const rg = S.rg;
+  rg.up[id] = (rg.up[id] || 0) + 1;
+  if (id === 'coat') { rg.maxHp++; rg.hp = Math.min(rg.maxHp, rg.hp + 1); }
+  if (id === 'reroll') rg.rerolls += 2;
+  picker.hidden = true; menuBtn.hidden = false;
+  S.running = true; last = performance.now();
+  startWave();
+}
+rerollBtn.addEventListener('click', () => { const rg = S.rg; if (!rg || rg.rerolls <= 0) return; rg.rerolls--; renderPicker(drawCards()); });
 
 function begin(mode) {
   reset(); S.mode = mode;
   if (mode === 'free') { S.q = null; }
+  else if (mode === 'survive') { S.q = null; S.rg = newRun(); picker.hidden = true; startWave(); }
   else if (mode === 'blink') { S.blinkPhase = 'dark'; S.darkT = BLINK_DARK; S.torchOn = true; spawnQuarry(); S.q.hiddenUntilLit = true; }
   else spawnQuarry();
   overlay.hidden = true; last = performance.now();
@@ -1493,6 +1981,7 @@ function begin(mode) {
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
+document.getElementById('start4').addEventListener('click', () => begin('survive'));
 document.getElementById('start').addEventListener('click', () => begin('chase'));
 
 // if frames keep coming slower than ~45 a second, render fewer pixels (never gameplay changes, just a softer image)
