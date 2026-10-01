@@ -123,7 +123,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .pr { flex: none; font-size: 0.68rem; letter-spacing: 0.1em; color: var(--ash); }
 .pr.cost { color: var(--bone); } .pr.cost::after { content: ' ◆'; font-size: 0.55rem; color: #e0a050; }
 .more { padding: 0 0.75rem 0.8rem calc(2.6rem + 1.55rem); display: grid; gap: 0.45rem; }
-.more .ds { font-size: 0.86rem; color: var(--bone); }
+.more .ds { font-size: 0.86rem; color: var(--bone); white-space: pre-line; }
 .more .lv { font-size: 0.68rem; letter-spacing: 0.06em; color: var(--ash); }
 @media (max-width: 30rem) { .more { padding-left: 0.75rem; } }
 .acts { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
@@ -1240,12 +1240,15 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
 const ROLL_T = 0.32, ROLL_DIST = 100, ROLL_SAFE = 0.26, ROLL_COOL = 0.85;   // Light Feet shortens the cooldown
 function dodge() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall) return;
-  const p = S.p; if ((p.roll || 0) > 0 || (p.rollCool || 0) > 0) return;
+  const p = S.p; if ((p.roll || 0) > 0) return;
+  const spare = (p.rollCool || 0) > 0;            // Expedition's Light Feet 2: one spare roll while the dodge recharges
+  if (spare && !(isEx() && lv('feet') > 1 && p.spare > 0)) return;
   const mv = Math.hypot(p.vx, p.vy);
   let a;
   if (mv > 15) a = Math.atan2(p.vy, p.vx);
   else { const [wx, wy] = screenDirToWorld(-Math.cos(S.aim), -Math.sin(S.aim)); a = Math.atan2(wy, wx); }   // backstep
-  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollCool = ROLL_COOL * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble')); p.rollBack = mv <= 15; p.ghosts = [];
+  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollBack = mv <= 15; p.ghosts = [];
+  if (spare) p.spare = 0; else { p.rollCool = ROLL_COOL * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble')); p.spare = isEx() && lv('feet') > 1 ? 1 : 0; }
   if (lv('nova') && S.rg.nova >= 12) { S.rg.nova = 0; lightBurst(p.x, p.y, 230, 0.85, 'white'); hitStop(0.06); }
   for (let i = 0; i < 6; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: -Math.cos(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vy: -Math.sin(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vz: 20 + Math.random() * 30, life: 0.4 + Math.random() * 0.3 });
   if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, 3500, 500, 0.28, 0.4, sfxGain); }
@@ -1258,13 +1261,15 @@ function update(dt) {
   const k = 1 - Math.exp(-ACCEL * dt);
   p.vx += (mx * speed - p.vx) * k; p.vy += (my * speed - p.vy) * k;
   if (p.rollCool > 0) { p.rollCool -= dt; if (p.rollCool <= 0) dodgeBtn.dataset.cool = '0'; }
+  if (dodgeBtn.dataset.cool === '1' && p.spare > 0 && !(p.roll > 0)) dodgeBtn.dataset.cool = '0';
   if (p.roll > 0) {                          // fast at the start, easing out at the end
     const u = 1 - p.roll / ROLL_T, v = ROLL_DIST / ROLL_T * 2 * (1 - u);
     p.vx = Math.cos(p.rollA) * v; p.vy = Math.sin(p.rollA) * v;
     p.roll -= dt; p.rollSafe -= dt;
     if (p.ghosts) { p.ghosts.push({ x: p.x, y: p.y, a: 0.45 }); if (p.ghosts.length > 5) p.ghosts.shift(); }
     if (isRg() && S.rg && lv('feet') && (p.trailT = (p.trailT || 0) - dt) <= 0) {   // Light Feet: burning light where you rolled
-      p.trailT = 0.05; S.rg.fires.push({ x: p.x, y: p.y, r: 20, life: 1.2 + 0.5 * lv('feet'), max: 1.2 + 0.5 * lv('feet'), seed: Math.random() * 9 });
+      const ex = isEx(), life = ex ? 3 + 0.5 * lv('feet') : 1.2 + 0.5 * lv('feet');   // Expedition: a long streak of burning light; at 3 it freezes
+      p.trailT = 0.05; S.rg.fires.push({ x: p.x, y: p.y, r: ex ? 24 : 20, life, max: life, seed: Math.random() * 9, freeze: ex && lv('feet') > 2 });
     }
     if (p.roll <= 0) { p.vx *= 0.3; p.vy *= 0.3; }
   }
@@ -1346,9 +1351,9 @@ function update(dt) {
   if (want) {
     S.torchOnT += dt;
     // a couple of stutters as it comes on, then full
-    const sputter = S.torchOnT < 0.25 && Math.random() < 0.35 ? 0.2 : 1;
+    const q = tu('quick'), sputter = S.torchOnT < 0.25 / (1 + q) && Math.random() < 0.35 ? 0.2 : 1;   // Quick Light: comes on faster and steadier
     const gutter = dry < 0.1 && Math.random() < 0.18 * (1 - dry * 10) ? 0.15 + Math.random() * 0.4 : 1;   // nearly dry: it gutters
-    S.torchLvl = Math.min(1, S.torchLvl + dt * 10) * sputter * gutter;
+    S.torchLvl = Math.min(1, S.torchLvl + dt * 10 * (1 + 0.8 * q)) * sputter * gutter;
   } else S.torchLvl = Math.max(0, S.torchLvl - dt * 25);
 }
 
@@ -3149,7 +3154,33 @@ const UPGRADES = [
   { id: 'luck', r: 'common', max: 3, tag: 'Fate', name: 'Rabbit Foot', desc: 'Rare and legendary cards turn up more often.' },
   { id: 'reroll', r: 'common', max: 99, tag: 'Fate', name: 'Loose Change', desc: 'Two more rerolls for future picks.' },
   { id: 'fourth', r: 'rare', max: 2, tag: 'Fate', name: 'Keen Eye', desc: 'See one more card at every pick.' },
+  // Expedition's kit only (never dealt as Nightfall cards)
+  { id: 'smoulder', ex: 1, r: 'common', max: 3, tag: 'Allies', name: 'Smoulder', desc: 'Anything your beam touches keeps burning for 2 seconds after the beam leaves, and leaves fire on the ground where it dies.' },
+  { id: 'glare', ex: 1, r: 'rare', max: 3, tag: 'Torch', name: 'Glare', desc: 'Spears and arrows that fly into your beam burn up in mid-air.' },
+  { id: 'mirror', ex: 1, r: 'rare', max: 2, tag: 'Torch', name: 'Mirror Shard', desc: 'Turn your beam onto a laser while it fires and the laser is bent back into whoever fired it.' },
 ];
+// Expedition's version of each kit item: only three are on at once, so level 1 has to be worth a slot on its own
+const EX_KIT = {
+  sweep: { max: 3, desc: 'Swing your beam fast and it leaves a burning arc of light hanging in the air for a second.', lv: ['A burning arc for 1 second', 'The arc lasts 2 seconds', 'Anything the arc touches stays frozen 2 seconds'] },
+  spot: { max: 3, desc: 'Hold your beam still for a second and it narrows into a spotlight: half again as long, burning twice as hot.', lv: ['Charges in 1 second, 1.5x as long', 'Charges in half a second', 'Twice as long'] },
+  core: { max: 2, desc: 'The centre of your beam burns far hotter. The edges barely burn.', lv: ['A hot centre line', 'The hot centre is wider and hotter'] },
+  strobe: { max: 3, desc: 'Every few seconds your beam pulses white, tearing 40% off everything in it.', lv: ['A pulse every 6.5 seconds', 'Every 5.3 seconds', 'Every 4.1 seconds, and each pulse freezes what it hits'] },
+  halo: { max: 3, desc: 'A ring of light around you freezes anything that gets close.', lv: ['A small ring', 'A bigger ring', 'Bigger again, and the ring burns'] },
+  blackout: { max: 2, desc: 'Flick your torch off and on again to fire a blinding flash down the beam.', lv: ['Flash every 5 seconds', 'Every 3.5 seconds, and the flash stuns for 2 seconds'] },
+  coat: { max: 3, desc: 'One more heart per level. Losing a heart sets off a white flash that burns everything near you.', lv: ['One more heart', 'Two more hearts', 'Three more, and the flash freezes them'] },
+  feet: { max: 3, desc: 'Your roll leaves a long streak of burning light behind you, and your dodge comes back sooner.', lv: ['A burning streak', 'A second roll before the cooldown', 'The streak freezes whatever crosses it'] },
+  wind: { max: 3, desc: 'A shield that shrugs off one hit, and comes back while you are out in the dark.', lv: ['Back 90 seconds after it breaks', 'Back after 60 seconds', 'Back after 30, and it flashes when it breaks'] },
+  close: { max: 2, desc: 'Rolling through a hit refills your dodge and makes your beam burn twice as hot for a few seconds.', lv: ['Double burn for 3 seconds', 'For 4.5 seconds, plus a burst of speed'] },
+  feast: { max: 3, desc: 'Burning things heals you: every so many you burn, you get a heart back.', lv: ['A heart every 20', 'Every 14', 'Every 10'] },
+  dread: { max: 2, desc: 'See their eyes in the dark from any distance.', lv: ['Eyes from anywhere', 'Plus a pulse every few seconds that outlines anything hiding'] },
+  chain: { max: 3, desc: 'Burned enemies burst, scorching the ones beside them.', lv: ['A small burst', 'A bigger burst', 'Bigger, and anything burning spreads fire to whatever it brushes'] },
+  smoulder: { lv: ['Burns on 2 seconds, small fires', 'Burns on 3 seconds, bigger fires', 'The fires freeze whatever walks in'] },
+  glare: { lv: ['Spears and arrows burn up', 'Bomber shells too', 'A wider catch, past the beam\'s edge'] },
+  mirror: { lv: ['The laser burns its owner', 'It bounces on to a second enemy'] },
+};
+const EX_CUT = ['kindling', 'afterglow', 'adrenaline', 'salt', 'echo', 'scar', 'embers'];   // folded into other items, or dropped
+const kitMax = u => (EX_KIT[u.id] && EX_KIT[u.id].max) || u.max;
+const kitDesc = u => (EX_KIT[u.id] && EX_KIT[u.id].desc) || u.desc;
 const UP = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
 
 const FOES = {
@@ -3167,17 +3198,24 @@ const FOES = {
   archer:  { hp: 1.0,  sp: 40, lightSp: 0,    h: 38, w: 11 },   // the Dunes' archer: keeps its distance and looses arrows
 };
 
-const lv = id => (S.rg && S.rg.up[id]) || 0;
+const rawLv = id => (S.rg && S.rg.up[id]) || 0;
+// Expedition's kit folds some of Nightfall's small cards into bigger items: Echo lives in Dread Sense 2, Kindling in Chain Ignition 3,
+// Ember Trail in Smoulder; Adrenaline is part of Close Call; Salt Pockets and Scorch Marks are gone. Nightfall is untouched.
+const EX_LV = { echo: () => +(rawLv('dread') >= 2), kindling: () => +(rawLv('chain') >= 3), embers: () => rawLv('smoulder'), afterglow: () => 0, adrenaline: () => 0, salt: () => 0, scar: () => 0 };
+const isEx = () => S && S.mode === 'expedition';
+const lv = id => isEx() && EX_LV[id] ? EX_LV[id]() : rawLv(id);
+const tu = id => isEx() && XS && XS.torch ? XS.torch[id] || 0 : 0;   // Expedition's torch upgrades, bought with embers
 const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const lastHeart = () => lv('lastlight') && S.rg.hp === 1;
 // Sweep: flares while you swing fast. Spotlight: tightens the longer you hold still.
-const sweepK = () => S.rg && lv('sweep') ? Math.min(1, (S.rg.sweepT || 0) / 0.2) : 0;
-const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / 0.9) : 0;
-function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.28 * lv('sweep') * sweepK()) * (1 - 0.15 * spotK()) * (lastHeart() ? 1.5 : 1)) * (1 + 0.05 * sr('wide')); }
-function rgRange() { return Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK())) * (1 + 0.06 * sr('reach')) * (1 - 0.5 * stormK()); }   // a dust storm halves the beam
+const sweepK = () => S.rg && lv('sweep') && !isEx() ? Math.min(1, (S.rg.sweepT || 0) / 0.2) : 0;   // Expedition's Sweep leaves a burning arc instead (see exSweepArc)
+const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / (isEx() ? (lv('spot') > 1 ? 0.5 : 1) : 0.9)) : 0;
+const exSpot = () => isEx() && spotK() >= 1;   // Expedition's Spotlight: fully charged, the beam narrows to a long, hot spotlight
+function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.28 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 0.6 : 1) : 1 - 0.15 * spotK()) * (lastHeart() ? 1.5 : 1)) * (1 + 0.06 * tu('width')); }
+function rgRange() { return (isEx() ? 0.62 * (exSpot() ? (lv('spot') > 2 ? 2 : 1.5) : 1) : Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK()))) * (1 + 0.08 * tu('reach')) * (1 - 0.5 * stormK()); }   // a dust storm halves the beam
 function rgBurn() {
   const rg = S.rg || {}, grow = 1 + 0.05 * Math.min(14, Math.max(0, (rg.wave || 1) - 1));   // the torch grows with the night
-  return 1.05 * (1 + 0.08 * sr('searing')) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
+  return 1.05 * (1 + 0.1 * tu('heat')) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 2 : 1) : 1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
 }
 function rgSpeed() { return 1.4 * (1 + 0.04 * sr('swift')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
 function rgDarkAlpha() { return 1; }   // the Dunes are as dark as the woods outside your light
@@ -3185,6 +3223,7 @@ function rgDarkAlpha() { return 1; }   // the Dunes are as dark as the woods out
 function rgWaveCount(w) { return Math.max(6, Math.round(8 + 2.6 * w + 0.16 * w * w)); }
 function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
 function rgSpawnGap(w) { return Math.max(0.3, 1.1 - 0.05 * w); }      // seconds between spawns
+const coreW = () => isEx() && lv('core') > 1 ? 0.5 : 0.35;   // Expedition's Searing Core 2 widens the hot centre
 function haloR() { return lv('halo') ? 55 + 22 * (lv('halo') - 1) : 0; }
 
 function newRun() {
@@ -3274,17 +3313,18 @@ function hurt(e) {
   if (S.p.rollSafe > 0) {                  // rolled right through it
     rg.inv = 0.35; hitStop(0.05); addShake(0.1);
     rg.dodged = { t: 0 }; sfx(2.2, 0.35, 'highpass', 3000, 0.15);
-    if (lv('close')) { S.p.rollCool = 0; dodgeBtn.dataset.cool = '0'; rg.rushT = 1.5 + 1.5 * lv('close'); }
+    if (lv('close')) { S.p.rollCool = 0; dodgeBtn.dataset.cool = '0'; rg.rushT = 1.5 + 1.5 * lv('close'); if (isEx() && lv('close') > 1) rg.adren = 2; }   // Close Call 2: a burst of speed too
     return;
   }
   if (rg.shield > 0) {                     // Second Wind: this one bounces off
-    rg.shield--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.pop = { t: 0, blocked: true };
+    rg.shield--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.pop = { t: 0, blocked: true }; rg.windT = 0;
+    if (isEx() && lv('wind') > 2) { lightBurst(S.p.x, S.p.y, 150, 0.4, 'white'); for (const o of rg.enemies) if (dist2(o, S.p) < 150) o.frozen = 2; }   // Second Wind 3: breaking it flashes
     addShake(0.35); hitStop(0.05); shove(e, 90); sfx(1.4, 0.6, 'bandpass', 1500, 0.3);
     return;
   }
   rg.hp--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = 1;
   rg.pop = { t: 0, lost: rg.hp };          // index of the heart that just went
-  if (lv('coat')) lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white');
+  if (lv('coat')) { lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white'); if (isEx() && lv('coat') > 2) for (const o of rg.enemies) if (dist2(o, S.p) < 150 + 20 * lv('coat')) o.frozen = 2.5; }   // Thick Coat 3: the flash freezes
   addShake(0.75); hitStop(0.11);
   { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }   // knocked back
   if (lv('adrenaline')) rg.adren = 1.5 + 0.8 * lv('adrenaline');
@@ -3316,7 +3356,7 @@ function lightBurst(x, y, R, frac, col) {
 }
 function killFoe(e) {
   const rg = S.rg;
-  if (lv('embers')) rg.fires.push({ x: e.x, y: e.y, r: 28 + 8 * lv('embers'), life: 2 + 1.5 * lv('embers'), max: 2 + 1.5 * lv('embers'), seed: Math.random() * 9 });
+  if (lv('embers')) rg.fires.push({ x: e.x, y: e.y, r: 28 + 8 * lv('embers'), life: 2 + 1.5 * lv('embers'), max: 2 + 1.5 * lv('embers'), seed: Math.random() * 9, freeze: isEx() && rawLv('smoulder') > 2 });
   if (lv('nova') && rg.nova < 12) { rg.nova++; if (rg.nova === 12) sfx(2.5, 0.4, 'bandpass', 2200, 0.3); }
   if (e.type === 'splitter') splitApart(e);
   e.dead = true; rg.kills++; rg.waveKills++;
@@ -3334,7 +3374,7 @@ function killFoe(e) {
   }
   if (lv('wildfire') && Math.random() < 0.25) fireFlare();
   if (S.mode === 'expedition' && e.type === 'tall') rg.loose.push({ kind: 'pack', x: e.x, y: e.y, items: ['r', 'r'], orb: false });   // it drops what it carried
-  if (lv('feast')) { const n = lv('feast') > 1 ? 14 : 20; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp++; rg.pop = { t: 0, gained: rg.hp - 1 }; } }
+  if (lv('feast')) { const n = [20, 20, 14, 10][Math.min(3, lv('feast'))]; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp++; rg.pop = { t: 0, gained: rg.hp - 1 }; } }
   dropWisps(e);
 }
 // ---- the bomber: keeps its distance, plants a mortar and lobs shells at where you stand ----
@@ -3390,6 +3430,7 @@ function updateShells(dt) {
   const rg = S.rg, p = S.p;
   for (const s of rg.shells) {
     s.t = Math.min(s.T, s.t + dt);
+    if (lv('glare') > 1 && s.t > 0.3 && inBeam(s.x, s.y, shellHeight(s), lv('glare') > 2 ? 1.35 : 1)) { s.done = true; s.t = -1; glareBurn(s.x, s.y, shellHeight(s)); continue; }   // Glare 2: shells too
     const u = s.t / s.T;
     s.x = s.x0 + (s.tx - s.x0) * u; s.y = s.y0 + (s.ty - s.y0) * u;
     s.trail.push({ x: s.x, y: s.y, h: shellHeight(s) }); if (s.trail.length > 10) s.trail.shift();
@@ -3427,7 +3468,10 @@ function laserStep(e, sp, d, dt) {
       return Math.hypot(e.x + ux * t - o.x, e.y + uy * t - o.y);
     };
     S.trauma = Math.max(S.trauma || 0, 0.12 + 0.18 * monNear(e, 500));   // the ground hums while it fires
-    if (onBeam(p) < LASER_HIT && rg.inv <= 0 && rg.phase === 'fight') hurt({ x: e.x, y: e.y });
+    if (lv('mirror') && e.beam > 0 && onBeam(p) < LASER_HIT * 2) {   // Mirror Shard: your beam bends it back into whoever fired it
+      e.mirrorT = 0.15; e.hp -= e.maxHp * 1.6 * dt; e.jit = 1;
+      if (lv('mirror') > 1) { let best = null, bd = 260; for (const o of rg.enemies) if (o !== e && !o.dead && dist2(o, e) < bd) { bd = dist2(o, e); best = o; } if (best) { best.hp -= best.maxHp * 1.6 * dt; best.jit = 1; e.mirrorTo = best; } }
+    } else if (onBeam(p) < LASER_HIT && rg.inv <= 0 && rg.phase === 'fight') hurt({ x: e.x, y: e.y });
     for (const o of rg.enemies) if (o !== e && !o.dead && onBeam(o) < LASER_HIT + FOES[o.type].w * 0.5) { o.hp -= 1.6 * dt * (1 + 0.09 * (rg.wave - 1)); o.jit = 1; }
     if ((e.st -= dt) <= 0) { e.ai = 'cool'; e.st = 1.8 + Math.random() * 0.8; }
     return;
@@ -3517,9 +3561,16 @@ function throwDart(e, kind, a) {
   if (kind === 'spear') playSpearThrow(e); else playBowLoose(e);
   addShake(0.08 * monNear(e, 500));
 }
+function inBeam(x, y, h = 0, wide = 1) {          // is this world point (h up off the ground) inside the lit beam right now?
+  const bi = S.beamInfo; if (!bi || S.torchLvl < 0.6) return false;
+  const [sx, sy0] = toScreen(x, y), sy = sy0 - h * Z, d = Math.hypot(sx - bi.bx, sy - bi.by);
+  return d < bi.br * 0.95 && Math.abs(angDiff(Math.atan2(sy - bi.by, sx - bi.bx), S.aim)) < HALF * wide;
+}
+function glareBurn(x, y, h) { ashBurst(x, y, 6, h + 6); S.rg.blasts.push({ x, y, t: 0, life: 0.25, r: 26, col: 'white' }); if (actx) noiseAt(actx.currentTime, 4000, 900, 0.12, 0.2, sfxGain); }
 function updateDarts(dt) {
   const rg = S.rg, p = S.p;
   for (const s of rg.darts) {
+    if (!s.stuck && lv('glare') && inBeam(s.x, s.y, dartLift(s), lv('glare') > 2 ? 1.35 : 1)) { s.done = true; glareBurn(s.x, s.y, dartLift(s)); continue; }   // Glare: burnt up in the light
     if (s.stuck) { s.stuck += dt; if (s.stuck > 2.5) s.done = true; continue; }   // left standing in the sand a while
     const step = s.v * dt, ux = Math.cos(s.a), uy = Math.sin(s.a), hit = s.kind === 'spear' ? SPEAR_HIT : ARROW_HIT;
     const x0 = s.x, y0 = s.y; s.x += ux * step; s.y += uy * step; s.gone += step;
@@ -3727,16 +3778,25 @@ function updateSurvive(dt) {
   rg.rushT = Math.max(0, rg.rushT - dt); rg.blackT = Math.max(0, rg.blackT - dt);
   if (rg.blackPend > 0 && (rg.blackPend -= dt) <= 0 && (S.torchLvl > 0.6 || (rg.blackPend = 0.01) < 0)) {   // Blackout flash, once the beam is back up
     rg.strobeFx = 0.3; addShake(0.25); sfx(3, 0.5, 'highpass', 2000, 0.2);
-    for (const e of rg.enemies) if (e.beam > 0) { e.hp -= 0.45 * e.maxHp; e.jit = 1; }
+    for (const e of rg.enemies) if (e.beam > 0) { e.hp -= 0.45 * e.maxHp; e.jit = 1; if (isEx() && lv('blackout') > 1) e.frozen = Math.max(e.frozen || 0, 2); }   // Blackout 2: stunned
   }
   for (const f of rg.fires) f.life -= dt;
   rg.fires = rg.fires.filter(f => f.life > 0); if (rg.fires.length > 60) rg.fires.splice(0, rg.fires.length - 60);
+  if (isEx() && lv('sweep') && rg.sweepT >= 0.6 && S.torchLvl > 0.6 && (rg.arcT = (rg.arcT || 0) - dt) <= 0) {   // Expedition's Sweep: a fast swing leaves burning light hanging in the air
+    rg.arcT = 0.05;
+    const [wx, wy] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)), wl = Math.hypot(wx, wy) || 1, L = rgRange() * RANGE;
+    for (const fr of [0.35, 0.6, 0.85]) rg.fires.push({ x: p.x + wx / wl * L * fr, y: p.y + wy / wl * L * fr, r: 24, life: lv('sweep') > 1 ? 2 : 1, max: lv('sweep') > 1 ? 2 : 1, seed: Math.random() * 9, freeze: lv('sweep') > 2 });
+  }
+  if (isEx() && lv('wind') && rg.shield < 1 && rg.phase === 'fight' && !rg.inCamp) {   // Expedition's Second Wind comes back while you're out
+    rg.windT = (rg.windT || 0) + dt;
+    if (rg.windT >= [90, 90, 60, 30][Math.min(3, lv('wind'))]) { rg.windT = 0; rg.shield = 1; rg.pop = { t: 0, blocked: true }; exNote('second wind is back'); }
+  }
   // strobe
   if (lv('strobe')) {
     rg.strobeT -= dt;
     if (rg.strobeT <= 0) {
       rg.strobeT = 6.5 - 1.2 * (lv('strobe') - 1); rg.strobeFx = 0.2;
-      for (const e of rg.enemies) if (e.beam > 0) e.hp -= 0.4 * e.maxHp;
+      for (const e of rg.enemies) if (e.beam > 0) { e.hp -= 0.4 * e.maxHp; if (isEx() && lv('strobe') > 2) e.frozen = Math.max(e.frozen || 0, 1.5); }   // Strobe 3: the pulse freezes
       sfx(3, 0.35, 'highpass', 2500, 0.12);
     }
   }
@@ -3749,17 +3809,20 @@ function updateSurvive(dt) {
     e.reveal = Math.max(0, e.reveal - dt);
     e.fly = flies.some(fl => Math.hypot(fl.x - e.x, fl.y - e.y) < 18) ? 1 : 0;
     e.flare = rg.flares.some(fl => dist2(fl, e) < fl.r) ? 1 : 0;
-    const inFire = rg.fires.some(fi => dist2(fi, e) < fi.r + f.w * 0.4);
+    const fireAt = rg.fires.find(fi => Math.abs(fi.x - e.x) < 60 && dist2(fi, e) < fi.r + f.w * 0.4), inFire = !!fireAt;
+    if (rg.fires.some(fi => fi.freeze && Math.abs(fi.x - e.x) < 60 && dist2(fi, e) < fi.r + f.w * 0.4)) e.frozen = Math.max(e.frozen || 0, 2);
+    e.frozen = Math.max(0, (e.frozen || 0) - dt);
     const safe = S.mode === 'expedition' ? exSafeAt(e.x, e.y, 30) : null, campLit = !!safe;   // camp and outposts freeze and burn anything at their edge
     const exLit = S.mode === 'expedition' && ((rg.recall && d < 60 + 50 * Math.min(1, rg.recall.t)) || rg.lamps.some(l => Math.abs(l.x - e.x) < 42 && dist2(l, e) < 42));
-    const worldLit = campLit || exLit || (hr && d < hr) || e.flare || inFire || rg.candles.some(c => dist2(c, e) < 55);
+    const worldLit = campLit || exLit || (hr && d < hr) || e.flare || inFire || e.frozen > 0 || rg.candles.some(c => dist2(c, e) < 55);
     e.lit = e.beam > 0 || !!worldLit;
     let dmg = 0;
-    if (e.beam > 0) { dmg += burn * e.beam; e.after = 0.6 * lv('afterglow'); if (lv('scar')) e.scarred = true; }
+    if (e.beam > 0) { dmg += burn * e.beam; e.after = isEx() ? [0, 2, 3, 3][rawLv('smoulder')] : 0.6 * lv('afterglow'); if (lv('scar')) e.scarred = true; }
     else if (e.after > 0) { e.after -= dt; dmg += burn * 0.6; }
     if (e.flare) dmg += 0.9;
     if (inFire) dmg += 1.1;
     if (campLit) dmg += 2.4;
+    if (isEx() && lv('halo') > 2 && hr && d < hr) dmg += 1.2;   // Lantern Halo 3: the ring burns too
     if (lv('kindling') && dmg > 0) for (const o of rg.enemies)   // Kindling: catches anything it brushes past
       if (o !== e && !o.dead && Math.abs(o.x - e.x) < 24 && Math.abs(o.y - e.y) < 24 && dist2(o, e) < 22) o.after = Math.max(o.after, 0.5 * lv('kindling'));
     if (e.fly) dmg += 1.5;
@@ -3877,7 +3940,7 @@ function surviveLight(bx, by, br, casters, lx, ly) {
         const ed = Math.hypot(e.x - lx, e.y - ly), eth = Math.atan2(e.y - ly, e.x - lx);
         const hidden = casters.some(c => c.d < ed && Math.abs(angDiff(eth, c.th)) < Math.asin(Math.min(1, c.r / c.d)));
         if (!hidden) k = 1 - 0.5 * d / br;
-        if (k && lv('core')) k *= off < HALF * 0.35 ? 1 + 1.4 * lv('core') : 0.6;
+        if (k && lv('core')) k *= off < HALF * coreW() ? 1 + 1.4 * lv('core') : 0.6;
       }
     }
     e.beam = k;
@@ -4142,6 +4205,13 @@ function drawSurviveFx(bx, by, br) {
     }
   }
   drawRangedTells(); drawDarts();
+  // Mirror Shard: a white-hot point where the laser meets your beam, and the bounce to a second one
+  for (const e of rg.enemies) {
+    if (!(e.mirrorT > 0)) continue; e.mirrorT -= 1 / 60;
+    const [x, y] = toScreen(S.p.x, S.p.y), lift = FOES.laser.h * 0.72 * Z, g = ctx.createRadialGradient(x, y - lift, 0, x, y - lift, 22 * Z);
+    g.addColorStop(0, 'rgba(235,245,255,0.95)'); g.addColorStop(1, 'rgba(90,170,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - lift, 22 * Z, 0, 7); ctx.fill();
+    if (e.mirrorTo && !e.mirrorTo.dead) { const [x0, y0] = toScreen(e.x, e.y), [x1, y1] = toScreen(e.mirrorTo.x, e.mirrorTo.y); ctx.strokeStyle = 'rgba(160,210,255,0.8)'; ctx.lineWidth = 3 * Z; ctx.beginPath(); ctx.moveTo(x0, y0 - lift); ctx.lineTo(x1, y1 - lift); ctx.stroke(); }
+  }
   // splitters: three pink cores in the chest, the three it will become
   for (const e of rg.enemies) {
     if (e.type !== 'splitter') continue;
@@ -4268,7 +4338,7 @@ function drawSurviveFx(bx, by, br) {
   }
   // Searing Core: a hot white line down the middle of the beam
   if (lv('core') && S.torchLvl > 0.6) {
-    const ch = HALF * 0.35;
+    const ch = HALF * coreW();
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,230,190,0.07)';
     ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(S.aim - ch) * br * 0.95, by + Math.sin(S.aim - ch) * br * 0.95);
     ctx.lineTo(bx + Math.cos(S.aim + ch) * br * 0.95, by + Math.sin(S.aim + ch) * br * 0.95); ctx.closePath(); ctx.fill(); ctx.restore();
@@ -4400,7 +4470,7 @@ const picker = document.getElementById('picker'), cardsEl = document.getElementB
 function drawCards() {
   const rg = S.rg, luck = lv('luck'), n = 3 + lv('fourth');
   const wts = { common: 62 - 12 * luck, rare: 30 + 7 * luck, legendary: 8 + 5 * luck };
-  const pool = UPGRADES.filter(u => (rg.up[u.id] || 0) < u.max), picks = [];
+  const pool = UPGRADES.filter(u => !u.ex && (rg.up[u.id] || 0) < u.max), picks = [];
   while (picks.length < n && pool.length) {
     let total = pool.reduce((s, u) => s + wts[u.r], 0), r = Math.random() * total, i = 0;
     for (; i < pool.length - 1; i++) { r -= wts[pool[i].r]; if (r <= 0) break; }
@@ -4475,7 +4545,7 @@ const EX_SPAWNS = [
   { type: 'laser',    weight: [0, 0, 12, 13], max: [0, 0, 2, 3] },
 ];
 // the shop: every Nightfall card except the ones that only change card picks
-const SHOP = UPGRADES.filter(u => u.tag !== 'Fate');
+const SHOP = UPGRADES.filter(u => u.tag !== 'Fate' && !EX_CUT.includes(u.id));
 const PRICE = { common: 10, rare: 24, legendary: 60 };
 const upPrice = (u, have) => Math.round(PRICE[u.r] * Math.pow(1.8, have));
 const GEAR = [
@@ -4486,6 +4556,21 @@ const GEAR = [
   { id: 'recall', use: true, name: 'Recall Flare', desc: "One use. Light it out in the dark and two seconds later you're home with your pack. You stand still while it burns, and a hit puts it out.", base: 20, max: 1 },
   { id: 'lanterns', use: true, name: 'Outpost Lantern', desc: 'Plant it past the near woods. Its light is safe ground, and over time it lays a trail of lamps toward the orb. Three in all.', base: 30, max: 1 },
 ];
+const TORCH_UP = [
+  { id: 'heat', name: 'Heat', desc: 'Your beam burns 10% hotter per level.', base: 15, max: 5, lvl: n => `${10 * n}% hotter` },
+  { id: 'reach', name: 'Reach', desc: 'Your beam is 8% longer per level.', base: 15, max: 4, lvl: n => `${8 * n}% longer` },
+  { id: 'width', name: 'Width', desc: 'Your beam is 6% wider per level.', base: 15, max: 4, lvl: n => `${6 * n}% wider` },
+  { id: 'quick', name: 'Quick Light', desc: 'Your torch comes on faster and steadier when you switch it on, so a flick of the light catches things sooner.', base: 18, max: 3, lvl: n => `${80 * n}% faster on` },
+  { id: 'clean', name: 'Clean Burn', desc: 'Your beam uses less oil while it is on. The Oil Tank makes the tank bigger; this makes each drop last longer.', base: 18, max: 3, lvl: n => `${15 * n}% less oil` },
+];
+const torchPrice = t => Math.round(t.base * Math.pow(1.8, XS.torch[t.id] || 0));
+function buyTorch(t) {
+  const have = XS.torch[t.id] || 0, cost = torchPrice(t);
+  if (have >= t.max || XS.embers < cost) return;
+  XS.embers -= cost; XS.torch[t.id] = have + 1;
+  sfx(1.4, 0.5, 'bandpass', 1500, 0.3);
+  exApply();
+}
 const gearPrice = g => g.use ? g.base : Math.round(g.base * Math.pow(1.8, XS[g.id]));
 const gearMax = g => g.id === 'lanterns' ? Math.min(g.max, 3 - XS.outposts.length) : g.max;
 const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
@@ -4493,7 +4578,7 @@ const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
 // ---- saving: everything banked lives on this device ----
 const EX_KEY = 'behind-you-expedition';
 let XS = null;
-function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
+function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, torch: {}, shop2: true, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
 function exRead() {
   try {
     const s = JSON.parse(localStorage.getItem(EX_KEY) || 'null');
@@ -4501,6 +4586,16 @@ function exRead() {
       const x = Object.assign(exFresh(), s);
       if (x.own && x.own.rear) { x.embers += PRICE.legendary; delete x.own.rear; }   // Eyes in the Back of Your Head was removed: refund it
       if (x.eq) x.eq = x.eq.filter(id => UP[id]);
+      if (!s.shop2) {                                // the v60 shop rework: refund what was cut or merged, and any levels over the new caps
+        for (const id in x.own) {
+          const u = UP[id]; if (!u) continue;
+          const keep = EX_CUT.includes(id) ? 0 : Math.min(x.own[id], kitMax(u));
+          for (let i = keep; i < x.own[id]; i++) x.embers += upPrice(u, i);
+          if (keep) x.own[id] = keep; else delete x.own[id];
+        }
+        x.eq = x.eq.filter(id => x.own[id]);
+        x.shop2 = true; x.torch = x.torch || {};
+      }
       return x;
     }
   } catch (e) {}
@@ -4841,9 +4936,6 @@ const STATS = [
   { id: 'hardy', g: 'Body', name: 'Hardy', max: 2, cost: [120, 300], sh: 'One more heart', desc: 'One more heart per rank, every run and every trip.' },
   { id: 'nimble', g: 'Body', name: 'Nimble', max: 4, sh: 'Dodge again sooner', desc: 'Your dodge recharges 8% faster per rank.' },
   { id: 'steady', g: 'Body', name: 'Steady', max: 3, sh: 'Longer safety after hits', desc: 'After a hit you stay safe 0.15 seconds longer per rank.' },
-  { id: 'searing', g: 'Torch', name: 'Searing', max: 5, sh: 'Torch burns hotter', desc: 'Your beam burns 8% hotter per rank.' },
-  { id: 'reach', g: 'Torch', name: 'Reach', max: 4, sh: 'Beam reaches further', desc: 'Your beam is 6% longer per rank.' },
-  { id: 'wide', g: 'Torch', name: 'Wide', max: 4, sh: 'Beam covers more', desc: 'Your beam is 5% wider per rank.' },
   { id: 'pull', g: 'Spirit', name: 'Pull', max: 3, sh: 'Wisps come to you', desc: 'Wisps fly to you from further away.' },
   { id: 'linger', g: 'Spirit', name: 'Linger', max: 2, sh: 'Wisps fade slower', desc: 'Wisps last 4 seconds longer per rank before they fade.' },
   { id: 'fortune', g: 'Spirit', name: 'Fortune', max: 3, sh: 'Kills drop more wisps', desc: 'Each kill has a 10% chance per rank to drop an extra wisp.' },
@@ -4852,12 +4944,14 @@ const STAT = Object.fromEntries(STATS.map(s => [s.id, s]));
 const STAT_COST = [15, 35, 70, 120, 190];
 const STAT_GROUPS = [
   { id: 'Body', line: 'Speed, hearts and dodging', icon: 'hardy' },
-  { id: 'Torch', line: 'How hard your beam burns', icon: 'searing' },
   { id: 'Spirit', line: 'Gathering wisps', icon: 'wisp' },
 ];
 function stRead() { try { const s = JSON.parse(localStorage.getItem(ST_KEY)); if (s && typeof s.w === 'number' && s.r) return s; } catch (e) {} return { w: 0, r: {} }; }
 function stSave() { try { localStorage.setItem(ST_KEY, JSON.stringify(ST)); } catch (e) {} }
 let ST = stRead();
+{ let back = 0;                                   // torch stats moved to the camp shop (embers): give back the wisps spent on them
+  for (const id of ['searing', 'reach', 'wide']) { for (let i = 0; i < (ST.r[id] || 0); i++) back += STAT_COST[i]; delete ST.r[id]; }
+  if (back) { ST.w += back; try { localStorage.setItem(ST_KEY, JSON.stringify(ST)); } catch (e) {} } }
 function sr(id) { return ST.r[id] || 0; }
 const statCost = (s, have) => (s.cost || STAT_COST)[have];
 const baseHearts = () => 3 + sr('hardy');
@@ -5821,7 +5915,7 @@ function portalStep(dt) {                      // returns true when the rest of 
 function exOilStep(dt, refill) {
   const rg = S.rg;
   if (refill) { rg.oil = Math.min(oilMax(), rg.oil + OIL_REFILL * dt); return; }
-  rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT : OIL_IDLE));
+  rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT * (1 - 0.15 * tu('clean')) : OIL_IDLE));   // Clean Burn: the beam sips less
   const f = rg.oil / oilMax();
   if (f < 0.3 && rg.oilWarn < 1) { rg.oilWarn = 1; exNote('oil low, head back', true); }
   if (f < 0.1 && rg.oilWarn < 2) { rg.oilWarn = 2; exNote('the torch is guttering', true); }
@@ -6315,7 +6409,7 @@ function exApply() {                         // loadout changed: rebuild the run
 }
 function buyUp(id) {
   const u = UP[id], have = XS.own[id] || 0, cost = upPrice(u, have);
-  if (have >= u.max || XS.embers < cost) return;
+  if (have >= kitMax(u) || XS.embers < cost) return;
   XS.embers -= cost; XS.own[id] = have + 1;
   if (!XS.eq.includes(id) && eqUsed() + slotCost(id) <= slotMax()) XS.eq.push(id);   // equip it straight away if there's room
   sfx(1.4, 0.5, 'bandpass', 1500, 0.3);
@@ -6344,6 +6438,13 @@ const ICONS = {
   steady: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>',
   searing: '<path d="M12 22c-4.2 0-7.2-3.4-6-7.4 1 1 3 1 3-1.2 0-4.2 3-7 6-8.9-1 4 4.3 6 4.3 10.4A7.2 7.2 0 0 1 12 22z"/>',
   reach: '<path d="M2 12h17"/><path d="M15 8l4 4-4 4"/><path d="M22 6v12"/>',
+  heat: '<path d="M12 22c-4.2 0-7.2-3.4-6-7.4 1 1 3 1 3-1.2 0-4.2 3-7 6-8.9-1 4 4.3 6 4.3 10.4A7.2 7.2 0 0 1 12 22z"/>',
+  width: '<path d="M4 12L20 4M4 12l16 8M4 12h16"/>',
+  quick: '<path d="M13 2L5 13h6l-1 9 8-12h-6z"/><path d="M2 6h3M2 18h3"/>',
+  clean: '<path d="M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11z"/><path d="M9 15l2 2 4-4"/>',
+  smoulder: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.5" stroke-dasharray="2 2"/><path d="M3 21h18"/>',
+  glare: '<path d="M3 12l17-6v12z"/><path d="M14 4l-3 4M17 18l-3-3"/>',
+  mirror: '<path d="M6 3l12 4-4 14L2 17z"/><path d="M9 8l5 2"/>',
   wide: '<path d="M4 12L20 4M4 12l16 8M4 12h16"/>',
   pull: '<path d="M6 3v9a6 6 0 0 0 12 0V3"/><path d="M6 7h4M14 7h4"/>',
   linger: '<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
@@ -6383,18 +6484,21 @@ const ICONS = {
   lanterns: '<path d="M6.5 21V4h8"/><rect x="11.5" y="7.5" width="6" height="8.5"/><path d="M14.5 4v3.5"/><path d="M14.5 10v3" stroke-width="2.4"/>',
 };
 const SHORT = {
-  sweep: 'Fast swings flare wider', spot: 'Hold still for a spotlight', kindling: 'Burning spreads to neighbours', afterglow: 'Burn lingers after the beam',
+  sweep: 'Fast swings leave burning arcs', spot: 'Hold still: a long, hot spotlight', kindling: 'Burning spreads to neighbours', afterglow: 'Burn lingers after the beam',
   core: 'Hot centre, weak edges', strobe: 'Beam pulses for big damage', halo: 'Light ring freezes anything close',
   nova: 'Kills charge a dodge blast', blackout: 'Flick the torch to flash',
-  coat: 'Extra heart, flash when hit', feet: 'Faster dodge, fiery rolls', wind: 'Shrug off one hit', close: 'Perfect dodges double your burn',
+  coat: 'Extra heart, flash when hit', feet: 'Rolls leave burning streaks', wind: 'A shield that comes back', close: 'Perfect dodges double your burn',
   adrenaline: 'Speed burst when hit', salt: 'Hits blast enemies back', feast: 'Burning things heals you', lastlight: 'Last heart, stronger beam',
   dread: 'See eyes from anywhere', echo: 'Pulses reveal hidden things',
   fireflies: 'Fireflies orbit and burn', candles: 'Drop candles as you walk', flare: 'Auto flares at lurkers', chain: 'Kills scorch their neighbours',
   scar: 'Burned enemies stay slower', wildfire: 'Bigger bursts, free flares', embers: 'Kills leave burning ground',
+  heat: 'Burns hotter', reach: 'A longer beam', width: 'A wider beam', quick: 'Comes on faster', clean: 'Uses less oil',
+  smoulder: 'Burn lingers, fire where they fall', glare: 'Burn spears and arrows mid-air', mirror: 'Bend lasers back at them',
   tank: 'More oil, go further', frame: 'Heavy loot slows you less', bag: 'Two more pack slots', slot: 'Equip one more upgrade', recall: 'One use: home now', lanterns: 'Plant a safe light',
 };
 const CATS = [
-  { id: 'Torch', line: 'How your beam burns', icon: 'torch' },
+  { id: 'Flame', nm: 'Torch upgrades', line: 'Always on, no slot needed', icon: 'searing' },
+  { id: 'Torch', nm: 'Beam', line: 'Beam tricks for your slots', icon: 'torch' },
   { id: 'Body', line: 'Hearts, hits and dodging', icon: 'coat' },
   { id: 'Allies', line: 'Fire that fights for you', icon: 'fireflies' },
   { id: 'Senses', line: 'See what hides out there', icon: 'dread' },
@@ -6404,6 +6508,11 @@ const CATS = [
 let campCat = null, campOpen = null;
 const svgIcon = id => { const s = el('span', 'ic'); s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] || ''}</svg>`; return s; };
 function campItems(cat) {                    // everything in a category, in one shape for drawing
+  if (cat === 'Flame') return TORCH_UP.map(t => {
+    const have = XS.torch[t.id] || 0, cost = torchPrice(t), maxed = have >= t.max;
+    return { id: t.id, name: t.name, desc: t.desc, cls: have ? 'own' : '', lvl: `${have ? t.lvl(have) + ' · ' : ''}level ${have} of ${t.max} · always on`, tag: maxed ? 'MAX' : String(cost), have, max: t.max,
+      buy: [maxed ? 'Maxed' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyTorch(t)] };
+  });
   if (cat === 'Gear') return GEAR.map(g => {
     const have = XS[g.id], cost = gearPrice(g), maxed = have >= gearMax(g);
     const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : g.id === 'tank' ? Math.round(oilMax()) + ' oil' : g.id === 'frame' ? Math.round(20 * (XS.frame || 0)) + '% lighter loads' : slotMax() + ' equip slots'} · level ${have} of ${g.max}`
@@ -6412,10 +6521,12 @@ function campItems(cat) {                    // everything in a category, in one
       buy: [maxed ? (g.use ? (have ? 'Carrying' : 'None left') : 'Maxed') : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyGear(g)] };
   });
   return SHOP.filter(u => u.tag === cat).map(u => {
-    const have = XS.own[u.id] || 0, maxed = have >= u.max, cost = upPrice(u, have), on = XS.eq.includes(u.id), room = eqUsed() + slotCost(u.id) <= slotMax();
-    return { id: u.id, name: u.name, desc: u.desc.replace('per wave', 'per trip'), cls: u.r + (on ? ' on' : '') + (have ? ' own' : ''),
-      lvl: `${RARITY[u.r].label}${u.r === 'legendary' ? ' · takes 2 slots' : ''} · ${have ? `level ${have} of ${u.max}` : u.max === 1 ? 'one level' : `${u.max} levels`}${on ? ' · equipped' : ''}`,
-      tag: on ? 'ON' : maxed ? 'MAX' : String(cost), have, max: u.max,
+    const mx = kitMax(u), have = XS.own[u.id] || 0, maxed = have >= mx, cost = upPrice(u, have), on = XS.eq.includes(u.id), room = eqUsed() + slotCost(u.id) <= slotMax();
+    const ladder = EX_KIT[u.id] && EX_KIT[u.id].lv;   // what each level adds
+    const lvTxt = ladder ? ladder.map((t, i) => `${i < have ? '✓' : i === have ? '›' : '·'} ${i + 1}: ${t}`).join('\n') : '';
+    return { id: u.id, name: u.name, desc: kitDesc(u) + (lvTxt ? '\n' + lvTxt : ''), cls: u.r + (on ? ' on' : '') + (have ? ' own' : ''),
+      lvl: `${RARITY[u.r].label}${u.r === 'legendary' ? ' · takes 2 slots' : ''} · ${have ? `level ${have} of ${mx}` : mx === 1 ? 'one level' : `${mx} levels`}${on ? ' · equipped' : ''}`,
+      tag: on ? 'ON' : maxed ? 'MAX' : String(cost), have, max: mx,
       buy: [maxed ? 'Maxed' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyUp(u.id)],
       eq: have ? [on ? 'Unequip' : room ? 'Equip' : 'No room', on || room, () => toggleEq(u.id)] : null };
   });
@@ -6436,8 +6547,9 @@ function renderCamp() {
       let count;
       if (c.id === 'Gear') count = `${packMax()} pack · ${slotMax()} slots`;
       else if (c.id === 'Stats') count = `${ST.w} wisps to spend`;
+      else if (c.id === 'Flame') count = `${TORCH_UP.reduce((a, t) => a + (XS.torch[t.id] || 0), 0)} of ${TORCH_UP.reduce((a, t) => a + t.max, 0)} levels`;
       else { const all = SHOP.filter(u => u.tag === c.id); count = `${all.filter(u => XS.own[u.id]).length} of ${all.length} owned`; }
-      const t = el('span', 'ct'); t.append(el('span', 'nm', c.id), el('span', 'sh', c.line), el('span', 'cnt', count));
+      const t = el('span', 'ct'); t.append(el('span', 'nm', c.nm || c.id), el('span', 'sh', c.line), el('span', 'cnt', count));
       b.append(svgIcon(c.icon), t);
       b.addEventListener('click', () => { if (c.id === 'Stats') return openStats('camp'); campCat = c.id; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); });
       return b;
@@ -6446,7 +6558,7 @@ function renderCamp() {
   }
   const head = el('div', 'cathead'), back = el('button', 'mini alt', '‹ All'); back.type = 'button';
   back.addEventListener('click', () => { campCat = null; campOpen = null; renderCamp(); });
-  head.append(back, el('h3', '', campCat));
+  head.append(back, el('h3', '', (CATS.find(c => c.id === campCat) || {}).nm || campCat));
   const list = el('div', 'items');
   list.append(...campItems(campCat).map(it => {
     const open = campOpen === it.id, wrap = el('div', 'item ' + it.cls + (open ? ' open' : ''));
