@@ -4320,6 +4320,7 @@ function exLoad() {                           // how much you're carrying, in we
 function exWeight() {                       // heavy loot slows you; a burning recall flare roots you
   const rg = S.rg; if (S.mode !== 'expedition' || !rg || !rg.pack) return 1;
   if (rg.recall) return 0;
+  const b = bossLive(); if (b && b.st !== 'dying' && b.st !== 'dead') return 1;   // in the Woodwarden's mist you move light, whatever you carry
   return Math.max(0.6, 1 - 0.04 * exLoad() * (1 - 0.2 * (XS.frame || 0)));
 }
 function exSafeAt(x, y, pad = 0) {           // inside the camp fence or an outpost's light?
