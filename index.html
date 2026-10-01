@@ -6614,6 +6614,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && !statsEl.hidden) cl
 statsLabel();
 
 function begin(mode) {
+  camZv = 1;                                    // the title's close-up zoom doesn't carry into the game
   reset(); S.mode = mode; EX_TEST = false;
   if (mode === 'free') { S.q = null; }
   else if (mode === 'survive') { S.q = null; S.rg = newRun(); picker.hidden = true; startWave(); }
@@ -6678,7 +6679,8 @@ function titleStep(dt) {
   const t = (TT.a += dt);
   S.torchOn = true; S.torchLvl = 1;
   S.aim = -Math.PI / 2 + Math.sin(t * 0.31) * 1.25 + Math.sin(t * 0.13) * 0.9;
-  const wide = W > 896 && W >= H, ox = wide ? W * 0.18 : 0, oy = wide ? 0 : -H * 0.2, k = K();   // where on screen the survivor stands
+  const wide = W > 896 && W >= H; camZv = wide ? 1.3 : 1.6; Z = ZB * CAMZ();   // a little closer in on the title, so the survivor fills the empty middle
+  const ox = wide ? W * 0.18 : 0, oy = wide ? H * 0.06 : H * 0.13, k = K();   // where on screen the survivor stands: low, in the open space above the menu
   S.cam.x = S.p.x + (-2 * oy / k - ox / k) / 2; S.cam.y = S.p.y + (ox / k - 2 * oy / k) / 2;
   let d = Math.abs(((S.aim - TT.eyeAng) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
   if (TT.eyeA <= 0.01 && d < 1.9) { TT.eyeAng = S.aim + Math.PI + (Math.random() - 0.5) * 1.2; d = 3; }   // gone; it finds another spot behind you
