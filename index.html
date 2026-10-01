@@ -244,6 +244,10 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <div class="audio"><h2>Playtest</h2>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
+      <button id="testDunes" class="alt">Test the desert orbs</button>
+      <p class="small">Starts in the Dunes with the green portal open and no teal orbs home yet, so you can hunt the first one.</p>
+      <button id="testPortal2" class="alt">Test the second portal</button>
+      <p class="small">Starts by the second shrine with two teal orbs home and the third in your hands.</p>
     </div>
   </section>
   <section class="card panel" id="pScores" hidden>
@@ -462,6 +466,7 @@ function propAt(i, j) {
 function makeProp(i, j) {
   if (Math.abs(i) < 2 && Math.abs(j) < 2) return null; // clear spawn
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2, j * T + T / 2) < CAMP_R + 60) return null;   // the camp clearing
+  if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2 - TELE2.x, j * T + T / 2 - TELE2.y) < 120) return null;   // and round the second shrine
   const cx = i * T + T / 2, cy = j * T + T / 2;
   for (const L of chunkLights(Math.floor(cx / C), Math.floor(cy / C)))
     if (L.kind !== 'flies' && Math.hypot(cx - L.x, cy - L.y) < 80) return null; // keep a clearing round each light
@@ -475,6 +480,7 @@ function makeProp(i, j) {
 }
 function propsNear(x, y, R) {
   const out = [];
+  if (inNext()) return out;
   if (inBeyond()) {
     for (let i = Math.floor((x - R) / T); i <= Math.ceil((x + R) / T); i++)
       for (let j = Math.floor((y - R) / T); j <= Math.ceil((y + R) / T); j++) { const p = desertPropAt(i, j); if (p) out.push(p); }
@@ -1241,12 +1247,12 @@ function update(dt) {
   if (S.mode === 'expedition' && !inBeyond()) exWall(p, ox, oy);
 
   // bump into trees and rocks (and the camp's towers, tent and stores)
-  for (const o of propsNear(p.x, p.y, 60).concat(lightsNear(p.x, p.y, 60).filter(L => L.r), S.mode === 'expedition' && Math.hypot(p.x, p.y) < CAMP_R + 40 ? CAMP_SOLID : [])) {
-    if (o.nocol) continue;
+  for (const o of propsNear(p.x, p.y, 60).concat(lightsNear(p.x, p.y, 60).filter(L => L.r), S.mode === 'expedition' && Math.hypot(p.x, p.y) < CAMP_R + 40 ? CAMP_SOLID : [], S.mode === 'expedition' && !inBeyond() && dist2(p, TELE2) < 120 && !(S.rg && S.rg.warp) ? [TELE2] : [])) {
+    if (o.nocol || (o === TELE2 && portal2Open() >= 1)) continue;   // an open portal you walk into
     const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = o.r * o.s + 7;
     if (d < min && d > 0) { p.x = o.x + dx / d * min; p.y = o.y + dy / d * min; }
   }
-  if (S.mode === 'expedition' && inBeyond()) for (const o of oasesNear(p.x, p.y, 200)) {   // you can wade the shallows, not swim the lagoon
+  if (S.mode === 'expedition' && inDunes()) for (const o of oasesNear(p.x, p.y, 200)) {   // you can wade the shallows, not swim the lagoon
     const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), sh = lagoonR(o, Math.atan2(dy, dx)) * 0.86;
     if (d < sh && d > 0) { p.x = o.x + dx / d * sh; p.y = o.y + dy / d * sh; }
   }
@@ -1354,6 +1360,7 @@ function floorTile() {
   return floorT = { w, h, pat: ctx.createPattern(cv, 'repeat') };
 }
 function drawGround() {
+  if (inNext()) { drawNextGround(); return; }
   if (inBeyond()) { drawBeyondGround(); return; }
   ctx.save(); worldMatrix(ctx, DPR);
   const R = viewR();
@@ -1810,7 +1817,9 @@ function oasisIn(ci, cj) {
   const key = ci + ',' + cj; if (oasisCache.has(key)) return oasisCache.get(key);
   let o = null;
   const gi = Math.floor(BEYOND_GATE.x / OASIS_CELL), gj = Math.floor((BEYOND_GATE.y + 300) / OASIS_CELL);
-  if (ci === gi && cj === gj) o = { x: BEYOND_GATE.x + 470, y: BEYOND_GATE.y + 290, r: 95 };   // the first one is close enough to find
+  const fo = XS && XS.dorbOasis;
+  if (fo && Math.floor(fo.x / OASIS_CELL) === ci && Math.floor(fo.y / OASIS_CELL) === cj) o = { x: fo.x, y: fo.y, r: fo.r };   // an oasis made for a teal orb
+  else if (ci === gi && cj === gj) o = { x: BEYOND_GATE.x + 470, y: BEYOND_GATE.y + 290, r: 95 };   // the first one is close enough to find
   else if (hash(ci * 1.3 + 7, cj * 2.1 - 4) > 0.5) o = { x: (ci + 0.2 + 0.6 * hash(cj, ci + 3)) * OASIS_CELL, y: (cj + 0.2 + 0.6 * hash(ci + 5, cj)) * OASIS_CELL, r: 55 + hash(ci - 2, cj * 3) * 60 };
   if (o) o.seed = hash(ci * 7.7, cj * 3.3) * 6.28;
   oasisCache.set(key, o); return o;
@@ -1833,7 +1842,7 @@ function desertPropAt(i, j) {
   if (desertCache.size > 100000) desertCache.clear();
   let p = null;
   const x = i * T + 8 + hash(j + 41, i - 13) * (T - 16), y = j * T + 8 + hash(i - 29, j + 3) * (T - 16);
-  if (Math.hypot(x - BEYOND_GATE.x, y - BEYOND_GATE.y) > 130) {
+  if (Math.hypot(x - BEYOND_GATE.x, y - BEYOND_GATE.y) > 130 && !(XS && XS.dorb && Math.hypot(x - XS.dorb.x, y - XS.dorb.y) < 50)) {
     const h = hash(i * 0.913 + 51, j * 1.37 - 77), v = hash(i * 2.1 - 5, j * 0.7 + 9), s = 0.85 + hash(i * 4.3, j * 1.9) * 0.4;
     const [oa, sd] = oasisAt(x, y);
     if (oa && sd < 14) p = null;                  // the water itself, and its very edge
@@ -2039,7 +2048,7 @@ function decorAt(i, j) {
   const h = hash(i * 1.31 + 17, j * 0.77 - 9);
   if (h < 0.27 && !(Math.abs(i) < 2 && Math.abs(j) < 2) && !propAt(i, j)) {
     const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
-    if (!(S && S.mode === 'expedition' && Math.hypot(x, y) < CAMP_R + 45)) {
+    if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || Math.hypot(x - TELE2.x, y - TELE2.y) < 70))) {
       const r = h / 0.27, v = hash(i * 3.3, j * 5.1);
       const kind = r < 0.36 ? 'grass' : r < 0.52 ? 'fern' : r < 0.64 ? 'pebbles' : r < 0.76 ? 'bush' : r < 0.85 ? 'shrooms' : r < 0.93 ? 'stump' : 'log';
       d = { kind: 'decor', dk: kind, x, y, s: 1 + hash(j * 1.7, i) * 0.55, v: (v * 97 | 0) % SPRITE_KINDS[kind][0], seed: v };
@@ -2055,6 +2064,7 @@ function decorNear(x, y, R) {
   return out;
 }
 function decorInView(lights) {   // ground cover only shows where some light reaches it, so skip the rest
+  if (inNext()) return [];
   if (inBeyond()) return desertDecorInView();
   const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
   const out = [], near = lights.filter(L => Math.hypot(L.x - S.p.x, L.y - S.p.y) < viewR() + 200);
@@ -3221,7 +3231,8 @@ function killFoe(e) {
   if (lv('nova') && rg.nova < 12) { rg.nova++; if (rg.nova === 12) sfx(2.5, 0.4, 'bandpass', 2200, 0.3); }
   if (e.type === 'splitter') splitApart(e);
   e.dead = true; rg.kills++; rg.waveKills++;
-  rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0, segs: e.type === 'centi' ? centiSegs(e).filter((q, i) => centiOut(e, i)) : null, hz: e.hz });
+  rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0, segs: e.type === 'centi' ? centiSegs(e).filter((q, i) => centiOut(e, i)) : null, hz: e.hz, k: e.k });
+  if (e.guard) { rg.guardDone = true; addShake(0.6); hitStop(0.1); }   // the orb's keeper is dead: it stays dead this trip
   if (e.type === 'centi') for (const q of centiSegs(e)) ashBurst(q.x, q.y, 3, 8);   // it drops to its knees and crumbles
   for (let i = 0; i < 14 * FOES[e.type].h / 38; i++) rg.embers.push({ x: e.x, y: e.y, z: Math.random() * FOES[e.type].h, vz: 30 + Math.random() * 70, vx: (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, life: 0.5 + Math.random() * 0.8, ember: true });
   if (e.type === 'tall') { addShake(0.5); hitStop(0.08); } else addShake(e.type === 'brute' ? 0.2 : 0.07);
@@ -3494,8 +3505,8 @@ function updateSurvive(dt) {
     e.reach = (e.reach || 0) + (reachTo - (e.reach || 0)) * Math.min(1, dt * 6);
     e.kick = Math.max(0, (e.kick || 0) - dt * 4);
     const farOff = !e.lit && d > Math.max(700, (e.spawnD || 500) + 300) && !seenAt(e.x, e.y);   // well out of reach and out of sight
-    if (S.mode === 'expedition' && farOff && d > 900) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
-    if (farOff) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
+    if (S.mode === 'expedition' && farOff && d > 900 && !e.guard) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
+    if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
     let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
@@ -3562,7 +3573,7 @@ function cutSurviveLights(bx, by, br) {
   for (const f of rg.fires) hole(f.x, f.y, f.r * 1.6 * (1 + 0.06 * Math.sin(S.t * 13 + f.seed)), 0.7 * Math.min(1, f.life / 0.5));
   for (const f of fireflyPositions()) hole(f.x, f.y, 20, 0.6 * f.on);
   for (const s of rg.shells) hole(s.x, s.y, 70, 0.35 + 0.35 * (1 - shellHeight(s) / s.apex));   // the shell lights the ground under it as it passes
-  for (const b of rg.blasts) hole(b.x, b.y, b.r, 0.95 * (1 - b.t / b.life), b.col !== 'green' && b.col !== 'pink');
+  for (const b of rg.blasts) hole(b.x, b.y, b.r, 0.95 * (1 - b.t / b.life), b.col !== 'green' && b.col !== 'pink' && b.col !== 'teal');
   for (const e of rg.enemies) {
     if (e.type === 'laser' && e.ai === 'fire') {    // the beam lights the ground it crosses
       const ux = Math.cos(e.dir), uy = Math.sin(e.dir);
@@ -3642,22 +3653,23 @@ function mortarEnds(e, sx, sy, w, h, fc) {   // base and mouth of the tube on sc
 }
 // ---- the burrowing centipede (the Dunes): swims under the sand toward you, bursts up and lunges, then lies out on the sand
 // thrashing for a few seconds before it dives again. Only while it's out can the torch burn it. Its colour is teal.
+const ck = e => e.k || 1;   // a guardian is drawn and moves bigger
 const CENTI_N = 13, CENTI_GAP = 9, CS = 1.45, CENTI_RISE = 0.85, CENTI_STRIKE = 0.32, CENTI_UP = 2.8, CENTI_COL = '70,225,200';
 function centiInit(e) { e.ai = 'under'; e.st = 1.5 + Math.random() * 2; e.trail = []; e.hz = 0; e.out = 0; e.inn = 0; e.wig = Math.random() * 6; e.grace = 0.1; }
 function centiOut(e, i) {                      // is segment i above the sand?
   if (e.ai === 'under' || e.ai === 'rise') return false;
-  return i * CENTI_GAP < e.out && !(e.ai === 'dive' && i * CENTI_GAP < e.inn);
+  const G = CENTI_GAP * ck(e); return i * G < e.out && !(e.ai === 'dive' && i * G < e.inn);
 }
 function centiSegs(e) {                         // the head and each segment, spaced along the path it took
-  const out = [{ x: e.x, y: e.y }], tr = e.trail; let need = CENTI_GAP, px = e.x, py = e.y, k = 0;
+  const G = CENTI_GAP * ck(e), out = [{ x: e.x, y: e.y }], tr = e.trail; let need = G, px = e.x, py = e.y, k = 0;
   while (out.length < CENTI_N && k < tr.length) {
     const q = tr[k], dl = Math.hypot(q.x - px, q.y - py);
-    if (dl >= need) { const u = need / dl; px += (q.x - px) * u; py += (q.y - py) * u; out.push({ x: px, y: py }); need = CENTI_GAP; }
+    if (dl >= need) { const u = need / dl; px += (q.x - px) * u; py += (q.y - py) * u; out.push({ x: px, y: py }); need = G; }
     else { need -= dl; px = q.x; py = q.y; k++; }
   }
   while (out.length < CENTI_N) {
     const L = out[out.length - 1], P = out[out.length - 2] || { x: L.x - 1, y: L.y }, dx = L.x - P.x, dy = L.y - P.y, dl = Math.hypot(dx, dy) || 1;
-    out.push({ x: L.x + dx / dl * CENTI_GAP, y: L.y + dy / dl * CENTI_GAP });
+    out.push({ x: L.x + dx / dl * G, y: L.y + dy / dl * G });
   }
   return out;
 }
@@ -3669,39 +3681,41 @@ function centiStep(e, sp, d, dt) {
   if (e.ai === 'under') {
     e.grace = 0.1; e.hz = -6;
     const v = f.sp * (seenAt(e.x, e.y) ? 1 : 3) * (1 + 0.03 * Math.min(rg.wave, 15));
-    if (d > 8) go(Math.atan2(p.y - e.y, p.x - e.x) + Math.sin(e.wig * 2.3) * 0.65, v);   // it weaves as it swims
+    const home = e.guard && XS.dorb && dist2(p, XS.dorb) > 520 ? XS.dorb : null;   // a guardian won't leave its orb for long
+    if (home) { if (dist2(e, home) > 70) go(Math.atan2(home.y - e.y, home.x - e.x) + 0.9, v * 0.5); else go(e.wig * 0.8, v * 0.3); }
+    else if (d > 8) go(Math.atan2(p.y - e.y, p.x - e.x) + Math.sin(e.wig * 2.3) * 0.65, v);   // it weaves as it swims
     if ((e.rumble = (e.rumble || 0) - dt) <= 0 && d < 380) { e.rumble = 0.2; centiSound('dig', e, d); }
-    if (d < 80 && e.st <= 0) { e.ai = 'rise'; e.st = CENTI_RISE; centiSound('rise', e, d); }
+    if (d < 80 * ck(e) && e.st <= 0) { e.ai = 'rise'; e.st = CENTI_RISE; centiSound('rise', e, d); }
   } else if (e.ai === 'rise') {                  // the sand heaves, cracks, and glows teal from below
     e.grace = 0.1;
     if (Math.random() < dt * 30) S.rg.ash.push({ x: e.x + (Math.random() - 0.5) * 16, y: e.y + (Math.random() - 0.5) * 16, z: 0, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, vz: 40 + Math.random() * 70, life: 0.4 + Math.random() * 0.4 });
     addShake(0.25 * dt);
     if (e.st <= 0) {
       e.ai = 'strike'; e.st = CENTI_STRIKE; e.out = 0; e.bit = false; e.hx = e.x; e.hy = e.y;
-      e.la = Math.atan2(p.y - e.y, p.x - e.x); e.lv = Math.min(115, d + 25) / CENTI_STRIKE;
+      e.la = Math.atan2(p.y - e.y, p.x - e.x); e.lv = Math.min(115 * ck(e), d + 25) / CENTI_STRIKE;
       ashBurst(e.x, e.y, 26, 10); addShake(0.35); centiSound('burst', e, d);
     }
   } else if (e.ai === 'strike') {                // out of the sand in one lunge, jaws first
     const u = 1 - e.st / CENTI_STRIKE;
     go(e.la, e.lv * (1.6 - 1.2 * u)); e.hz = 4 + 28 * Math.sin(Math.PI * Math.min(1, u * 1.1));
-    if (!e.bit && dist2(e, p) < 24 && rg.inv <= 0) { e.bit = true; hurt(e); }
-    if (e.st <= 0) { e.ai = 'up'; e.st = CENTI_UP; }
+    if (!e.bit && dist2(e, p) < 24 * ck(e) && rg.inv <= 0) { e.bit = true; hurt(e); }
+    if (e.st <= 0) { e.ai = 'up'; e.st = CENTI_UP * (e.guard ? 1.3 : 1); }
   } else if (e.ai === 'up') {                    // out on the sand: it crawls at you, slower in the light, thrashing as it burns
     e.hz = 4 + 2 * Math.sin(S.t * 7 + e.wig);
     const v = (e.lit ? 18 : 46) * (1 + (e.pain || 0) * 0.6);
     if (d > 10) go(Math.atan2(p.y - e.y, p.x - e.x) + Math.sin(e.wig * 4) * 0.5 + (e.pain || 0) * Math.sin(S.t * 19) * 0.9, v);
-    if (d < 20 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
+    if (d < 20 * ck(e) && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
     if (e.st <= 0) { e.ai = 'dive'; e.inn = 0; e.dx = e.x; e.dy = e.y; ashBurst(e.x, e.y, 10, 6); centiSound('dive', e, d); }
   } else if (e.ai === 'dive') {                  // head first back into the sand, the body pouring in after it
     const b = e.trail[3] || { x: e.x - 1, y: e.y }; go(Math.atan2(e.y - b.y, e.x - b.x), 60);
     e.hz = -6;
     if (Math.random() < dt * 14) S.rg.ash.push({ x: e.dx, y: e.dy, z: 0, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, vz: 30 + Math.random() * 40, life: 0.4 });
-    if (e.inn > CENTI_N * CENTI_GAP + 4) { e.ai = 'under'; e.st = 2.2 + Math.random() * 1.5; }
+    if (e.inn > CENTI_N * CENTI_GAP * ck(e) + 4) { e.ai = 'under'; e.st = 2.2 + Math.random() * 1.5; }
   }
   const moved = Math.hypot(e.x - ox, e.y - oy);
   e.out += moved; if (e.ai === 'dive') e.inn += moved;
   e.phase += moved * 0.35;
-  if (!e.trail.length || Math.hypot(e.x - e.trail[0].x, e.y - e.trail[0].y) >= 2.5) { e.trail.unshift({ x: e.x, y: e.y }); if (e.trail.length > 70) e.trail.length = 70; }
+  if (!e.trail.length || Math.hypot(e.x - e.trail[0].x, e.y - e.trail[0].y) >= 2.5) { e.trail.unshift({ x: e.x, y: e.y }); if (e.trail.length > 70 * ck(e)) e.trail.length = Math.round(70 * ck(e)); }
 }
 function centiSound(kind, e, d) {
   if (!actx) return;
@@ -3720,15 +3734,15 @@ function centiHole(c, x, y, r) {
   c.fillStyle = '#1b1a18'; c.beginPath(); c.ellipse(x, y, r, r * 0.48, 0, 0, 7); c.fill();
 }
 function drawCentipede(e) {
-  const segs = centiSegs(e);
+  const segs = centiSegs(e), kk = ck(e), G = CENTI_GAP * kk;
   if (e.ai === 'under' || e.ai === 'rise') {     // only the sand moving shows where it is
     for (let i = CENTI_N - 1; i >= 0; i--) {
-      if (i * CENTI_GAP > e.trail.length * 2.5) continue;
+      if (i * G > e.trail.length * 2.5) continue;
       const [x, y] = toScreen(segs[i].x, segs[i].y), w = 1 - i / CENTI_N;
-      centiMound(ctx, x, y + Math.sin(S.t * 9 + i) * 0.5 * Z, (7 + 4 * w) * Z, 0.35 + 0.65 * w);
+      centiMound(ctx, x, y + Math.sin(S.t * 9 + i) * 0.5 * Z, (7 + 4 * w) * Z * kk, 0.35 + 0.65 * w);
     }
     if (e.ai === 'rise') {                       // the ground heaves where it's coming up
-      const k = 1 - e.st / CENTI_RISE, [x, y] = toScreen(e.x, e.y), r = (14 + 14 * k) * Z;
+      const k = 1 - e.st / CENTI_RISE, [x, y] = toScreen(e.x, e.y), r = (14 + 14 * k) * Z * kk;
       centiMound(ctx, x + (Math.random() - 0.5) * 2 * k * Z, y, r, 1);
       ctx.strokeStyle = '#2a2925'; ctx.lineWidth = 1.2 * Z; ctx.beginPath();
       for (let n = 0; n < 7; n++) { const a = n / 7 * 6.28 + e.wig, l = r * (0.4 + 0.7 * k); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l * 0.5); }
@@ -3736,23 +3750,23 @@ function drawCentipede(e) {
     }
     return;
   }
-  if (e.out < CENTI_N * CENTI_GAP) { const [x, y] = toScreen(e.hx, e.hy); centiHole(ctx, x, y, 9 * Z); }
-  if (e.ai === 'dive') { const [x, y] = toScreen(e.dx, e.dy); centiHole(ctx, x, y, 9 * Z); }
+  if (e.out < CENTI_N * G) { const [x, y] = toScreen(e.hx, e.hy); centiHole(ctx, x, y, 9 * Z * kk); }
+  if (e.ai === 'dive') { const [x, y] = toScreen(e.dx, e.dy); centiHole(ctx, x, y, 9 * Z * kk); }
   const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())));
   ctx.lineCap = 'round';
   for (let i = CENTI_N - 1; i >= 0; i--) {
     if (!centiOut(e, i)) continue;
     const q = segs[i], fw = segs[Math.max(0, i - 1)], bk = segs[Math.min(CENTI_N - 1, i + 1)];
     let fx = fw.x - bk.x, fy = fw.y - bk.y; const fl = Math.hypot(fx, fy) || 1; fx /= fl; fy /= fl;
-    const thr = pain * Math.sin(S.t * 22 + i * 1.3) * 2.2, qx = q.x - fy * thr, qy = q.y + fx * thr;   // writhes as it burns
+    const thr = pain * Math.sin(S.t * 22 + i * 1.3) * 2.2 * kk, qx = q.x - fy * thr, qy = q.y + fx * thr;   // writhes as it burns
     const z = i === 0 ? e.hz : i < 4 && e.ai === 'strike' ? e.hz * (1 - i / 4) + 3 : 3 + Math.max(0, e.hz - 4) * Math.max(0, 1 - i / 3);
-    const [sx, gy] = toScreen(qx, qy), sy = gy - z * Z, r = (i === 0 ? 6 : 6.2 - i * 0.22) * Z * CS;
+    const [sx, gy] = toScreen(qx, qy), sy = gy - z * Z, r = (i === 0 ? 6 : 6.2 - i * 0.22) * Z * CS * kk;
     if (z < 12) {                                // legs: two pairs per segment, rippling down the body
       ctx.strokeStyle = pal.far; ctx.lineWidth = Math.max(1, 1.2 * Z);
       for (const sd of [-1, 1]) for (const o of [-0.3, 0.3]) {
         const ph = Math.sin(e.phase * 1.6 - i * 0.9 + o * 3 + (sd > 0 ? Math.PI : 0));
-        const [lx, ly] = toScreen(qx - fy * sd * 15 + fx * (o * 8 + ph * 4), qy + fx * sd * 15 + fy * (o * 8 + ph * 4));
-        const [kx, ky] = toScreen(qx - fy * sd * 10 + fx * o * 7, qy + fx * sd * 10 + fy * o * 7);
+        const [lx, ly] = toScreen(qx - fy * sd * 15 * kk + fx * (o * 8 + ph * 4) * kk, qy + fx * sd * 15 * kk + fy * (o * 8 + ph * 4) * kk);
+        const [kx, ky] = toScreen(qx - fy * sd * 10 * kk + fx * o * 7 * kk, qy + fx * sd * 10 * kk + fy * o * 7 * kk);
         ctx.beginPath(); ctx.moveTo(sx, sy + r * 0.2); ctx.lineTo(kx, ky - (z * 0.6 + 2.5) * Z); ctx.lineTo(lx, ly); ctx.stroke();
       }
     }
@@ -3762,10 +3776,10 @@ function drawCentipede(e) {
     ctx.fillStyle = pal.head; ctx.beginPath(); ctx.ellipse(sx - r * 0.25, sy - r * 0.28, r * 0.45, r * 0.2, 0, 0, 7); ctx.fill();   // a sheen
     ctx.strokeStyle = pal.edge; ctx.lineWidth = Math.max(0.8, 0.7 * Z); ctx.beginPath(); ctx.ellipse(sx, sy - r * 0.05, r * 0.98, r * 0.62, 0, 0, 7); ctx.stroke();
     if (i === 0) {                               // the head: jaws that open as it strikes, and long feelers
-      const [ax, ay] = toScreen(qx + fx * 12, qy + fy * 12), hx = ax - sx, hy = ay - gy, open = e.ai === 'strike' ? 1 : 0.35 + 0.25 * Math.sin(S.t * 9);
+      const [ax, ay] = toScreen(qx + fx * 12 * kk, qy + fy * 12 * kk), hx = ax - sx, hy = ay - gy, open = e.ai === 'strike' ? 1 : 0.35 + 0.25 * Math.sin(S.t * 9);
       ctx.strokeStyle = pal.edge; ctx.lineWidth = 2.6 * Z;
       for (const sd of [-1, 1]) {
-        const [px2, py2] = toScreen(qx - fy * sd * 7, qy + fx * sd * 7), bx = px2 - sx, by = py2 - gy;
+        const [px2, py2] = toScreen(qx - fy * sd * 7 * kk, qy + fx * sd * 7 * kk), bx = px2 - sx, by = py2 - gy;
         ctx.beginPath(); ctx.moveTo(sx + bx * 0.6, sy + by * 0.6); ctx.quadraticCurveTo(sx + hx * 0.9 + bx * (0.9 + open), sy + hy * 0.9 + by * (0.9 + open), sx + hx * 1.1 + bx * 0.1 * (1 - open), sy + hy * 1.1 + by * 0.1 * (1 - open)); ctx.stroke();
         ctx.lineWidth = 0.8 * Z; ctx.strokeStyle = pal.far;
         ctx.beginPath(); ctx.moveTo(sx + bx * 0.3 + hx * 0.4, sy - r * 0.4); ctx.quadraticCurveTo(sx + hx * 1.6 + bx * 1.5, sy - r * 2.4 + Math.sin(S.t * 6 + sd) * 2 * Z, sx + hx * 2.2 + bx * 2.6, sy - r * 1.2 + Math.sin(S.t * 5 + sd) * 2 * Z); ctx.stroke();
@@ -3776,7 +3790,7 @@ function drawCentipede(e) {
 }
 function centiFx(e, a) {                        // drawn over the dark: the teal glow of it coming up, and its eyes
   if (e.ai === 'rise') {
-    const k = 1 - e.st / CENTI_RISE, [x, y] = toScreen(e.x, e.y), r = (20 + 16 * k) * Z, fl = 0.7 + 0.3 * Math.sin(S.t * 30);
+    const k = 1 - e.st / CENTI_RISE, [x, y] = toScreen(e.x, e.y), r = (20 + 16 * k) * Z * ck(e), fl = 0.7 + 0.3 * Math.sin(S.t * 30);
     const g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.6);
     g.addColorStop(0, `rgba(${CENTI_COL},${0.55 * k * fl})`); g.addColorStop(1, `rgba(${CENTI_COL},0)`);
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, r * 1.6, r * 0.8, 0, 0, 7); ctx.fill();
@@ -3786,14 +3800,14 @@ function centiFx(e, a) {                        // drawn over the dark: the teal
     return;
   }
   if (!centiOut(e, 0) || a < 0.02) return;
-  const [x, y] = toScreen(e.x, e.y), yy = y - e.hz * Z - 2 * Z, [px] = toScreen(e.x + 1, e.y - 1), r = 1.1 * Z;
+  const [x, y] = toScreen(e.x, e.y), yy = y - e.hz * Z - 2 * Z, [px] = toScreen(e.x + 1, e.y - 1), r = 1.1 * Z * ck(e);
   ctx.fillStyle = `rgba(${CENTI_COL},${a})`;
-  for (const o of [-3, 3]) { ctx.beginPath(); ctx.arc(x + o * Z, yy - 2 * Z, r * 1.3, 0, 7); ctx.fill(); }
+  for (const o of [-3, 3]) { ctx.beginPath(); ctx.arc(x + o * Z * ck(e), yy - 2 * Z * ck(e), r * 1.3, 0, 7); ctx.fill(); }
 }
 function drawCentiDying(g) {                    // it curls up white-hot and falls to ash, segment by segment
   const k = g.t / 0.8, pal = foePalette(1);
   (g.segs || []).forEach((q, i) => {
-    const kk = Math.min(1, k * 1.4 + i * 0.03), [sx, gy] = toScreen(q.x, q.y), r = (6.2 - i * 0.22) * Z * CS * (1 - 0.6 * kk), sy = gy - (3 + (i === 0 ? (g.hz || 0) * (1 - kk) : 0)) * Z;
+    const kk = Math.min(1, k * 1.4 + i * 0.03), [sx, gy] = toScreen(q.x, q.y), r = (6.2 - i * 0.22) * Z * CS * (g.k || 1) * (1 - 0.6 * kk), sy = gy - (3 + (i === 0 ? (g.hz || 0) * (1 - kk) : 0)) * Z;
     if (kk >= 1) return;
     ctx.globalAlpha = 1 - kk; ctx.fillStyle = pal.body; ctx.beginPath(); ctx.ellipse(sx + (Math.random() - 0.5) * 2 * Z, sy, r, r * 0.6, 0, 0, 7); ctx.fill();
   });
@@ -3878,6 +3892,7 @@ function drawSurviveFx(bx, by, br) {
     if (b.col === 'white' && S.mode === 'expedition') { g.addColorStop(0, `rgba(255,236,200,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,170,90,${0.45 * k})`); g.addColorStop(1, 'rgba(255,140,60,0)'); }
     else if (b.col === 'white') { g.addColorStop(0, `rgba(255,255,250,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,240,210,${0.45 * k})`); g.addColorStop(1, 'rgba(255,220,180,0)'); }
     else if (b.col === 'pink') { g.addColorStop(0, `rgba(255,220,240,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,90,190,${0.5 * k})`); g.addColorStop(1, 'rgba(220,40,160,0)'); }
+    else if (b.col === 'teal') { g.addColorStop(0, `rgba(220,255,248,${0.9 * k})`); g.addColorStop(0.4, `rgba(70,225,200,${0.5 * k})`); g.addColorStop(1, 'rgba(30,170,150,0)'); }
     else if (b.col === 'green') { g.addColorStop(0, `rgba(220,255,230,${0.9 * k})`); g.addColorStop(0.4, `rgba(70,230,120,${0.5 * k})`); g.addColorStop(1, 'rgba(40,180,90,0)'); }
     else if (b.col === 'yellow') { g.addColorStop(0, `rgba(255,250,200,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,210,40,${0.55 * k})`); g.addColorStop(1, 'rgba(240,170,0,0)'); }
     else { g.addColorStop(0, `rgba(255,${b.muzzle ? 120 : 170},90,${0.8 * k})`); g.addColorStop(0.4, `rgba(230,50,25,${0.45 * k})`); g.addColorStop(1, 'rgba(200,20,10,0)'); }
@@ -4157,10 +4172,12 @@ rerollBtn.addEventListener('click', () => { const rg = S.rg; if (!rg || rg.rerol
 const CAMP_R = 170, RINGS = [1800, 4200, 7200];
 const RING_NAMES = ['the near woods', 'the middle woods', 'the far woods', 'the deep'];
 const TELE = { kind: 'tele', x: 92, y: -92, s: 1 };
+const TELE2 = { kind: 'tele', x: -300, y: 300, s: 1, r: 30, second: true };   // the second shrine: out past the wall on the far side of camp, for the desert orbs
 const EX_FIRE = { kind: 'fire', x: 0, y: 0, r: 14, s: 1, seed: 3.7 };
 const OUT_R = 100, LAMP_GAP = 170, LAMP_MAX = 40, RECALL_T = 2;
 const ITEMS = { s: { name: 'scrap', slots: 1, val: 1 }, c: { name: 'cache', slots: 1, val: 5 }, r: { name: 'relic', slots: 2, val: 22 } };
-const ORB_COL = '70,230,120';
+let ORB_COL = '70,230,120', ORB_DARK = 'rgb(40,170,85)', ORB_LITE = 'rgb(150,255,185)';   // swapped to teal while the second shrine draws (asTeal)
+const DORB_COL = '70,225,200';
 const exRing = d => d < RINGS[0] ? 0 : d < RINGS[1] ? 1 : d < RINGS[2] ? 2 : 3;
 const exInCamp = () => Math.hypot(S.p.x, S.p.y) < CAMP_R;
 // Spawning follows distance from camp: how many may be out at once, and seconds between spawns, per ring.
@@ -4193,7 +4210,7 @@ const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
 // ---- saving: everything banked lives on this device ----
 const EX_KEY = 'behind-you-expedition';
 let XS = null;
-function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0 }; }
+function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
 function exRead() {
   try {
     const s = JSON.parse(localStorage.getItem(EX_KEY) || 'null');
@@ -4217,7 +4234,7 @@ const OIL_BASE = 60, OIL_IDLE = 0.6, OIL_LIT = 1, OIL_REFILL = 25;
 const WEIGHT = { s: 0.5, c: 1, r: 3 }, ORB_WEIGHT = 4;
 const oilMax = () => OIL_BASE * (1 + 0.4 * (XS ? XS.tank || 0 : 0));
 function exLoad() {                           // how much you're carrying, in weight
-  const rg = S.rg; return rg.pack.reduce((a, k) => a + (WEIGHT[k] || 0), 0) + (rg.carryOrb ? ORB_WEIGHT : 0);
+  const rg = S.rg; return rg.pack.reduce((a, k) => a + (WEIGHT[k] || 0), 0) + (rg.carryOrb ? ORB_WEIGHT : 0) + (rg.carryDorb ? ORB_WEIGHT : 0);
 }
 function exWeight() {                       // heavy loot slows you; a burning recall flare roots you
   const rg = S.rg; if (S.mode !== 'expedition' || !rg || !rg.pack) return 1;
@@ -4528,7 +4545,7 @@ function drawCampFlames() {
 }
 function exItems() {   // camp, chests and dropped packs, drawn in with the trees
   const rg = S.rg; if (!rg || rg.beyond) return [];
-  return CAMP.concat([TELE], exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose);
+  return CAMP.concat([TELE, TELE2], exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose);
 }
 
 // ---- personal stats: kills drop violet wisps, wisps buy small boosts that last for good (Nightfall and Expedition) ----
@@ -4698,7 +4715,7 @@ function exNewRun() {
   rg.wave = 1; rg.up = {};
   for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
   rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = rg.up.wind || 0;
-  rg.pack = []; rg.carryOrb = false; rg.looted = new Set(); rg.left = new Map(); rg.loose = []; rg.notes = [];
+  rg.pack = []; rg.carryOrb = false; rg.carryDorb = false; rg.looted = new Set(); rg.left = new Map(); rg.loose = []; rg.notes = [];
   rg.inCamp = true; rg.oil = oilMax(); rg.oilWarn = 0; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
   return rg;
 }
@@ -4708,23 +4725,25 @@ function exBegin() {
   if (XS.drop) { if (XS.drop.orb) XS.orbField = true; XS.drop = null; }   // packs from older saves: gone, the orb goes back out
   if (XS.out) { exDropPack(XS.out); XS.out = null; note = ['you never made it back', 'Everything you carried is gone']; }
   if (!XS.orb && XS.orbs < 3) exNewOrb();
+  if (XS.orbs >= 3 && !XS.dorb && (XS.dorbs || 0) < 3) exNewDorb();
   if (XS.orbField && XS.orb && Math.hypot(XS.orb.x, XS.orb.y) < RINGS[2]) exNewOrb();   // an orb from before the woods grew: move it out into the new deep   // one orb is out there at a time
   exSave();
   S.rg = exNewRun(); exPlaceHome();
   S.msg = note ? { text: note[0], sub: note[1], t: 0 }
-    : { text: 'expedition', sub: XS.orbs >= 3 ? 'The portal is open' : XS.orbs ? `${XS.orbs} of 3 orbs home` : 'A green light waits in the deep', t: 0 };
+    : { text: 'expedition', sub: XS.dorbs >= 3 ? 'Both portals are open' : XS.orbs >= 3 ? `The portal is open · ${XS.dorbs || 0} of 3 teal orbs home` : XS.orbs ? `${XS.orbs} of 3 orbs home` : 'A green light waits in the deep', t: 0 };
 }
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
 function exNote(text, big) { S.rg.notes.push({ text, t: 0, big: !!big }); if (S.rg.notes.length > 3) S.rg.notes.shift(); }
 function exDropPack(src) {                   // nothing is left behind: what you carried is lost, and a carried orb goes back to where it was found
   if (src.orb) XS.orbField = true;
+  if (src.dorb) XS.dorbField = true;
   XS.drop = null;
 }
 function exDeath() {
   const rg = S.rg;
   rg.phase = 'dead'; rg.deadT = 0;
-  const had = rg.pack.length || rg.carryOrb || rg.wispCarry;
-  exDropPack({ x: S.p.x, y: S.p.y, items: rg.pack, orb: rg.carryOrb });
+  const had = rg.pack.length || rg.carryOrb || rg.carryDorb || rg.wispCarry;
+  exDropPack({ x: S.p.x, y: S.p.y, items: rg.pack, orb: rg.carryOrb, dorb: rg.carryDorb });
   XS.out = null; exSave();
   S.msg = { text: 'The dark took you', sub: had ? 'Everything you carried is gone' : 'You wake by the fire', t: 0 };
 }
@@ -4796,7 +4815,7 @@ function exDeposit() {
   rg.blasts.push({ x: TELE.x, y: TELE.y, t: 0, life: 0.9, r: 220, col: 'green' });
   rg.echoes.push({ r: 0, x: TELE.x, y: TELE.y, max: 500, burst: true });
   if (actx) { const t = actx.currentTime; boomAt(t, 60, 220, 1.2, 0.5, sfxGain); }
-  if (XS.orbs >= 3) { rg.portalFx = { t: 0, flashed: false }; S.msg = null; return; }   // the last one: the shrine wakes (see portalStep)
+  if (XS.orbs >= 3) { rg.portalFx = { t: 0, flashed: false }; S.msg = null; if (!XS.dorb) { exNewDorb(); exSave(); } return; }   // the last one: the shrine wakes (see portalStep)
   S.msg = { text: `${XS.orbs} of 3`, sub: 'Another wakes, further out', t: 0 };
 }
 function exHome() {                          // stepped inside the fence: bank the pack, heal up
@@ -4840,7 +4859,7 @@ function exStep(dt) {
     return;                                  // nothing new comes while you're home
   }
   if (ring > rg.ringMax) { rg.ringMax = ring; rg.ringMsg = { text: RING_NAMES[ring], t: 0 }; }
-  if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb }; exSave(); }   // where your pack ends up if you quit out here
+  if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // where your pack ends up if you quit out here
   for (const o of XS.outposts) o.n = Math.min(LAMP_MAX, (o.n || 0) + dt / 20);   // outposts lay a new lamp every 20 s you're out
   if (rg.recall && (rg.recall.t += dt) >= RECALL_T) {                             // the flare carries you home
     XS.recall--; rg.recall = null;
@@ -4851,23 +4870,15 @@ function exStep(dt) {
     return;
   }
   const outpost = exSafeAt(p.x, p.y);
-  if (outpost) rg.oil = Math.min(oilMax(), rg.oil + OIL_REFILL * dt);   // an outpost's lamp tops the torch up
-  else {
-    rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT : OIL_IDLE));
-    const f = rg.oil / oilMax();
-    if (f < 0.3 && rg.oilWarn < 1) { rg.oilWarn = 1; exNote('oil low, head back', true); }
-    if (f < 0.1 && rg.oilWarn < 2) { rg.oilWarn = 2; exNote('the torch is guttering', true); }
-    if (rg.oil <= 0 && rg.oilWarn < 3) { rg.oilWarn = 3; exNote('out of oil', true); if (actx) { const t = actx.currentTime; noiseAt(t, 600, 150, 0.6, 0.3, sfxGain); } }
-    if (f > 0.35) rg.oilWarn = 0;
-  }
+  exOilStep(dt, !!outpost);                  // an outpost's lamp tops the torch up
   if (outpost) {                             // safe in an outpost's light: nothing new comes, the ranged ones back off
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }
   } else {
     rg.spawnT -= dt;
-    const bait = rg.carryOrb ? 5 : 0;         // a carried orb draws them in from all round
+    const bait = rg.carryOrb || rg.carryDorb ? 5 : 0;         // a carried orb draws them in from all round
     const cap = EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3);   // and so does a heavy pack
     if (rg.spawnT <= 0) {
-      rg.spawnT = EX_GAP[ring] * (rg.carryOrb ? 0.55 : 1) * (0.6 + Math.random() * 0.8);
+      rg.spawnT = EX_GAP[ring] * (rg.carryOrb || rg.carryDorb ? 0.55 : 1) * (0.6 + Math.random() * 0.8);
       if (rg.enemies.length < cap) exSpawn(exPickFoe(ring));
     }
   }
@@ -4879,6 +4890,8 @@ function exStep(dt) {
   for (const L of rg.loose) if (!L.taken && dist2(L, p) < 26) exTakeLoose(L);
   rg.loose = rg.loose.filter(L => !L.taken);
   if (XS.orbField && XS.orb && !rg.carryOrb && dist2(XS.orb, p) < 30) exTakeOrb();
+  if (rg.carryDorb && dist2(p, TELE2) < 46) exDepositD();                    // the second shrine, out past the wall
+  if (portal2Open() >= 1 && !rg.warp && dist2(p, TELE2) < 16) warpStart('next');
 }
 
 // ---- drawing ----
@@ -4917,20 +4930,41 @@ function drawTele(o, c, sx, sy, col) {       // an ancient dais of black stone; 
 }
 function teleSockets(sx, sy) { const ZT = Z * TELE_S; return [0, 1, 2].map(i => { const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 26 * ZT, y = sy + Math.sin(a) * 13 * ZT; return [x + (sx - x) * 0.3, y - 70 * ZT]; }); }
 function drawPackProp(o, c, sx, sy) { stamp(c, sprite('pack', 0), sx, sy, Z, 1, 0, false); }
+function drawOrbBeacon(o) {                    // an orb waiting out in the dark: a beam you can see from a long way off, then the crystal itself
+  const [ox, oy0] = toScreen(o.x, o.y), d = dist2(o, S.p), oy = oy0 - (26 + 4 * Math.sin(S.t * 2)) * Z;
+  if (d < 3600) {
+    const k = Math.min(1, (3600 - d) / 1200);
+    const g = ctx.createLinearGradient(0, oy - 520, 0, oy);
+    g.addColorStop(0, `rgba(${ORB_COL},0)`); g.addColorStop(1, `rgba(${ORB_COL},${0.16 * k})`);
+    ctx.fillStyle = g; ctx.fillRect(ox - 7 * Z, oy - 520, 14 * Z, 520);
+    const hg = ctx.createRadialGradient(ox, oy, 0, ox, oy, 220 * Z);
+    hg.addColorStop(0, `rgba(${ORB_COL},${0.22 * k})`); hg.addColorStop(1, `rgba(${ORB_COL},0)`);
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(ox, oy, 220 * Z, 0, 7); ctx.fill();
+  }
+  if (ox > -60 && ox < W + 60 && oy > -60 && oy < H + 60) drawOrb(ox, oy, Z, 1);
+}
 function drawOrb(x, y, s, a) {               // a levitating green crystal and its glow
   const g = ctx.createRadialGradient(x, y, 0, x, y, 46 * s);
   g.addColorStop(0, `rgba(${ORB_COL},${0.55 * a})`); g.addColorStop(1, `rgba(${ORB_COL},0)`);
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 46 * s, 0, 7); ctx.fill();
   const w = 6 * s, h = 11 * s, sp = Math.sin(S.t * 1.7) * 0.25;
   ctx.globalAlpha = a;
-  ctx.fillStyle = 'rgb(40,170,85)'; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x + w, y); ctx.lineTo(x, y + h); ctx.lineTo(x - w, y); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = 'rgb(150,255,185)'; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x + w * sp, y); ctx.lineTo(x, y + h); ctx.lineTo(x - w, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = ORB_DARK; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x + w, y); ctx.lineTo(x, y + h); ctx.lineTo(x - w, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = ORB_LITE; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x + w * sp, y); ctx.lineTo(x, y + h); ctx.lineTo(x - w, y); ctx.closePath(); ctx.fill();
   ctx.fillStyle = 'rgb(230,255,235)'; ctx.beginPath(); ctx.arc(x - w * 0.3, y - h * 0.3, 1.3 * s, 0, 7); ctx.fill();
   ctx.globalAlpha = 1;
 }
 function exHoles(hole) {                     // light the orb puts out round itself
   const rg = S.rg;
-  if (rg.beyond) { hole(BEYOND_GATE.x, BEYOND_GATE.y, 120, 0.6, 0); return; }
+  if (rg.next) { hole(NEXT_GATE.x, NEXT_GATE.y, 120, 0.6, 0); return; }
+  if (rg.beyond) {
+    hole(BEYOND_GATE.x, BEYOND_GATE.y, 120, 0.6, 0);
+    if (XS.dorbField && XS.dorb) hole(XS.dorb.x, XS.dorb.y, 95 * (1 + 0.05 * Math.sin(S.t * 2)), 0.8, 0);
+    if (rg.carryDorb) hole(S.p.x, S.p.y, 70, 0.55, 0);
+    return;
+  }
+  if (rg.carryDorb) hole(S.p.x, S.p.y, 70, 0.55, 0);
+  if (XS.dorbs || XS.orbs >= 3) hole(TELE2.x, TELE2.y, 60 + 25 * (XS.dorbs || 0) + 70 * portal2Open(), 0.4 + 0.3 * portal2Open(), 0);
   for (const g of GATES) { const p = polar(g, CAMP_R + 8); if (Math.abs(p.x - S.cam.x) < 900 && Math.abs(p.y - S.cam.y) < 900) hole(p.x, p.y, 62 * (1 + 0.05 * Math.sin(S.t * 9 + g)), 0.55); }
   if (XS.orbField && XS.orb) hole(XS.orb.x, XS.orb.y, 95 * (1 + 0.05 * Math.sin(S.t * 2)), 0.8, 0);   // the orbs keep their green
   if (rg.carryOrb) hole(S.p.x, S.p.y, 70, 0.55, 0);
@@ -4959,7 +4993,10 @@ function exPointer(px, py, tx, ty, col, glyph, a) {   // a chevron circling you,
 // carried to another world (blank for now: flat ground, a way back, nothing else yet).
 const BEYOND_GATE = { x: 0, y: 60000 };        // where the way back stands in the other world (far from anything at home)
 const P_RISE = 1.8, P_FLASH = 1.8, P_OPEN = 1.6;   // orbs rise and spiral in; the flash; the tear widens
-const inBeyond = () => S && S.mode === 'expedition' && S.rg && S.rg.beyond;
+const inBeyond = () => S && S.mode === 'expedition' && S.rg && S.rg.beyond;   // in any world through a portal (the Dunes, or the one past them)
+const inNext = () => inBeyond() && S.rg.next;                                    // the world past the second portal (blank for now)
+const inDunes = () => inBeyond() && !S.rg.next;
+const NEXT_GATE = { x: 60000, y: 0 };
 function portalOpen() {                        // 0 shut, 1 fully open
   if (!XS || XS.orbs < 3) return 0;
   const f = S.rg && S.rg.portalFx; if (!f) return 1;
@@ -4979,8 +5016,21 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (f.t > P_FLASH + P_OPEN && !f.said) { f.said = true; S.msg = { text: 'the way is open', sub: 'Step into the light', t: 0 }; }
     if (f.t > P_FLASH + P_OPEN + 1) rg.portalFx = null;
   }
+  const f2 = rg.portal2Fx;                       // the second shrine opening, the same way as the first, in teal
+  if (f2) {
+    const t0 = f2.t; f2.t += dt;
+    if (f2.t < P_FLASH) { addShake(0.9 * dt * (0.4 + f2.t / P_RISE)); if (actx && Math.floor(t0 * 6) !== Math.floor(f2.t * 6)) noiseAt(actx.currentTime, 90, 40, 0.5, 0.18 + 0.1 * f2.t, sfxGain); }
+    if (!f2.flashed && f2.t >= P_FLASH) {
+      f2.flashed = true; hitStop(0.2); addShake(0.9);
+      rg.blasts.push({ x: TELE2.x, y: TELE2.y, t: 0, life: 1.2, r: 320, col: 'teal' });
+      rg.echoes.push({ r: 0, x: TELE2.x, y: TELE2.y, max: 700, burst: true });
+      if (actx) { const t = actx.currentTime; boomAt(t, 45, 28, 2.4, 0.8, sfxGain); boomAt(t + 0.05, 330, 80, 1.4, 0.35, sfxGain); noiseAt(t, 3000, 300, 2.2, 0.3, sfxGain); }
+    }
+    if (f2.t > P_FLASH + P_OPEN && !f2.said) { f2.said = true; S.msg = { text: 'another way opens', sub: 'Step through, if you dare', t: 0 }; }
+    if (f2.t > P_FLASH + P_OPEN + 1) rg.portal2Fx = null;
+  }
   if (rg.warp) {
-    const w = rg.warp, at = w.dir === 'out' ? TELE : BEYOND_GATE;
+    const w = rg.warp, at = { out: TELE, home: BEYOND_GATE, next: TELE2, home2: NEXT_GATE }[w.dir];
     w.t += dt;
     if (!w.moved) { p.x += (at.x - p.x) * Math.min(1, dt * 5); p.y += (at.y - p.y) * Math.min(1, dt * 5); p.vx = p.vy = 0; }   // pulled in
     if (!w.moved && w.t >= 0.9) { w.moved = true; warpArrive(w.dir); }
@@ -4988,17 +5038,107 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (w.t >= 1.9) rg.warp = null;
     return true;
   }
-  if (rg.beyond) {                             // nothing here yet: no oil burned, nothing hunting, only the way back
-    rg.oil = oilMax(); campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
+  if (rg.next) {                               // past the second portal: nothing here yet, only the way back
+    rg.oil = oilMax(); rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
+    if (dist2(p, NEXT_GATE) > 40) rg.leftGate = true;
+    if (rg.leftGate && dist2(p, NEXT_GATE) < 16) warpStart('home2');
+    return true;
+  }
+  if (rg.beyond) {                             // the Dunes: oil burns, centipedes hunt, a teal orb waits out in the sand
+    rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
+    exOilStep(dt, dist2(p, BEYOND_GATE) < 130);  // the portal's light tops the torch up
+    if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // quitting out here loses what you carry
     if (dist2(p, BEYOND_GATE) > 40) rg.leftGate = true;
+    if (XS.dorbField && XS.dorb && !rg.carryDorb && dist2(XS.dorb, p) < 30) exTakeDorb();
+    if (XS.dorbField && XS.dorb && !rg.guardDone && dist2(p, XS.dorb) < 750 && !rg.enemies.some(e => e.guard)) spawnGuard();
+    if (dist2(p, BEYOND_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the ranged ones off, like an outpost
     if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // centipedes hunt the open sand; the ground round the portal is safe
-      if ((rg.duneT = (rg.duneT ?? 6) - dt) <= 0) { rg.duneT = 5 + Math.random() * 5; if (rg.enemies.filter(e => e.type === 'centi').length < 3) spawnFoe('centi'); }
+      // harder than the deep woods: no limit per kind, only on how many hunt at once, and that grows the further out you are
+      const dg = dist2(p, BEYOND_GATE), cap = Math.min(24, 14 + dg / 250) + (rg.carryDorb ? 5 : 0);
+      if ((rg.duneT = (rg.duneT ?? 3) - dt) <= 0) {
+        rg.duneT = 0.65 * (rg.carryDorb ? 0.6 : 1) * (0.6 + Math.random() * 0.8);
+        if (rg.enemies.filter(e => !e.guard).length < cap) { let r = Math.random() * DUNE_MIX.reduce((a, m) => a + m.w, 0); for (const m of DUNE_MIX) if ((r -= m.w) < 0) { spawnFoe(m.type); break; } }
+      }
       if (!rg.centiSeen && rg.enemies.some(e => e.type === 'centi' && e.ai === 'rise' && dist2(e, p) < 260)) { rg.centiSeen = true; rg.ringMsg = { text: 'something under the sand', sub: 'when the ground glows, move', t: 0 }; }
     }
     if (rg.leftGate && dist2(p, BEYOND_GATE) < 16) warpStart('home');
     return true;
   }
   return false;
+}
+function exOilStep(dt, refill) {
+  const rg = S.rg;
+  if (refill) { rg.oil = Math.min(oilMax(), rg.oil + OIL_REFILL * dt); return; }
+  rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT : OIL_IDLE));
+  const f = rg.oil / oilMax();
+  if (f < 0.3 && rg.oilWarn < 1) { rg.oilWarn = 1; exNote('oil low, head back', true); }
+  if (f < 0.1 && rg.oilWarn < 2) { rg.oilWarn = 2; exNote('the torch is guttering', true); }
+  if (rg.oil <= 0 && rg.oilWarn < 3) { rg.oilWarn = 3; exNote('out of oil', true); if (actx) { const t = actx.currentTime; noiseAt(t, 600, 150, 0.6, 0.3, sfxGain); } }
+  if (f > 0.35) rg.oilWarn = 0;
+}
+// ---- the teal orbs of the Dunes: three of them, each by an oasis further out, each guarded by a great centipede.
+// Carry them back through the green portal to the second shrine past the camp wall; three open the next way.
+const DORB_D = [1200, 2000, 2800];
+const DUNE_MIX = [{ type: 'centi', w: 30 }, { type: 'kamikaze', w: 25 }, { type: 'bomber', w: 22 }, { type: 'laser', w: 23 }];   // who hunts the Dunes, and how often each comes
+function exNewDorb() {
+  if ((XS.dorbs || 0) >= 3) { XS.dorb = null; XS.dorbField = false; return; }
+  let a, tries = 0;
+  do a = Math.random() * Math.PI * 2; while (XS.dorbA !== null && XS.dorbA !== undefined && Math.abs(angDiff(a, XS.dorbA)) < Math.PI / 2 && ++tries < 50);
+  const D = DORB_D[XS.dorbs || 0], tx = BEYOND_GATE.x + Math.cos(a) * D, ty = BEYOND_GATE.y + Math.sin(a) * D;
+  let best = null, bd = 1e9;                      // the nearest good-sized oasis to that spot
+  for (const o of oasesNear(tx, ty, 900)) { const d = Math.hypot(o.x - tx, o.y - ty); const og = Math.hypot(o.x - BEYOND_GATE.x, o.y - BEYOND_GATE.y); if (o.r >= 60 && d < bd && og > D * 0.8 && og < D * 1.25) { bd = d; best = o; } }
+  if (!best) {                                    // no oasis out there: one appears for it
+    XS.dorbOasis = { x: tx, y: ty, r: 85 }; oasisCache.clear();
+    best = oasisIn(Math.floor(tx / OASIS_CELL), Math.floor(ty / OASIS_CELL));
+  }
+  let at = { x: tx, y: ty };
+  if (best) { const b = Math.atan2(BEYOND_GATE.y - best.y, BEYOND_GATE.x - best.x), r = lagoonR(best, b) + 38; at = { x: best.x + Math.cos(b) * r, y: best.y + Math.sin(b) * r }; }   // on the near shore
+  XS.dorbA = a; XS.dorb = at; XS.dorbField = true; desertCache.clear();
+}
+function exTakeDorb() {
+  const rg = S.rg;
+  rg.carryDorb = true; XS.dorbField = false; rg.outT = 0;
+  hitStop(0.12); addShake(0.45);
+  rg.blasts.push({ x: XS.dorb.x, y: XS.dorb.y, t: 0, life: 0.7, r: 160, col: 'teal' });
+  rg.echoes.push({ r: 0, x: XS.dorb.x, y: XS.dorb.y, max: 400, burst: true });
+  for (const e of rg.enemies) e.reveal = 1;
+  if (actx) { const t = actx.currentTime; boomAt(t, 120, 35, 1.4, 0.6, sfxGain); }
+  S.msg = { text: 'a teal orb', sub: 'Take it home, to the stones past the camp wall', t: 0 };
+}
+function exDepositD() {
+  const rg = S.rg;
+  rg.carryDorb = false; XS.dorbs = (XS.dorbs || 0) + 1; XS.dorb = null; XS.dorbField = false; XS.out = null; exNewDorb(); exSave();
+  hitStop(0.15); addShake(0.5);
+  rg.blasts.push({ x: TELE2.x, y: TELE2.y, t: 0, life: 0.9, r: 220, col: 'teal' });
+  rg.echoes.push({ r: 0, x: TELE2.x, y: TELE2.y, max: 500, burst: true });
+  if (actx) { const t = actx.currentTime; boomAt(t, 55, 200, 1.2, 0.5, sfxGain); }
+  if (XS.dorbs >= 3) { rg.portal2Fx = { t: 0, flashed: false }; S.msg = null; return; }
+  S.msg = { text: `${XS.dorbs} of 3`, sub: 'Another waits in the sand, further out', t: 0 };
+}
+function portal2Open() {
+  if (!XS || (XS.dorbs || 0) < 3) return 0;
+  const f = S.rg && S.rg.portal2Fx; if (!f) return 1;
+  return Math.max(0, Math.min(1, (f.t - P_FLASH) / P_OPEN));
+}
+function spawnGuard() {                          // a great centipede coiled under the sand by the orb
+  const o = XS.dorb, a = Math.random() * Math.PI * 2;
+  spawnFoe('centi', { x: o.x + Math.cos(a) * 90, y: o.y + Math.sin(a) * 90, d: 700 });
+  const e = S.rg.enemies[S.rg.enemies.length - 1];
+  e.guard = true; e.k = 1.7; e.hp = e.maxHp = 8 * (1 + 0.09 * (S.rg.wave - 1)); e.st = 0.5;
+  if (!S.rg.guardSeen) { S.rg.guardSeen = true; S.rg.ringMsg = { text: 'the sand is deep here', sub: 'something big keeps the orb', t: 0 }; }
+}
+// draw something as the second shrine would: teal instead of green, with its own orbs, opening and place
+function asTeal(fn) {
+  const rg = S.rg, keep = [ORB_COL, ORB_DARK, ORB_LITE, rg.portalFx, XS.orbs, TELE.x, TELE.y];
+  ORB_COL = DORB_COL; ORB_DARK = 'rgb(30,150,135)'; ORB_LITE = 'rgb(160,255,235)';
+  rg.portalFx = rg.portal2Fx; XS.orbs = XS.dorbs || 0; TELE.x = TELE2.x; TELE.y = TELE2.y;
+  try { fn(); } finally { [ORB_COL, ORB_DARK, ORB_LITE, rg.portalFx, XS.orbs, TELE.x, TELE.y] = keep; }
+}
+function drawNextGround() {                      // past the second portal: bare dark ground, nothing made yet
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = '#4a4a48'; ctx.fillRect(0, 0, W, H); ctx.restore();
+  ctx.save(); worldMatrix(ctx, DPR);
+  for (const f of S.p.prints) { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a); ctx.fillStyle = `rgba(30,30,28,${0.5 * (1 - f.age / 10)})`; ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 2.2, 0, 0, 7); ctx.fill(); ctx.restore(); }
+  ctx.restore();
 }
 function warpStart(dir) {
   const rg = S.rg; rg.warp = { t: 0, dir, moved: false }; rg.leftGate = false;
@@ -5009,12 +5149,19 @@ function warpArrive(dir) {
   const rg = S.rg, p = S.p;
   for (const e of rg.enemies) e.dead = e.gone = true;
   rg.enemies = []; rg.fires = []; rg.wisps = []; rg.blasts = []; rg.echoes = [];
+  rg.guardDone = false; rg.homeA = 0;
   if (dir === 'out') {
-    rg.beyond = true; p.x = BEYOND_GATE.x; p.y = BEYOND_GATE.y + 34;
-    S.msg = { text: 'the dunes', sub: 'Find water. Find shade. Keep moving', t: 0 };
+    rg.beyond = true; rg.next = false; p.x = BEYOND_GATE.x; p.y = BEYOND_GATE.y + 34;
+    S.msg = (XS.dorbs || 0) < 3 && !rg.carryDorb ? { text: 'the dunes', sub: XS.dorbs ? `${XS.dorbs} of 3 teal orbs home · another waits out in the sand` : 'A teal light waits out in the sand', t: 0 } : { text: 'the dunes', sub: 'Find water. Find shade. Keep moving', t: 0 };
+  } else if (dir === 'next') {
+    rg.beyond = true; rg.next = true; p.x = NEXT_GATE.x; p.y = NEXT_GATE.y + 34;
+    S.msg = { text: 'somewhere else', sub: 'Nothing here yet', t: 0 };
+  } else if (dir === 'home2') {
+    rg.beyond = false; rg.next = false; p.x = TELE2.x + 26; p.y = TELE2.y - 26;   // back out of the second shrine
+    S.msg = { text: 'home', sub: 'The camp is close', t: 0 };
   } else {
-    rg.beyond = false; p.x = TELE.x - 26; p.y = TELE.y + 26;   // stepped back out beside the shrine
-    S.msg = { text: 'home', sub: 'Back by the fire', t: 0 };
+    rg.beyond = false; rg.next = false; p.x = TELE.x - 26; p.y = TELE.y + 26;   // stepped back out beside the shrine
+    S.msg = rg.carryDorb ? { text: 'home', sub: 'Take the teal orb to the stones past the wall', t: 0 } : { text: 'home', sub: 'Back by the fire', t: 0 };
   }
   S.cam.x = p.x; S.cam.y = p.y; addShake(0.5);
 }
@@ -5031,6 +5178,26 @@ function drawBeyondGround() {                  // the dunes: rippled pale sand r
 }
 // the portal: a ragged tear standing on the pit. Through it you look down a deep green tunnel to a light at the far end;
 // its edge burns like cold green fire, and the dark around it is lit green
+// out in the Dunes: a green arrow circling you that always points back to the portal, so you can find your way home
+function drawHomeArrow(gx, gy, gate) {
+  const rg = S.rg, d = dist2(S.p, gate), on = Math.max(0, Math.min(1, (d - 160) / 120));
+  rg.homeA = (rg.homeA || 0) + (on - (rg.homeA || 0)) * Math.min(1, frameDt * 4);
+  if (rg.homeA < 0.02 || rg.warp) return;
+  const [px, py0] = toScreen(S.p.x, S.p.y), py = py0 - 18 * Z, a = Math.atan2(gy - 40 * Z - py, gx - px);   // aims at the portal's middle
+  const R = 46 * Z, x = px + Math.cos(a) * R, y = py + Math.sin(a) * R * 0.8, s = 11 * Z * (1 + 0.08 * Math.sin(S.t * 4)), al = rg.homeA * (0.7 + 0.3 * Math.sin(S.t * 4));
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2.2); g.addColorStop(0, `rgba(${ORB_COL},${0.35 * al})`); g.addColorStop(1, `rgba(${ORB_COL},0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, s * 2.2, 0, 7); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(${ORB_COL},${al})`; ctx.strokeStyle = `rgba(220,255,232,${al})`; ctx.lineWidth = 1.2 * Z; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.7, -s * 0.75); ctx.lineTo(-s * 0.3, 0); ctx.lineTo(-s * 0.7, s * 0.75); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  if (d > 600) {                                  // how far, in steps, under the arrow
+    ctx.save(); ctx.font = `${Math.round(9 * Z)}px ui-monospace, monospace`; ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(${ORB_COL},${0.85 * rg.homeA})`; ctx.fillText(Math.round(d / 10) + ' m', x, y + 18 * Z); ctx.restore();
+  }
+}
 function drawPortal(tx, ty, ZT, o, sockets) {
   if (o <= 0) return;
   const t = S.t, cy = ty - 5 * ZT, G = a => `rgba(${ORB_COL},${Math.max(0, Math.min(1, a))})`, Wt = a => `rgba(220,255,232,${Math.max(0, Math.min(1, a))})`;
@@ -5136,6 +5303,7 @@ function drawPortalRise(tx, ty, ZT, sockets) {
 }
 function drawWarpVeil() {                      // stepping through: the world folds into green, then white, then the other side
   const rg = S.rg, f = rg.portalFx, w = rg.warp;
+  if (!drawWarpVeil.inner && ((w && (w.dir === 'next' || w.dir === 'home2')) || (rg.portal2Fx && !rg.next && !rg.beyond))) { drawWarpVeil.inner = true; try { asTeal(drawWarpVeil); } finally { drawWarpVeil.inner = false; } if (!(rg.portalFx || (w && (w.dir === 'out' || w.dir === 'home')))) return; }
   let a = 0, col = '200,255,215';
   if (w) a = w.t < 0.9 ? Math.pow(w.t / 0.9, 2) : Math.max(0, 1 - (w.t - 0.9) / 1);
   if (f && f.t >= P_FLASH && f.t < P_FLASH + 0.6) { a = Math.max(a, 0.85 * (1 - (f.t - P_FLASH) / 0.6)); col = '225,255,232'; }
@@ -5150,20 +5318,7 @@ function drawWarpVeil() {                      // stepping through: the world fo
   ctx.fillStyle = `rgba(${col},${a})`; ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
-function drawExFx() {
-  const rg = S.rg; if (!rg || !XS) return;
-  if (rg.beyond) { drawLagoonGlints(); drawSandWind(); const [gx, gy] = toScreen(BEYOND_GATE.x, BEYOND_GATE.y); drawPortal(gx, gy, Z * TELE_S, 1, null); drawWarpVeil(); return; }
-  drawCampFlames();
-  const p = S.p, [px, py] = toScreen(p.x, p.y), alive = rg.phase === 'fight';
-  // chests catch a glint of light now and then, so you can find them in the dark
-  for (const c of exChestsNear(p.x, p.y, 440)) {
-    if (rg.looted.has(c.key)) continue;
-    const tw = Math.sin(S.t * 1.9 + c.tw); if (tw < 0.75) continue;
-    const a = (tw - 0.75) / 0.25 * Math.max(0, 1 - dist2(c, p) / 440) * (c.tier === 3 ? 1 : 0.65);
-    const [x, y] = toScreen(c.x, c.y), yy = y - 12 * Z, r = (c.tier === 3 ? 6 : 4) * Z;
-    ctx.strokeStyle = `rgba(250,250,240,${a})`; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(x - r, yy); ctx.lineTo(x + r, yy); ctx.moveTo(x, yy - r); ctx.lineTo(x, yy + r); ctx.stroke();
-  }
+function drawShrineFx() {
   // the shrine: runes that wake, a pit that opens onto somewhere else, stones that float, and the orbs brought home
   { const ZT = Z * TELE_S, [tx, ty] = toScreen(TELE.x, TELE.y), onScreen = tx > -150 && tx < W + 150 && ty > -150 && ty < H + 400;
     if (onScreen) { const sk = teleSockets(tx, ty), t = S.t, n = XS.orbs, pw = 0.3 + 0.7 * n / 3, cy = ty - 5 * ZT;
@@ -5260,21 +5415,32 @@ function drawExFx() {
     }
     if (n >= 3) { drawPortalRise(tx, ty, ZT, sk); drawPortal(tx, ty, ZT, portalOpen(), sk); }
   } }
+}
+function drawExFx() {
+  const rg = S.rg; if (!rg || !XS) return;
+  if (rg.next) { const [gx, gy] = toScreen(NEXT_GATE.x, NEXT_GATE.y); asTeal(() => { drawPortal(gx, gy, Z * TELE_S, 1, null); drawHomeArrow(gx, gy, NEXT_GATE); drawWarpVeil(); }); return; }
+  if (rg.beyond) {
+    drawLagoonGlints(); drawSandWind(); const [gx, gy] = toScreen(BEYOND_GATE.x, BEYOND_GATE.y); drawPortal(gx, gy, Z * TELE_S, 1, null);
+    if (XS.dorbField && XS.dorb) asTeal(() => drawOrbBeacon(XS.dorb));
+    const [px, py] = toScreen(S.p.x, S.p.y);
+    if (rg.carryDorb) asTeal(() => drawOrb(px + 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4) * 2 * Z, Z * 0.75, 1));
+    drawHomeArrow(gx, gy, BEYOND_GATE); drawWarpVeil(); return;
+  }
+  drawCampFlames();
+  const p = S.p, [px, py] = toScreen(p.x, p.y), alive = rg.phase === 'fight';
+  // chests catch a glint of light now and then, so you can find them in the dark
+  for (const c of exChestsNear(p.x, p.y, 440)) {
+    if (rg.looted.has(c.key)) continue;
+    const tw = Math.sin(S.t * 1.9 + c.tw); if (tw < 0.75) continue;
+    const a = (tw - 0.75) / 0.25 * Math.max(0, 1 - dist2(c, p) / 440) * (c.tier === 3 ? 1 : 0.65);
+    const [x, y] = toScreen(c.x, c.y), yy = y - 12 * Z, r = (c.tier === 3 ? 6 : 4) * Z;
+    ctx.strokeStyle = `rgba(250,250,240,${a})`; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x - r, yy); ctx.lineTo(x + r, yy); ctx.moveTo(x, yy - r); ctx.lineTo(x, yy + r); ctx.stroke();
+  }
+  drawShrineFx(); if (XS.orbs >= 3) asTeal(drawShrineFx);   // the green shrine in camp, and the teal one past the wall
   drawWarpVeil();
   // the orb out in the deep: a beacon you can see from a long way off, then the crystal itself
-  if (XS.orbField && XS.orb) {
-    const [ox, oy0] = toScreen(XS.orb.x, XS.orb.y), d = dist2(XS.orb, p), oy = oy0 - (26 + 4 * Math.sin(S.t * 2)) * Z;
-    if (d < 3600) {
-      const k = Math.min(1, (3600 - d) / 1200);
-      const g = ctx.createLinearGradient(0, oy - 520, 0, oy);
-      g.addColorStop(0, `rgba(${ORB_COL},0)`); g.addColorStop(1, `rgba(${ORB_COL},${0.16 * k})`);
-      ctx.fillStyle = g; ctx.fillRect(ox - 7 * Z, oy - 520, 14 * Z, 520);
-      const hg = ctx.createRadialGradient(ox, oy, 0, ox, oy, 220 * Z);
-      hg.addColorStop(0, `rgba(${ORB_COL},${0.22 * k})`); hg.addColorStop(1, `rgba(${ORB_COL},0)`);
-      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(ox, oy, 220 * Z, 0, 7); ctx.fill();
-    }
-    if (ox > -60 && ox < W + 60 && oy > -60 && oy < H + 60) drawOrb(ox, oy, Z, 1);
-  }
+  if (XS.orbField && XS.orb) drawOrbBeacon(XS.orb);
   // dropped packs: a faint pale marker so you can find your things
   for (const L of rg.loose) {
     const [x, y] = toScreen(L.x, L.y), a = 0.25 + 0.15 * Math.sin(S.t * 3);
@@ -5304,9 +5470,11 @@ function drawExFx() {
   }
   // a carried orb rides over your shoulder
   if (rg.carryOrb) drawOrb(px + 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4) * 2 * Z, Z * 0.75, 1);
+  if (rg.carryDorb) asTeal(() => drawOrb(px - 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4 + 1) * 2 * Z, Z * 0.75, 1));
   // pointers round you: green to the orb, white to home, pale to a dropped pack
-  if (!rg.inCamp || rg.loose.length || (XS.orbField && XS.orb)) {
+  if (!rg.inCamp || rg.loose.length || (XS.orbField && XS.orb) || rg.carryDorb) {
     const on = (x, y) => x > 40 && x < W - 40 && y > 40 && y < H - 40;
+    if (rg.carryDorb) { const [x, y] = toScreen(TELE2.x, TELE2.y); exPointer(px, py, x, y, `rgb(${DORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
     if (XS.orbField && XS.orb && !rg.carryOrb) { const [x, y] = toScreen(XS.orb.x, XS.orb.y); exPointer(px, py, x, y, `rgb(${ORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
     if (!rg.inCamp) { const gp = Math.hypot(S.p.x, S.p.y) > CAMP_R + 30 ? exNearestGate(S.p.x, S.p.y) : { x: 0, y: 0 }, [x, y] = toScreen(gp.x, gp.y); exPointer(px, py, x, y, '#efefea', 'house', on(x, y) ? 0.25 : rg.carryOrb ? 0.95 : 0.7); }
     for (const L of rg.loose) { const [x, y] = toScreen(L.x, L.y); exPointer(px, py, x, y, L.orb ? `rgb(${ORB_COL})` : 'rgba(239,239,234,0.9)', 'pack', on(x, y) ? 0.25 : 0.7); }
@@ -5354,7 +5522,7 @@ function drawExHud(top) {
   const rg = S.rg; if (!rg || !XS) return;
   ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(239,239,234,0.75)';
-  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
+  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.next ? 'SOMEWHERE ELSE' : rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
   for (let i = 0; i < rg.maxHp; i++) {
     const x = 16 + i * 15, y = 37 + top;
     heartPath(ctx, x + 5, y + 5, 11);
@@ -5362,7 +5530,7 @@ function drawExHud(top) {
     else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
   }
   ctx.fillStyle = 'rgba(239,239,234,0.4)';
-  const bits = [`PACK ${packUsed(rg.pack)}/${packMax()}`, `${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, `ORBS ${XS.orbs}/3`, `OIL ${Math.round(100 * rg.oil / oilMax())}%`];
+  const bits = [`PACK ${packUsed(rg.pack)}/${packMax()}`, `${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`, `OIL ${Math.round(100 * rg.oil / oilMax())}%`];
   if (XS.recall) bits.push('FLARE'); if (XS.lanterns) bits.push('LANTERN');
   let ln = '', y = 54 + top; const room = W - 16 - 110;   // wrap before it reaches the Menu button
   for (const b of bits) { const t = ln ? ln + ' · ' + b : b; if (ln && ctx.measureText(t).width > room) { ctx.fillText(ln, 16, y); y += 17; ln = b; } else ln = t; }
@@ -5585,6 +5753,21 @@ document.getElementById('testPortal').addEventListener('click', () => {   // str
   XS = JSON.parse(JSON.stringify(XS)); XS.orbs = 2; XS.orb = null; XS.orbField = false; XS.out = null;
   S.rg.carryOrb = true; S.p.x = TELE.x - 60; S.p.y = TELE.y + 60; S.cam.x = S.p.x; S.cam.y = S.p.y;
   S.msg = { text: 'playtest', sub: 'Carry the last orb to the shrine', t: 0 };
+});
+function exTestCopy(orbs, dorbs) {
+  begin('expedition'); EX_TEST = true;
+  XS = JSON.parse(JSON.stringify(XS)); XS.orbs = orbs; XS.orb = null; XS.orbField = false; XS.out = null;
+  XS.dorbs = dorbs; XS.dorb = null; XS.dorbField = false; XS.dorbA = null;
+}
+document.getElementById('testDunes').addEventListener('click', () => {
+  exTestCopy(3, 0); exNewDorb();
+  const rg = S.rg; rg.beyond = true; rg.next = false; rg.inCamp = false; S.p.x = BEYOND_GATE.x; S.p.y = BEYOND_GATE.y + 34; S.cam.x = S.p.x; S.cam.y = S.p.y;
+  S.msg = { text: 'playtest', sub: 'Find the teal orb and bring it home', t: 0 };
+});
+document.getElementById('testPortal2').addEventListener('click', () => {
+  exTestCopy(3, 2);
+  S.rg.carryDorb = true; S.p.x = TELE2.x + 70; S.p.y = TELE2.y - 70; S.cam.x = S.p.x; S.cam.y = S.p.y;
+  S.msg = { text: 'playtest', sub: 'Carry the last teal orb to the stones', t: 0 };
 });
 document.getElementById('start').addEventListener('click', () => begin('chase'));
 
