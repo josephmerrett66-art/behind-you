@@ -1769,7 +1769,7 @@ const UPGRADES = [
   // body
   { id: 'coat', r: 'common', max: 4, tag: 'Body', name: 'Thick Coat', desc: 'One more heart, and heal one.' },
   { id: 'boots', r: 'common', max: 4, tag: 'Body', name: 'Trail Boots', desc: 'Move 12% faster.' },
-  { id: 'wind', r: 'common', max: 1, tag: 'Body', name: 'Second Wind', desc: 'Heal one heart at the start of every wave.' },
+  { id: 'wind', r: 'common', max: 1, tag: 'Body', name: 'Second Wind', desc: 'Once per wave, shrug off a hit without losing a heart.' },
   { id: 'phantom', r: 'common', max: 2, tag: 'Body', name: 'Cold Sweat', desc: 'Stay untouchable for longer after a hit.' },
   { id: 'adrenaline', r: 'rare', max: 2, tag: 'Body', name: 'Adrenaline', desc: 'Getting hit gives you a sharp burst of speed.' },
   { id: 'salt', r: 'rare', max: 2, tag: 'Body', name: 'Salt Pockets', desc: 'When something reaches you, a spray of salt blasts every nearby shade back.' },
@@ -1870,7 +1870,9 @@ function startWave() {
   const rg = S.rg;
   rg.wave++; rg.phase = 'fight'; rg.waveKills = 0;
   rg.waveTotal = rg.toSpawn = rgWaveCount(rg.wave); rg.spawnGap = rgSpawnGap(rg.wave); rg.spawnT = 0.8;
-  if (lv('wind')) rg.hp = Math.min(rg.maxHp, rg.hp + 1);
+  if (rg.wave > 1 && rg.hp < rg.maxHp) rg.pop = { t: 0, refill: rg.hp };   // show the hearts filling back up
+  rg.hp = rg.maxHp;                        // three lives a wave: every wave starts at full health
+  rg.shield = lv('wind');
   if (rg.wave % 5 === 0) { spawnFoe('tall'); rg.waveTotal++; S.msg = { text: 'Wave ' + rg.wave, sub: 'Something tall is coming', t: 0 }; }
   else if (rg.wave === 2) S.msg = { text: 'Wave 2', sub: 'The yellow ones burst', t: 0 };
   else if (rg.wave === 3) S.msg = { text: 'Wave 3', sub: 'Watch the sky for red', t: 0 };
@@ -1886,7 +1888,13 @@ function ashBurst(x, y, n, hgt = 20) {
 function shove(e, amt) { const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypot(dx, dy) || 1; e.x += dx / d * amt; e.y += dy / d * amt; }
 function hurt(e) {
   const rg = S.rg;
+  if (rg.shield > 0) {                     // Second Wind: this one bounces off
+    rg.shield--; rg.inv = 1.2 + 0.6 * lv('phantom'); rg.pop = { t: 0, blocked: true };
+    addShake(0.35); hitStop(0.05); shove(e, 90); sfx(1.4, 0.6, 'bandpass', 1500, 0.3);
+    return;
+  }
   rg.hp--; rg.inv = 1.2 + 0.6 * lv('phantom'); rg.hurtFx = 1;
+  rg.pop = { t: 0, lost: rg.hp };          // index of the heart that just went
   addShake(0.75); hitStop(0.11);
   { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }   // knocked back
   if (lv('adrenaline')) rg.adren = 1.5 + 0.8 * lv('adrenaline');
@@ -1909,7 +1917,7 @@ function killFoe(e) {
     rg.echoes.push({ r: 0, x: e.x, y: e.y, max: R, burst: true });
   }
   if (lv('wildfire') && Math.random() < 0.25) fireFlare();
-  if (lv('feast')) { const n = lv('feast') > 1 ? 14 : 20; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp++; S.msg = { text: '+1 heart', t: 0, short: true }; } }
+  if (lv('feast')) { const n = lv('feast') > 1 ? 14 : 20; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp++; rg.pop = { t: 0, gained: rg.hp - 1 }; } }
 }
 // ---- the bomber: keeps its distance, plants a mortar and lobs shells at where you stand ----
 const BOMB_SETUP = 1.2, BOMB_R = 52, BOMB_FLIGHT = 1.8, BOMB_NEAR = 150;
@@ -2067,6 +2075,7 @@ function updateSurvive(dt) {
   if (!rg) return;
   for (const a of rg.ash) { a.x += a.vx * dt; a.y += a.vy * dt; a.z += a.vz * dt; a.vz -= 60 * dt; a.vx *= 0.97; a.vy *= 0.97; a.life -= dt; }
   rg.ash = rg.ash.filter(a => a.life > 0);
+  if (rg.pop) { rg.pop.t += dt; if (rg.pop.t > HEART_POP) rg.pop = null; }
   rg.hurtFx = Math.max(0, rg.hurtFx - dt * 1.8); rg.strobeFx = Math.max(0, rg.strobeFx - dt);
   if (rg.phase === 'dead') { rg.deadT += dt; if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
   if (rg.phase === 'dawn') { rg.dawnT -= dt; if (rg.dawnT <= 0) openPicker(); return; }
@@ -2441,6 +2450,55 @@ function drawSurviveFx(bx, by, br) {
     g.addColorStop(0, 'rgba(160,20,20,0)'); g.addColorStop(1, `rgba(160,20,20,${0.55 * rg.hurtFx})`);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
+  drawHeartPop();
+}
+// ---- hearts that pop up over your head when something changes, right where you're looking ----
+const HEART_POP = 2.7;
+function heartPath(c, x, y, s) {           // a heart centred on x,y, s wide
+  const h = s * 0.5;
+  c.beginPath(); c.moveTo(x, y + h * 0.9);
+  c.bezierCurveTo(x - h * 1.9, y - h * 0.2, x - h * 0.9, y - h * 1.6, x, y - h * 0.55);
+  c.bezierCurveTo(x + h * 0.9, y - h * 1.6, x + h * 1.9, y - h * 0.2, x, y + h * 0.9);
+  c.closePath();
+}
+function drawHeartPop() {
+  const rg = S.rg, P = rg && rg.pop; if (!P || rg.phase === 'dawn') return;
+  const t = P.t, n = rg.maxHp, sz = 15, gap = 20, [px, py] = toScreen(S.p.x, S.p.y);
+  const cx = px, cy = py - 62 * Z - 6;
+  const fade = t < HEART_POP - 0.45 ? 1 : Math.max(0, (HEART_POP - t) / 0.45);
+  const last = rg.hp === 1;
+  ctx.save(); ctx.lineJoin = 'round';
+  for (let i = 0; i < n; i++) {
+    const pop = Math.min(1, (t - i * 0.05) / 0.14);                     // each heart springs up in turn
+    if (pop <= 0) continue;
+    const bounce = pop < 1 ? 0.5 + 0.7 * pop : 1 + 0.12 * Math.max(0, 1 - (t - 0.14 - i * 0.05) / 0.2);
+    let x = cx + (i - (n - 1) / 2) * gap, y = cy, s = sz * bounce, a = fade, full = i < rg.hp, col = last ? '#e03434' : '#efefea';
+    if (P.refill !== undefined && i >= P.refill) full = t > 0.25 + (i - P.refill) * 0.18;   // refilling one by one
+    if (P.gained === i) full = t > 0.25;
+    if (P.lost === i) {                    // the heart you lost: flashes red, cracks, then drops away
+      const k = t - 0.35;
+      if (k < 0) { full = true; col = '#ff4a4a'; x += (Math.random() - 0.5) * 3; }
+      else {
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - k / 0.7) * fade;
+        ctx.translate(x + k * 18, y + 140 * k * k); ctx.rotate(k * 2.4);
+        heartPath(ctx, 0, 0, s); ctx.fillStyle = '#b02020'; ctx.fill();
+        ctx.restore();
+        full = false;
+      }
+    }
+    ctx.globalAlpha = a;
+    heartPath(ctx, x, y, s);
+    if (full) {
+      ctx.fillStyle = col; ctx.fill();
+      ctx.strokeStyle = 'rgba(10,10,10,0.8)'; ctx.lineWidth = 2; ctx.stroke();
+      if (last && P.lost === undefined || last && t > 0.35) { ctx.globalAlpha = a * (0.3 + 0.3 * Math.sin(t * 9)); heartPath(ctx, x, y, s * 1.35); ctx.strokeStyle = '#e03434'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    } else { ctx.fillStyle = 'rgba(10,10,10,0.55)'; ctx.fill(); ctx.strokeStyle = 'rgba(239,239,234,0.55)'; ctx.lineWidth = 1.5; ctx.stroke(); }
+  }
+  if (P.blocked && t < 0.6) {              // Second Wind: a ring flashes out round the hearts
+    ctx.globalAlpha = 1 - t / 0.6; ctx.strokeStyle = '#efefea'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(cx, cy, (n * gap) * (0.6 + t), 16 * (0.8 + t), 0, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
 }
 function drawSurviveHud(top) {
   const rg = S.rg; if (!rg) return;
@@ -2449,8 +2507,9 @@ function drawSurviveHud(top) {
   ctx.fillText(`WAVE ${rg.wave}`, 16, 16 + top);
   for (let i = 0; i < rg.maxHp; i++) {
     const x = 16 + i * 15, y = 37 + top;
-    if (i < rg.hp) { ctx.fillStyle = lastHeart() ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fillRect(x, y, 10, 10); }
-    else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, 9, 9); }
+    heartPath(ctx, x + 5, y + 5, 11);
+    if (i < rg.hp) { ctx.fillStyle = rg.hp === 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); }
+    else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
   }
   ctx.fillStyle = 'rgba(239,239,234,0.4)';
   ctx.fillText(`${rg.kills} BURNED · BEST ${bests.survive || 0}`, 16, 54 + top);
@@ -2507,7 +2566,7 @@ function openPicker() {
 function choose(id) {
   const rg = S.rg;
   rg.up[id] = (rg.up[id] || 0) + 1;
-  if (id === 'coat') { rg.maxHp++; rg.hp = Math.min(rg.maxHp, rg.hp + 1); }
+  if (id === 'coat') { rg.maxHp++; rg.hp = rg.maxHp; }
   if (id === 'reroll') rg.rerolls += 2;
   picker.hidden = true; menuBtn.hidden = false;
   S.running = true; last = performance.now();
