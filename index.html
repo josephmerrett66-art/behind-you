@@ -700,7 +700,7 @@ const MON_WAV = {
 const mon = {};
 const BURN_PEAK = 0.42;       // seconds into the burn recording where it hits full force: the shade dies right there
 const BURN_MAX = 6, GRAIN = 0.09, HOP = 0.045;   // at most 6 burning at once are heard; the hiss is stretched from overlapping grains
-const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05, laser: 0.95, kamikaze: 1.3, splitter: 0.9, splitling: 1.55, centi: 1.45 };   // bigger things sound lower
+const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05, laser: 0.95, kamikaze: 1.3, splitter: 0.9, splitling: 1.55, centi: 1.45, spear: 1.1, archer: 1 };   // bigger things sound lower
 const burnVoices = new Set(), monLast = { death: 0, small: 0 };
 let hann = null;
 function monOut(x, y, gain) {       // a gain node panned toward where the monster is on screen
@@ -1087,6 +1087,8 @@ const KIT = {
   kamikaze: { head: 'goggles', charges: 1 },
   splitter: { head: 'hood', vest: 1 },
   splitling:{},
+  spear:    { head: 'helmet', vest: 1 },
+  archer:   { head: 'hood', coat: 1 },
 };
 const shadeC = (col, k) => {                     // the same colour, darker by k ('rgb(...)' or '#rrggbb')
   const ch = col[0] === '#' ? [1, 3, 5].map(i => parseInt(col.slice(i, i + 2), 16)) : col.slice(col.indexOf('(') + 1, -1).split(',').map(Number);
@@ -3158,6 +3160,8 @@ const FOES = {
   splitter:{ hp: 1.8,  sp: 32, lightSp: 0,    h: 42, w: 14 },
   splitling:{ hp: 0.35, sp: 80, lightSp: 0,   h: 21, w: 8 },
   centi:   { hp: 2.2,  sp: 78, lightSp: 1,    h: 14, w: 16 },   // the Dunes' burrowing centipede: moves itself (centiStep)
+  spear:   { hp: 1.2,  sp: 74, lightSp: 0,    h: 36, w: 12 },   // the Dunes' spear thrower: runs in, stops, throws
+  archer:  { hp: 1.0,  sp: 40, lightSp: 0,    h: 38, w: 11 },   // the Dunes' archer: keeps its distance and looses arrows
 };
 
 const lv = id => (S.rg && S.rg.up[id]) || 0;
@@ -3181,7 +3185,7 @@ function rgSpawnGap(w) { return Math.max(0.3, 1.1 - 0.05 * w); }      // seconds
 function haloR() { return lv('halo') ? 55 + 22 * (lv('halo') - 1) : 0; }
 
 function newRun() {
-  return { wave: 0, hp: baseHearts(), maxHp: baseHearts(), kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [], shells: [], blasts: [], embers: [], dying: [], beatT: 0, beatFx: 0, fires: [], nova: 0, sweepT: 0, still: 0, rushT: 0, blackT: 0,
+  return { wave: 0, hp: baseHearts(), maxHp: baseHearts(), kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [], shells: [], darts: [], blasts: [], embers: [], dying: [], beatT: 0, beatFx: 0, fires: [], nova: 0, sweepT: 0, still: 0, rushT: 0, blackT: 0,
     inv: 0, adren: 0, hurtFx: 0, strobeT: 4, strobeFx: 0, echoT: 2, flareT: 5, walked: 0, phase: 'fight', waveTotal: 0, waveKills: 0, deadT: 0 };
 }
 function sfx(rate, gain, type, freq, len = 0.25) {
@@ -3235,6 +3239,8 @@ function spawnFoe(type, at = spawnSpot()) {
   if (type === 'laser') { e.ai = 'move'; e.st = 0; e.want = 170 + Math.random() * 60; }
   if (type === 'kamikaze') e.ai = 'run';
   if (type === 'centi') centiInit(e);
+  if (type === 'spear') spearInit(e);
+  if (type === 'archer') archerInit(e);
 }
 function startWave() {
   const rg = S.rg;
@@ -3445,6 +3451,196 @@ function kamikazeBurst(e) {
   const dmg = 1.2 * (1 + 0.09 * (rg.wave - 1));
   for (const o of rg.enemies) if (!o.dead && dist2(o, e) < KAMI_R + FOES[o.type].w * 0.5) { o.hp -= dmg; o.jit = 1; }
 }
+// ---- the Dunes' ranged hunters. Out on open sand there's no cover, so they fight from range ----
+// Spear thrower (orange eyes): runs in close, stops, draws back and throws a spear down a line you can see.
+// Archer (lime eyes): keeps far off, draws its bow while a dotted line follows you, then the line freezes and it looses.
+// Light on either while it winds up spoils the shot. The aim follows you until the last moment, then locks: move, or roll.
+const SPEAR_WIND = 0.85, SPEAR_LOCK = 0.32, SPEAR_V = 470, SPEAR_RANGE = 460, SPEAR_HIT = 12;
+const ARROW_DRAW = 1.25, ARROW_LOCK = 0.36, ARROW_V = 650, ARROW_RANGE = 720, ARROW_HIT = 9;
+const SCR_FACE = { spear: 1, archer: 1 };      // these face the way they look on screen (scrAng), so a throw goes where the arm points
+function spearInit(e) { e.ai = 'run'; e.st = 0; e.want = 110 + Math.random() * 60; }
+function archerInit(e) { e.ai = 'move'; e.st = 0.6 + Math.random(); e.want = 290 + Math.random() * 90; }
+function aimLead(e, k) { const p = S.p; return Math.atan2(p.y - e.y, p.x - e.x); }
+function walkTo(e, tx, ty, sp, dt, away = false) {   // a plain walk toward (or away from) a spot, with footsteps
+  let dx = tx - e.x, dy = ty - e.y; const d = Math.hypot(dx, dy) || 1; if (away) { dx = -dx; dy = -dy; }
+  if (sp <= 0 || (!away && d < 4)) return;
+  const stride = Math.floor(e.phase / Math.PI);
+  e.x += dx / d * sp * dt; e.y += dy / d * sp * dt; e.phase += dt * sp * 0.25;
+  if (Math.floor(e.phase / Math.PI) > stride) playMonStep(e);
+}
+function guardHome(e, sp, dt) {               // a keeper won't follow you far from its orb
+  if (!e.guard || !XS.dorb || dist2(S.p, XS.dorb) < 520) return false;
+  walkTo(e, XS.dorb.x, XS.dorb.y, sp, dt); e.ai = e.type === 'spear' ? 'run' : 'move'; return true;
+}
+function spearStep(e, sp, d, dt) {
+  const p = S.p;
+  if (e.ai === 'run') {
+    if (guardHome(e, sp, dt)) return;
+    if (d > e.want) walkTo(e, p.x, p.y, sp * 1.15, dt);
+    else if (!e.lit) { e.ai = 'wind'; e.st = SPEAR_WIND * (e.guard ? 1.1 : 1); e.dir = aimLead(e); playSpearWind(e); if (!S.rg.spearSeen && d < 320) { S.rg.spearSeen = true; S.rg.ringMsg = { text: 'spear throwers', sub: 'when one stops and draws back, move', t: 0 }; } }
+    return;
+  }
+  if (e.ai === 'wind') {
+    if (e.lit) { e.ai = 'cool'; e.st = 0.7; return; }          // light in its eyes spoils the throw
+    if (e.st > SPEAR_LOCK) e.dir = aimLead(e);                  // follows you, then locks
+    if ((e.st -= dt) <= 0) {
+      const n = e.guard ? 3 : 1;                                 // the keeper throws three in a fan
+      for (let i = 0; i < n; i++) throwDart(e, 'spear', e.dir + (i - (n - 1) / 2) * 0.2);
+      e.ai = 'cool'; e.st = 1.3 + Math.random() * 0.7; e.kick = 1;
+    }
+    return;
+  }
+  if (d < 90) walkTo(e, p.x, p.y, sp * 0.7, dt, true);       // empty-handed: keep its distance while it pulls another spear
+  if ((e.st -= dt) <= 0) { e.ai = 'run'; e.want = 110 + Math.random() * 60; }
+}
+function archerStep(e, sp, d, dt) {
+  const p = S.p;
+  if (e.ai === 'move') {
+    if (guardHome(e, sp, dt)) return;
+    if (d > e.want + 50) walkTo(e, p.x, p.y, sp, dt);
+    else if (d < e.want - 90) walkTo(e, p.x, p.y, sp * 1.2, dt, true);   // too close: back off across the sand
+    if ((e.st -= dt) <= 0 && d < e.want + 140 && !e.lit) { e.ai = 'draw'; e.st = ARROW_DRAW; e.dir = aimLead(e); playBowDraw(e); if (!S.rg.archerSeen) { S.rg.archerSeen = true; S.rg.ringMsg = { text: 'archers', sub: 'when the dotted line stops, move', t: 0 }; } }
+    return;
+  }
+  if (e.ai === 'draw') {
+    if (e.lit) { e.ai = 'move'; e.st = 0.8; if (e.drawSnd) try { e.drawSnd.stop(); } catch (err) {} return; }
+    if (e.st > ARROW_LOCK) e.dir = aimLead(e);
+    if ((e.st -= dt) <= 0) { throwDart(e, 'arrow', e.dir); e.ai = 'move'; e.st = 1.7 + Math.random() * 0.9; e.kick = 0.6; }
+  }
+}
+function throwDart(e, kind, a) {
+  const rg = S.rg, f = FOES[e.type], v = kind === 'spear' ? SPEAR_V : ARROW_V;
+  rg.darts.push({ kind, x: e.x + Math.cos(a) * 10, y: e.y + Math.sin(a) * 10, a, v, gone: 0, range: kind === 'spear' ? SPEAR_RANGE : ARROW_RANGE, h0: f.h * (kind === 'spear' ? 0.95 : 0.8) * ((e.k) || 1), from: e, stuck: 0, passed: false });
+  if (kind === 'spear') playSpearThrow(e); else playBowLoose(e);
+  addShake(0.08 * monNear(e, 500));
+}
+function updateDarts(dt) {
+  const rg = S.rg, p = S.p;
+  for (const s of rg.darts) {
+    if (s.stuck) { s.stuck += dt; if (s.stuck > 2.5) s.done = true; continue; }   // left standing in the sand a while
+    const step = s.v * dt, ux = Math.cos(s.a), uy = Math.sin(s.a), hit = s.kind === 'spear' ? SPEAR_HIT : ARROW_HIT;
+    const x0 = s.x, y0 = s.y; s.x += ux * step; s.y += uy * step; s.gone += step;
+    const t = Math.max(0, Math.min(step, (p.x - x0) * ux + (p.y - y0) * uy));      // nearest point of this frame's flight to you
+    if (!s.passed && Math.hypot(x0 + ux * t - p.x, y0 + uy * t - p.y) < hit && rg.inv <= 0 && rg.phase === 'fight') {
+      if (p.rollSafe > 0) s.passed = true;                       // rolled under it: it flies on
+      hurt({ x: x0, y: y0 }); if (!s.passed && rg.inv > 0) { s.done = true; ashBurst(p.x, p.y, 6, 16); continue; }
+      s.passed = true;
+    }
+    const dmg = 1.2 * (1 + 0.09 * ((rg.wave || 1) - 1));
+    for (const o of rg.enemies) if (o !== s.from && !o.dead && o.type !== 'centi' && Math.hypot(o.x - s.x, o.y - s.y) < 8 + FOES[o.type].w * 0.5) { o.hp -= dmg; o.jit = 1; s.done = true; break; }   // anything in the way takes it
+    if (!s.done && s.gone >= s.range) { s.stuck = 0.001; ashBurst(s.x, s.y, 4, 4); if (actx && monNear(s, 500) > 0) noiseAt(actx.currentTime, 1400, 250, 0.12, 0.25 * monNear(s, 500), sfxGain); }
+  }
+  rg.darts = rg.darts.filter(s => !s.done);
+}
+function dartLift(s) { const u = Math.min(1, s.gone / s.range); return s.stuck ? 0 : s.h0 * (1 - u * u) * (s.kind === 'spear' ? 1 : 0.6) + (s.kind === 'spear' ? 18 * Math.sin(Math.PI * u) : 0); }
+function drawDarts() {                          // spears and arrows in flight: pale shafts with a glint of their thrower's colour
+  const rg = S.rg; if (!rg || !rg.darts.length) return;
+  ctx.save(); ctx.lineCap = 'round';
+  for (const s of rg.darts) {
+    const len = s.kind === 'spear' ? 30 : 17, ux = Math.cos(s.a), uy = Math.sin(s.a), lift = dartLift(s) * Z;
+    const tipDip = s.stuck ? 9 : 0;           // stuck: tip buried, shaft slanting up out of the sand
+    const [hx, hy] = toScreen(s.x, s.y), [tx, ty] = toScreen(s.x - ux * len, s.y - uy * len);
+    const head = [hx, hy - lift + tipDip * Z * 0.2], tail = [tx, ty - lift - (s.stuck ? 14 * Z : 0)];
+    const col = s.kind === 'spear' ? '255,140,40' : '190,255,70', fade = s.stuck ? Math.max(0, 1 - (s.stuck - 1.6) / 0.9) : 1;
+    if (!s.stuck) {                          // a streak of its colour behind it, so you can see it come out of the dark
+      const [qx, qy] = toScreen(s.x - ux * len * 3.2, s.y - uy * len * 3.2), g = ctx.createLinearGradient(head[0], head[1], qx, qy - lift);
+      g.addColorStop(0, `rgba(${col},0.55)`); g.addColorStop(1, `rgba(${col},0)`);
+      ctx.strokeStyle = g; ctx.lineWidth = 3 * Z; ctx.beginPath(); ctx.moveTo(head[0], head[1]); ctx.lineTo(qx, qy - lift); ctx.stroke();
+    }
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = '#1a1a19'; ctx.lineWidth = (s.kind === 'spear' ? 3.2 : 2.4) * Z; ctx.beginPath(); ctx.moveTo(...head); ctx.lineTo(...tail); ctx.stroke();
+    ctx.strokeStyle = '#d8d8d0'; ctx.lineWidth = (s.kind === 'spear' ? 1.6 : 1) * Z; ctx.beginPath(); ctx.moveTo(...head); ctx.lineTo(...tail); ctx.stroke();
+    if (s.kind === 'arrow') { ctx.strokeStyle = `rgba(${col},0.9)`; ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.moveTo(...tail); ctx.lineTo(tail[0] + (head[0] - tail[0]) * 0.18, tail[1] + (head[1] - tail[1]) * 0.18); ctx.stroke(); }   // fletching
+    ctx.fillStyle = `rgba(${col},${s.stuck ? 0.5 : 1})`; ctx.beginPath(); ctx.arc(head[0], head[1], (s.kind === 'spear' ? 2 : 1.4) * Z, 0, 7); ctx.fill();   // the point catches the light
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+function drawRangedTells() {                    // the wind-ups: a dotted line down the aim that follows you, then freezes and brightens
+  const rg = S.rg; if (!rg) return;
+  for (const e of rg.enemies) {
+    const sp = e.type === 'spear' && e.ai === 'wind', ar = e.type === 'archer' && e.ai === 'draw';
+    if (!sp && !ar || e.dir === undefined) continue;
+    const T = sp ? SPEAR_WIND * (e.guard ? 1.1 : 1) : ARROW_DRAW, LK = sp ? SPEAR_LOCK : ARROW_LOCK, locked = e.st <= LK, k = 1 - e.st / T;
+    const col = sp ? '255,140,40' : '190,255,70', reach = sp ? SPEAR_RANGE : ARROW_RANGE, lift = FOES[e.type].h * 0.85 * Z * (e.k || 1);
+    if (locked && Math.sin(S.t * 40) < -0.3) continue;     // flickers fast once it's locked
+    const fans = sp && e.guard ? [-0.2, 0, 0.2] : [0];
+    for (const off of fans) {
+      const ux = Math.cos(e.dir + off), uy = Math.sin(e.dir + off), gap = sp ? 16 : 22;
+      for (let t = 20; t < reach; t += gap) {
+        const [x, y] = toScreen(e.x + ux * t, e.y + uy * t), fall = 1 - t / reach;
+        ctx.fillStyle = `rgba(${col},${(locked ? 0.85 : 0.18 + 0.3 * k) * (0.35 + 0.65 * fall)})`;
+        ctx.beginPath(); ctx.arc(x, y - lift * fall, (locked ? 2 : 1.3) * Z, 0, 7); ctx.fill();
+      }
+    }
+  }
+}
+// their gear, drawn in the figure's own frame (forward, right, up)
+function rangedOpt(e, pal) {
+  const GEAR = shadeC(pal.body, 0.6), DARK = shadeC(pal.body, 0.38), SHAFT = shadeC(pal.near, 0.85);
+  const seg = (P, Zs, OUT, c, a, b, w, col) => { const [x0, y0] = P(...a), [x1, y1] = P(...b); c.strokeStyle = OUT ? '#1a1a19' : col; c.lineWidth = (w + (OUT ? 1.6 : 0)) * Zs; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
+  if (e.type === 'spear') {
+    const wind = e.ai === 'wind', held = e.ai !== 'cool', k = wind ? Math.min(1, (1 - e.st / SPEAR_WIND) * 2.5) : 0;
+    const hand = [-7 * k + 2, 5.5, 31 + 7 * k];
+    return {
+      arms: wind ? (sd, def) => sd === 1 ? [def[0], [def[0][0] - 3 * k, 6.8, def[0][2] - 2 + 4 * k], hand] : [def[0], [def[0][0] + 4, -5.5, def[0][2] - 4], [def[0][0] + 8, -4, def[0][2] - 1]] : null,
+      prop: (P, Zs, OUT, c) => {
+        c.lineCap = 'round';
+        seg(P, Zs, OUT, c, [-4, -2, 14], [-5.5, 2.5, 42], 1.2, SHAFT);   // spare spears across the back
+        seg(P, Zs, OUT, c, [-3.2, -2.6, 15], [-6.5, 1.5, 41], 1.2, SHAFT);
+        if (!held) return;
+        const a = wind ? [hand[0] - 13, 5.5, hand[2] - 3] : [-8, 5, 22], b = wind ? [hand[0] + 19, 5.5, hand[2] + 5] : [20, 5, 34];
+        seg(P, Zs, OUT, c, a, b, 1.5, SHAFT);
+        if (!OUT) { const [x, y] = P(...b); c.fillStyle = DARK; c.beginPath(); c.arc(x, y, 1.6 * Zs, 0, 7); c.fill(); }
+      },
+    };
+  }
+  const draw = e.ai === 'draw', k = draw ? Math.min(1, (1 - e.st / ARROW_DRAW) * 1.6) : 0;
+  const bowH = draw ? [12, -1.5, 31] : [3, -5, 22], pull = [12 - 11 * k, -0.8, 31.5];
+  return {
+    arms: draw ? (sd, def) => sd === -1 ? [def[0], [def[0][0] + 6, -4.5, def[0][2] - 0.5], bowH] : [def[0], [pull[0] - 2, 4, pull[2] - 1], pull] : null,
+    prop: (P, Zs, OUT, c) => {
+      c.lineCap = 'round';
+      seg(P, Zs, OUT, c, [-3.5, 2.5, 18], [-5, 3.5, 40], 3, GEAR);       // a quiver on the back
+      const up = draw ? [0, 0, 10] : [0, 0, 9], top = bowH.map((v, i) => v + up[i]), bot = bowH.map((v, i) => v - up[i]);
+      const mid = [bowH[0] + 3.5, bowH[1], bowH[2]];
+      const [x0, y0] = P(...top), [x1, y1] = P(...bot), [mx, my] = P(...mid), [hx, hy] = P(...bowH);
+      c.strokeStyle = OUT ? '#1a1a19' : DARK; c.lineWidth = (1.8 + (OUT ? 1.6 : 0)) * Zs;
+      c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(2 * mx - hx, 2 * my - hy, x1, y1); c.stroke();
+      if (OUT) return;
+      const sh = draw ? P(...pull) : [x0 + (x1 - x0) * 0.5, y0 + (y1 - y0) * 0.5];
+      c.strokeStyle = 'rgba(220,220,212,0.7)'; c.lineWidth = 0.6 * Zs;  // the string
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(sh[0], sh[1]); c.lineTo(x1, y1); c.stroke();
+      if (draw) { const [ax, ay] = P(bowH[0] + 5, bowH[1], bowH[2] + 0.5); c.strokeStyle = SHAFT; c.lineWidth = 1 * Zs; c.beginPath(); c.moveTo(sh[0], sh[1]); c.lineTo(ax, ay); c.stroke(); }   // the arrow on the string
+    },
+  };
+}
+// sounds (placeholders made in code, like the others)
+function playSpearWind(e) {                    // a grunt and the scrape of the shaft drawn back
+  if (!actx || !noiseBuf) return;
+  const t = actx.currentTime, out = monOut(e.x, e.y, 0.2 + 0.3 * monNear(e, 600));
+  boomAt(t, 150, 95, 0.18, 0.5, out); noiseAt(t + 0.05, 900, 300, 0.35, 0.3, out);
+}
+function playSpearThrow(e) {                   // a heave and the whoosh of the spear
+  if (!actx || !noiseBuf) return;
+  const t = actx.currentTime, out = monOut(e.x, e.y, 0.3 + 0.4 * monNear(e, 700));
+  boomAt(t, 120, 70, 0.14, 0.6, out); noiseAt(t, 3200, 500, 0.32, 0.5, out);
+}
+function playBowDraw(e) {                      // the creak of the bow bending
+  if (!actx) return;
+  const t = actx.currentTime, out = monOut(e.x, e.y, 0.1 + 0.15 * monNear(e, 800));
+  const o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(115, t + ARROW_DRAW);
+  lp.type = 'bandpass'; lp.frequency.value = 900; lp.Q.value = 6;
+  g.gain.setValueAtTime(0.001, t); g.gain.exponentialRampToValueAtTime(0.35, t + ARROW_DRAW); g.gain.linearRampToValueAtTime(0, t + ARROW_DRAW + 0.03);
+  o.connect(lp); lp.connect(g); g.connect(out); o.start(t); o.stop(t + ARROW_DRAW + 0.05);
+  e.drawSnd = o;
+}
+function playBowLoose(e) {                     // the twang and the hiss of the arrow
+  if (!actx || !noiseBuf) return;
+  const t = actx.currentTime, out = monOut(e.x, e.y, 0.3 + 0.4 * monNear(e, 800));
+  boomAt(t, 340, 170, 0.2, 0.5, out); noiseAt(t, 5000, 1500, 0.22, 0.35, out);
+}
 function chase(e, sp, d, dt) {      // plain walk straight at you, with footsteps; the last few steps are a lunge
   const p = S.p;
   if (!e.lit && d < 60 && e.type !== 'kamikaze') sp *= 1.7;
@@ -3455,8 +3651,8 @@ function chase(e, sp, d, dt) {      // plain walk straight at you, with footstep
   }
   const [sx0] = toScreen(e.x, e.y), [sx1] = toScreen(p.x, p.y); e.face = sx1 > sx0 ? 1 : -1;
 }
-const FOE_AI = { bomber: bomberStep, laser: laserStep, kamikaze: kamikazeStep, centi: centiStep };
-const NO_TOUCH = { bomber: 1, kamikaze: 1, centi: 1 };   // these hurt you their own way, not by touch
+const FOE_AI = { bomber: bomberStep, laser: laserStep, kamikaze: kamikazeStep, centi: centiStep, spear: spearStep, archer: archerStep };
+const NO_TOUCH = { bomber: 1, kamikaze: 1, centi: 1, spear: 1, archer: 1 };   // these hurt you their own way, not by touch
 function fireFlare() {
   const rg = S.rg; let best = null, bd = 1e9;
   for (const e of rg.enemies) { if (e.dead) continue; const d = dist2(e, S.p) + (e.lit ? 600 : 0); if (d < bd) { bd = d; best = e; } }
@@ -3468,7 +3664,7 @@ function endWave() {
   const rg = S.rg;
   for (const e of rg.enemies) ashBurst(e.x, e.y, 10, FOES[e.type].h * 0.6);
   if (rg.wisps && rg.wisps.length) { gainWisps(rg.wisps.reduce((a, w) => a + w.n, 0)); rg.wisps = []; }   // dawn: whatever is still floating comes to you
-  rg.enemies = []; rg.flares = []; rg.shells = []; rg.blasts = []; rg.embers = []; rg.fires = [];
+  rg.enemies = []; rg.flares = []; rg.shells = []; rg.darts = []; rg.blasts = []; rg.embers = []; rg.fires = [];
   rg.phase = 'dawn'; rg.dawnT = 1.6; S.rounds = rg.wave;
   S.msg = { text: 'Dawn', sub: `Wave ${rg.wave} survived`, t: 0 };
   submitScore('survive', rg.wave);
@@ -3581,12 +3777,12 @@ function updateSurvive(dt) {
       if (rg.embers.length < 320 && Math.random() < dt * (7 + 10 * burnt) * sc) rg.embers.push({ x: e.x, y: e.y, z: f.h * (0.5 + Math.random() * 0.5), vz: 18 + Math.random() * 14, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 0.9 + Math.random() * 0.7, r: 2 + Math.random() * 3 });
     }
     // reaching for you when close in the dark
-    const reachTo = e.type === 'kamikaze' ? (e.ai === 'run' ? 1 : 0.4) : (!e.lit && d < 140 && !NO_TOUCH[e.type] && !(e.type === 'laser' && e.ai !== 'move')) ? 1 : 0;
+    const reachTo = e.type === 'kamikaze' ? (e.ai === 'run' ? 1 : 0.4) : (!e.lit && d < 140 && !NO_TOUCH[e.type] && !SCR_FACE[e.type] && !(e.type === 'laser' && e.ai !== 'move')) ? 1 : 0;
     e.reach = (e.reach || 0) + (reachTo - (e.reach || 0)) * Math.min(1, dt * 6);
     e.kick = Math.max(0, (e.kick || 0) - dt * 4);
     const farOff = !e.lit && d > Math.max(700, (e.spawnD || 500) + 300) && !seenAt(e.x, e.y);   // well out of reach and out of sight
     if (S.mode === 'expedition' && farOff && d > 900 && !e.guard) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
-    if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
+    if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; if (e.type === 'spear') spearInit(e); if (e.type === 'archer') archerInit(e); continue; }   // left far behind: bring it back around you
     let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
@@ -3599,7 +3795,7 @@ function updateSurvive(dt) {
     if (safe) { const cd = Math.hypot(e.x - safe.x, e.y - safe.y) || 1; if (cd < safe.r) { e.x = safe.x + (e.x - safe.x) * safe.r / cd; e.y = safe.y + (e.y - safe.y) * safe.r / cd; } }   // can't step inside
     if (!NO_TOUCH[e.type] && !e.dead && d < 14 + f.w * 0.45 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
   }
-  updateShells(dt);
+  updateShells(dt); updateDarts(dt);
   for (const e of rg.enemies) if (e.hp <= 0 && !e.dead) killFoe(e);
   // heartbeat: something unseen is close
   let nd = 1e9; for (const e of rg.enemies) if (!e.dead && !e.lit) nd = Math.min(nd, dist2(e, p));
@@ -3685,7 +3881,7 @@ function surviveLight(bx, by, br, casters, lx, ly) {
   }
 }
 const HUNCH = { stalker: 0.35, bomber: 0.2, kamikaze: 0.45 };
-const EYES = { centi: '70,225,200', tall: '210,40,40', laser: '90,170,255', kamikaze: '255,215,60', splitter: '255,110,200', splitling: '255,110,200' };   // each kind has its colour
+const EYES = { centi: '70,225,200', tall: '210,40,40', laser: '90,170,255', kamikaze: '255,215,60', splitter: '255,110,200', splitling: '255,110,200', spear: '255,140,40', archer: '190,255,70' };   // each kind has its colour
 // Enemies are the same pale figure as the one you chase in Chase and Blink, sized by kind.
 // As they burn they glow hotter, from white through amber to ember red.
 const mixC = (c0, c1, k) => `rgb(${c0.map((v, i) => Math.round(v + (c1[i] - v) * k)).join(',')})`;
@@ -3694,13 +3890,14 @@ function foePalette(burn) {
   return { far: mixC([158, 158, 152], [200, 90, 30], k), near: mixC([207, 207, 200], hot, k), body: mixC([218, 218, 211], hot, k),
     head: mixC([228, 228, 222], [255, 175, 90], k), face: mixC([143, 143, 137], [120, 40, 10], k), edge: '#262624' };
 }
-const foeScale = e => FOES[e.type].h / 38;   // a plain shade is player-sized; the rest scale from it
+const foeScale = e => FOES[e.type].h / 38 * (SCR_FACE[e.type] && e.k ? e.k : 1);   // a plain shade is player-sized; the rest scale from it
 function foeDir(e) {                          // which way the figure faces: its aim if it has one, else at you
   if (e.type === 'laser' && e.ai !== 'move' && e.dir !== undefined) return e.dir;
+  if ((e.type === 'spear' && e.ai === 'wind' || e.type === 'archer' && e.ai === 'draw') && e.dir !== undefined) return e.dir;
   return Math.atan2(S.p.y - e.y, S.p.x - e.x);
 }
 function foeHead(e) {                         // the head on screen, for the eyes that shine in the dark
-  const [sx, sy] = toScreen(e.x, e.y), a = foeDir(e), Zs = Z * foeScale(e);
+  const [sx, sy] = toScreen(e.x, e.y), a = SCR_FACE[e.type] ? scrAng(foeDir(e)) : foeDir(e), Zs = Z * foeScale(e);
   return [sx + 2.6 * Math.cos(a) * Zs, sy + (2.6 * Math.sin(a) - 36) * Zs, Math.sin(a)];
 }
 function drawShade(e) {
@@ -3709,10 +3906,11 @@ function drawShade(e) {
   const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, fuse = e.type === 'kamikaze' && e.ai === 'fuse';
   const jx = (e.jit ? (Math.random() - 0.5) * 3 * Z * (0.4 + burn) : 0) + (Math.random() - 0.5) * Z * (4 * pain + (fuse ? 5 : 0)), sx = sx0 + jx;
   const pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())));   // flickers hotter while it burns
-  e.dirFace = foeDir(e);
+  e.dirFace = SCR_FACE[e.type] ? scrAng(foeDir(e)) : foeDir(e);
+  const gear = SCR_FACE[e.type] ? rangedOpt(e, pal) : {};
   const leanAdd = -6 * (e.kick || 0) + (e.type === 'laser' && e.ai === 'fire' ? -2.5 : 0) + (fuse ? -3 : 0);
   drawQuarry({ x: e.x, y: e.y, dir: e.dirFace, phase: e.phase, state: 'run', t: 0 }, ctx, false,
-    { scale: foeScale(e) * (fuse ? 1 + 0.08 * Math.sin(S.t * 40) : 1), jx, pal, pain, reach: e.reach || 0, leanAdd, kit: KIT[e.type] });
+    { scale: foeScale(e) * (fuse ? 1 + 0.08 * Math.sin(S.t * 40) : 1), jx, pal, pain, reach: e.reach || 0, leanAdd, kit: KIT[e.type], arms: gear.arms, prop: gear.prop });
   const h = f.h * Z, w = f.w * Z, fc = e.face || 1;
   ctx.fillStyle = ctx.strokeStyle = pal.near; ctx.lineCap = 'round';
   if (e.type === 'laser' && e.ai !== 'move') {                    // arm raised, pointing down its line of fire
@@ -3940,6 +4138,7 @@ function drawSurviveFx(bx, by, br) {
       ctx.restore();
     }
   }
+  drawRangedTells(); drawDarts();
   // splitters: three pink cores in the chest, the three it will become
   for (const e of rg.enemies) {
     if (e.type !== 'splitter') continue;
@@ -3999,7 +4198,7 @@ function drawSurviveFx(bx, by, br) {
   // the dying: dropping to their knees, white-hot, crumbling away
   for (const g of rg.dying) {
     if (g.type === 'centi') { drawCentiDying(g); continue; }
-    const k = g.t / 0.8, sc = FOES[g.type].h / 38;
+    const k = g.t / 0.8, sc = FOES[g.type].h / 38 * (SCR_FACE[g.type] && g.k ? g.k : 1);
     ctx.save(); ctx.globalAlpha = k < 0.45 ? 1 : Math.max(0, 1 - (k - 0.45) / 0.55);
     drawQuarry({ x: g.x, y: g.y, dir: g.dir, phase: g.phase, state: 'run', t: 0 }, ctx, false,
       { scale: sc * (1 - 0.15 * k), jx: (Math.random() - 0.5) * 4 * Z * (1 - k), pal: foePalette(1), pain: 1 - k * 0.6, kneel: Math.min(1, k * 2.2), kit: KIT[g.type] });
@@ -5593,7 +5792,7 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (rg.leftGate && dist2(p, NEXT_GATE) < 16) warpStart('home2');
     return true;
   }
-  if (rg.beyond) {                             // the Dunes: oil burns, centipedes hunt, a teal orb waits out in the sand
+  if (rg.beyond) {                             // the Dunes: oil burns, spear throwers and archers hunt, a teal orb waits out in the sand
     rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
     exOilStep(dt, dist2(p, BEYOND_GATE) < 130);  // the portal's light tops the torch up
     if (rg.phase === 'fight') stormStep(dt); stormSound(stormK());
@@ -5601,16 +5800,15 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (dist2(p, BEYOND_GATE) > 40) rg.leftGate = true;
     if (XS.dorbField && XS.dorb && !rg.carryDorb && dist2(XS.dorb, p) < 30) exTakeDorb();
     if (XS.dorbField && XS.dorb && !rg.guardDone && dist2(p, XS.dorb) < 750 && !rg.enemies.some(e => e.guard)) spawnGuard();
-    if (dist2(p, BEYOND_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the ranged ones off, like an outpost
-    if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // centipedes hunt the open sand; the ground round the portal is safe
+    if (dist2(p, BEYOND_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser' || e.type === 'spear' || e.type === 'archer') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the ranged ones off, like an outpost
+    if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // hunters roam the open sand; the ground round the portal is safe
       // harder than the deep woods: no limit per kind, only on how many hunt at once, and that grows the further out you are
       const dg = dist2(p, BEYOND_GATE), cap = Math.min(24, 14 + dg / 250) + (rg.carryDorb ? 5 : 0);
       if ((rg.duneT = (rg.duneT ?? 3) - dt) <= 0) {
-        const storming = stormK() > 0.5, mix = storming ? DUNE_MIX.map(m => m.type === 'centi' ? { type: m.type, w: m.w * 2.5 } : m) : DUNE_MIX;   // in a storm, the centipedes come up
+        const storming = stormK() > 0.5, mix = storming ? DUNE_MIX.map(m => m.type === 'spear' ? { type: m.type, w: m.w * 2.5 } : m.type === 'archer' ? { type: m.type, w: m.w * 0.5 } : m) : DUNE_MIX;   // in a storm the archers can't see far, so the spear throwers close in
         rg.duneT = 0.65 * (rg.carryDorb ? 0.6 : 1) * (storming ? 0.75 : 1) * (0.6 + Math.random() * 0.8);
         if (rg.enemies.filter(e => !e.guard).length < cap) { let r = Math.random() * mix.reduce((a, m) => a + m.w, 0); for (const m of mix) if ((r -= m.w) < 0) { spawnFoe(m.type); break; } }
       }
-      if (!rg.centiSeen && rg.enemies.some(e => e.type === 'centi' && e.ai === 'rise' && dist2(e, p) < 260)) { rg.centiSeen = true; rg.ringMsg = { text: 'something under the sand', sub: 'when the ground glows, move', t: 0 }; }
     }
     if (rg.leftGate && dist2(p, BEYOND_GATE) < 16) warpStart('home');
     return true;
@@ -5630,7 +5828,7 @@ function exOilStep(dt, refill) {
 // ---- the teal orbs of the Dunes: three of them, each by an oasis further out, each guarded by a great centipede.
 // Carry them back through the green portal to the second shrine past the camp wall; three open the next way.
 const DORB_D = [1200, 2000, 2800];
-const DUNE_MIX = [{ type: 'centi', w: 30 }, { type: 'kamikaze', w: 25 }, { type: 'bomber', w: 22 }, { type: 'laser', w: 23 }];   // who hunts the Dunes, and how often each comes
+const DUNE_MIX = [{ type: 'spear', w: 30 }, { type: 'archer', w: 26 }, { type: 'bomber', w: 22 }, { type: 'laser', w: 22 }];   // who hunts the Dunes, and how often each comes
 function exNewDorb() {
   if ((XS.dorbs || 0) >= 3) { XS.dorb = null; XS.dorbField = false; return; }
   let a, tries = 0;
@@ -5671,12 +5869,13 @@ function portal2Open() {
   const f = S.rg && S.rg.portal2Fx; if (!f) return 1;
   return Math.max(0, Math.min(1, (f.t - P_FLASH) / P_OPEN));
 }
-function spawnGuard() {                          // a great centipede coiled under the sand by the orb
+function spawnGuard() {                          // a big spear thrower keeps the orb, throwing three at a time
   const o = XS.dorb, a = Math.random() * Math.PI * 2;
-  spawnFoe('centi', { x: o.x + Math.cos(a) * 90, y: o.y + Math.sin(a) * 90, d: 700 });
+  spawnFoe('spear', { x: o.x + Math.cos(a) * 90, y: o.y + Math.sin(a) * 90, d: 700 });
   const e = S.rg.enemies[S.rg.enemies.length - 1];
-  e.guard = true; e.k = 1.7; e.hp = e.maxHp = 8 * (1 + 0.09 * (S.rg.wave - 1)); e.st = 0.5;
-  if (!S.rg.guardSeen) { S.rg.guardSeen = true; S.rg.ringMsg = { text: 'the sand is deep here', sub: 'something big keeps the orb', t: 0 }; }
+  e.guard = true; e.k = 1.6; e.hp = e.maxHp = 8 * (1 + 0.09 * (S.rg.wave - 1)); e.want = 150;
+  S.rg.spearSeen = true;
+  if (!S.rg.guardSeen) { S.rg.guardSeen = true; S.rg.ringMsg = { text: 'the orb is kept', sub: 'something big throws three at once', t: 0 }; }
 }
 // draw something as the second shrine would: teal instead of green, with its own orbs, opening and place
 function asTeal(fn) {
@@ -5699,7 +5898,7 @@ function warpStart(dir) {
 function warpArrive(dir) {
   const rg = S.rg, p = S.p;
   for (const e of rg.enemies) e.dead = e.gone = true;
-  rg.enemies = []; rg.fires = []; rg.wisps = []; rg.blasts = []; rg.echoes = [];
+  rg.enemies = []; rg.darts = []; rg.fires = []; rg.wisps = []; rg.blasts = []; rg.echoes = [];
   rg.guardDone = false; rg.homeA = 0; rg.storm = null;
   if (dir === 'out') {
     rg.beyond = true; rg.next = false; p.x = BEYOND_GATE.x; p.y = BEYOND_GATE.y + 34;
