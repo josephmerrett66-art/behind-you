@@ -32,6 +32,8 @@ p { margin: 0; line-height: 1.55; color: var(--ash); font-size: 0.95rem; }
 .controls span:nth-child(odd) { color: var(--bone); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; padding-top: 0.1rem; }
 button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--void); background: var(--bone); border: 0; padding: 0.85rem 1.4rem; cursor: pointer; }
 #torch { position: fixed; right: 16px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; }
+#dodge { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
+#dodge[data-cool="1"] { opacity: 0.4; }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 #sound { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding: 0.5rem 0.75rem; font-size: 0.7rem; letter-spacing: 0.12em; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 .modes { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -76,6 +78,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 
 <canvas id="game"></canvas>
 <button id="torch" hidden aria-pressed="true">Torch</button>
+<button id="dodge" hidden>Dodge</button>
 <button id="sound" hidden>Sound on</button>
 <button id="menu" hidden>Menu</button>
 <div id="picker" hidden>
@@ -104,8 +107,8 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
       <dt>Free roam</dt><dd>No goals. Walk the woods with rabbits, birds and fireflies.</dd>
     </dl>
     <div class="controls">
-      <span>Phone</span><span>Right thumb aims. Left thumb walks, or sets off early in Chase.</span>
-      <span>Desktop</span><span>Mouse aims. W or Space walks or sets off. Shift runs in Free roam.</span>
+      <span>Phone</span><span>Right thumb aims. Left thumb walks, or sets off early in Chase. In Nightfall, tap Dodge to roll.</span>
+      <span>Desktop</span><span>Mouse aims. W or Space walks or sets off. Shift runs in Free roam. In Nightfall, right-click or Q to dodge.</span>
     </div>
     <section class="board" aria-labelledby="boardTitle">
       <div class="boardhead">
@@ -180,7 +183,9 @@ function worldMatrix(c, scale) {
 
 // ---- input ----
 const keys = {};
-addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); });
+addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
+cv.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); dodge(); } });
+cv.addEventListener('contextmenu', e => { if (S && S.mode === 'survive') e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 cv.addEventListener('mousemove', e => {
   if (!S) return;
@@ -934,12 +939,36 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
 }
 
 // ---- update ----
+// ---- dodge (Nightfall): a quick roll with a moment of invulnerability. Rolls the way you're going,
+// or steps back away from where the torch points if you're standing still ----
+const ROLL_T = 0.32, ROLL_DIST = 100, ROLL_SAFE = 0.26, ROLL_COOL = 0.85;
+function dodge() {
+  if (!S || !S.running || S.mode !== 'survive' || !S.rg || S.rg.phase !== 'fight') return;
+  const p = S.p; if ((p.roll || 0) > 0 || (p.rollCool || 0) > 0) return;
+  const mv = Math.hypot(p.vx, p.vy);
+  let a;
+  if (mv > 15) a = Math.atan2(p.vy, p.vx);
+  else { const [wx, wy] = screenDirToWorld(-Math.cos(S.aim), -Math.sin(S.aim)); a = Math.atan2(wy, wx); }   // backstep
+  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollCool = ROLL_COOL; p.rollBack = mv <= 15; p.ghosts = [];
+  for (let i = 0; i < 6; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: -Math.cos(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vy: -Math.sin(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vz: 20 + Math.random() * 30, life: 0.4 + Math.random() * 0.3 });
+  if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, 3500, 500, 0.28, 0.4, sfxGain); }
+  dodgeBtn.dataset.cool = '1';
+}
 function update(dt) {
   S.t += dt;
   const p = S.p;
   const [mx, my, speed] = moveInput();
   const k = 1 - Math.exp(-ACCEL * dt);
   p.vx += (mx * speed - p.vx) * k; p.vy += (my * speed - p.vy) * k;
+  if (p.rollCool > 0) { p.rollCool -= dt; if (p.rollCool <= 0) dodgeBtn.dataset.cool = '0'; }
+  if (p.roll > 0) {                          // fast at the start, easing out at the end
+    const u = 1 - p.roll / ROLL_T, v = ROLL_DIST / ROLL_T * 2 * (1 - u);
+    p.vx = Math.cos(p.rollA) * v; p.vy = Math.sin(p.rollA) * v;
+    p.roll -= dt; p.rollSafe -= dt;
+    if (p.ghosts) { p.ghosts.push({ x: p.x, y: p.y, a: 0.45 }); if (p.ghosts.length > 5) p.ghosts.shift(); }
+    if (p.roll <= 0) { p.vx *= 0.3; p.vy *= 0.3; }
+  }
+  if (p.ghosts) { for (const g of p.ghosts) g.a -= dt * 2.2; p.ghosts = p.ghosts.filter(g => g.a > 0); }
   p.x += p.vx * dt; p.y += p.vy * dt;
 
   // bump into trees and rocks
@@ -1621,7 +1650,13 @@ function renderScene() {
   drawLightGlow(lights);
   drawEyeshine(bx, by, br, casters, lx, ly);
   if (S.q && S.q.lit) { ctx.save(); ctx.globalAlpha = Math.max(0, S.q.fall) * S.torchLvl; drawQuarry(S.q); ctx.restore(); }
+  if (S.p.ghosts && S.p.ghosts.length) {   // after-images trailing the roll
+    const p = S.p, x0 = p.x, y0 = p.y;
+    for (const g of p.ghosts) { p.x = g.x; p.y = g.y; ctx.save(); ctx.globalAlpha = Math.max(0, g.a); drawPlayer(); ctx.restore(); }
+    p.x = x0; p.y = y0;
+  }
   drawPlayer(); // drawn over the dark so the whole figure stays readable
+  if (S.mode === 'survive') drawDodgeFx();
   if (S.mode === 'survive') { surviveLight(bx, by, br, casters, lx, ly); drawSurviveFx(bx, by, br); }
 
   if (S.q) {                                   // is the creature inside the beam, with nothing in the way?
@@ -1661,6 +1696,8 @@ function toggleTorch() {
   torchBtn.setAttribute('aria-pressed', S.torchOn ? 'true' : 'false');
 }
 torchBtn.addEventListener('click', toggleTorch);
+const dodgeBtn = document.getElementById('dodge');
+dodgeBtn.addEventListener('pointerdown', e => { e.preventDefault(); dodge(); });
 let soundOn = true;
 function setSound(on) {
   soundOn = on;
@@ -1892,6 +1929,11 @@ function ashBurst(x, y, n, hgt = 20) {
 function shove(e, amt) { const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypot(dx, dy) || 1; e.x += dx / d * amt; e.y += dy / d * amt; }
 function hurt(e) {
   const rg = S.rg;
+  if (S.p.rollSafe > 0) {                  // rolled right through it
+    rg.inv = 0.35; hitStop(0.05); addShake(0.1);
+    rg.dodged = { t: 0 }; sfx(2.2, 0.35, 'highpass', 3000, 0.15);
+    return;
+  }
   if (rg.shield > 0) {                     // Second Wind: this one bounces off
     rg.shield--; rg.inv = 1.2 + 0.6 * lv('phantom'); rg.pop = { t: 0, blocked: true };
     addShake(0.35); hitStop(0.05); shove(e, 90); sfx(1.4, 0.6, 'bandpass', 1500, 0.3);
@@ -2095,6 +2137,7 @@ function updateSurvive(dt) {
   for (const a of rg.ash) { a.x += a.vx * dt; a.y += a.vy * dt; a.z += a.vz * dt; a.vz -= 60 * dt; a.vx *= 0.97; a.vy *= 0.97; a.life -= dt; }
   rg.ash = rg.ash.filter(a => a.life > 0);
   if (rg.pop) { rg.pop.t += dt; if (rg.pop.t > HEART_POP) rg.pop = null; }
+  if (rg.dodged) { rg.dodged.t += dt; if (rg.dodged.t > 0.7) rg.dodged = null; }
   rg.hurtFx = Math.max(0, rg.hurtFx - dt * 1.8); rg.strobeFx = Math.max(0, rg.strobeFx - dt);
   if (rg.phase === 'dead') { rg.deadT += dt; if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
   if (rg.phase === 'dawn') { rg.dawnT -= dt; if (rg.dawnT <= 0) openPicker(); return; }
@@ -2481,6 +2524,24 @@ function drawSurviveFx(bx, by, br) {
   }
   drawHeartPop();
 }
+function drawDodgeFx() {
+  const rg = S.rg, p = S.p; if (!rg) return;
+  const [px, py] = toScreen(p.x, p.y);
+  if (p.rollCool > 0 && rg.phase === 'fight') {    // a thin ring at your feet fills back up while the dodge recharges
+    const k = 1 - p.rollCool / ROLL_COOL;
+    ctx.save(); ctx.strokeStyle = 'rgba(239,239,234,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(px, py, 15 * Z, 7.5 * Z, 0, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  if (rg.dodged) {                                 // close call: a white ring and a word
+    const t = rg.dodged.t;
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - t / 0.7);
+    ctx.strokeStyle = '#efefea'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(px, py - 18 * Z, (20 + 80 * t) * Z, (10 + 40 * t) * Z, 0, 0, 7); ctx.stroke();
+    ctx.font = '600 12px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#efefea';
+    ctx.fillText('DODGED', px, py - 70 * Z - 20 * t);
+    ctx.restore();
+  }
+}
 // ---- hearts that pop up over your head when something changes, right where you're looking ----
 const HEART_POP = 2.7;
 function heartPath(c, x, y, s) {           // a heart centred on x,y, s wide
@@ -2610,7 +2671,7 @@ function begin(mode) {
   else if (mode === 'blink') { S.blinkPhase = 'dark'; S.darkT = BLINK_DARK; S.torchOn = true; spawnQuarry(); S.q.hiddenUntilLit = true; }
   else spawnQuarry();
   overlay.hidden = true; last = performance.now();
-  initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive'; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
