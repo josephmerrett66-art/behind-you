@@ -677,7 +677,7 @@ const MON_WAV = {
 const mon = {};
 const BURN_PEAK = 0.42;       // seconds into the burn recording where it hits full force: the shade dies right there
 const BURN_MAX = 6, GRAIN = 0.09, HOP = 0.045;   // at most 6 burning at once are heard; the hiss is stretched from overlapping grains
-const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05, laser: 0.95, kamikaze: 1.3, splitter: 0.9, splitling: 1.55 };   // bigger things sound lower
+const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05, laser: 0.95, kamikaze: 1.3, splitter: 0.9, splitling: 1.55, centi: 1.45 };   // bigger things sound lower
 const burnVoices = new Set(), monLast = { death: 0, small: 0 };
 let hann = null;
 function monOut(x, y, gain) {       // a gain node panned toward where the monster is on screen
@@ -1246,6 +1246,10 @@ function update(dt) {
     const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = o.r * o.s + 7;
     if (d < min && d > 0) { p.x = o.x + dx / d * min; p.y = o.y + dy / d * min; }
   }
+  if (S.mode === 'expedition' && inBeyond()) for (const o of oasesNear(p.x, p.y, 200)) {   // you can wade the shallows, not swim the lagoon
+    const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), sh = lagoonR(o, Math.atan2(dy, dx)) * 0.86;
+    if (d < sh && d > 0) { p.x = o.x + dx / d * sh; p.y = o.y + dy / d * sh; }
+  }
 
   { const [wx, wy] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)); S.aimW = Math.atan2(wy, wx); }
   // camera leads toward the torch, so the player sits opposite the beam and the beam gets the screen
@@ -1736,260 +1740,92 @@ function sprite(kind, v, Ld = 1) {
   const [, w, h, ax, ay, paint] = SPRITE_KINDS[kind];
   return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld));
 }
-// ================= THE SUNLESS SANDS: the first world through the portal =================
-// A pale desert nothing human ever touched: black monoliths carved with writing no one can read, the ribs and skulls of
-// things far bigger than people, horned spires, standing rings of stone, rocks that hang in the air. All painted once as sprites.
-function glyphs(g, R, x0, y0, x1, y1, col, step = 6) {   // rows of unreadable carved marks
-  g.strokeStyle = col; g.lineWidth = 0.55;
-  for (let y = y0; y > y1; y -= step) for (let x = x0; x < x1; x += 4.5) {
-    if (R() < 0.25) continue;
-    const u = 1.5; g.beginPath();
-    switch (R() * 6 | 0) {
-      case 0: g.moveTo(x, y - u); g.lineTo(x, y + u); g.moveTo(x - u, y - u * 0.3); g.lineTo(x + u, y - u * 0.3); break;
-      case 1: g.arc(x, y, u * 0.7, 0, 7); break;
-      case 2: g.moveTo(x - u, y + u); g.lineTo(x, y - u); g.lineTo(x + u, y + u); break;
-      case 3: g.moveTo(x - u, y - u); g.lineTo(x + u, y - u); g.lineTo(x - u, y + u); g.lineTo(x + u, y + u); break;
-      case 4: g.moveTo(x, y - u); g.lineTo(x, y + u); g.arc(x, y - u * 0.4, u * 0.5, Math.PI, 0); break;
-      default: g.moveTo(x - u, y); g.lineTo(x + u, y); g.moveTo(x - u * 0.4, y - u); g.lineTo(x - u * 0.4, y + u); g.moveTo(x + u * 0.4, y - u); g.lineTo(x + u * 0.4, y + u);
-    }
-    g.stroke();
-  }
-}
+// ================= THE DUNES: the first world through the portal =================
+// Rolling sand under the moon, mostly empty: the odd rock, dry scrub, a dead tree. Now and then an oasis: a small lagoon
+// ringed with reeds and palm trees. Scenery is painted once as sprites, like the forest.
 function sandFoot(g, R, w) {                     // sand drifted up against the foot of something: a soft mound, no hard edge
   const h = Math.min(7, w * 0.16), gr = g.createRadialGradient(0, 0, 0, 0, 0, w);
   gr.addColorStop(0, 'rgba(160,157,148,0.95)'); gr.addColorStop(0.6, 'rgba(160,157,148,0.6)'); gr.addColorStop(1, 'rgba(160,157,148,0)');
   g.save(); g.scale(1, h / w); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, w, Math.PI, 0); g.fill(); g.restore();
-  g.strokeStyle = 'rgba(205,202,194,0.35)'; g.lineWidth = 0.4; g.beginPath(); g.moveTo(-w * 0.5, -h * 0.35); g.quadraticCurveTo(0, -h * 0.75, w * 0.5, -h * 0.35); g.stroke();
 }
-function paintMonolith(g, R, Ld) {               // a slab of black stone far too tall, its top sheared off at an angle
-  const H = 120 + R() * 40, wb = 10 + R() * 3, wt = wb * (0.72 + R() * 0.15), cut = (R() - 0.5) * 14;
-  g.fillStyle = grey(24);
-  g.beginPath(); g.moveTo(-wb, 0); g.lineTo(-wt, -H + cut); g.lineTo(wt, -H - cut); g.lineTo(wb, 0); g.closePath(); g.fill();
-  g.fillStyle = grey(40);                        // the face turned to the light
-  g.beginPath(); g.moveTo(Ld * wb * 0.25, 0); g.lineTo(Ld * wt * 0.25, -H + Ld * -cut * 0.25); g.lineTo(Ld * wt, -H - Ld * cut); g.lineTo(Ld * wb, 0); g.closePath(); g.fill();
-  g.strokeStyle = grey(96); g.lineWidth = 0.7; g.beginPath(); g.moveTo(Ld * wb, 0); g.lineTo(Ld * wt, -H - Ld * cut); g.stroke();
-  g.strokeStyle = grey(70); g.lineWidth = 0.5; g.beginPath(); g.moveTo(-wt, -H + cut); g.lineTo(wt, -H - cut); g.stroke();
-  g.save(); g.beginPath(); g.moveTo(-wb, 0); g.lineTo(-wt, -H + cut); g.lineTo(wt, -H - cut); g.lineTo(wb, 0); g.closePath(); g.clip();
-  glyphs(g, R, -wt * 0.6, -14, wt * 0.6, -H + 18, 'rgba(150,150,144,0.55)', 7);
-  g.restore();
-  shadeRound(g, Ld, wb, H);
-  sandFoot(g, R, wb * 1.8);
-}
-function paintSpire(g, R, Ld) {                  // a horned spire twisting up out of the ground like a shell
-  const H = 90 + R() * 40, w = 9 + R() * 3, turns = 7 + (R() * 3 | 0);
-  g.fillStyle = grey(118);
-  g.beginPath(); g.moveTo(-w, 0); g.quadraticCurveTo(-w * 0.6, -H * 0.5, R() * 6 - 3, -H); g.quadraticCurveTo(w * 0.6, -H * 0.5, w, 0); g.closePath(); g.fill();
-  g.save(); g.clip();
-  for (let k = 0; k < turns; k++) {              // the spiral ridges, each a band from one edge across to the other
-    const y = -k / turns * H, h2 = H / turns;
-    g.fillStyle = grey(150 + (k % 2) * 10); g.beginPath(); g.moveTo(-w * 1.2, y); g.lineTo(w * 1.2, y - h2 * 0.8); g.lineTo(w * 1.2, y - h2 * 0.8 - 2.2); g.lineTo(-w * 1.2, y - 2.2); g.closePath(); g.fill();
-    g.strokeStyle = grey(70); g.lineWidth = 0.5; g.beginPath(); g.moveTo(-w * 1.2, y + 0.4); g.lineTo(w * 1.2, y - h2 * 0.8 + 0.4); g.stroke();
+function paintPalm(g, R, Ld) {                   // a date palm: a ringed trunk leaning and curving, a crown of long feathered fronds
+  const H = 70 + R() * 30, lean = (R() - 0.5) * 34, cx = lean * 0.35;
+  const tx = lean, ty = -H, steps = 16, wb = 3.6, wt = 2.2;
+  const at = u => [cx * 2 * u * (1 - u) + tx * u * u, ty * u];   // the trunk's curve
+  for (let k = 0; k < steps; k++) {                // the trunk, ring by ring
+    const u0 = k / steps, u1 = (k + 1) / steps, [x0, y0] = at(u0), [x1, y1] = at(u1), w = wb + (wt - wb) * u0;
+    g.fillStyle = grey(70 + (k % 2) * 8); g.beginPath(); g.moveTo(x0 - w, y0); g.lineTo(x1 - w * 0.95, y1); g.lineTo(x1 + w * 0.95, y1); g.lineTo(x0 + w, y0); g.closePath(); g.fill();
+    g.fillStyle = grey(104 + (k % 2) * 8); g.beginPath(); g.moveTo(x0 + Ld * w * 0.15, y0); g.lineTo(x1 + Ld * w * 0.15, y1); g.lineTo(x1 + Ld * w * 0.95, y1); g.lineTo(x0 + Ld * w, y0); g.closePath(); g.fill();
+    g.strokeStyle = grey(44); g.lineWidth = 0.45; g.beginPath(); g.moveTo(x1 - w * 0.95, y1); g.quadraticCurveTo(x1, y1 + 1.2, x1 + w * 0.95, y1); g.stroke();
   }
-  g.restore();
-  shadeRound(g, Ld, w, H);
-  sandFoot(g, R, w * 2);
-}
-function paintRing(g, R, Ld) {                   // a ring of black stone standing on its edge, taller than a house, with a piece broken out
-  const ro = 36 + R() * 6, ri = ro - 8, cy = -ro + 4, gap = R() * 6.3;
-  g.fillStyle = grey(30);
-  g.beginPath(); g.arc(0, cy, ro, gap + 0.35, gap + 6.28); g.arc(0, cy, ri, gap + 6.28, gap + 0.35, true); g.closePath(); g.fill();
-  g.strokeStyle = grey(84); g.lineWidth = 0.8; g.beginPath(); g.arc(0, cy, ro - 0.4, Ld > 0 ? -1.2 : 1.95, Ld > 0 ? 1.2 : 4.35); g.stroke();
-  g.save(); g.beginPath(); g.arc(0, cy, ro, 0, 7); g.arc(0, cy, ri, 0, 7, true); g.clip('evenodd');
-  g.strokeStyle = 'rgba(150,150,144,0.5)'; g.lineWidth = 0.55;
-  for (let k = 0; k < 26; k++) { const a = k / 26 * 6.28, r = (ro + ri) / 2, x = Math.cos(a) * r, y = cy + Math.sin(a) * r; if (R() < 0.3) continue;
-    g.beginPath(); g.moveTo(x - Math.cos(a) * 2, y - Math.sin(a) * 2); g.lineTo(x + Math.cos(a) * 2, y + Math.sin(a) * 2); if (R() < 0.5) { g.moveTo(x - Math.sin(a) * 1.3, y + Math.cos(a) * 1.3); g.lineTo(x + Math.sin(a) * 1.3, y - Math.cos(a) * 1.3); } g.stroke(); }
-  g.restore();
-  shadeRound(g, Ld, ro, ro * 2, 0, cy, true);
-  sandFoot(g, R, ro * 0.7);
-}
-function paintShard(g, R, Ld) {                  // a rock torn loose and left hanging in the air
-  const n = 7, pts = [];
-  for (let k = 0; k < n; k++) { const a = k / n * 6.28, r = 9 + R() * 6; pts.push([Math.cos(a) * r, -16 + Math.sin(a) * r * 0.75 + (Math.sin(a) > 0 ? 6 : 0)]); }
-  g.fillStyle = grey(44); g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill();
-  g.fillStyle = grey(78); g.beginPath(); g.moveTo(0, -18); for (const [x, y] of pts) if (x * Ld > -2 && y < -10) g.lineTo(x, y); g.closePath(); g.fill();
-  g.fillStyle = grey(26); g.beginPath(); g.moveTo(-8, -10); g.lineTo(0, 0); g.lineTo(8, -10); g.closePath(); g.fill();   // the torn underside
-}
-function paintDStone(g, R, Ld) {                 // a flat stone half under the sand, a mark cut in it
-  const w = 6 + R() * 4; g.fillStyle = grey(70); g.beginPath(); g.ellipse(0, -1, w, w * 0.4, 0, Math.PI, 0); g.fill();
-  g.fillStyle = grey(96); g.beginPath(); g.ellipse(Ld * w * 0.3, -1.6, w * 0.5, w * 0.2, 0, Math.PI, 0); g.fill();
-  if (R() < 0.6) glyphs(g, R, -w * 0.4, -1.4, w * 0.4, -2.5, 'rgba(30,30,28,0.6)', 3);
-  sandFoot(g, R, w * 1.2);
-}
-function spines(g, R, x0, y0, x1, y1, n, len, col) {   // tiny pale thorns along an edge
-  g.strokeStyle = col; g.lineWidth = 0.3;
-  for (let k = 0; k < n; k++) { const u = R(), x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u, a = R() * 6.3; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); g.stroke(); }
-}
-function ribbedLimb(g, R, pts, w, tone, Ld) {    // a ribbed cactus limb along a path: dark body, lit flank, rib lines, thorns
-  const seg = (lw, col) => { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); };
-  seg(w, grey(tone)); 
-  g.save(); g.translate(Ld * w * 0.22, 0); seg(w * 0.45, grey(tone + 26)); g.restore();
-  for (const o of [-0.3, 0.05, 0.32]) { g.save(); g.translate(o * w, 0); seg(0.35, grey(tone - 22)); g.restore(); }
-  for (let i = 1; i < pts.length; i++) spines(g, R, pts[i - 1][0] - w / 2, pts[i - 1][1], pts[i][0] - w / 2, pts[i][1], 3, 1.6, 'rgba(225,222,212,0.8)'), spines(g, R, pts[i - 1][0] + w / 2, pts[i - 1][1], pts[i][0] + w / 2, pts[i][1], 3, 1.6, 'rgba(225,222,212,0.8)');
-}
-function paintCactusCurl(g, R, Ld) {             // a tall ribbed cactus whose arms curl round like a ram's horn, crowned with a pale spiked bloom
-  const H = 58 + R() * 30, w = 7 + R() * 2;
-  const trunk = []; for (let k = 0; k <= 8; k++) trunk.push([Math.sin(k * 0.6 + R()) * 1.2, -k / 8 * H]);
-  const arms = 2 + (R() * 2 | 0);
-  for (let a = 0; a < arms; a++) {
-    const sd = a % 2 ? -1 : 1, y0 = -H * (0.3 + R() * 0.35), r0 = 8 + R() * 5, pts = [[0, y0]];
-    for (let k = 1; k <= 14; k++) { const t = k / 14, ang = Math.PI - t * Math.PI * 1.55, r = r0 * (1 - t * 0.45); pts.push([sd * (r0 + Math.cos(ang) * r), y0 - 4 - Math.sin(ang) * r - t * 10]); }
-    ribbedLimb(g, R, pts, w * 0.65, 84 + R() * 10, Ld);
+  const fr = 10 + (R() * 3 | 0), fronds = [];
+  for (let k = 0; k < fr; k++) fronds.push([k / fr * Math.PI * 2 + R() * 0.3, 30 + R() * 14, 0.7 + R() * 0.6]);
+  fronds.sort((a, b) => Math.sin(a[0]) - Math.sin(b[0]));   // the ones reaching away from you first
+  g.fillStyle = grey(40); for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(tx + (k - 2) * 2, ty + 3 + (k % 2) * 1.5, 1.8, 0, 7); g.fill(); }   // dates hanging under the crown
+  for (const [a, L, droop] of fronds) {
+    const dx = Math.cos(a), back = Math.sin(a), pts = [], N = 14;
+    for (let m = 0; m <= N; m++) { const u = m / N; pts.push([tx + dx * L * u * (1 - 0.15 * back), ty - back * 7 * u - 11 * u * (1 - back * 0.4) + 30 * droop * u * u]); }   // up and out, then arching over and down
+    const lit = dx * Ld > 0 ? 1 : 0, tone = 50 + lit * 38 - back * 12;
+    for (let m = 1; m < N; m++) {                  // long leaflets hanging off both sides of the rib, shorter toward the tip
+      const [x, y] = pts[m], [nx, ny] = pts[m + 1], ang = Math.atan2(ny - y, nx - x), l = 11 * (1 - m / (N + 3));
+      for (const sd of [-1, 1]) {
+        const la = ang + sd * 0.9, hx = x + Math.cos(la) * l, hy = y + Math.sin(la) * l + l * 0.55;   // they hang with their own weight
+        g.fillStyle = grey(tone + (sd * Ld > 0 ? 10 : -8) + R() * 10); g.beginPath(); g.moveTo(x - 0.8, y); g.quadraticCurveTo((x + hx) / 2, (y + hy) / 2 - 1.5, hx, hy); g.lineTo(x + 0.8, y + 0.6); g.closePath(); g.fill();
+      }
+    }
+    g.strokeStyle = grey(tone + 14); g.lineWidth = 1.1;
+    g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
   }
-  ribbedLimb(g, R, trunk, w, 88, Ld);
-  g.fillStyle = grey(212);                         // the bloom: long pale petals like knives
-  for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * 0.42, l = 5 + R() * 4; g.beginPath(); g.moveTo(-1.2, -H); g.lineTo(Math.cos(a) * l, -H + Math.sin(a) * l); g.lineTo(1.2, -H); g.closePath(); g.fill(); }
-  shadeRound(g, Ld, 18, H);
-  sandFoot(g, R, 14);
+  sandFoot(g, R, 9);
 }
-function paintCactusBarrel(g, R, Ld) {           // a knot of round, deeply ribbed barrels, each bristling with long hooked thorns
-  const n = 3 + (R() * 3 | 0), bs = [];
-  for (let k = 0; k < n; k++) bs.push([(R() - 0.5) * 22, (R() - 0.5) * 4, 5 + R() * 6]);
-  bs.sort((a, b) => b[2] - a[2] + (a[1] - b[1]));
-  for (const [x, y, r] of bs) {
-    const cy = y - r * 0.95;
-    g.fillStyle = grey(78); g.beginPath(); g.ellipse(x, cy, r, r * 1.05, 0, 0, 7); g.fill();
-    g.fillStyle = grey(104); g.beginPath(); g.ellipse(x + Ld * r * 0.3, cy - r * 0.1, r * 0.55, r * 0.9, 0, 0, 7); g.fill();
-    g.strokeStyle = grey(52); g.lineWidth = 0.4;
-    for (let m = -3; m <= 3; m++) { g.beginPath(); g.ellipse(x, cy, Math.abs(m) / 3.5 * r + 0.1, r * 1.04, 0, -Math.PI / 2, Math.PI / 2, m < 0); g.stroke(); }
-    g.strokeStyle = 'rgba(228,225,214,0.85)'; g.lineWidth = 0.35;   // long thorns from the crown, hooked at the tips
-    for (let m = 0; m < 9; m++) { const a = -Math.PI / 2 + (m - 4) * 0.33, l = r * (0.7 + R() * 0.6), x1 = x + Math.cos(a) * l, y1 = cy - r + Math.sin(a) * l * 0.9;
-      g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.3, cy - r * 0.8); g.lineTo(x1, y1); g.lineTo(x1 + (a > -Math.PI / 2 ? 1 : -1) * 0.8, y1 + 0.8); g.stroke(); }
-  }
-  shadeRound(g, Ld, 18, 18, 0, -9, true);
-  sandFoot(g, R, 18);
+function paintScrub(g, R, Ld) {                  // a dry desert bush: a low dome of grey twigs
+  const w = 9 + R() * 6, h = 7 + R() * 5;
+  for (let k = 0; k < 40; k++) { const a = Math.PI + R() * Math.PI, r = R(), x = Math.cos(a) * w * r, y = Math.sin(a) * h * r;
+    g.strokeStyle = grey(60 + (x * Ld > 0 ? 40 : 10) + R() * 20); g.lineWidth = 0.45; g.beginPath(); g.moveTo(x * 0.3, 0); g.lineTo(x, y); g.lineTo(x + (R() - 0.5) * 3, y - 1.5 - R() * 2); g.stroke(); }
+  sandFoot(g, R, w);
 }
-function paintCactusPods(g, R, Ld) {             // a twisted stalk whose drooping branches end in pale hanging pods
-  const H = 50 + R() * 20, stalk = [];
-  for (let k = 0; k <= 8; k++) stalk.push([Math.sin(k * 0.9) * 2.5, -k / 8 * H]);
-  for (let b = 0; b < 5; b++) {
-    const [bx, by] = stalk[3 + b % 5], sd = b % 2 ? -1 : 1, len = 10 + R() * 8, ex = bx + sd * len, ey = by - 6 + R() * 4;
-    g.strokeStyle = grey(76); g.lineWidth = 2.2; g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(bx + sd * len * 0.7, by - 10, ex, ey); g.stroke();
-    g.strokeStyle = grey(110); g.lineWidth = 0.5; g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex, ey + 5); g.stroke();
-    g.fillStyle = grey(200 + R() * 25); g.beginPath(); g.moveTo(ex, ey + 4); g.quadraticCurveTo(ex + 3, ey + 8, ex, ey + 12); g.quadraticCurveTo(ex - 3, ey + 8, ex, ey + 4); g.fill();   // the pod
-    g.fillStyle = grey(150); g.beginPath(); g.ellipse(ex - Ld * 0.8, ey + 9, 0.7, 1.8, 0, 0, 7); g.fill();
-  }
-  ribbedLimb(g, R, stalk, 5.5, 80, Ld);
-  shadeRound(g, Ld, 16, H);
-  sandFoot(g, R, 12);
-}
-function paintCactusWhips(g, R, Ld) {            // long thorny wands fanning out of the sand
-  const n = 7 + (R() * 5 | 0);
+function paintReeds(g, R, Ld) {                  // tall reeds and rushes at the water's edge, a few with seed heads
+  const n = 10 + (R() * 8 | 0);
   for (let k = 0; k < n; k++) {
-    const a = -Math.PI / 2 + (k / (n - 1) - 0.5) * 1.3 + (R() - 0.5) * 0.15, l = 40 + R() * 30, bend = (R() - 0.5) * 12;
-    const x1 = Math.cos(a) * l, y1 = Math.sin(a) * l, tone = 70 + (x1 * Ld > 0 ? 30 : 0);
-    g.strokeStyle = grey(tone); g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(x1 * 0.5 + bend, y1 * 0.5, x1, y1); g.stroke();
-    g.strokeStyle = 'rgba(225,222,212,0.7)'; g.lineWidth = 0.3;
-    for (let m = 1; m < 14; m++) { const u = m / 14, x = x1 * u + bend * 2 * u * (1 - u), y = y1 * u; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (m % 2 ? 1.6 : -1.6), y - 0.6); g.stroke(); }
-    if (R() < 0.5) { g.fillStyle = grey(210); g.beginPath(); g.ellipse(x1, y1 - 1, 1, 2.2, a + Math.PI / 2, 0, 7); g.fill(); }   // a pale bud at the tip
+    const x0 = (R() - 0.5) * 14, l = 14 + R() * 16, bend = (R() - 0.5) * 6, tone = 70 + (x0 * Ld > 0 ? 34 : 6) + R() * 14;
+    g.strokeStyle = grey(tone); g.lineWidth = 0.7; g.beginPath(); g.moveTo(x0, 0); g.quadraticCurveTo(x0 + bend * 0.3, -l * 0.6, x0 + bend, -l); g.stroke();
+    if (R() < 0.35) { g.fillStyle = grey(58); g.beginPath(); g.ellipse(x0 + bend * 0.85, -l * 0.86, 0.9, 3, bend * 0.03, 0, 7); g.fill(); }
   }
-  sandFoot(g, R, 10);
 }
-function paintHoodoo(g, R, Ld) {                 // a column of wind-cut rock, a great stone balanced on top of it where no stone should stay
-  const H = 40 + R() * 30, w = 9 + R() * 4; let y = 0;
-  for (let k = 0; k < 4; k++) {                   // banded layers, each pinched in at the waist
-    const h = H / 4, wl = w * (1 - k * 0.12) * (0.9 + R() * 0.2), tone = 70 + (k % 2) * 16;
-    g.fillStyle = grey(tone); g.beginPath(); g.moveTo(-wl, y); g.quadraticCurveTo(-wl * 0.65, y - h / 2, -wl * 0.95, y - h); g.lineTo(wl * 0.95, y - h); g.quadraticCurveTo(wl * 0.65, y - h / 2, wl, y); g.closePath(); g.fill();
-    g.strokeStyle = grey(tone - 22); g.lineWidth = 0.45; g.beginPath(); g.moveTo(-wl * 0.95, y - h); g.lineTo(wl * 0.95, y - h); g.stroke();
-    y -= h;
-  }
-  const br = 11 + R() * 6;                        // the cap stone, wider than the column under it
-  g.fillStyle = grey(56); g.beginPath(); g.ellipse(R() * 3 - 1.5, y - br * 0.7, br * 1.25, br * 0.8, (R() - 0.5) * 0.3, 0, 7); g.fill();
-  g.fillStyle = grey(90); g.beginPath(); g.ellipse(Ld * br * 0.35, y - br * 1.0, br * 0.7, br * 0.4, 0, 0, 7); g.fill();
-  shadeRound(g, Ld, w * 1.6, H + br * 1.6);
-  sandFoot(g, R, w * 1.8);
+function paintTuft(g, R, Ld) {                   // a clump of dry desert grass
+  for (let k = 0; k < 9; k++) { const a = -Math.PI / 2 + (R() - 0.5) * 1.6, l = 4 + R() * 7; g.strokeStyle = grey(120 + R() * 50); g.lineWidth = 0.5; g.beginPath(); g.moveTo((R() - 0.5) * 3, 0); g.quadraticCurveTo(Math.cos(a) * l * 0.4, Math.sin(a) * l * 0.6, Math.cos(a) * l, Math.sin(a) * l); g.stroke(); }
 }
-function paintArch(g, R, Ld) {                   // a natural bridge of banded rock, worn through by wind, lopsided and rough
-  const w = 40 + R() * 12, h = 50 + R() * 16, t = 12 + R() * 5, lean = (R() - 0.5) * 0.35, out = [], inn = [];
-  for (let k = 0; k <= 22; k++) {
-    const u = k / 22, a = Math.PI * (1 - u), sk = 1 + lean * Math.cos(a);   // one side a little higher than the other
-    const ro = 1 + (R() - 0.5) * 0.1, ri = 1 + (R() - 0.5) * 0.12, foot = Math.pow(Math.abs(Math.cos(a)), 6) * 7;   // the legs flare where they meet the sand
-    out.push([Math.cos(a) * (w + t * 0.5 + foot) * ro, -Math.sin(a) * (h + t * 0.5) * sk * ro]);
-    inn.push([Math.cos(a) * (w - t * 0.5) * ri, -Math.sin(a) * (h - t * 0.6) * sk * ri]);
-  }
-  out[0][1] = out[22][1] = 0; inn[0][1] = inn[22][1] = 0;
-  const shape = () => { g.beginPath(); out.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); for (let k = inn.length - 1; k >= 0; k--) g.lineTo(inn[k][0], inn[k][1]); g.closePath(); };
-  g.fillStyle = grey(64); shape(); g.fill();
-  g.save(); shape(); g.clip();
-  for (let k = 0; k < 10; k++) { const y = -k / 10 * (h + t); g.fillStyle = k % 2 ? 'rgba(255,255,250,0.07)' : 'rgba(0,0,0,0.1)'; g.beginPath(); g.moveTo(-w * 2, y); for (let x = -w * 2; x <= w * 2; x += 6) g.lineTo(x, y + Math.sin(x * 0.2 + k) * 1.2); g.lineTo(w * 2, y - (h + t) / 10); g.lineTo(-w * 2, y - (h + t) / 10); g.closePath(); g.fill(); }
-  const lg = g.createLinearGradient(-w, 0, w, 0); lg.addColorStop(0, Ld > 0 ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,245,0.16)'); lg.addColorStop(1, Ld > 0 ? 'rgba(255,255,245,0.16)' : 'rgba(0,0,0,0.28)');
-  g.fillStyle = lg; g.fillRect(-w * 2, -h * 2, w * 4, h * 2.2);
-  g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); inn.forEach(([x, y], i) => i ? g.lineTo(x, y + 3) : g.moveTo(x, y + 3)); g.lineTo(inn[22][0], inn[22][1]); for (let k = 22; k >= 0; k--) g.lineTo(inn[k][0], inn[k][1]); g.fill();   // the underside of the span in shadow
-  g.restore();
-  for (const x of [-w, w]) { g.save(); g.translate(x, 0); sandFoot(g, R, t * 1.4); g.restore(); }
-}
-function paintCrystal(g, R, Ld) {                // a cluster of pale glassy prisms pushing up through the sand at odd angles
-  const n = 4 + (R() * 4 | 0), cs = [];
-  for (let k = 0; k < n; k++) cs.push([(R() - 0.5) * 16, (R() - 0.5) * 0.9, 14 + R() * 26, 2.5 + R() * 2.5]);
-  cs.sort((a, b) => b[2] - a[2]);
-  for (const [x, a, l, w] of cs) {
-    const tx = x + Math.sin(a) * l, ty = -Math.cos(a) * l, nx = Math.cos(a) * w, ny = Math.sin(a) * w, tip = 4 + w;
-    const px = tx + Math.sin(a) * tip, py = ty - Math.cos(a) * tip;
-    g.fillStyle = grey(150); g.beginPath(); g.moveTo(x - nx, -ny); g.lineTo(tx - nx, ty - ny); g.lineTo(px, py); g.lineTo(tx + nx, ty + ny); g.lineTo(x + nx, ny); g.closePath(); g.fill();
-    const lit = Ld * a > 0 ? 1 : 0;   // one face catches the light, the other stays glassy grey
-    g.fillStyle = grey(lit ? 225 : 190); g.beginPath(); g.moveTo(x + Ld * nx * 0.1, 0); g.lineTo(tx + Ld * nx * 0.1, ty); g.lineTo(px, py); g.lineTo(tx + Ld * nx, ty + Ld * ny); g.lineTo(x + Ld * nx, Ld * ny); g.closePath(); g.fill();
-    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.35; g.beginPath(); g.moveTo(x, 0); g.lineTo(tx, ty); g.lineTo(px, py); g.stroke();
-  }
-  sandFoot(g, R, 14);
-}
-function paintPillar(g, R, Ld) {                 // a tall finger of rock the wind has bored right through in places
-  const H = 70 + R() * 30, w = 10 + R() * 3, pts = [];
-  for (let k = 0; k <= 10; k++) pts.push([(Math.sin(k * 1.3 + R() * 2) * 0.25 + 1) * w * (1 - k / 10 * 0.45), -k / 10 * H]);
-  g.fillStyle = grey(72); g.beginPath(); g.moveTo(-pts[0][0], 0);
-  for (const [x, y] of pts) g.lineTo(-x, y); for (let k = pts.length - 1; k >= 0; k--) g.lineTo(pts[k][0], pts[k][1]); g.closePath(); g.fill();
-  g.save(); g.clip();
-  g.fillStyle = 'rgba(255,255,245,0.14)'; g.fillRect(Ld > 0 ? w * 0.1 : -w * 2, -H, w * 2, H);
-  for (let k = 0; k < 7; k++) { const y = -k / 7 * H; g.fillStyle = k % 2 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,250,0.05)'; g.fillRect(-w * 2, y - H / 7, w * 4, H / 7); }
-  g.restore();
-  for (let k = 0; k < 3; k++) {                   // holes worn through, sky-dark inside
-    const y = -H * (0.35 + k * 0.2 + R() * 0.05), r = 2 + R() * 2.5, x = (R() - 0.5) * w * 0.6;
-    g.fillStyle = grey(16); g.beginPath(); g.ellipse(x, y, r, r * 1.3, 0, 0, 7); g.fill();
-    g.strokeStyle = grey(110); g.lineWidth = 0.4; g.beginPath(); g.ellipse(x, y, r, r * 1.3, 0, Ld > 0 ? Math.PI * 0.6 : -Math.PI * 0.4, Ld > 0 ? Math.PI * 1.4 : Math.PI * 0.4); g.stroke();
-  }
-  shadeRound(g, Ld, w, H);
-  sandFoot(g, R, w * 1.9);
-}
-function paintDrift(g, R, Ld) {                  // a long low ridge of sand, sharp-crested on the windward side
-  const w = 26 + R() * 14, h = 4 + R() * 3;
-  const gr = g.createLinearGradient(0, -h, 0, 2); gr.addColorStop(0, grey(186)); gr.addColorStop(1, grey(150));
-  g.fillStyle = gr; g.beginPath(); g.moveTo(-w, 2); g.quadraticCurveTo(-w * 0.3, -h * 1.4, w * 0.2, -h); g.quadraticCurveTo(w * 0.7, -h * 0.4, w, 2); g.closePath(); g.fill();
-  g.strokeStyle = 'rgba(100,98,92,0.5)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(-w * 0.55, -h * 0.4); g.quadraticCurveTo(-w * 0.1, -h * 1.2, w * 0.2, -h); g.stroke();
-}
-function paintStoneRing(g, R, Ld) {              // small stones set in a careful circle, by no one
-  const n = 7 + (R() * 3 | 0), rr = 9 + R() * 4;
-  for (let k = 0; k < n; k++) { const a = k / n * 6.28, x = Math.cos(a) * rr, y = Math.sin(a) * rr * 0.45, r = 1.6 + R() * 1.2;
-    g.fillStyle = grey(66); g.beginPath(); g.ellipse(x, y - r * 0.6, r, r * 0.8, 0, 0, 7); g.fill(); g.fillStyle = grey(110); g.beginPath(); g.ellipse(x + Ld * r * 0.3, y - r * 0.9, r * 0.5, r * 0.35, 0, 0, 7); g.fill(); }
-}
-function paintCactusNub(g, R, Ld) {              // a small cactus, a single ribbed knob with a thorny crown
-  const h = 6 + R() * 6, w = 3 + R() * 1.5;
-  g.fillStyle = grey(82); g.beginPath(); g.ellipse(0, -h / 2, w, h / 2, 0, 0, 7); g.fill();
-  g.fillStyle = grey(108); g.beginPath(); g.ellipse(Ld * w * 0.35, -h / 2, w * 0.4, h * 0.42, 0, 0, 7); g.fill();
-  spines(g, R, -w, -h, w, -h, 7, 1.8, 'rgba(225,222,212,0.85)');
-}
-function paintDGrass(g, R, Ld) {                 // a few stiff pale blades, the only thing growing
-  for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (R() - 0.5) * 1.2, l = 4 + R() * 6; g.strokeStyle = grey(110 + R() * 50); g.lineWidth = 0.5; g.beginPath(); g.moveTo((R() - 0.5) * 3, 0); g.lineTo(Math.cos(a) * l, Math.sin(a) * l); g.stroke(); }
+function paintDStone(g, R, Ld) {                 // a flat stone half under the sand
+  const w = 5 + R() * 4; g.fillStyle = grey(76); g.beginPath(); g.ellipse(0, -1, w, w * 0.4, 0, Math.PI, 0); g.fill();
+  g.fillStyle = grey(104); g.beginPath(); g.ellipse(Ld * w * 0.3, -1.6, w * 0.5, w * 0.2, 0, Math.PI, 0); g.fill();
 }
 const DESERT_KINDS = {
-  mono: [5, 44, 186, 22, 176, paintMonolith], spire: [4, 36, 146, 18, 140, paintSpire], ring: [3, 90, 100, 45, 94, paintRing], shard: [5, 34, 32, 17, 26, paintShard],
-  cCurl: [5, 64, 110, 32, 100, paintCactusCurl], cBarrel: [4, 50, 40, 25, 32, paintCactusBarrel], cPods: [4, 52, 84, 26, 76, paintCactusPods], cWhips: [4, 100, 80, 50, 74, paintCactusWhips],
-  hoodoo: [4, 50, 104, 25, 96, paintHoodoo], arch: [3, 150, 92, 75, 84, paintArch], crystal: [5, 52, 56, 26, 48, paintCrystal], pillar: [4, 40, 116, 20, 108, paintPillar],
-  dstone: [4, 26, 12, 13, 8, paintDStone], dgrass: [3, 16, 12, 8, 10, paintDGrass], drift: [4, 84, 16, 42, 10, paintDrift], sring: [3, 34, 16, 17, 10, paintStoneRing], cNub: [4, 12, 16, 6, 14, paintCactusNub],
+  palm: [6, 140, 150, 70, 142, paintPalm], scrub: [4, 34, 20, 17, 16, paintScrub], reeds: [4, 34, 34, 17, 32, paintReeds],
+  tuft: [4, 22, 14, 11, 12, paintTuft], dstone: [4, 22, 10, 11, 7, paintDStone],
 };
 Object.assign(SPRITE_KINDS, DESERT_KINDS);
-// what stands where. The sands are split into regions, each with its own character, so walking any way you pass from one
-// kind of place into another: monolith fields, cactus groves, rock gardens, open dunes and crystal flats.
-const REGIONS = [
-  { name: 'monoliths', rate: 0.055, pick: [['mono', 6], ['ring', 2], ['shard', 2], ['spire', 1]], decor: [['dstone', 5], ['sring', 2], ['drift', 2]] },
-  { name: 'grove', rate: 0.095, pick: [['cCurl', 4], ['cBarrel', 4], ['cPods', 3], ['cWhips', 3], ['hoodoo', 1]], decor: [['cNub', 5], ['dgrass', 5], ['dstone', 1]] },
-  { name: 'rocks', rate: 0.07, pick: [['hoodoo', 4], ['pillar', 4], ['arch', 0.5], ['shard', 3], ['cBarrel', 1]], decor: [['dstone', 5], ['drift', 2], ['cNub', 1]] },
-  { name: 'dunes', rate: 0.022, pick: [['spire', 3], ['cWhips', 2], ['mono', 1], ['shard', 1]], decor: [['drift', 6], ['dgrass', 2]] },
-  { name: 'crystal', rate: 0.065, pick: [['crystal', 6], ['spire', 2], ['shard', 2], ['pillar', 1]], decor: [['dstone', 3], ['sring', 1], ['drift', 2]] },
-];
-const DESERT_R = { mono: 10, spire: 7, ring: 14, shard: 0, cCurl: 7, cBarrel: 11, cPods: 6, cWhips: 6, hoodoo: 10, arch: 0, crystal: 9, pillar: 9 };
-function regionAt(i, j) {                        // regions are blocks about 14 tiles across, with ragged edges
-  const bi = Math.floor((i + (hash(j * 0.31, 5) - 0.5) * 6) / 14), bj = Math.floor((j + (hash(i * 0.29, 9) - 0.5) * 6) / 14);
-  return REGIONS[(hash(bi * 3.7 + 11, bj * 5.3 - 2) * REGIONS.length) | 0];
+// ---- oases: one in roughly every other 1400-unit cell, plus one near where you arrive ----
+const OASIS_CELL = 1400, oasisCache = new Map();
+function oasisIn(ci, cj) {
+  const key = ci + ',' + cj; if (oasisCache.has(key)) return oasisCache.get(key);
+  let o = null;
+  const gi = Math.floor(BEYOND_GATE.x / OASIS_CELL), gj = Math.floor((BEYOND_GATE.y + 300) / OASIS_CELL);
+  if (ci === gi && cj === gj) o = { x: BEYOND_GATE.x + 470, y: BEYOND_GATE.y + 290, r: 95 };   // the first one is close enough to find
+  else if (hash(ci * 1.3 + 7, cj * 2.1 - 4) > 0.5) o = { x: (ci + 0.2 + 0.6 * hash(cj, ci + 3)) * OASIS_CELL, y: (cj + 0.2 + 0.6 * hash(ci + 5, cj)) * OASIS_CELL, r: 55 + hash(ci - 2, cj * 3) * 60 };
+  if (o) o.seed = hash(ci * 7.7, cj * 3.3) * 6.28;
+  oasisCache.set(key, o); return o;
 }
-function weighted(list, u) { let tot = 0; for (const [, w] of list) tot += w; let x = u * tot; for (const [k, w] of list) { if ((x -= w) < 0) return k; } return list[0][0]; }
+function oasesNear(x, y, R) {
+  const out = [];
+  for (let ci = Math.floor((x - R) / OASIS_CELL); ci <= Math.floor((x + R) / OASIS_CELL); ci++)
+    for (let cj = Math.floor((y - R) / OASIS_CELL); cj <= Math.floor((y + R) / OASIS_CELL); cj++) { const o = oasisIn(ci, cj); if (o) out.push(o); }
+  return out;
+}
+const lagoonR = (o, a) => o.r * (1 + 0.14 * Math.sin(3 * a + o.seed) + 0.07 * Math.sin(5 * a + o.seed * 2) + 0.04 * Math.sin(9 * a - o.seed));   // its ragged shore
+function oasisAt(x, y) {                         // the oasis this point belongs to, and how far out from its shore (negative = in the water)
+  for (const o of oasesNear(x, y, 300)) { const d = Math.hypot(x - o.x, y - o.y), a = Math.atan2(y - o.y, x - o.x), sh = lagoonR(o, a); if (d < sh + 220) return [o, d - sh]; }
+  return [null, 1e9];
+}
 const desertCache = new Map();
 function desertPropAt(i, j) {
   const key = i * 2097152 + j;
@@ -1997,25 +1833,29 @@ function desertPropAt(i, j) {
   if (desertCache.size > 100000) desertCache.clear();
   let p = null;
   const x = i * T + 8 + hash(j + 41, i - 13) * (T - 16), y = j * T + 8 + hash(i - 29, j + 3) * (T - 16);
-  if (Math.hypot(x - BEYOND_GATE.x, y - BEYOND_GATE.y) > 150) {
-    const h = hash(i * 0.913 + 51, j * 1.37 - 77), v = hash(i * 2.1 - 5, j * 0.7 + 9), s = 0.75 + hash(i * 4.3, j * 1.9) * 0.6, reg = regionAt(i, j);
-    const big = (((i % 7) + 7) % 7 === 0) && (((j % 7) + 7) % 7 === 0);   // the very large pieces only on a sparse grid
-    if (big && h > 0.6) { const k = reg.name === 'rocks' ? (h > 0.8 ? 'arch' : 'pillar') : reg.name === 'dunes' ? 'spire' : reg.name === 'monoliths' ? 'ring' : reg.name === 'grove' ? 'cCurl' : 'crystal'; p = { kind: 'dprop', dk: k, x, y, s: s * (k === 'arch' || k === 'ring' ? 1.6 : 1.4), r: DESERT_R[k], v: (v * 97 | 0) % DESERT_KINDS[k][0], nocol: k === 'arch' }; }
-    else if (h > 1 - reg.rate) {
-      const k = weighted(reg.pick, hash(i * 1.9 + 3, j * 2.7 - 8));
-      p = { kind: 'dprop', dk: k, x, y, s: s * (k[0] === 'c' ? 1.3 : 1), r: DESERT_R[k], v: (v * 97 | 0) % DESERT_KINDS[k][0] };
-      if (k === 'shard') { p.float = 26 + v * 40; p.nocol = true; p.s *= 1.1; }
-      if (k === 'mono' && v < 0.25) p.float = 10;
-      if (k === 'arch') p.nocol = true;          // you can walk under an arch
-    }
+  if (Math.hypot(x - BEYOND_GATE.x, y - BEYOND_GATE.y) > 130) {
+    const h = hash(i * 0.913 + 51, j * 1.37 - 77), v = hash(i * 2.1 - 5, j * 0.7 + 9), s = 0.85 + hash(i * 4.3, j * 1.9) * 0.4;
+    const [oa, sd] = oasisAt(x, y);
+    if (oa && sd < 14) p = null;                  // the water itself, and its very edge
+    else if (oa && sd < 130) { if (h > 0.84 - (sd < 60 ? 0.08 : 0)) p = { kind: 'dprop', dk: 'palm', x, y, s: s * 1.1, r: 4, v: (v * 97 | 0) % 6, sway: v * 9 }; }   // palms crowd round the water
+    else if (h > 0.988) p = { kind: 'rock', x, y, r: 9, s: 0.7 + v * 0.7 };
+    else if (h > 0.978) p = { kind: 'dprop', dk: 'scrub', x, y, s, r: 6, v: (v * 97 | 0) % 4 };
+    else if (h > 0.9755) p = { kind: 'tree', type: 'dead', seed: v, x, y, r: 6, s: 0.7 + v * 0.3, key: 'd' + i + ',' + j };
   }
   desertCache.set(key, p);
   return p;
 }
 function desertDecorAt(i, j) {
-  const h = hash(i * 1.71 - 3, j * 0.53 + 21); if (h > 0.22 || desertPropAt(i, j)) return null;
-  const reg = regionAt(i, j), v = hash(i * 3.7, j * 1.3), dk = weighted(reg.decor, h / 0.22);
-  return { kind: 'decor', dk, x: i * T + 6 + hash(j, i + 2) * (T - 12), y: j * T + 6 + hash(i + 4, j) * (T - 12), s: 0.8 + hash(j * 1.3, i) * 0.6, v: (v * 97 | 0) % DESERT_KINDS[dk][0], seed: v };
+  if (desertPropAt(i, j)) return null;
+  const h = hash(i * 1.71 - 3, j * 0.53 + 21), x = i * T + 6 + hash(j, i + 2) * (T - 12), y = j * T + 6 + hash(i + 4, j) * (T - 12), v = hash(i * 3.7, j * 1.3);
+  const [oa, sd] = oasisAt(x, y);
+  let dk = null;
+  if (oa && sd < 4) return null;
+  if (oa && sd < 40) dk = h < 0.75 ? 'reeds' : null;                 // reeds along the shore
+  else if (oa && sd < 150) dk = h < 0.45 ? 'tuft' : h < 0.55 ? 'scrub' : null;   // grass round the oasis
+  else dk = h < 0.05 ? 'tuft' : h < 0.08 ? 'dstone' : null;           // the open dunes: almost nothing
+  if (!dk) return null;
+  return { kind: 'decor', dk, x, y, s: 0.8 + hash(j * 1.3, i) * 0.6, v: (v * 97 | 0) % DESERT_KINDS[dk][0], seed: v };
 }
 function desertDecorInView() {                   // only what the torch can reach
   const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60, out = [], R = viewR();
@@ -2028,13 +1868,97 @@ function desertDecorInView() {                   // only what the torch can reac
   return out;
 }
 function drawDesertProp(o, c, mask, sx, sy, s) {
-  const bob = o.float ? Math.sin(S.t * 0.8 + o.x * 0.01) * 3 : 0, lift = (o.float || 0) + bob;
-  if (o.float && !mask) {                        // its shadow on the sand below, and a thin trickle of sand falling from it
-    c.fillStyle = 'rgba(20,20,18,0.35)'; c.beginPath(); c.ellipse(sx, sy, 12 * s * (o.dk === 'mono' ? 1.2 : 0.9), 5 * s, 0, 0, 7); c.fill();
-    c.fillStyle = 'rgba(200,198,190,0.5)';
-    for (let k = 0; k < 6; k++) { const u = (S.t * 0.9 + k / 6) % 1; c.fillRect(sx + (k - 2.5) * 1.6 * s, sy - lift * s * (1 - u), 0.9 * s, 1.6 * s); }
+  const sway = o.dk === 'palm' ? (Math.sin(S.t * 0.6 + o.sway) * 2.6 + Math.sin(S.t * 1.7 + o.sway * 3) * 0.7) * s : 0;   // palms rock in the night wind
+  if (o.dk === 'palm' && !mask) shadow(sx, sy, 9 * s);
+  litStamp(c, o.dk, o.v, sx, sy, s, mask, sway);
+}
+// the dunes: one big height field (1536 units square, repeating), shaded once by the moon and laid over the sand.
+// Each ridge rises gently on the windward side and drops steeply on the slip face, with a pale crest along the top.
+const DUNE_P = 1536;
+let duneT = null;
+function duneTile() {
+  if (duneT) return duneT;
+  const N = 256, hgt = new Float32Array(N * N), TAU = Math.PI * 2;
+  const prof = t => t < 0.72 ? 0.5 - 0.5 * Math.cos(Math.PI * t / 0.72) : 0.5 + 0.5 * Math.cos(Math.PI * (t - 0.72) / 0.28);   // slow rise, sharp fall
+  const fr = x => x - Math.floor(x);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const u = i / N, v = j / N;
+    const p1 = 3 * u + v + 0.3 * Math.sin(TAU * (u - 2 * v)) + 0.12 * Math.sin(TAU * (2 * u + v) + 1);   // long ridges that wander
+    const sw = 0.7 + 0.3 * Math.sin(TAU * (u + 2 * v) + 0.5);    // ridges swell and fade along their length
+    hgt[j * N + i] = prof(fr(p1)) * sw + 0.12 * Math.sin(TAU * (-2 * u + 5 * v)) + 0.06 * Math.sin(TAU * (4 * u - 3 * v) + 2);
   }
-  litStamp(c, o.dk, o.v, sx, sy - lift * s, s, mask);
+  const cv = document.createElement('canvas'); cv.width = cv.height = N;
+  const g = cv.getContext('2d'), im = g.createImageData(N, N), d = im.data, Lx = -0.62, Ly = -0.78;   // the moon low in the north-west
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const at = (a, b) => hgt[((b + N) % N) * N + (a + N) % N];
+    const gx = at(i + 1, j) - at(i - 1, j), gy = at(i, j + 1) - at(i, j - 1), sl = Math.tanh(-(gx * Lx + gy * Ly) * 9);   // facing the moon = lit
+    const crest = Math.min(0.5, Math.max(0, at(i, j) - (at(i - 1, j) + at(i + 1, j) + at(i, j - 1) + at(i, j + 1)) / 4) * 40);  // the sharp tops
+    const lit = Math.max(-1, Math.min(1, sl + crest)), k = (j * N + i) * 4;
+    if (lit >= 0) { d[k] = 232; d[k + 1] = 229; d[k + 2] = 220; d[k + 3] = lit * 150; }
+    else { d[k] = 26; d[k + 1] = 25; d[k + 2] = 22; d[k + 3] = -lit * 215; }
+  }
+  g.putImageData(im, 0, 0);
+  duneT = { hgt, N, cv }; return duneT;
+}
+function duneHeight(x, y) { const t = duneTile(), N = t.N, i = ((Math.floor(x / DUNE_P * N) % N) + N) % N, j = ((Math.floor(y / DUNE_P * N) % N) + N) % N; return t.hgt[j * N + i]; }
+let duneS = null;
+function duneScreenTile() {                      // slanted once into screen space at low resolution; stretched up when drawn
+  if (duneS) return duneS;
+  const t = duneTile(), w = 1024, h = 512, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d'), sx = w / (2 * DUNE_P), sy = h / DUNE_P, pat = g.createPattern(t.cv, 'repeat');
+  pat.setTransform(new DOMMatrix().scale(DUNE_P / t.N));
+  g.imageSmoothingEnabled = true; g.setTransform(sx, sy / 2, -sx, sy / 2, 0, 0); g.fillStyle = pat; g.fillRect(-2 * DUNE_P, -DUNE_P, 4 * DUNE_P, 4 * DUNE_P);
+  return duneS = cv;
+}
+function drawDunes() {
+  const cv = duneScreenTile(), k = K(), tw = 2 * k * DUNE_P * DPR, th = k * DUNE_P * DPR;
+  const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
+  const x0 = ((ox % tw) + tw) % tw - tw, y0 = ((oy % th) + th) % th - th, cw = ctx.canvas.width, ch = ctx.canvas.height;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true;
+  for (let x = x0; x < cw; x += tw) for (let y = y0; y < ch; y += th) ctx.drawImage(cv, x, y, tw, th);
+  ctx.restore();
+}
+// the lagoon of an oasis: dark still water, a wet rim, slow rings and the moon's light lying on it
+function lagoonPath(c, o, k) {
+  c.beginPath();
+  for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2, r = lagoonR(o, a) * k + (k > 1 ? 0 : 0); i ? c.lineTo(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r) : c.moveTo(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r); }
+  c.closePath();
+}
+function drawLagoons() {
+  const t = S.t;
+  for (const o of oasesNear(S.cam.x, S.cam.y, viewR() + 150)) {
+    ctx.fillStyle = 'rgba(70,68,62,0.35)'; lagoonPath(ctx, o, 1.32); ctx.fill();   // damp sand round the water
+    ctx.fillStyle = 'rgba(58,56,51,0.5)'; lagoonPath(ctx, o, 1.12); ctx.fill();
+    const gr = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r * 1.1);
+    gr.addColorStop(0, '#202426'); gr.addColorStop(0.65, '#33393b'); gr.addColorStop(1, '#5d625f');
+    ctx.fillStyle = gr; lagoonPath(ctx, o, 1); ctx.fill();
+    ctx.save(); lagoonPath(ctx, o, 1); ctx.clip();
+    ctx.lineWidth = 1;
+    for (let n = 0; n < 4; n++) {                 // slow rings spreading from the middle
+      const u = (t * 0.12 + n / 4 + o.seed) % 1;
+      ctx.strokeStyle = `rgba(190,192,190,${0.16 * (1 - u)})`; lagoonPath(ctx, o, 0.15 + u * 0.85); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(220,224,222,0.3)'; ctx.lineWidth = 1.6;
+    for (let n = 0; n < 9; n++) {                 // the moon's light, broken up by the ripples
+      const y = o.y - o.r * 0.5 + n * o.r * 0.13, x = o.x - o.r * 0.25 + Math.sin(t * 0.9 + n * 1.7 + o.seed) * 5, l = o.r * (0.12 + 0.1 * Math.sin(t * 1.3 + n));
+      ctx.beginPath(); ctx.moveTo(x - l, y + l * 0.5); ctx.lineTo(x + l, y - l * 0.5); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = `rgba(220,220,214,${0.32 + 0.12 * Math.sin(t * 1.1 + o.seed)})`; ctx.lineWidth = 1.2; lagoonPath(ctx, o, 1 + 0.02 * Math.sin(t * 0.8)); ctx.stroke();   // a thin lip of foam lapping the shore
+  }
+}
+function drawLagoonGlints() {                    // the water catches the moon even in the dark, so you can spot an oasis from far off
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const o of oasesNear(S.cam.x, S.cam.y, viewR() + 150)) {
+    for (let n = 0; n < 22; n++) {
+      const a = hash(n, o.seed) * 6.28, r = Math.sqrt(hash(o.seed, n)) * o.r * 0.85, tw = Math.max(0, Math.sin(S.t * (1.2 + hash(n, 3)) + n * 2.3));
+      if (tw < 0.3) continue;
+      const [sx, sy] = toScreen(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r), l = (0.8 + 1.6 * tw) * Z;
+      ctx.strokeStyle = `rgba(225,228,226,${0.4 * tw})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(sx - l, sy); ctx.lineTo(sx + l, sy); ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 // the sand itself: wind ripples, grains and soft hollows, painted into one tile like the forest floor
 let sandPat = null, sandT = null;
@@ -2144,7 +2068,7 @@ function decorInView(lights) {   // ground cover only shows where some light rea
 }
 function drawDecor(o) {   // sets the transform directly (no save/restore): there are a lot of these each frame
   const s = o.s * Z, spr = sprite(o.dk, o.v), k = s / SPR, f = o.seed > 0.5 ? k : -k;
-  const sh = o.dk === 'grass' || o.dk === 'fern' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
+  const sh = o.dk === 'grass' || o.dk === 'fern' || o.dk === 'reeds' || o.dk === 'tuft' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
   if (o.dk === 'bush' || o.dk === 'stump') shadow(o.sx, o.sy, 9 * s);
   const [l, hy] = lean(o.sx, o.sy);   // combined lean and wind sway, applied as one transform
   withXf(ctx, f, sh * k - l * k, hy * k, o.sx, o.sy, () => ctx.drawImage(spr.cv, -spr.ax * SPR, -spr.ay * SPR));
@@ -2155,7 +2079,7 @@ function drawDecor(o) {   // sets the transform directly (no save/restore): ther
 function caster(o) {
   if (o.kind === 'tree') return { r: (o.type === 'oak' ? 12 : o.type === 'dead' ? 4 : 9) * o.s, len: 1600 };
   if (o.kind === 'rock') return { r: 11 * o.s, len: 90 * o.s };
-  if (o.kind === 'dprop') return o.dk === 'shard' || o.dk === 'arch' ? null : { r: (DESERT_R[o.dk] || 6) * 0.9 * o.s, len: o.dk === 'cBarrel' || o.dk === 'crystal' ? 120 * o.s : 1600 };
+  if (o.kind === 'dprop') return { r: (o.dk === 'palm' ? 4 : 5) * o.s, len: o.dk === 'palm' ? 1600 : 120 * o.s };
   if (o.kind === 'post' || o.kind === 'lamp') return { r: 3.5, len: 1600 };
   if (o.kind === 'fence') return { r: 2.5, len: 45 };
   if (o.camp) return o.cast || null;
@@ -2176,11 +2100,11 @@ function shadowPoly(c, lx, ly, o, r, len, extra) {
 
 // c: canvas to draw on; mask: draw a solid silhouette (used to cut lit shapes out of the dark)
 // a sprite lit on the side facing the player, the light sliding across as they pass (both versions share one outline)
-function litStamp(c, kind, v, sx, sy, s, mask) {
+function litStamp(c, kind, v, sx, sy, s, mask, sw = 0) {
   const wR = Math.max(0, Math.min(1, 0.5 - (sx - toScreen(S.p.x, S.p.y)[0]) / (60 * Z)));
-  if (mask || wR <= 0.02 || wR >= 0.98) { stamp(c, sprite(kind, v, wR >= 0.5 ? 1 : -1), sx, sy, s, 1, 0, mask); return; }
-  stamp(c, sprite(kind, v, -1), sx, sy, s, 1, 0, false);
-  const ga = c.globalAlpha; c.globalAlpha = ga * wR; stamp(c, sprite(kind, v, 1), sx, sy, s, 1, 0, false); c.globalAlpha = ga;
+  if (mask || wR <= 0.02 || wR >= 0.98) { stamp(c, sprite(kind, v, wR >= 0.5 ? 1 : -1), sx, sy, s, 1, sw, mask); return; }
+  stamp(c, sprite(kind, v, -1), sx, sy, s, 1, sw, false);
+  const ga = c.globalAlpha; c.globalAlpha = ga * wR; stamp(c, sprite(kind, v, 1), sx, sy, s, 1, sw, false); c.globalAlpha = ga;
 }
 // a touch of perspective: we look down on the world from above the player, so anything standing up leans gently away from
 // the middle of the screen and stands a little taller toward the top; as you walk past, things turn and shift like solid objects
@@ -3143,6 +3067,7 @@ const FOES = {
   kamikaze:{ hp: 0.5,  sp: 84, lightSp: 0,    h: 26, w: 11 },
   splitter:{ hp: 1.8,  sp: 32, lightSp: 0,    h: 42, w: 14 },
   splitling:{ hp: 0.35, sp: 80, lightSp: 0,   h: 21, w: 8 },
+  centi:   { hp: 2.2,  sp: 78, lightSp: 1,    h: 14, w: 16 },   // the Dunes' burrowing centipede: moves itself (centiStep)
 };
 
 const lv = id => (S.rg && S.rg.up[id]) || 0;
@@ -3219,6 +3144,7 @@ function spawnFoe(type, at = spawnSpot()) {
   if (type === 'bomber') bomberReset(e);
   if (type === 'laser') { e.ai = 'move'; e.st = 0; e.want = 170 + Math.random() * 60; }
   if (type === 'kamikaze') e.ai = 'run';
+  if (type === 'centi') centiInit(e);
 }
 function startWave() {
   const rg = S.rg;
@@ -3240,7 +3166,8 @@ function ashBurst(x, y, n, hgt = 20) {
     S.rg.ash.push({ x, y, z: Math.random() * hgt, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 30 + Math.random() * 60, life: 0.6 + Math.random() * 0.8 });
   }
 }
-function shove(e, amt) { const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypot(dx, dy) || 1; e.x += dx / d * amt; e.y += dy / d * amt; }
+function shove(e, amt) { if (e.type === 'centi') return;   // too long and dug in to be knocked about
+  const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypot(dx, dy) || 1; e.x += dx / d * amt; e.y += dy / d * amt; }
 function hurt(e) {
   const rg = S.rg;
   if (S.mode === 'expedition' && exSafeAt(S.p.x, S.p.y)) return;   // nothing reaches you inside the firelight or an outpost
@@ -3294,7 +3221,8 @@ function killFoe(e) {
   if (lv('nova') && rg.nova < 12) { rg.nova++; if (rg.nova === 12) sfx(2.5, 0.4, 'bandpass', 2200, 0.3); }
   if (e.type === 'splitter') splitApart(e);
   e.dead = true; rg.kills++; rg.waveKills++;
-  rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0 });   // it drops to its knees and crumbles
+  rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0, segs: e.type === 'centi' ? centiSegs(e).filter((q, i) => centiOut(e, i)) : null, hz: e.hz });
+  if (e.type === 'centi') for (const q of centiSegs(e)) ashBurst(q.x, q.y, 3, 8);   // it drops to its knees and crumbles
   for (let i = 0; i < 14 * FOES[e.type].h / 38; i++) rg.embers.push({ x: e.x, y: e.y, z: Math.random() * FOES[e.type].h, vz: 30 + Math.random() * 70, vx: (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, life: 0.5 + Math.random() * 0.8, ember: true });
   if (e.type === 'tall') { addShake(0.5); hitStop(0.08); } else addShake(e.type === 'brute' ? 0.2 : 0.07);
   ashBurst(e.x, e.y, e.type === 'tall' ? 70 : e.type === 'brute' ? 36 : 22, FOES[e.type].h * 0.8);
@@ -3436,8 +3364,8 @@ function chase(e, sp, d, dt) {      // plain walk straight at you, with footstep
   }
   const [sx0] = toScreen(e.x, e.y), [sx1] = toScreen(p.x, p.y); e.face = sx1 > sx0 ? 1 : -1;
 }
-const FOE_AI = { bomber: bomberStep, laser: laserStep, kamikaze: kamikazeStep };
-const NO_TOUCH = { bomber: 1, kamikaze: 1 };   // these hurt you their own way, not by touch
+const FOE_AI = { bomber: bomberStep, laser: laserStep, kamikaze: kamikazeStep, centi: centiStep };
+const NO_TOUCH = { bomber: 1, kamikaze: 1, centi: 1 };   // these hurt you their own way, not by touch
 function fireFlare() {
   const rg = S.rg; let best = null, bd = 1e9;
   for (const e of rg.enemies) { if (e.dead) continue; const d = dist2(e, S.p) + (e.lit ? 600 : 0); if (d < bd) { bd = d; best = e; } }
@@ -3665,7 +3593,7 @@ function surviveLight(bx, by, br, casters, lx, ly) {
   }
 }
 const HUNCH = { stalker: 0.35, bomber: 0.2, kamikaze: 0.45 };
-const EYES = { tall: '210,40,40', laser: '90,170,255', kamikaze: '255,215,60', splitter: '255,110,200', splitling: '255,110,200' };   // each kind has its colour
+const EYES = { centi: '70,225,200', tall: '210,40,40', laser: '90,170,255', kamikaze: '255,215,60', splitter: '255,110,200', splitling: '255,110,200' };   // each kind has its colour
 // Enemies are the same pale figure as the one you chase in Chase and Blink, sized by kind.
 // As they burn they glow hotter, from white through amber to ember red.
 const mixC = (c0, c1, k) => `rgb(${c0.map((v, i) => Math.round(v + (c1[i] - v) * k)).join(',')})`;
@@ -3684,6 +3612,7 @@ function foeHead(e) {                         // the head on screen, for the eye
   return [sx + 2.6 * Math.cos(a) * Zs, sy + (2.6 * Math.sin(a) - 36) * Zs, Math.sin(a)];
 }
 function drawShade(e) {
+  if (e.type === 'centi') return drawCentipede(e);
   const f = FOES[e.type], [sx0, sy] = toScreen(e.x, e.y);
   const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, fuse = e.type === 'kamikaze' && e.ai === 'fuse';
   const jx = (e.jit ? (Math.random() - 0.5) * 3 * Z * (0.4 + burn) : 0) + (Math.random() - 0.5) * Z * (4 * pain + (fuse ? 5 : 0)), sx = sx0 + jx;
@@ -3711,6 +3640,165 @@ function mortarEnds(e, sx, sy, w, h, fc) {   // base and mouth of the tube on sc
   return [[L(sx - fc * w * 0.45, sx + fc * w * 0.75), L(sy - h * 0.4, sy - h * 0.05)],
           [L(sx - fc * w * 0.95, sx + fc * w * 1.05), L(sy - h * 1.05, sy - h * 0.62)]];
 }
+// ---- the burrowing centipede (the Dunes): swims under the sand toward you, bursts up and lunges, then lies out on the sand
+// thrashing for a few seconds before it dives again. Only while it's out can the torch burn it. Its colour is teal.
+const CENTI_N = 13, CENTI_GAP = 9, CS = 1.45, CENTI_RISE = 0.85, CENTI_STRIKE = 0.32, CENTI_UP = 2.8, CENTI_COL = '70,225,200';
+function centiInit(e) { e.ai = 'under'; e.st = 1.5 + Math.random() * 2; e.trail = []; e.hz = 0; e.out = 0; e.inn = 0; e.wig = Math.random() * 6; e.grace = 0.1; }
+function centiOut(e, i) {                      // is segment i above the sand?
+  if (e.ai === 'under' || e.ai === 'rise') return false;
+  return i * CENTI_GAP < e.out && !(e.ai === 'dive' && i * CENTI_GAP < e.inn);
+}
+function centiSegs(e) {                         // the head and each segment, spaced along the path it took
+  const out = [{ x: e.x, y: e.y }], tr = e.trail; let need = CENTI_GAP, px = e.x, py = e.y, k = 0;
+  while (out.length < CENTI_N && k < tr.length) {
+    const q = tr[k], dl = Math.hypot(q.x - px, q.y - py);
+    if (dl >= need) { const u = need / dl; px += (q.x - px) * u; py += (q.y - py) * u; out.push({ x: px, y: py }); need = CENTI_GAP; }
+    else { need -= dl; px = q.x; py = q.y; k++; }
+  }
+  while (out.length < CENTI_N) {
+    const L = out[out.length - 1], P = out[out.length - 2] || { x: L.x - 1, y: L.y }, dx = L.x - P.x, dy = L.y - P.y, dl = Math.hypot(dx, dy) || 1;
+    out.push({ x: L.x + dx / dl * CENTI_GAP, y: L.y + dy / dl * CENTI_GAP });
+  }
+  return out;
+}
+function centiStep(e, sp, d, dt) {
+  const p = S.p, rg = S.rg, f = FOES.centi, h = e.trail[0], ox = e.x, oy = e.y;
+  if (h && Math.hypot(e.x - h.x, e.y - h.y) > 60) { e.trail = []; e.ai = 'under'; e.st = 1; }   // brought back round from far off
+  e.st -= dt; e.wig += dt;
+  const go = (a, v) => { e.x += Math.cos(a) * v * dt; e.y += Math.sin(a) * v * dt; };
+  if (e.ai === 'under') {
+    e.grace = 0.1; e.hz = -6;
+    const v = f.sp * (seenAt(e.x, e.y) ? 1 : 3) * (1 + 0.03 * Math.min(rg.wave, 15));
+    if (d > 8) go(Math.atan2(p.y - e.y, p.x - e.x) + Math.sin(e.wig * 2.3) * 0.65, v);   // it weaves as it swims
+    if ((e.rumble = (e.rumble || 0) - dt) <= 0 && d < 380) { e.rumble = 0.2; centiSound('dig', e, d); }
+    if (d < 80 && e.st <= 0) { e.ai = 'rise'; e.st = CENTI_RISE; centiSound('rise', e, d); }
+  } else if (e.ai === 'rise') {                  // the sand heaves, cracks, and glows teal from below
+    e.grace = 0.1;
+    if (Math.random() < dt * 30) S.rg.ash.push({ x: e.x + (Math.random() - 0.5) * 16, y: e.y + (Math.random() - 0.5) * 16, z: 0, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, vz: 40 + Math.random() * 70, life: 0.4 + Math.random() * 0.4 });
+    addShake(0.25 * dt);
+    if (e.st <= 0) {
+      e.ai = 'strike'; e.st = CENTI_STRIKE; e.out = 0; e.bit = false; e.hx = e.x; e.hy = e.y;
+      e.la = Math.atan2(p.y - e.y, p.x - e.x); e.lv = Math.min(115, d + 25) / CENTI_STRIKE;
+      ashBurst(e.x, e.y, 26, 10); addShake(0.35); centiSound('burst', e, d);
+    }
+  } else if (e.ai === 'strike') {                // out of the sand in one lunge, jaws first
+    const u = 1 - e.st / CENTI_STRIKE;
+    go(e.la, e.lv * (1.6 - 1.2 * u)); e.hz = 4 + 28 * Math.sin(Math.PI * Math.min(1, u * 1.1));
+    if (!e.bit && dist2(e, p) < 24 && rg.inv <= 0) { e.bit = true; hurt(e); }
+    if (e.st <= 0) { e.ai = 'up'; e.st = CENTI_UP; }
+  } else if (e.ai === 'up') {                    // out on the sand: it crawls at you, slower in the light, thrashing as it burns
+    e.hz = 4 + 2 * Math.sin(S.t * 7 + e.wig);
+    const v = (e.lit ? 18 : 46) * (1 + (e.pain || 0) * 0.6);
+    if (d > 10) go(Math.atan2(p.y - e.y, p.x - e.x) + Math.sin(e.wig * 4) * 0.5 + (e.pain || 0) * Math.sin(S.t * 19) * 0.9, v);
+    if (d < 20 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
+    if (e.st <= 0) { e.ai = 'dive'; e.inn = 0; e.dx = e.x; e.dy = e.y; ashBurst(e.x, e.y, 10, 6); centiSound('dive', e, d); }
+  } else if (e.ai === 'dive') {                  // head first back into the sand, the body pouring in after it
+    const b = e.trail[3] || { x: e.x - 1, y: e.y }; go(Math.atan2(e.y - b.y, e.x - b.x), 60);
+    e.hz = -6;
+    if (Math.random() < dt * 14) S.rg.ash.push({ x: e.dx, y: e.dy, z: 0, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, vz: 30 + Math.random() * 40, life: 0.4 });
+    if (e.inn > CENTI_N * CENTI_GAP + 4) { e.ai = 'under'; e.st = 2.2 + Math.random() * 1.5; }
+  }
+  const moved = Math.hypot(e.x - ox, e.y - oy);
+  e.out += moved; if (e.ai === 'dive') e.inn += moved;
+  e.phase += moved * 0.35;
+  if (!e.trail.length || Math.hypot(e.x - e.trail[0].x, e.y - e.trail[0].y) >= 2.5) { e.trail.unshift({ x: e.x, y: e.y }); if (e.trail.length > 70) e.trail.length = 70; }
+}
+function centiSound(kind, e, d) {
+  if (!actx) return;
+  const t = actx.currentTime, near = Math.max(0, 1 - d / 420);
+  if (kind === 'dig') noiseAt(t, 260, 120, 0.22, 0.05 + 0.18 * near * near, sfxGain);   // sand hissing past it
+  else if (kind === 'rise') { noiseAt(t, 180, 600, CENTI_RISE, 0.35 * near + 0.05, sfxGain); boomAt(t, 60, 40, CENTI_RISE, 0.3 * near, sfxGain); }
+  else if (kind === 'burst') { boomAt(t, 110, 45, 0.45, 0.6, sfxGain); noiseAt(t, 3200, 500, 0.5, 0.35, sfxGain); sfx(2.6, 0.5, 'highpass', 3500, 0.18); }   // the sand bursts and its jaws click
+  else noiseAt(t, 900, 150, 0.5, 0.2 * near + 0.03, sfxGain);
+}
+function centiMound(c, x, y, r, a) {           // a ridge of disturbed sand: a lit crest and a shaded underside
+  c.fillStyle = `rgba(56,54,48,${0.4 * a})`; c.beginPath(); c.ellipse(x, y + r * 0.18, r, r * 0.42, 0, 0, 7); c.fill();
+  c.fillStyle = `rgba(206,202,192,${0.75 * a})`; c.beginPath(); c.ellipse(x - r * 0.1, y - r * 0.08, r * 0.8, r * 0.3, 0, 0, 7); c.fill();
+}
+function centiHole(c, x, y, r) {
+  c.fillStyle = 'rgba(150,147,138,0.9)'; c.beginPath(); c.ellipse(x, y, r * 1.5, r * 0.75, 0, 0, 7); c.fill();
+  c.fillStyle = '#1b1a18'; c.beginPath(); c.ellipse(x, y, r, r * 0.48, 0, 0, 7); c.fill();
+}
+function drawCentipede(e) {
+  const segs = centiSegs(e);
+  if (e.ai === 'under' || e.ai === 'rise') {     // only the sand moving shows where it is
+    for (let i = CENTI_N - 1; i >= 0; i--) {
+      if (i * CENTI_GAP > e.trail.length * 2.5) continue;
+      const [x, y] = toScreen(segs[i].x, segs[i].y), w = 1 - i / CENTI_N;
+      centiMound(ctx, x, y + Math.sin(S.t * 9 + i) * 0.5 * Z, (7 + 4 * w) * Z, 0.35 + 0.65 * w);
+    }
+    if (e.ai === 'rise') {                       // the ground heaves where it's coming up
+      const k = 1 - e.st / CENTI_RISE, [x, y] = toScreen(e.x, e.y), r = (14 + 14 * k) * Z;
+      centiMound(ctx, x + (Math.random() - 0.5) * 2 * k * Z, y, r, 1);
+      ctx.strokeStyle = '#2a2925'; ctx.lineWidth = 1.2 * Z; ctx.beginPath();
+      for (let n = 0; n < 7; n++) { const a = n / 7 * 6.28 + e.wig, l = r * (0.4 + 0.7 * k); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l * 0.5); }
+      ctx.stroke();
+    }
+    return;
+  }
+  if (e.out < CENTI_N * CENTI_GAP) { const [x, y] = toScreen(e.hx, e.hy); centiHole(ctx, x, y, 9 * Z); }
+  if (e.ai === 'dive') { const [x, y] = toScreen(e.dx, e.dy); centiHole(ctx, x, y, 9 * Z); }
+  const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())));
+  ctx.lineCap = 'round';
+  for (let i = CENTI_N - 1; i >= 0; i--) {
+    if (!centiOut(e, i)) continue;
+    const q = segs[i], fw = segs[Math.max(0, i - 1)], bk = segs[Math.min(CENTI_N - 1, i + 1)];
+    let fx = fw.x - bk.x, fy = fw.y - bk.y; const fl = Math.hypot(fx, fy) || 1; fx /= fl; fy /= fl;
+    const thr = pain * Math.sin(S.t * 22 + i * 1.3) * 2.2, qx = q.x - fy * thr, qy = q.y + fx * thr;   // writhes as it burns
+    const z = i === 0 ? e.hz : i < 4 && e.ai === 'strike' ? e.hz * (1 - i / 4) + 3 : 3 + Math.max(0, e.hz - 4) * Math.max(0, 1 - i / 3);
+    const [sx, gy] = toScreen(qx, qy), sy = gy - z * Z, r = (i === 0 ? 6 : 6.2 - i * 0.22) * Z * CS;
+    if (z < 12) {                                // legs: two pairs per segment, rippling down the body
+      ctx.strokeStyle = pal.far; ctx.lineWidth = Math.max(1, 1.2 * Z);
+      for (const sd of [-1, 1]) for (const o of [-0.3, 0.3]) {
+        const ph = Math.sin(e.phase * 1.6 - i * 0.9 + o * 3 + (sd > 0 ? Math.PI : 0));
+        const [lx, ly] = toScreen(qx - fy * sd * 15 + fx * (o * 8 + ph * 4), qy + fx * sd * 15 + fy * (o * 8 + ph * 4));
+        const [kx, ky] = toScreen(qx - fy * sd * 10 + fx * o * 7, qy + fx * sd * 10 + fy * o * 7);
+        ctx.beginPath(); ctx.moveTo(sx, sy + r * 0.2); ctx.lineTo(kx, ky - (z * 0.6 + 2.5) * Z); ctx.lineTo(lx, ly); ctx.stroke();
+      }
+    }
+    { ctx.fillStyle = 'rgba(20,20,18,0.28)'; ctx.beginPath(); ctx.ellipse(sx, gy + 1 * Z, r * 1.1, r * 0.5, 0, 0, 7); ctx.fill(); }   // its shadow on the sand
+    ctx.fillStyle = pal.face; ctx.beginPath(); ctx.ellipse(sx, sy + r * 0.25, r * 1.05, r * 0.72, 0, 0, 7); ctx.fill();   // the armoured plate: dark underside,
+    ctx.fillStyle = pal.body; ctx.beginPath(); ctx.ellipse(sx, sy - r * 0.08, r * 0.98, r * 0.6, 0, 0, 7); ctx.fill();    // pale back,
+    ctx.fillStyle = pal.head; ctx.beginPath(); ctx.ellipse(sx - r * 0.25, sy - r * 0.28, r * 0.45, r * 0.2, 0, 0, 7); ctx.fill();   // a sheen
+    ctx.strokeStyle = pal.edge; ctx.lineWidth = Math.max(0.8, 0.7 * Z); ctx.beginPath(); ctx.ellipse(sx, sy - r * 0.05, r * 0.98, r * 0.62, 0, 0, 7); ctx.stroke();
+    if (i === 0) {                               // the head: jaws that open as it strikes, and long feelers
+      const [ax, ay] = toScreen(qx + fx * 12, qy + fy * 12), hx = ax - sx, hy = ay - gy, open = e.ai === 'strike' ? 1 : 0.35 + 0.25 * Math.sin(S.t * 9);
+      ctx.strokeStyle = pal.edge; ctx.lineWidth = 2.6 * Z;
+      for (const sd of [-1, 1]) {
+        const [px2, py2] = toScreen(qx - fy * sd * 7, qy + fx * sd * 7), bx = px2 - sx, by = py2 - gy;
+        ctx.beginPath(); ctx.moveTo(sx + bx * 0.6, sy + by * 0.6); ctx.quadraticCurveTo(sx + hx * 0.9 + bx * (0.9 + open), sy + hy * 0.9 + by * (0.9 + open), sx + hx * 1.1 + bx * 0.1 * (1 - open), sy + hy * 1.1 + by * 0.1 * (1 - open)); ctx.stroke();
+        ctx.lineWidth = 0.8 * Z; ctx.strokeStyle = pal.far;
+        ctx.beginPath(); ctx.moveTo(sx + bx * 0.3 + hx * 0.4, sy - r * 0.4); ctx.quadraticCurveTo(sx + hx * 1.6 + bx * 1.5, sy - r * 2.4 + Math.sin(S.t * 6 + sd) * 2 * Z, sx + hx * 2.2 + bx * 2.6, sy - r * 1.2 + Math.sin(S.t * 5 + sd) * 2 * Z); ctx.stroke();
+        ctx.lineWidth = 2.6 * Z; ctx.strokeStyle = pal.edge;
+      }
+    }
+  }
+}
+function centiFx(e, a) {                        // drawn over the dark: the teal glow of it coming up, and its eyes
+  if (e.ai === 'rise') {
+    const k = 1 - e.st / CENTI_RISE, [x, y] = toScreen(e.x, e.y), r = (20 + 16 * k) * Z, fl = 0.7 + 0.3 * Math.sin(S.t * 30);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.6);
+    g.addColorStop(0, `rgba(${CENTI_COL},${0.55 * k * fl})`); g.addColorStop(1, `rgba(${CENTI_COL},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, r * 1.6, r * 0.8, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(${CENTI_COL},${(0.4 + 0.5 * k) * fl})`; ctx.lineWidth = 1.2 * Z; ctx.beginPath();
+    for (let n = 0; n < 7; n++) { const an = n / 7 * 6.28 + e.wig, l = r * (0.4 + 0.7 * k); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(an) * l, y + Math.sin(an) * l * 0.5); }
+    ctx.stroke();
+    return;
+  }
+  if (!centiOut(e, 0) || a < 0.02) return;
+  const [x, y] = toScreen(e.x, e.y), yy = y - e.hz * Z - 2 * Z, [px] = toScreen(e.x + 1, e.y - 1), r = 1.1 * Z;
+  ctx.fillStyle = `rgba(${CENTI_COL},${a})`;
+  for (const o of [-3, 3]) { ctx.beginPath(); ctx.arc(x + o * Z, yy - 2 * Z, r * 1.3, 0, 7); ctx.fill(); }
+}
+function drawCentiDying(g) {                    // it curls up white-hot and falls to ash, segment by segment
+  const k = g.t / 0.8, pal = foePalette(1);
+  (g.segs || []).forEach((q, i) => {
+    const kk = Math.min(1, k * 1.4 + i * 0.03), [sx, gy] = toScreen(q.x, q.y), r = (6.2 - i * 0.22) * Z * CS * (1 - 0.6 * kk), sy = gy - (3 + (i === 0 ? (g.hz || 0) * (1 - kk) : 0)) * Z;
+    if (kk >= 1) return;
+    ctx.globalAlpha = 1 - kk; ctx.fillStyle = pal.body; ctx.beginPath(); ctx.ellipse(sx + (Math.random() - 0.5) * 2 * Z, sy, r, r * 0.6, 0, 0, 7); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
 function drawSurviveFx(bx, by, br) {
   const rg = S.rg; if (!rg) return;
   const [px, py] = toScreen(S.p.x, S.p.y);
@@ -3719,6 +3807,7 @@ function drawSurviveFx(bx, by, br) {
     const f = FOES[e.type], d = dist2(e, S.p);
     let a = lv('dread') ? 0.9 : Math.pow(Math.max(0, 1 - d / 240), 1.3) * 0.95;
     if (e.lit) a = 1;
+    if (e.type === 'centi') { centiFx(e, a); continue; }
     if (e.blink < 0 || a < 0.02) continue;
     const [hx, hy, fy] = foeHead(e), gap = 1.3 * Z * foeScale(e) * (0.4 + 0.6 * Math.abs(fy)) + 0.6, sx = hx, ox = 0;
     ctx.fillStyle = `rgba(${EYES[e.type] || '239,239,234'},${a})`;
@@ -3813,6 +3902,7 @@ function drawSurviveFx(bx, by, br) {
   }
   // the dying: dropping to their knees, white-hot, crumbling away
   for (const g of rg.dying) {
+    if (g.type === 'centi') { drawCentiDying(g); continue; }
     const k = g.t / 0.8, sc = FOES[g.type].h / 38;
     ctx.save(); ctx.globalAlpha = k < 0.45 ? 1 : Math.max(0, 1 - (k - 0.45) / 0.55);
     drawQuarry({ x: g.x, y: g.y, dir: g.dir, phase: g.phase, state: 'run', t: 0 }, ctx, false,
@@ -4901,6 +4991,10 @@ function portalStep(dt) {                      // returns true when the rest of 
   if (rg.beyond) {                             // nothing here yet: no oil burned, nothing hunting, only the way back
     rg.oil = oilMax(); campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
     if (dist2(p, BEYOND_GATE) > 40) rg.leftGate = true;
+    if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // centipedes hunt the open sand; the ground round the portal is safe
+      if ((rg.duneT = (rg.duneT ?? 6) - dt) <= 0) { rg.duneT = 5 + Math.random() * 5; if (rg.enemies.filter(e => e.type === 'centi').length < 3) spawnFoe('centi'); }
+      if (!rg.centiSeen && rg.enemies.some(e => e.type === 'centi' && e.ai === 'rise' && dist2(e, p) < 260)) { rg.centiSeen = true; rg.ringMsg = { text: 'something under the sand', sub: 'when the ground glows, move', t: 0 }; }
+    }
     if (rg.leftGate && dist2(p, BEYOND_GATE) < 16) warpStart('home');
     return true;
   }
@@ -4917,19 +5011,21 @@ function warpArrive(dir) {
   rg.enemies = []; rg.fires = []; rg.wisps = []; rg.blasts = []; rg.echoes = [];
   if (dir === 'out') {
     rg.beyond = true; p.x = BEYOND_GATE.x; p.y = BEYOND_GATE.y + 34;
-    S.msg = { text: 'the sunless sands', sub: 'Nothing here was made by hands', t: 0 };
+    S.msg = { text: 'the dunes', sub: 'Find water. Find shade. Keep moving', t: 0 };
   } else {
     rg.beyond = false; p.x = TELE.x - 26; p.y = TELE.y + 26;   // stepped back out beside the shrine
     S.msg = { text: 'home', sub: 'Back by the fire', t: 0 };
   }
   S.cam.x = p.x; S.cam.y = p.y; addShake(0.5);
 }
-function drawBeyondGround() {                  // the Sunless Sands: rippled pale sand, laid down like the forest floor
+function drawBeyondGround() {                  // the dunes: rippled pale sand rolling in long moonlit ridges, laid down like the forest floor
   const st = sandTile(), k = K();
   const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
   st.pat.setTransform(new DOMMatrix().translate(Math.round(ox), Math.round(oy)));
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = st.pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
+  drawDunes();
   ctx.save(); worldMatrix(ctx, DPR);
+  drawLagoons();
   for (const f of S.p.prints) { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a); ctx.fillStyle = `rgba(60,58,54,${0.5 * (1 - f.age / 10)})`; ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 2.2, 0, 0, 7); ctx.fill(); ctx.restore(); }
   ctx.restore();
 }
@@ -5056,7 +5152,7 @@ function drawWarpVeil() {                      // stepping through: the world fo
 }
 function drawExFx() {
   const rg = S.rg; if (!rg || !XS) return;
-  if (rg.beyond) { drawSandWind(); const [gx, gy] = toScreen(BEYOND_GATE.x, BEYOND_GATE.y); drawPortal(gx, gy, Z * TELE_S, 1, null); drawWarpVeil(); return; }
+  if (rg.beyond) { drawLagoonGlints(); drawSandWind(); const [gx, gy] = toScreen(BEYOND_GATE.x, BEYOND_GATE.y); drawPortal(gx, gy, Z * TELE_S, 1, null); drawWarpVeil(); return; }
   drawCampFlames();
   const p = S.p, [px, py] = toScreen(p.x, p.y), alive = rg.phase === 'fight';
   // chests catch a glint of light now and then, so you can find them in the dark
@@ -5258,7 +5354,7 @@ function drawExHud(top) {
   const rg = S.rg; if (!rg || !XS) return;
   ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(239,239,234,0.75)';
-  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.beyond ? 'THE SUNLESS SANDS' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
+  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
   for (let i = 0; i < rg.maxHp; i++) {
     const x = 16 + i * 15, y = 37 + top;
     heartPath(ctx, x + 5, y + 5, 11);
