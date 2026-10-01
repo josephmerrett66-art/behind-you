@@ -74,11 +74,30 @@ p.small { font-size: 0.82rem; }
 .pickfoot p { margin: 0; flex: 1 1 14rem; min-width: 0; }
 #reroll:disabled { opacity: 0.35; cursor: default; }
 button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
+#campBtn { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
+.exuse { position: fixed; right: 26px; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
+#recallBtn { bottom: calc(210px + env(safe-area-inset-bottom, 0px)); }
+#lampBtn { bottom: calc(266px + env(safe-area-inset-bottom, 0px)); }
+#camp { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding-inline: 16px; padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); background: rgba(5,5,5,0.9); }
+#camp h3 { margin: 0.4rem 0 0; font: 600 0.72rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); display: flex; justify-content: space-between; gap: 1rem; }
+#camp h3 span { color: var(--ash); font-weight: 400; }
+.shopgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); gap: 0.65rem; }
+.card-up.shop { cursor: default; min-height: 0; }
+.card-up.shop:hover { transform: none; }
+.card-up.shop.on { outline: 1px solid var(--bone); outline-offset: 2px; }
+.acts { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
+button.mini { padding: 0.5rem 0.7rem; font-size: 0.64rem; letter-spacing: 0.1em; }
+button.mini:disabled { opacity: 0.35; cursor: default; }
+.chips { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+.chip { padding: 0.45rem 0.7rem; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: none; background: transparent; color: var(--bone); border: 1px solid var(--bone); }
 </style>
 
 <canvas id="game"></canvas>
 <button id="torch" hidden aria-pressed="true">Torch</button>
 <button id="dodge" hidden>Dodge</button>
+<button id="campBtn" hidden>Camp</button>
+<button id="recallBtn" class="exuse" hidden>Flare</button>
+<button id="lampBtn" class="exuse" hidden>Lantern</button>
 <button id="sound" hidden>Sound on</button>
 <button id="menu" hidden>Menu</button>
 <div id="picker" hidden>
@@ -87,6 +106,20 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
     <h2>Choose one</h2>
     <div id="cards"></div>
     <div class="pickfoot"><button id="reroll" class="alt">Reroll</button><p id="owned" class="small"></p></div>
+  </div>
+</div>
+<div id="camp" hidden>
+  <div class="pick">
+    <p class="eyebrow" id="campEyebrow"></p>
+    <h2>Camp</h2>
+    <p class="small">Upgrades you buy are yours for good. Equip the ones you want for the next trip; legendaries take two slots.</p>
+    <h3>Equipped <span id="slotInfo"></span></h3>
+    <div id="campEq" class="chips"></div>
+    <h3>Gear</h3>
+    <div id="campGear" class="shopgrid"></div>
+    <h3>Upgrades</h3>
+    <div id="campShop" class="shopgrid"></div>
+    <div class="pickfoot"><button id="campGo">Back to the fire</button><button id="campWipe" class="alt">Start over</button></div>
   </div>
 </div>
 <div id="overlay">
@@ -99,16 +132,18 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
       <button id="start2" class="alt">Blink</button>
       <button id="start3" class="alt">Free roam</button>
       <button id="start4" class="alt">Nightfall</button>
+      <button id="start5" class="alt">Expedition</button>
     </div>
     <dl class="modelist">
       <dt>Chase</dt><dd>Stop to search with a fading torch, then run blind for eight seconds while they flee. Two red trails show where they went. Miss them once and they're gone.</dd>
       <dt>Blink</dt><dd>No running. Two seconds of dark, then the torch comes on somewhere new with them hidden nearby. Find them before the light fades.</dd>
       <dt>Nightfall</dt><dd>Survive waves of shades. They only move in the dark and freeze in your light; hold the beam on them and they burn. Burn every shade to clear the wave; each wave brings more. Pick an upgrade after every wave.</dd>
+      <dt>Expedition</dt><dd>Live by a fenced campfire and head out into the dark for loot. Carry it home to bank it and buy upgrades that last. The further out, the worse it gets, and nothing ever tells you to turn back. Three green orbs wait in the deep, one at a time. Bring them home to the teleporter.</dd>
       <dt>Free roam</dt><dd>No goals. Walk the woods with rabbits, birds and fireflies.</dd>
     </dl>
     <div class="controls">
-      <span>Phone</span><span>Right thumb aims. Left thumb walks, or sets off early in Chase. In Nightfall, tap Dodge to roll.</span>
-      <span>Desktop</span><span>Mouse aims. W or Space walks or sets off. Shift runs in Free roam. In Nightfall, right-click or Q to dodge.</span>
+      <span>Phone</span><span>Right thumb aims. Left thumb walks, or sets off early in Chase. In Nightfall and Expedition, tap Dodge to roll. Tap Camp at the fire to shop.</span>
+      <span>Desktop</span><span>Mouse aims. W or Space walks or sets off. Shift runs in Free roam. In Nightfall and Expedition, right-click or Q to dodge. E at the fire opens the camp, R lights a recall flare, T plants an outpost lantern.</span>
     </div>
     <section class="board" aria-labelledby="boardTitle">
       <div class="boardhead">
@@ -161,6 +196,7 @@ const RANGE = 330, BASE_HALF = 0.38, WALK = 46, RUN = 95, ACCEL = 9, T = 48;
 let HALF = BASE_HALF;   // beam half-width; upgrades change it in Nightfall
 
 let S;
+const isRg = () => !!S && (S.mode === 'survive' || S.mode === 'expedition');   // modes that use Nightfall's enemies and upgrades
 function reset() {
   S = { p: { x: 0, y: 0, vx: 0, vy: 0, phase: 0, step: 0, side: 1, prints: [] }, dash: 0, dashTick: 0, needRelease: false, look: 6, lookMax: 6, spotted: false, rounds: 0, over: false, overT: 0, catches: 0, msg: null, q: null, birds: [], watchers: [], watchT: 3, flushed: new Map(), rabbits: [], rabbitChunks: new Set(), cam: { x: 0, y: 0 }, torchOn: true, torchLvl: 1, torchOnT: 1, aim: -Math.PI / 2, aimW: -Math.PI * 0.75, t: 0, running: true };
 }
@@ -185,7 +221,7 @@ function worldMatrix(c, scale) {
 const keys = {};
 addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
 cv.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); dodge(); } });
-cv.addEventListener('contextmenu', e => { if (S && S.mode === 'survive') e.preventDefault(); });
+cv.addEventListener('contextmenu', e => { if (S && isRg()) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 cv.addEventListener('mousemove', e => {
   if (!S) return;
@@ -215,7 +251,7 @@ function moveInput() {
     if (s.side === 'aim' && m > 12) S.aim = Math.atan2(s.y - s.oy, s.x - s.ox);
   }
   // dash rule: pressing go starts a 4 second run you can't stop; you can still steer with the torch
-  if (S.running && S.mode !== 'free' && S.mode !== 'survive') {            // free roam: plain walking, hold to walk, drag further to run
+  if (S.running && S.mode !== 'free' && !isRg()) {            // free roam: plain walking, hold to walk, drag further to run
     if (!go) S.needRelease = false;
     if (S.mode === 'blink') go = false;
     else if (S.dash <= 0 && go && !S.needRelease && !S.over && S.torchLvl > 0.6) { S.needRelease = true; startDash(); }
@@ -224,7 +260,7 @@ function moveInput() {
   if (!go) return [0, 0, 0];
   // equal speed on screen in every direction (the iso view squashes up/down, so the world step is scaled to match)
   const [wx, wy] = screenDirToWorld(Math.cos(S.aim) * K() * 1.1, Math.sin(S.aim) * K() * 1.1);
-  return [wx, wy, speed * (S.mode === 'survive' ? rgSpeed() : 1)];
+  return [wx, wy, speed * (isRg() ? rgSpeed() * exWeight() : 1)];
 }
 
 function viewR() { return Math.hypot(W, H * 2) / K() * 0.6; }
@@ -241,6 +277,7 @@ const DASH = 8;              // seconds of forced running, torch off
 const FLASH_EVERY = DASH / 3, FLASH_LEN = 0.3;   // two red flashes per run, a third and two thirds of the way through
 const WORLD_LIGHTS = false;   // campfires, lanterns and fireflies are switched off for now
 function chunkLights(ci, cj) {
+  if (S && S.mode === 'expedition') return exLightsIn(ci, cj);   // only the camp fire and outposts
   if (!WORLD_LIGHTS && !(S && S.mode === 'free')) return [];   // lights only appear in free roam for now
   const key = ci + ',' + cj;
   if (lightCache.has(key)) return lightCache.get(key);
@@ -276,7 +313,7 @@ function fliesOf(L) {
 const propCache = new Map();
 let propCacheFree = null;
 function propAt(i, j) {
-  const free = !!(S && S.mode === 'free');   // free roam clears space round its lights, so it has its own set
+  const free = S ? (S.mode === 'free' ? 1 : S.mode === 'expedition' ? 2 : 0) : 0;   // free roam and Expedition clear space for their lights, so each has its own set
   if (free !== propCacheFree || propCache.size > 200000) { propCache.clear(); propCacheFree = free; }
   const key = i * 2097152 + j;
   let p = propCache.get(key);
@@ -285,6 +322,7 @@ function propAt(i, j) {
 }
 function makeProp(i, j) {
   if (Math.abs(i) < 2 && Math.abs(j) < 2) return null; // clear spawn
+  if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2, j * T + T / 2) < CAMP_R + 60) return null;   // the camp clearing
   const cx = i * T + T / 2, cy = j * T + T / 2;
   for (const L of chunkLights(Math.floor(cx / C), Math.floor(cy / C)))
     if (L.kind !== 'flies' && Math.hypot(cx - L.x, cy - L.y) < 80) return null; // keep a clearing round each light
@@ -545,7 +583,7 @@ function burnDrop(v, t) {           // stop grains that haven't started yet
 function burnAudio() {
   if (!actx || !mon.burn) return;
   if (!hann) { hann = new Float32Array(32); for (let i = 0; i < 32; i++) hann[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / 31); }
-  const rg = S.rg, live = S.running && S.mode === 'survive' && rg && rg.phase === 'fight', t = actx.currentTime;
+  const rg = S.rg, live = S.running && isRg() && rg && rg.phase === 'fight', t = actx.currentTime;
   if (live && burnVoices.size < BURN_MAX) {
     for (const e of rg.enemies) {
       if (!e.burning || e.voice || e.dead) continue;
@@ -849,7 +887,7 @@ function updateBlink(dt) {
 }
 function updateRounds(dt) {
   if (!S.mode || S.mode === 'free') return;
-  if (S.mode === 'survive') return updateSurvive(dt);
+  if (isRg()) return updateSurvive(dt);
   if (S.mode === 'blink') {
     if (S.over) {
       S.overT += dt;
@@ -941,15 +979,16 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
 // ---- update ----
 // ---- dodge (Nightfall): a quick roll with a moment of invulnerability. Rolls the way you're going,
 // or steps back away from where the torch points if you're standing still ----
-const ROLL_T = 0.32, ROLL_DIST = 100, ROLL_SAFE = 0.26, ROLL_COOL = 0.85;
+const ROLL_T = 0.32, ROLL_DIST = 100, ROLL_SAFE = 0.26, ROLL_COOL = 0.85;   // Light Feet shortens the cooldown
 function dodge() {
-  if (!S || !S.running || S.mode !== 'survive' || !S.rg || S.rg.phase !== 'fight') return;
+  if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall) return;
   const p = S.p; if ((p.roll || 0) > 0 || (p.rollCool || 0) > 0) return;
   const mv = Math.hypot(p.vx, p.vy);
   let a;
   if (mv > 15) a = Math.atan2(p.vy, p.vx);
   else { const [wx, wy] = screenDirToWorld(-Math.cos(S.aim), -Math.sin(S.aim)); a = Math.atan2(wy, wx); }   // backstep
-  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollCool = ROLL_COOL; p.rollBack = mv <= 15; p.ghosts = [];
+  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollCool = ROLL_COOL * (1 - 0.18 * lv('feet')); p.rollBack = mv <= 15; p.ghosts = [];
+  if (lv('nova') && S.rg.nova >= 12) { S.rg.nova = 0; lightBurst(p.x, p.y, 230, 0.85, 'white'); hitStop(0.06); }
   for (let i = 0; i < 6; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: -Math.cos(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vy: -Math.sin(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vz: 20 + Math.random() * 30, life: 0.4 + Math.random() * 0.3 });
   if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, 3500, 500, 0.28, 0.4, sfxGain); }
   dodgeBtn.dataset.cool = '1';
@@ -966,6 +1005,9 @@ function update(dt) {
     p.vx = Math.cos(p.rollA) * v; p.vy = Math.sin(p.rollA) * v;
     p.roll -= dt; p.rollSafe -= dt;
     if (p.ghosts) { p.ghosts.push({ x: p.x, y: p.y, a: 0.45 }); if (p.ghosts.length > 5) p.ghosts.shift(); }
+    if (isRg() && S.rg && lv('feet') && (p.trailT = (p.trailT || 0) - dt) <= 0) {   // Light Feet: burning light where you rolled
+      p.trailT = 0.05; S.rg.fires.push({ x: p.x, y: p.y, r: 20, life: 1.2 + 0.5 * lv('feet'), max: 1.2 + 0.5 * lv('feet'), seed: Math.random() * 9 });
+    }
     if (p.roll <= 0) { p.vx *= 0.3; p.vy *= 0.3; }
   }
   if (p.ghosts) { for (const g of p.ghosts) g.a -= dt * 2.2; p.ghosts = p.ghosts.filter(g => g.a > 0); }
@@ -979,7 +1021,7 @@ function update(dt) {
 
   { const [wx, wy] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)); S.aimW = Math.atan2(wy, wx); }
   // camera leads toward the torch, so the player sits opposite the beam and the beam gets the screen
-  const lead = S.mode === 'survive' ? 0.4 : 1;   // Nightfall keeps you nearer the middle so you can see what is behind you
+  const lead = isRg() ? 0.4 : 1;   // Nightfall keeps you nearer the middle so you can see what is behind you
   const [lx, ly] = screenDirToWorld(Math.cos(S.aim) * W * 0.32 * lead, Math.sin(S.aim) * H * 0.3 * lead);
   const ck = 1 - Math.exp(-3 * dt);
   S.cam.x += (p.x + lx - S.cam.x) * ck; S.cam.y += (p.y + ly - S.cam.y) * ck;
@@ -1025,7 +1067,7 @@ function update(dt) {
   }
   // trial: the torch only shines while you stand still
   if (screenSpeed(p) > 4) S.stillT = 0; else S.stillT = (S.stillT || 0) + dt;
-  const want = S.mode === 'free' || S.mode === 'survive' ? S.torchOn : S.mode === 'blink' ? S.torchOn && (S.blinkPhase === 'look' || S.blinkPhase === 'found') : S.torchOn && S.stillT > 0.25;
+  const want = S.mode === 'free' || isRg() ? S.torchOn : S.mode === 'blink' ? S.torchOn && (S.blinkPhase === 'look' || S.blinkPhase === 'found') : S.torchOn && S.stillT > 0.25;
   if (want !== !!S.wasLit) { S.wasLit = want; S.torchOnT = 0; playClick(want); }
   if (want) {
     S.torchOnT += dt;
@@ -1136,6 +1178,7 @@ function caster(o) {
   if (o.kind === 'tree') return { r: (o.type === 'oak' ? 12 : o.type === 'dead' ? 4 : 9) * o.s, len: 1600 };
   if (o.kind === 'rock') return { r: 11 * o.s, len: 90 * o.s };
   if (o.kind === 'post' || o.kind === 'lamp') return { r: 3.5, len: 1600 };
+  if (o.kind === 'fence') return { r: 2.5, len: 45 };
   return null;
 }
 function shadowPoly(c, lx, ly, o, r, len, extra) {
@@ -1172,6 +1215,16 @@ function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
     }
     c.strokeStyle = col('#2a2a28'); c.lineWidth = 3.5 * Z; c.lineCap = 'round';   // logs
     c.beginPath(); c.moveTo(sx - 9 * Z, sy + 3 * Z); c.lineTo(sx + 9 * Z, sy - 3 * Z); c.moveTo(sx - 8 * Z, sy - 3 * Z); c.lineTo(sx + 8 * Z, sy + 3 * Z); c.stroke();
+  } else if (o.kind === 'fence') {               // camp fence: a post and two rails to the next one
+    if (!o.gate) {
+      const [nx, ny] = toScreen(o.nx, o.ny);
+      c.strokeStyle = col('#3d3d3a'); c.lineWidth = 1.6 * Z;
+      c.beginPath(); c.moveTo(sx, sy - 7 * Z); c.lineTo(nx, ny - 7 * Z); c.moveTo(sx, sy - 14 * Z); c.lineTo(nx, ny - 14 * Z); c.stroke();
+    }
+    c.fillStyle = col('#2f2f2d'); c.fillRect(sx - 2 * Z, sy - 19 * Z, 4 * Z, 19 * Z);
+  } else if (o.kind === 'chest') { if (!mask) drawChest(o, c, sx, sy);
+  } else if (o.kind === 'tele') { drawTele(o, c, sx, sy, col);
+  } else if (o.kind === 'pack') { if (!mask) drawPackProp(o, c, sx, sy);
   } else if (o.kind === 'lamp') {
     if (!mask) shadow(sx, sy, 6 * Z);
     c.fillStyle = col('#2f2f2d'); c.fillRect(sx - 2.5 * Z, sy - 50 * Z, 5 * Z, 50 * Z);
@@ -1421,7 +1474,7 @@ function drawTargetFlash() {
 
 // how much charge is left this stop: 1 when the light comes on, easing down to 0 as time runs out
 function torchFade() {
-  if (S.mode === 'free' || S.mode === 'survive' || S.dash > 0 || S.over || !S.lookMax || S.blinkPhase === 'found') return 1;
+  if (S.mode === 'free' || isRg() || S.dash > 0 || S.over || !S.lookMax || S.blinkPhase === 'found') return 1;
   const f = Math.max(0, Math.min(1, S.look / S.lookMax));
   return Math.sqrt(f);          // stays strong for a while, then fades faster near the end
 }
@@ -1429,7 +1482,7 @@ function torchFade() {
 function drawHud() {
   const top = SAFE_TOP;
   if (!S.mode || S.mode === 'free') return;
-  if (S.mode === 'survive') drawSurviveHud(top); else {
+  if (S.mode === 'expedition') drawExHud(top); else if (isRg()) drawSurviveHud(top); else {
   ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(239,239,234,0.7)';
   ctx.fillText(`ROUND ${S.rounds}`, 16, 16 + top);
@@ -1551,13 +1604,13 @@ function render() {
   try { renderScene(); } finally { S.cam.x -= shx; S.cam.y -= shy; }
 }
 function renderScene() {
-  HALF = S.mode === 'survive' ? rgHalf() : BASE_HALF;
+  HALF = isRg() ? rgHalf() : BASE_HALF;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, W, H);
   drawGround();
 
   const lights = lightsNear(S.cam.x, S.cam.y, viewR() + 200);
-  const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : []).map(o => ({ o, k: o.x + o.y }));
+  const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : [], S.mode === 'expedition' && S.rg ? S.rg.enemies.concat(exItems()) : []).map(o => ({ o, k: o.x + o.y }));
   items.sort((a, b) => a.k - b.k);
   for (const it of items) it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
   drawBirds(1);
@@ -1569,14 +1622,14 @@ function renderScene() {
   dctx.fillStyle = '#050505'; dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
   // beam is drawn in screen space so its width and length never change with direction
-  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * flicker() * (0.2 + 0.8 * torchFade()) * (S.mode === 'survive' ? rgRange() : 1); // beam starts at the torch lens and reaches most of the way across the screen
+  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * flicker() * (0.2 + 0.8 * torchFade()) * (isRg() ? rgRange() : 1); // beam starts at the torch lens and reaches most of the way across the screen
   let grad = dctx.createRadialGradient(bx, by, 0, bx, by, br);
   grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(0.7, 'rgba(0,0,0,0.9)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
   dctx.fillStyle = grad; dctx.globalAlpha = S.torchLvl * (0.55 + 0.45 * torchFade());
   dctx.beginPath(); dctx.moveTo(bx, by);
   for (let t = -HALF; t <= HALF + 0.001; t += HALF / 16) dctx.lineTo(bx + Math.cos(S.aim + t) * br, by + Math.sin(S.aim + t) * br);
   dctx.closePath(); dctx.fill(); dctx.globalAlpha = 1;
-  if (S.mode === 'survive') cutSurviveLights(bx, by, br);
+  if (isRg()) cutSurviveLights(bx, by, br);
 
   // shadows: everything behind an obstacle (seen from the torch) goes back to dark
   const lx = S.p.x + Math.cos(S.aimW) * 6, ly = S.p.y + Math.sin(S.aimW) * 6;
@@ -1643,7 +1696,7 @@ function renderScene() {
   }
   applyWorldLights(lights, items);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = S.mode === 'survive' ? rgDarkAlpha() : 1;
+  ctx.globalAlpha = isRg() ? rgDarkAlpha() : 1;
   ctx.drawImage(dark, 0, 0);
   ctx.globalAlpha = 1;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1656,8 +1709,9 @@ function renderScene() {
     p.x = x0; p.y = y0;
   }
   drawPlayer(); // drawn over the dark so the whole figure stays readable
-  if (S.mode === 'survive') drawDodgeFx();
-  if (S.mode === 'survive') { surviveLight(bx, by, br, casters, lx, ly); drawSurviveFx(bx, by, br); }
+  if (isRg()) drawDodgeFx();
+  if (isRg()) { surviveLight(bx, by, br, casters, lx, ly); drawSurviveFx(bx, by, br); }
+  if (S.mode === 'expedition') drawExFx();
 
   if (S.q) {                                   // is the creature inside the beam, with nothing in the way?
     const q = S.q, [qx, qy] = toScreen(q.x, q.y), d = Math.hypot(qx - bx, qy - by);
@@ -1693,6 +1747,11 @@ const soundBtn = document.getElementById('sound');
 const torchBtn = document.getElementById('torch');
 function toggleTorch() {
   S.torchOn = !S.torchOn; S.torchOnT = 0;
+  const rg = S.rg;
+  if (isRg() && rg && lv('blackout')) {
+    if (!S.torchOn) rg.offAt = S.t;
+    else if (S.t - (rg.offAt ?? -9) > 0.15 && rg.blackT <= 0) { rg.blackPend = 0.22; rg.blackT = 5 - 1.5 * (lv('blackout') - 1); }   // fires once the light is back up
+  }
   torchBtn.setAttribute('aria-pressed', S.torchOn ? 'true' : 'false');
 }
 torchBtn.addEventListener('click', toggleTorch);
@@ -1773,14 +1832,14 @@ initBoard();
 // ---- menu: pause, switch mode, see scores ----
 const menuBtn = document.getElementById('menu'), resumeBtn = document.getElementById('resume');
 function openMenu() {
-  if (S.mode && S.mode !== 'free' && S.mode !== 'survive' && S.rounds > 0 && !S.over) submitScore(S.mode, S.rounds);   // bank the run so far
+  if (S.mode && S.mode !== 'free' && !isRg() && S.rounds > 0 && !S.over) submitScore(S.mode, S.rounds);   // bank the run so far
   S.running = false; overlay.hidden = false; menuBtn.hidden = true;
   resumeBtn.hidden = !S.mode; lb.tab = S.mode === 'blink' || S.mode === 'survive' ? S.mode : 'chase';
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-pressed', t.dataset.mode === lb.tab ? 'true' : 'false'));
   renderBoard();
 }
 menuBtn.addEventListener('click', openMenu);
-addEventListener('keydown', e => { if (e.key === 'Escape' && S.mode && picker.hidden) (overlay.hidden ? openMenu() : resumeBtn.click()); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && S.mode && picker.hidden && campEl.hidden) (overlay.hidden ? openMenu() : resumeBtn.click()); });
 resumeBtn.addEventListener('click', () => { overlay.hidden = true; menuBtn.hidden = false; S.running = true; last = performance.now(); });
 
 // ================= NIGHTFALL: the roguelike survival mode =================
@@ -1794,20 +1853,21 @@ const RARITY = {
 };
 const UPGRADES = [
   // torch
-  { id: 'lens', r: 'common', max: 5, tag: 'Torch', name: 'Wide Lens', desc: 'Your beam is 18% wider.' },
-  { id: 'throw', r: 'common', max: 5, tag: 'Torch', name: 'Long Throw', desc: 'Your beam reaches 15% further.' },
-  { id: 'filament', r: 'common', max: 6, tag: 'Torch', name: 'Hot Filament', desc: 'Shades burn 25% faster.' },
+  { id: 'sweep', r: 'common', max: 3, tag: 'Torch', name: 'Sweep', desc: 'Swing your beam fast and it flares wide and hot for a moment.' },
+  { id: 'spot', r: 'common', max: 3, tag: 'Torch', name: 'Spotlight', desc: 'Hold your beam still and it tightens into a long, hot spotlight.' },
+  { id: 'kindling', r: 'common', max: 3, tag: 'Torch', name: 'Kindling', desc: 'Anything burning sets alight whatever it brushes past.' },
   { id: 'afterglow', r: 'common', max: 3, tag: 'Torch', name: 'Afterglow', desc: 'Shades keep smouldering for a moment after the beam leaves them.' },
-  { id: 'focus', r: 'rare', max: 2, tag: 'Torch', name: 'Pinhole Focus', desc: 'Beam 30% narrower, but it burns 80% hotter.' },
+  { id: 'core', r: 'rare', max: 2, tag: 'Torch', name: 'Searing Core', desc: 'The centre of your beam burns far hotter. The edges barely burn.' },
   { id: 'strobe', r: 'rare', max: 3, tag: 'Torch', name: 'Strobe', desc: 'Every few seconds your beam pulses white, tearing 40% off everything in it.' },
   { id: 'halo', r: 'rare', max: 3, tag: 'Torch', name: 'Lantern Halo', desc: 'A ring of light around you freezes anything that gets close.' },
   { id: 'rear', r: 'legendary', max: 1, tag: 'Torch', name: 'Eyes in the Back of Your Head', desc: 'A second, shorter beam shines behind you and burns too.' },
-  { id: 'sun', r: 'legendary', max: 1, tag: 'Torch', name: 'Midnight Sun', desc: 'Beam 40% wider, 40% longer and 40% hotter.' },
+  { id: 'nova', r: 'legendary', max: 1, tag: 'Torch', name: 'Supernova', desc: 'Every 12 you burn charges a nova. Your next dodge lets it go, burning everything around you.' },
+  { id: 'blackout', r: 'rare', max: 2, tag: 'Torch', name: 'Blackout', desc: 'Flick your torch off and on again to fire a blinding flash down the beam.' },
   // body
-  { id: 'coat', r: 'common', max: 4, tag: 'Body', name: 'Thick Coat', desc: 'One more heart, and heal one.' },
-  { id: 'boots', r: 'common', max: 4, tag: 'Body', name: 'Trail Boots', desc: 'Move 12% faster.' },
+  { id: 'coat', r: 'common', max: 4, tag: 'Body', name: 'Thick Coat', desc: 'One more heart. Losing a heart sets off a white flash that burns everything near you.' },
+  { id: 'feet', r: 'common', max: 3, tag: 'Body', name: 'Light Feet', desc: 'Your dodge recharges faster and leaves a trail of burning light.' },
   { id: 'wind', r: 'common', max: 1, tag: 'Body', name: 'Second Wind', desc: 'Once per wave, shrug off a hit without losing a heart.' },
-  { id: 'phantom', r: 'common', max: 2, tag: 'Body', name: 'Cold Sweat', desc: 'Stay untouchable for longer after a hit.' },
+  { id: 'close', r: 'rare', max: 2, tag: 'Body', name: 'Close Call', desc: 'Rolling through a hit refills your dodge and makes your beam burn twice as hot for a few seconds.' },
   { id: 'adrenaline', r: 'rare', max: 2, tag: 'Body', name: 'Adrenaline', desc: 'Getting hit gives you a sharp burst of speed.' },
   { id: 'salt', r: 'rare', max: 2, tag: 'Body', name: 'Salt Pockets', desc: 'When something reaches you, a spray of salt blasts every nearby shade back.' },
   { id: 'feast', r: 'rare', max: 2, tag: 'Body', name: 'Ember Heart', desc: 'Every 20 shades you burn heals a heart. Second level: every 14.' },
@@ -1815,7 +1875,6 @@ const UPGRADES = [
   // senses
   { id: 'dread', r: 'rare', max: 1, tag: 'Senses', name: 'Dread Sense', desc: 'See their eyes in the dark from any distance.' },
   { id: 'echo', r: 'rare', max: 2, tag: 'Senses', name: 'Echo', desc: 'A pulse rolls out from you every few seconds, outlining anything hiding in the dark.' },
-  { id: 'owl', r: 'common', max: 3, tag: 'Senses', name: 'Owl Eyes', desc: 'The dark thins a little. Shapes show faintly.' },
   // allies
   { id: 'fireflies', r: 'rare', max: 4, tag: 'Allies', name: 'Firefly Swarm', desc: 'Two fireflies orbit you, burning anything they touch.' },
   { id: 'candles', r: 'rare', max: 2, tag: 'Allies', name: 'Candle Trail', desc: 'You drop candles as you walk. Their light freezes shades.' },
@@ -1824,7 +1883,7 @@ const UPGRADES = [
   { id: 'scar', r: 'common', max: 2, tag: 'Allies', name: 'Scorch Marks', desc: 'Once lit, a shade moves 20% slower for good.' },
   { id: 'wildfire', r: 'legendary', max: 1, tag: 'Allies', name: 'Wildfire', desc: 'Every burst is twice the size, and each kill may launch a flare on its own.' },
   // fate
-  { id: 'dawn', r: 'common', max: 3, tag: 'Fate', name: 'Early Dawn', desc: 'Every wave sends 10% fewer shades.' },
+  { id: 'embers', r: 'common', max: 3, tag: 'Allies', name: 'Ember Trail', desc: 'Whatever you burn leaves embers on the ground that light and burn for a few seconds.' },
   { id: 'luck', r: 'common', max: 3, tag: 'Fate', name: 'Rabbit Foot', desc: 'Rare and legendary cards turn up more often.' },
   { id: 'reroll', r: 'common', max: 99, tag: 'Fate', name: 'Loose Change', desc: 'Two more rerolls for future picks.' },
   { id: 'fourth', r: 'rare', max: 2, tag: 'Fate', name: 'Keen Eye', desc: 'See one more card at every pick.' },
@@ -1846,19 +1905,25 @@ const FOES = {
 const lv = id => (S.rg && S.rg.up[id]) || 0;
 const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const lastHeart = () => lv('lastlight') && S.rg.hp === 1;
-function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.18 * lv('lens')) * Math.pow(0.7, lv('focus')) * (lv('sun') ? 1.4 : 1) * (lastHeart() ? 1.5 : 1)); }
-function rgRange() { return Math.min(1.35, 0.62 * (1 + 0.15 * lv('throw')) * (lv('sun') ? 1.4 : 1)); }
-function rgBurn() { return 1.05 * (1 + 0.25 * lv('filament')) * Math.pow(1.8, lv('focus')) * (lv('sun') ? 1.4 : 1) * (lastHeart() ? 2 : 1); }
-function rgSpeed() { return 1.4 * (1 + 0.12 * lv('boots')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
-function rgDarkAlpha() { return 1 - 0.08 * lv('owl'); }
+// Sweep: flares while you swing fast. Spotlight: tightens the longer you hold still.
+const sweepK = () => S.rg && lv('sweep') ? Math.min(1, (S.rg.sweepT || 0) / 0.2) : 0;
+const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / 0.9) : 0;
+function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.28 * lv('sweep') * sweepK()) * (1 - 0.15 * spotK()) * (lastHeart() ? 1.5 : 1)); }
+function rgRange() { return Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK())); }
+function rgBurn() {
+  const rg = S.rg || {}, grow = 1 + 0.05 * Math.min(14, Math.max(0, (rg.wave || 1) - 1));   // the torch grows with the night
+  return 1.05 * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
+}
+function rgSpeed() { return 1.4 * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
+function rgDarkAlpha() { return 1; }
 // Wave size: how many shades must burn before dawn. 11, 14, 17, 21, 25 ... 50 at wave 10, 83 at wave 15.
-function rgWaveCount(w) { return Math.max(6, Math.round((8 + 2.6 * w + 0.16 * w * w) * (1 - 0.1 * lv('dawn')))); }
+function rgWaveCount(w) { return Math.max(6, Math.round(8 + 2.6 * w + 0.16 * w * w)); }
 function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
 function rgSpawnGap(w) { return Math.max(0.3, 1.1 - 0.05 * w); }      // seconds between spawns
 function haloR() { return lv('halo') ? 55 + 22 * (lv('halo') - 1) : 0; }
 
 function newRun() {
-  return { wave: 0, hp: 3, maxHp: 3, kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [], shells: [], blasts: [], embers: [], dying: [], beatT: 0, beatFx: 0,
+  return { wave: 0, hp: 3, maxHp: 3, kills: 0, up: {}, rerolls: 1, enemies: [], ash: [], candles: [], flares: [], echoes: [], shells: [], blasts: [], embers: [], dying: [], beatT: 0, beatFx: 0, fires: [], nova: 0, sweepT: 0, still: 0, rushT: 0, blackT: 0,
     inv: 0, adren: 0, hurtFx: 0, strobeT: 4, strobeFx: 0, echoT: 2, flareT: 5, walked: 0, phase: 'fight', waveTotal: 0, waveKills: 0, deadT: 0 };
 }
 function sfx(rate, gain, type, freq, len = 0.25) {
@@ -1897,8 +1962,8 @@ function spawnSpot() {
   const d = 400 + Math.random() * 160;   // past the end of the beam (RANGE), so nothing pops into existence in the light
   return { x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d };
 }
-function spawnFoe(type) {
-  const rg = S.rg, at = spawnSpot(), f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
+function spawnFoe(type, at = spawnSpot()) {
+  const rg = S.rg, f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
   rg.enemies.push({ kind: 'shade', type, x: at.x, y: at.y, hp, maxHp: hp,
     beam: 0, lit: false, after: 0, scarred: false, blink: Math.random() * 4, jit: 0, reveal: 0, fly: 0, flare: 0, phase: Math.random() * 6, face: 1 });
   const e = rg.enemies[rg.enemies.length - 1];
@@ -1929,18 +1994,22 @@ function ashBurst(x, y, n, hgt = 20) {
 function shove(e, amt) { const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypot(dx, dy) || 1; e.x += dx / d * amt; e.y += dy / d * amt; }
 function hurt(e) {
   const rg = S.rg;
+  if (S.mode === 'expedition' && exSafeAt(S.p.x, S.p.y)) return;   // nothing reaches you inside the firelight or an outpost
+  if (S.mode === 'expedition' && rg.recall) { rg.recall = null; exNote('the flare went out'); }   // a hit snuffs a recall flare
   if (S.p.rollSafe > 0) {                  // rolled right through it
     rg.inv = 0.35; hitStop(0.05); addShake(0.1);
     rg.dodged = { t: 0 }; sfx(2.2, 0.35, 'highpass', 3000, 0.15);
+    if (lv('close')) { S.p.rollCool = 0; dodgeBtn.dataset.cool = '0'; rg.rushT = 1.5 + 1.5 * lv('close'); }
     return;
   }
   if (rg.shield > 0) {                     // Second Wind: this one bounces off
-    rg.shield--; rg.inv = 1.2 + 0.6 * lv('phantom'); rg.pop = { t: 0, blocked: true };
+    rg.shield--; rg.inv = 1.2; rg.pop = { t: 0, blocked: true };
     addShake(0.35); hitStop(0.05); shove(e, 90); sfx(1.4, 0.6, 'bandpass', 1500, 0.3);
     return;
   }
-  rg.hp--; rg.inv = 1.2 + 0.6 * lv('phantom'); rg.hurtFx = 1;
+  rg.hp--; rg.inv = 1.2; rg.hurtFx = 1;
   rg.pop = { t: 0, lost: rg.hp };          // index of the heart that just went
+  if (lv('coat')) lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white');
   addShake(0.75); hitStop(0.11);
   { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }   // knocked back
   if (lv('adrenaline')) rg.adren = 1.5 + 0.8 * lv('adrenaline');
@@ -1963,8 +2032,17 @@ function splitApart(e) {
   rg.blasts.push({ x: e.x, y: e.y, t: 0, life: 0.35, r: 70, col: 'pink' });
   addShake(0.15);
 }
+function lightBurst(x, y, R, frac, col) {
+  const rg = S.rg;
+  for (const o of rg.enemies) if (!o.dead && Math.hypot(o.x - x, o.y - y) < R) { o.hp -= frac * o.maxHp; o.jit = 1; }
+  rg.blasts.push({ x, y, t: 0, life: 0.5, r: R * 0.9, col });
+  rg.echoes.push({ r: 0, x, y, max: R, burst: true });
+  addShake(0.3); sfx(1.6, 0.6, 'highpass', 1800, 0.35);
+}
 function killFoe(e) {
   const rg = S.rg;
+  if (lv('embers')) rg.fires.push({ x: e.x, y: e.y, r: 28 + 8 * lv('embers'), life: 2 + 1.5 * lv('embers'), max: 2 + 1.5 * lv('embers'), seed: Math.random() * 9 });
+  if (lv('nova') && rg.nova < 12) { rg.nova++; if (rg.nova === 12) sfx(2.5, 0.4, 'bandpass', 2200, 0.3); }
   if (e.type === 'splitter') splitApart(e);
   e.dead = true; rg.kills++; rg.waveKills++;
   rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0 });   // it drops to its knees and crumbles
@@ -1978,6 +2056,7 @@ function killFoe(e) {
     rg.echoes.push({ r: 0, x: e.x, y: e.y, max: R, burst: true });
   }
   if (lv('wildfire') && Math.random() < 0.25) fireFlare();
+  if (S.mode === 'expedition' && e.type === 'tall') rg.loose.push({ kind: 'pack', x: e.x, y: e.y, items: ['r', 'r'], orb: false });   // it drops what it carried
   if (lv('feast')) { const n = lv('feast') > 1 ? 14 : 20; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp++; rg.pop = { t: 0, gained: rg.hp - 1 }; } }
 }
 // ---- the bomber: keeps its distance, plants a mortar and lobs shells at where you stand ----
@@ -2119,13 +2198,14 @@ function fireFlare() {
 function endWave() {
   const rg = S.rg;
   for (const e of rg.enemies) ashBurst(e.x, e.y, 10, FOES[e.type].h * 0.6);
-  rg.enemies = []; rg.flares = []; rg.shells = []; rg.blasts = []; rg.embers = [];
+  rg.enemies = []; rg.flares = []; rg.shells = []; rg.blasts = []; rg.embers = []; rg.fires = [];
   rg.phase = 'dawn'; rg.dawnT = 1.6; S.rounds = rg.wave;
   S.msg = { text: 'Dawn', sub: `Wave ${rg.wave} survived`, t: 0 };
   submitScore('survive', rg.wave);
 }
 function nightOver() {
   const rg = S.rg;
+  if (S.mode === 'expedition') return exDeath();
   rg.phase = 'dead'; rg.deadT = 0;
   submitScore('survive', rg.wave - 1);
   S.msg = { text: 'The night took you', sub: `Survived ${rg.wave - 1} wave${rg.wave === 2 ? '' : 's'} · ${rg.kills} burned`, t: 0 };
@@ -2139,16 +2219,19 @@ function updateSurvive(dt) {
   if (rg.pop) { rg.pop.t += dt; if (rg.pop.t > HEART_POP) rg.pop = null; }
   if (rg.dodged) { rg.dodged.t += dt; if (rg.dodged.t > 0.7) rg.dodged = null; }
   rg.hurtFx = Math.max(0, rg.hurtFx - dt * 1.8); rg.strobeFx = Math.max(0, rg.strobeFx - dt);
-  if (rg.phase === 'dead') { rg.deadT += dt; if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
+  if (rg.phase === 'dead') { rg.deadT += dt; if (S.mode === 'expedition') { if (rg.deadT > 3.5) exWake(); return; } if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
   if (rg.phase === 'dawn') { rg.dawnT -= dt; if (rg.dawnT <= 0) openPicker(); return; }
   if (rg.phase !== 'fight') return;
   rg.inv -= dt; rg.adren -= dt;
 
-  rg.spawnT -= dt;
-  if (rg.toSpawn > 0 && rg.spawnT <= 0 && rg.enemies.length < rgMaxAlive(rg.wave)) {
-    const n = rg.wave > 6 && Math.random() < 0.3 ? 2 : 1;
-    for (let i = 0; i < n && rg.toSpawn > 0; i++, rg.toSpawn--) spawnFoe(pickFoe());
-    rg.spawnT = rg.spawnGap * (0.6 + Math.random() * 0.8);
+  if (S.mode === 'expedition') exStep(dt);
+  else {
+    rg.spawnT -= dt;
+    if (rg.toSpawn > 0 && rg.spawnT <= 0 && rg.enemies.length < rgMaxAlive(rg.wave)) {
+      const n = rg.wave > 6 && Math.random() < 0.3 ? 2 : 1;
+      for (let i = 0; i < n && rg.toSpawn > 0; i++, rg.toSpawn--) spawnFoe(pickFoe());
+      rg.spawnT = rg.spawnGap * (0.6 + Math.random() * 0.8);
+    }
   }
 
   // candles dropped as you walk
@@ -2167,6 +2250,17 @@ function updateSurvive(dt) {
     if (!ec.burst && !ec.salt) for (const e of rg.enemies) if (Math.abs(dist2(e, p) - ec.r) < 30) e.reveal = 1;
   }
   rg.echoes = rg.echoes.filter(ec => ec.r < (ec.max || (ec.salt ? 200 : viewR())));
+  // how fast you're swinging the beam: Sweep flares on fast swings, Spotlight builds while you hold still
+  { const va = Math.abs(angDiff(S.aim, rg.lastAim ?? S.aim)) / Math.max(dt, 1e-3); rg.lastAim = S.aim;
+    if (va > 3.5) rg.sweepT = 0.6; else rg.sweepT = Math.max(0, rg.sweepT - dt);
+    rg.still = va < 0.5 ? rg.still + dt : Math.max(0, rg.still - dt * 4); }
+  rg.rushT = Math.max(0, rg.rushT - dt); rg.blackT = Math.max(0, rg.blackT - dt);
+  if (rg.blackPend > 0 && (rg.blackPend -= dt) <= 0 && (S.torchLvl > 0.6 || (rg.blackPend = 0.01) < 0)) {   // Blackout flash, once the beam is back up
+    rg.strobeFx = 0.3; addShake(0.25); sfx(3, 0.5, 'highpass', 2000, 0.2);
+    for (const e of rg.enemies) if (e.beam > 0) { e.hp -= 0.45 * e.maxHp; e.jit = 1; }
+  }
+  for (const f of rg.fires) f.life -= dt;
+  rg.fires = rg.fires.filter(f => f.life > 0); if (rg.fires.length > 60) rg.fires.splice(0, rg.fires.length - 60);
   // strobe
   if (lv('strobe')) {
     rg.strobeT -= dt;
@@ -2185,12 +2279,19 @@ function updateSurvive(dt) {
     e.reveal = Math.max(0, e.reveal - dt);
     e.fly = flies.some(fl => Math.hypot(fl.x - e.x, fl.y - e.y) < 18) ? 1 : 0;
     e.flare = rg.flares.some(fl => dist2(fl, e) < fl.r) ? 1 : 0;
-    const worldLit = (hr && d < hr) || e.flare || rg.candles.some(c => dist2(c, e) < 55);
+    const inFire = rg.fires.some(fi => dist2(fi, e) < fi.r + f.w * 0.4);
+    const safe = S.mode === 'expedition' ? exSafeAt(e.x, e.y, 30) : null, campLit = !!safe;   // camp and outposts freeze and burn anything at their edge
+    const exLit = S.mode === 'expedition' && ((rg.recall && d < 60 + 50 * Math.min(1, rg.recall.t)) || rg.lamps.some(l => Math.abs(l.x - e.x) < 42 && dist2(l, e) < 42));
+    const worldLit = campLit || exLit || (hr && d < hr) || e.flare || inFire || rg.candles.some(c => dist2(c, e) < 55);
     e.lit = e.beam > 0 || !!worldLit;
     let dmg = 0;
     if (e.beam > 0) { dmg += burn * e.beam; e.after = 0.6 * lv('afterglow'); if (lv('scar')) e.scarred = true; }
     else if (e.after > 0) { e.after -= dt; dmg += burn * 0.6; }
     if (e.flare) dmg += 0.9;
+    if (inFire) dmg += 1.1;
+    if (campLit) dmg += 2.4;
+    if (lv('kindling') && dmg > 0) for (const o of rg.enemies)   // Kindling: catches anything it brushes past
+      if (o !== e && !o.dead && Math.abs(o.x - e.x) < 24 && Math.abs(o.y - e.y) < 24 && dist2(o, e) < 22) o.after = Math.max(o.after, 0.5 * lv('kindling'));
     if (e.fly) dmg += 1.5;
     if (e.grace > 0) { e.grace -= dt; dmg = 0; }
     if (e.popT > 0) { e.popT -= dt; e.x += e.pvx * dt; e.y += e.pvy * dt; e.pvx *= 0.9; e.pvy *= 0.9; }   // flung out of the split
@@ -2212,6 +2313,7 @@ function updateSurvive(dt) {
     const reachTo = e.type === 'kamikaze' ? (e.ai === 'run' ? 1 : 0.4) : (!e.lit && d < 140 && !NO_TOUCH[e.type] && !(e.type === 'laser' && e.ai !== 'move')) ? 1 : 0;
     e.reach = (e.reach || 0) + (reachTo - (e.reach || 0)) * Math.min(1, dt * 6);
     e.kick = Math.max(0, (e.kick || 0) - dt * 4);
+    if (S.mode === 'expedition' && d > 900 && !e.lit) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
     if (d > 700 && !e.lit) { const at = spawnSpot(); e.x = at.x; e.y = at.y; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
     let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (e.lit) sp *= f.lightSp;
@@ -2221,6 +2323,7 @@ function updateSurvive(dt) {
       const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy), min = o.r * o.s + f.w * 0.5;
       if (od < min && od > 0) { e.x = o.x + ox / od * min; e.y = o.y + oy / od * min; }
     }
+    if (safe) { const cd = Math.hypot(e.x - safe.x, e.y - safe.y) || 1; if (cd < safe.r) { e.x = safe.x + (e.x - safe.x) * safe.r / cd; e.y = safe.y + (e.y - safe.y) * safe.r / cd; } }   // can't step inside
     if (!NO_TOUCH[e.type] && !e.dead && d < 14 + f.w * 0.45 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);
   }
   updateShells(dt);
@@ -2238,7 +2341,7 @@ function updateSurvive(dt) {
   for (const g of rg.dying) g.t += dt;
   rg.dying = rg.dying.filter(g => g.t < 0.8);
   rg.enemies = rg.enemies.filter(e => !e.dead);
-  if (rg.phase === 'fight' && rg.toSpawn <= 0 && rg.enemies.length === 0) endWave();
+  if (S.mode !== 'expedition' && rg.phase === 'fight' && rg.toSpawn <= 0 && rg.enemies.length === 0) endWave();
 }
 function fireflyPositions() {
   const n = 2 * lv('fireflies'), out = [];
@@ -2271,6 +2374,7 @@ function cutSurviveLights(bx, by, br) {
   const hr = haloR(); if (hr) hole(S.p.x, S.p.y, hr * 1.25, 0.8);
   for (const c of rg.candles) hole(c.x, c.y, 60 * (0.95 + 0.05 * Math.sin(S.t * 9 + c.seed)), 0.85 * Math.min(1, c.life));
   for (const f of rg.flares) hole(f.x, f.y, f.r * Math.min(1, f.t * 5) * (1 + (Math.random() - 0.5) * 0.06), 0.95 * Math.min(1, f.life));
+  for (const f of rg.fires) hole(f.x, f.y, f.r * 1.6 * (1 + 0.06 * Math.sin(S.t * 13 + f.seed)), 0.7 * Math.min(1, f.life / 0.5));
   for (const f of fireflyPositions()) hole(f.x, f.y, 20, 0.6 * f.on);
   for (const s of rg.shells) hole(s.x, s.y, 70, 0.35 + 0.35 * (1 - shellHeight(s) / s.apex));   // the shell lights the ground under it as it passes
   for (const b of rg.blasts) hole(b.x, b.y, b.r, 0.95 * (1 - b.t / b.life));
@@ -2281,6 +2385,7 @@ function cutSurviveLights(bx, by, br) {
     }
     if (e.type === 'kamikaze' && e.ai === 'fuse') hole(e.x, e.y, 45, 0.5 + 0.3 * Math.sin(S.t * 40));
   }
+  if (S.mode === 'expedition') exHoles(hole);
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 function surviveLight(bx, by, br, casters, lx, ly) {
@@ -2295,6 +2400,7 @@ function surviveLight(bx, by, br, casters, lx, ly) {
         const ed = Math.hypot(e.x - lx, e.y - ly), eth = Math.atan2(e.y - ly, e.x - lx);
         const hidden = casters.some(c => c.d < ed && Math.abs(angDiff(eth, c.th)) < Math.asin(Math.min(1, c.r / c.d)));
         if (!hidden) k = 1 - 0.5 * d / br;
+        if (k && lv('core')) k *= off < HALF * 0.35 ? 1 + 1.4 * lv('core') : 0.6;
       }
       if (!k && lv('rear')) {
         const rb = br * 0.55, oy = py - 22 * Z, d2 = Math.hypot(sx - px, sy - oy), off2 = Math.abs(angDiff(Math.atan2(sy - oy, sx - px), S.aim + Math.PI));
@@ -2426,7 +2532,9 @@ function drawSurviveFx(bx, by, br) {
   for (const b of rg.blasts) {
     const [x, y] = toScreen(b.x, b.y), k = 1 - b.t / b.life, r = b.r * Z * (b.muzzle ? 0.5 : 0.6 + 0.4 * (b.t / b.life));
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    if (b.col === 'pink') { g.addColorStop(0, `rgba(255,220,240,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,90,190,${0.5 * k})`); g.addColorStop(1, 'rgba(220,40,160,0)'); }
+    if (b.col === 'white') { g.addColorStop(0, `rgba(255,255,250,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,240,210,${0.45 * k})`); g.addColorStop(1, 'rgba(255,220,180,0)'); }
+    else if (b.col === 'pink') { g.addColorStop(0, `rgba(255,220,240,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,90,190,${0.5 * k})`); g.addColorStop(1, 'rgba(220,40,160,0)'); }
+    else if (b.col === 'green') { g.addColorStop(0, `rgba(220,255,230,${0.9 * k})`); g.addColorStop(0.4, `rgba(70,230,120,${0.5 * k})`); g.addColorStop(1, 'rgba(40,180,90,0)'); }
     else if (b.col === 'yellow') { g.addColorStop(0, `rgba(255,250,200,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,210,40,${0.55 * k})`); g.addColorStop(1, 'rgba(240,170,0,0)'); }
     else { g.addColorStop(0, `rgba(255,${b.muzzle ? 120 : 170},90,${0.8 * k})`); g.addColorStop(0.4, `rgba(230,50,25,${0.45 * k})`); g.addColorStop(1, 'rgba(200,20,10,0)'); }
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
@@ -2504,6 +2612,30 @@ function drawSurviveFx(bx, by, br) {
     const [ax, ay] = toScreen(a.x, a.y);
     ctx.fillStyle = `rgba(235,230,220,${Math.min(1, a.life * 1.5)})`; ctx.fillRect(ax, ay - a.z * Z, 1.8 * Z, 1.8 * Z);
   }
+  // ground fires (Ember Trail, Light Feet): a flickering orange glow with little flames
+  for (const f of rg.fires) {
+    const [x, y] = toScreen(f.x, f.y), a = Math.min(1, f.life / 0.5), r = f.r * 1.3 * Z;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(255,150,60,${0.35 * a})`); g.addColorStop(1, 'rgba(255,90,20,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgba(255,${170 + Math.round(60 * Math.random())},80,${0.8 * a})`;
+    for (let i = 0; i < 3; i++) { const fx = x + Math.sin(f.seed + i * 2.1) * f.r * 0.5 * Z, fh = (4 + 3 * Math.sin(S.t * 17 + f.seed + i)) * Z; ctx.fillRect(fx, y - fh + Math.cos(f.seed + i) * f.r * 0.25 * Z, 1.6 * Z, fh); }
+  }
+  // Searing Core: a hot white line down the middle of the beam
+  if (lv('core') && S.torchLvl > 0.6) {
+    const ch = HALF * 0.35;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,230,190,0.07)';
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(S.aim - ch) * br * 0.95, by + Math.sin(S.aim - ch) * br * 0.95);
+    ctx.lineTo(bx + Math.cos(S.aim + ch) * br * 0.95, by + Math.sin(S.aim + ch) * br * 0.95); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  // Sweep / Spotlight / Close Call: the beam itself warms up when they're active
+  { const heat = Math.max(sweepK(), spotK() * 0.8, rg.rushT > 0 ? 1 : 0);
+    if (heat > 0.05 && S.torchLvl > 0.6) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,170,90,${0.06 * heat})`;
+      ctx.beginPath(); ctx.moveTo(bx, by);
+      for (let t = -HALF; t <= HALF + 0.001; t += HALF / 8) ctx.lineTo(bx + Math.cos(S.aim + t) * br * 0.9, by + Math.sin(S.aim + t) * br * 0.9);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    } }
   // strobe pulse
   if (rg.strobeFx > 0) {
     ctx.fillStyle = `rgba(255,255,250,${0.35 * rg.strobeFx / 0.2})`;
@@ -2527,8 +2659,13 @@ function drawSurviveFx(bx, by, br) {
 function drawDodgeFx() {
   const rg = S.rg, p = S.p; if (!rg) return;
   const [px, py] = toScreen(p.x, p.y);
+  if (lv('nova') && rg.phase === 'fight') {         // Supernova charge: a gold ring at your feet fills as you burn, and glows when ready
+    const k = rg.nova / 12, ready = k >= 1;
+    ctx.save(); ctx.strokeStyle = ready ? `rgba(255,215,120,${0.7 + 0.3 * Math.sin(S.t * 8)})` : 'rgba(255,215,120,0.35)'; ctx.lineWidth = ready ? 3 : 1.5;
+    ctx.beginPath(); ctx.ellipse(px, py, 20 * Z, 10 * Z, 0, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
   if (p.rollCool > 0 && rg.phase === 'fight') {    // a thin ring at your feet fills back up while the dodge recharges
-    const k = 1 - p.rollCool / ROLL_COOL;
+    const k = 1 - p.rollCool / (ROLL_COOL * (1 - 0.18 * lv('feet')));
     ctx.save(); ctx.strokeStyle = 'rgba(239,239,234,0.5)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(px, py, 15 * Z, 7.5 * Z, 0, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke(); ctx.restore();
   }
@@ -2664,18 +2801,614 @@ function choose(id) {
 }
 rerollBtn.addEventListener('click', () => { const rg = S.rg; if (!rg || rg.rerolls <= 0) return; rg.rerolls--; renderPicker(drawCards()); });
 
+// ================= EXPEDITION: the extraction mode =================
+// You live at a fenced camp round a fire. Walk out into the dark, loot chests, carry it home and bank it,
+// then spend it on upgrades you keep for good. Danger grows with distance from camp, never with time.
+// Far out in the deep a green orb waits; bring it home to the teleporter.
+
+const CAMP_R = 170, RINGS = [900, 2100, 3600];
+const RING_NAMES = ['the near woods', 'the middle woods', 'the far woods', 'the deep'];
+const TELE = { kind: 'tele', x: 92, y: -92, s: 1 };
+const EX_FIRE = { kind: 'fire', x: 0, y: 0, r: 14, s: 1, seed: 3.7 };
+const OUT_R = 100, LAMP_GAP = 170, LAMP_MAX = 14, RECALL_T = 2;
+const ITEMS = { s: { name: 'scrap', slots: 1, val: 1 }, c: { name: 'cache', slots: 1, val: 4 }, r: { name: 'relic', slots: 2, val: 15 } };
+const ORB_COL = '70,230,120';
+const exRing = d => d < RINGS[0] ? 0 : d < RINGS[1] ? 1 : d < RINGS[2] ? 2 : 3;
+const exInCamp = () => Math.hypot(S.p.x, S.p.y) < CAMP_R;
+// Spawning follows distance from camp: how many may be out at once, and seconds between spawns, per ring.
+const EX_CAP = [4, 8, 13, 18], EX_GAP = [2.6, 1.5, 1.0, 0.7];
+const EX_SPAWNS = [
+  { type: 'shade',    weight: [60, 40, 28, 22] },
+  { type: 'kamikaze', weight: [6, 12, 12, 12], max: [1, 2, 3, 4] },
+  { type: 'stalker',  weight: [0, 16, 16, 16] },
+  { type: 'splitter', weight: [0, 9, 10, 10], max: [0, 1, 2, 3] },
+  { type: 'brute',    weight: [0, 0, 10, 12] },
+  { type: 'bomber',   weight: [0, 0, 12, 13], max: [0, 0, 2, 3] },
+  { type: 'laser',    weight: [0, 0, 12, 13], max: [0, 0, 2, 3] },
+];
+// the shop: every Nightfall card except the ones that only change card picks
+const SHOP = UPGRADES.filter(u => u.tag !== 'Fate');
+const PRICE = { common: 10, rare: 24, legendary: 60 };
+const upPrice = (u, have) => Math.round(PRICE[u.r] * Math.pow(1.8, have));
+const GEAR = [
+  { id: 'bag', name: 'Bigger Backpack', desc: 'Two more pack slots.', base: 12, max: 4 },
+  { id: 'slot', name: 'Equip Slot', desc: 'Equip one more upgrade at a time.', base: 18, max: 5 },
+  { id: 'recall', use: true, name: 'Recall Flare', desc: "One use. Light it out in the dark and two seconds later you're home with your pack. You stand still while it burns, and a hit puts it out.", base: 20, max: 1 },
+  { id: 'lanterns', use: true, name: 'Outpost Lantern', desc: 'Plant it past the near woods. Its light is safe ground, and over time it lays a trail of lamps toward the orb. Three in all.', base: 30, max: 1 },
+];
+const gearPrice = g => g.use ? g.base : Math.round(g.base * Math.pow(1.8, XS[g.id]));
+const gearMax = g => g.id === 'lanterns' ? Math.min(g.max, 3 - XS.outposts.length) : g.max;
+const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
+
+// ---- saving: everything banked lives on this device ----
+const EX_KEY = 'behind-you-expedition';
+let XS = null;
+function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [] }; }
+function exRead() {
+  try { const s = JSON.parse(localStorage.getItem(EX_KEY) || 'null'); if (s && s.v === 1) return Object.assign(exFresh(), s); } catch (e) {}
+  return exFresh();
+}
+function exSave() { try { localStorage.setItem(EX_KEY, JSON.stringify(XS, (k, v) => k === 'light' ? undefined : v)); } catch (e) {} }
+const packMax = () => 6 + 2 * XS.bag, slotMax = () => 3 + XS.slot;
+const packUsed = items => items.reduce((a, k) => a + ITEMS[k].slots, 0);
+const eqUsed = () => XS.eq.reduce((a, id) => a + slotCost(id), 0);
+function exWeight() {                       // a full pack slows you a little; a burning recall flare roots you
+  const rg = S.rg; if (S.mode !== 'expedition' || !rg || !rg.pack) return 1;
+  return rg.recall ? 0 : 1 - 0.1 * packUsed(rg.pack) / packMax();
+}
+function exSafeAt(x, y, pad = 0) {           // inside the camp fence or an outpost's light?
+  if (Math.hypot(x, y) < CAMP_R + pad) return { x: 0, y: 0, r: CAMP_R };
+  if (XS) for (const o of XS.outposts) if (Math.hypot(x - o.x, y - o.y) < OUT_R + pad) return { x: o.x, y: o.y, r: OUT_R };
+  return null;
+}
+function exLightsIn(ci, cj) {
+  const out = ci === 0 && cj === 0 ? [EX_FIRE] : [];
+  if (XS) for (const o of XS.outposts) if (Math.floor(o.x / C) === ci && Math.floor(o.y / C) === cj)
+    out.push(o.light || (o.light = { kind: 'lamp', x: o.x, y: o.y, r: 4, s: 1, seed: o.x % 7 }));
+  return out;
+}
+function exPathLamps() {                     // each outpost lays dim lamps toward the orb, one more every so often
+  const out = [];
+  if (!(XS.orbField && XS.orb)) return out;
+  for (const o of XS.outposts) {
+    const dx = XS.orb.x - o.x, dy = XS.orb.y - o.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    const n = Math.min(Math.floor(o.n || 0), Math.floor((d - 120) / LAMP_GAP));
+    for (let i = 1; i <= n; i++) {
+      const w = (hash(i * 3.1, o.x * 0.01) - 0.5) * 50;
+      out.push({ x: o.x + ux * LAMP_GAP * i - uy * w, y: o.y + uy * LAMP_GAP * i + ux * w, seed: i * 1.7 + o.x * 0.01 });
+    }
+  }
+  return out;
+}
+function exNewOrb() {                        // the next orb wakes further out, well away from where the last one was
+  if (XS.orbs >= 3) { XS.orb = null; XS.orbField = false; return; }
+  let a, tries = 0;
+  do a = Math.random() * Math.PI * 2; while (XS.orbA !== null && XS.orbA !== undefined && Math.abs(angDiff(a, XS.orbA)) < Math.PI / 2 && ++tries < 50);
+  const d = 4000 + 600 * XS.orbs + Math.random() * 400;
+  XS.orbA = a; XS.orb = { x: Math.cos(a) * d, y: Math.sin(a) * d }; XS.orbField = true;
+}
+function exRecall() {
+  const rg = S.rg;
+  if (S.mode !== 'expedition' || !rg || rg.phase !== 'fight' || !S.running || rg.inCamp || rg.recall) return;
+  if (!XS.recall) return exNote('no recall flare');
+  rg.recall = { t: 0 }; exNote('flare lit');
+  if (actx) { const t = actx.currentTime; noiseAt(t, 4000, 1500, RECALL_T, 0.25, sfxGain); }
+}
+function exPlant() {
+  const rg = S.rg, p = S.p;
+  if (S.mode !== 'expedition' || !rg || rg.phase !== 'fight' || !S.running || rg.inCamp) return;
+  if (!XS.lanterns) return exNote('no lantern');
+  if (Math.hypot(p.x, p.y) < RINGS[0]) return exNote('too near camp');
+  if (XS.outposts.some(o => dist2(o, p) < 500)) return exNote('too near another outpost');
+  XS.lanterns--; XS.outposts.push({ x: p.x + 18, y: p.y - 18, n: 0 }); rg.outT = 0;
+  rg.blasts.push({ x: p.x, y: p.y, t: 0, life: 0.7, r: 160, col: 'white' }); rg.echoes.push({ r: 0, x: p.x, y: p.y, max: 260, burst: true });
+  hitStop(0.06); addShake(0.25); sfx(0.9, 0.6, 'bandpass', 900, 0.6);
+  exNote('outpost planted', true);
+}
+function exItemsText(list) {
+  const n = {}; for (const k of list) n[k] = (n[k] || 0) + 1;
+  return Object.keys(n).map(k => `${n[k]} ${ITEMS[k].name}`).join(' · ');
+}
+
+// ---- chests: fixed by position on a coarse grid, better the further out they are ----
+const CG = 300, chestCache = new Map();
+function chestAt(i, j) {
+  const key = i + ',' + j;
+  if (chestCache.has(key)) return chestCache.get(key);
+  let c = null;
+  if (hash(i * 3.7 + 1.3, j * 5.1 - 2.2) < 0.42) {
+    const x = i * CG + 40 + hash(i + 2.1, j - 4.4) * (CG - 80), y = j * CG + 40 + hash(i - 6.6, j + 1.9) * (CG - 80), d = Math.hypot(x, y);
+    if (d > CAMP_R + 140 && !propsNear(x, y, 30).some(o => Math.hypot(o.x - x, o.y - y) < 30)) {
+      const ring = exRing(d), roll = hash(i * 9.1, j * 4.3);
+      const items = ring === 0 ? (roll < 0.35 ? ['s', 's'] : ['s'])
+        : ring === 1 ? (roll < 0.65 ? ['c'] : ['s', 's'])
+        : ring === 2 ? (roll < 0.35 ? ['r'] : ['c', roll < 0.7 ? 's' : 'c'])
+        : (roll < 0.7 ? ['r'] : ['r', 'c']);
+      c = { kind: 'chest', key, x, y, s: 1, tier: items.includes('r') ? 3 : items.includes('c') ? 2 : 1, items, tw: hash(i, j) * 40 };
+    }
+  }
+  chestCache.set(key, c);
+  return c;
+}
+function exChestsNear(x, y, R) {
+  const out = [];
+  for (let i = Math.floor((x - R) / CG); i <= Math.floor((x + R) / CG); i++)
+    for (let j = Math.floor((y - R) / CG); j <= Math.floor((y + R) / CG); j++) { const c = chestAt(i, j); if (c) out.push(c); }
+  return out;
+}
+const FENCE = [];
+for (let i = 0; i < 44; i++) {
+  const a = i / 44 * Math.PI * 2, b = (i + 1) / 44 * Math.PI * 2;
+  FENCE.push({ kind: 'fence', x: Math.cos(a) * CAMP_R, y: Math.sin(a) * CAMP_R, nx: Math.cos(b) * CAMP_R, ny: Math.sin(b) * CAMP_R, s: 1, gate: i % 11 === 5 });
+}
+function exItems() {   // camp, chests and dropped packs, drawn in with the trees
+  const rg = S.rg; if (!rg) return [];
+  return FENCE.concat([TELE], exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose);
+}
+
+// ---- a trip ----
+function exNewRun() {
+  const rg = newRun();
+  rg.wave = 1; rg.up = {};
+  for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
+  rg.maxHp = rg.hp = 3 + (rg.up.coat || 0); rg.shield = rg.up.wind || 0;
+  rg.pack = []; rg.carryOrb = false; rg.looted = new Set(); rg.left = new Map(); rg.loose = []; rg.notes = [];
+  rg.inCamp = true; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
+  if (XS.drop) rg.loose.push({ kind: 'pack', x: XS.drop.x, y: XS.drop.y, items: XS.drop.items.slice(), orb: XS.drop.orb, mine: true });
+  return rg;
+}
+function exBegin() {
+  XS = exRead();
+  let note = null;
+  if (XS.out) { exDropPack(XS.out); XS.out = null; note = ['you never made it back', 'Your pack lies where you were']; }
+  if (!XS.orb && XS.orbs < 3) exNewOrb();   // one orb is out there at a time
+  exSave();
+  S.rg = exNewRun(); exPlaceHome();
+  S.msg = note ? { text: note[0], sub: note[1], t: 0 }
+    : { text: 'expedition', sub: XS.orbs ? `${XS.orbs} of 3 orbs home` : 'A green light waits in the deep', t: 0 };
+}
+function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
+function exNote(text, big) { S.rg.notes.push({ text, t: 0, big: !!big }); if (S.rg.notes.length > 3) S.rg.notes.shift(); }
+function exDropPack(src) {
+  if (XS.drop && XS.drop.orb) XS.orbField = true;   // an older pack with the orb in it is gone: the orb goes back to where it was found
+  XS.drop = src.items.length || src.orb ? { x: src.x, y: src.y, items: src.items.slice(), orb: !!src.orb } : null;
+}
+function exDeath() {
+  const rg = S.rg;
+  rg.phase = 'dead'; rg.deadT = 0;
+  const had = rg.pack.length || rg.carryOrb;
+  exDropPack({ x: S.p.x, y: S.p.y, items: rg.pack, orb: rg.carryOrb });
+  XS.out = null; exSave();
+  S.msg = { text: 'The dark took you', sub: had ? 'Your pack lies where you fell' : 'You wake by the fire', t: 0 };
+}
+function exWake() {
+  S.rg = exNewRun(); exPlaceHome(); S.msg = null;
+  S.rg.pop = { t: 0, refill: 0 };
+  exNote('back by the fire');
+}
+function exSpawn(type) {
+  for (let n = 0; n < 8; n++) {
+    const at = spawnSpot();
+    if (!exSafeAt(at.x, at.y, 280)) { spawnFoe(type, at); return; }
+  }
+}
+function exPickFoe(r) {
+  const rg = S.rg, ok = EX_SPAWNS.filter(s => s.weight[r] > 0 && (!s.max || rg.enemies.filter(e => e.type === s.type).length < s.max[r]));
+  let x = Math.random() * ok.reduce((a, s) => a + s.weight[r], 0);
+  for (const s of ok) if ((x -= s.weight[r]) < 0) return s.type;
+  return 'shade';
+}
+function exTake(list) {                      // move what fits from list into the pack; returns what was taken
+  const rg = S.rg, took = [];
+  for (let i = 0; i < list.length;) {
+    if (packUsed(rg.pack) + ITEMS[list[i]].slots <= packMax()) { rg.pack.push(list[i]); took.push(list.splice(i, 1)[0]); }
+    else i++;
+  }
+  return took;
+}
+function exFull() {
+  const rg = S.rg;
+  if (S.t > (rg.fullNagT || 0)) { exNote('pack full'); rg.fullNagT = S.t + 3; }
+}
+function exGot(x, y, took) {
+  const rg = S.rg, best = took.includes('r') ? 3 : took.includes('c') ? 2 : 1;
+  exNote('+ ' + exItemsText(took));
+  for (let i = 0; i < 10 + 8 * best; i++) rg.embers.push({ x: x + (Math.random() - 0.5) * 10, y: y + (Math.random() - 0.5) * 10, z: 4, vz: 40 + Math.random() * 60, vx: (Math.random() - 0.5) * 50, vy: (Math.random() - 0.5) * 50, life: 0.5 + Math.random() * 0.5, ember: true });
+  sfx(1.6 + 0.3 * best, 0.45, 'bandpass', 1800 + 500 * best, 0.25);
+  if (best === 3) { hitStop(0.05); addShake(0.2); }
+  if (packUsed(rg.pack) >= packMax()) { rg.fullFx = 1; sfx(0.5, 0.6, 'lowpass', 400, 0.3); addShake(0.12); }
+}
+function exOpen(c) {
+  const rg = S.rg, left = rg.left.get(c.key) || c.items.slice(), took = exTake(left);
+  if (!took.length) return exFull();
+  if (left.length) rg.left.set(c.key, left); else { rg.left.delete(c.key); rg.looted.add(c.key); }
+  exGot(c.x, c.y, took);
+}
+function exTakeLoose(L) {
+  const rg = S.rg, took = exTake(L.items);
+  if (L.orb && !rg.carryOrb) { L.orb = false; exTakeOrb(L); }
+  if (took.length) exGot(L.x, L.y, took);
+  else if (L.items.length && !rg.fullNagT) exFull();
+  if (!L.items.length && !L.orb) L.taken = true;
+  if (L.mine) { XS.drop = L.taken ? null : { x: L.x, y: L.y, items: L.items.slice(), orb: L.orb }; rg.outT = 0; }   // the snapshot below saves it
+}
+function exTakeOrb(at) {
+  const rg = S.rg, p = S.p, src = at || XS.orb;
+  rg.carryOrb = true; XS.orbField = false; rg.outT = 0;
+  hitStop(0.12); addShake(0.45);
+  rg.blasts.push({ x: src.x, y: src.y, t: 0, life: 0.7, r: 160, col: 'green' });
+  rg.echoes.push({ r: 0, x: src.x, y: src.y, max: 400, burst: true });
+  for (const e of rg.enemies) e.reveal = 1;   // every eye out there turns toward you
+  if (actx) { const t = actx.currentTime; boomAt(t, 140, 40, 1.4, 0.6, sfxGain); }
+  S.msg = { text: 'the orb', sub: 'Every eye turns toward you', t: 0 };
+}
+function exDeposit() {
+  const rg = S.rg;
+  rg.carryOrb = false; XS.orbs++; XS.orb = null; XS.orbField = false; XS.out = null; exNewOrb(); exSave();
+  hitStop(0.15); addShake(0.5);
+  rg.blasts.push({ x: TELE.x, y: TELE.y, t: 0, life: 0.9, r: 220, col: 'green' });
+  rg.echoes.push({ r: 0, x: TELE.x, y: TELE.y, max: 500, burst: true });
+  if (actx) { const t = actx.currentTime; boomAt(t, 60, 220, 1.2, 0.5, sfxGain); }
+  S.msg = { text: `${XS.orbs} of 3`, sub: XS.orbs < 3 ? 'Another wakes, further out' : 'The teleporter is ready', t: 0 };
+}
+function exHome() {                          // stepped inside the fence: bank the pack, heal up
+  const rg = S.rg;
+  if (rg.pack.length) {
+    const v = rg.pack.reduce((a, k) => a + ITEMS[k].val, 0);
+    XS.embers += v; rg.pack = []; rg.fullFx = 0;
+    exNote(`+${v} embers banked`, true);
+    sfx(0.9, 0.6, 'bandpass', 700, 0.6); sfx(1.8, 0.35, 'bandpass', 2400, 0.4);
+    for (let i = 0; i < 30; i++) rg.embers.push({ x: (Math.random() - 0.5) * 16, y: (Math.random() - 0.5) * 16, z: 6, vz: 50 + Math.random() * 80, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.8 + Math.random() * 0.8, ember: true });
+  }
+  if (rg.hp < rg.maxHp) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = rg.maxHp; }
+  rg.shield = lv('wind'); rg.looted.clear(); rg.left.clear();
+  XS.out = null; exSave();
+}
+function exLeave() {
+  const rg = S.rg;
+  rg.ringMax = 0; rg.ringMsg = { text: RING_NAMES[0], t: 0 }; rg.tallCd = 10; rg.outT = 0;
+  if (actx) { const t = actx.currentTime; noiseAt(t, 900, 200, 0.5, 0.25, sfxGain); }   // the gate creaks shut behind you
+}
+function exStep(dt) {
+  const rg = S.rg, p = S.p, d0 = Math.hypot(p.x, p.y), ring = exRing(d0), inCamp = d0 < CAMP_R;
+  rg.wave = Math.min(13, 1 + d0 / 400);      // enemy toughness follows distance
+  for (const n of rg.notes) n.t += dt;
+  rg.notes = rg.notes.filter(n => n.t < 2.4);
+  if (rg.ringMsg && !(S.msg && S.msg.t < 2.2)) { rg.ringMsg.t += dt; if (rg.ringMsg.t > 2.8) rg.ringMsg = null; }   // waits for any big banner to clear
+  rg.fullFx = Math.max(0, (rg.fullFx || 0) - dt * 1.5);
+  if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
+  campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp;
+  recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns;
+  rg.lamps = exPathLamps();
+  if (inCamp) {
+    for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }   // the ranged ones melt back into the dark
+    if (rg.carryOrb && dist2(p, TELE) < 46) exDeposit();
+    return;                                  // nothing new comes while you're home
+  }
+  if (ring > rg.ringMax) { rg.ringMax = ring; rg.ringMsg = { text: RING_NAMES[ring], t: 0 }; }
+  if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb }; exSave(); }   // where your pack ends up if you quit out here
+  for (const o of XS.outposts) o.n = Math.min(LAMP_MAX, (o.n || 0) + dt / 20);   // outposts lay a new lamp every 20 s you're out
+  if (rg.recall && (rg.recall.t += dt) >= RECALL_T) {                             // the flare carries you home
+    XS.recall--; rg.recall = null;
+    rg.blasts.push({ x: p.x, y: p.y, t: 0, life: 0.6, r: 200, col: 'white' });
+    exPlaceHome(); hitStop(0.1); addShake(0.4);
+    rg.blasts.push({ x: p.x, y: p.y, t: 0, life: 0.6, r: 160, col: 'white' });
+    if (actx) { const t = actx.currentTime; boomAt(t, 300, 60, 0.8, 0.5, sfxGain); }
+    return;
+  }
+  const outpost = exSafeAt(p.x, p.y);
+  if (outpost) {                             // safe in an outpost's light: nothing new comes, the ranged ones back off
+    for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }
+  } else {
+    rg.spawnT -= dt;
+    const bait = rg.carryOrb ? 5 : 0;         // a carried orb draws them in from all round
+    const cap = EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3);   // and so does a heavy pack
+    if (rg.spawnT <= 0) {
+      rg.spawnT = EX_GAP[ring] * (rg.carryOrb ? 0.55 : 1) * (0.6 + Math.random() * 0.8);
+      if (rg.enemies.length < cap) exSpawn(exPickFoe(ring));
+    }
+  }
+  if (ring === 3 && !rg.enemies.some(e => e.type === 'tall') && (rg.tallCd -= dt) <= 0) {
+    exSpawn('tall'); rg.tallCd = 45;
+    if (!rg.tallSeen) { rg.tallSeen = true; rg.ringMsg = { text: 'something tall', sub: 'walks the deep', t: 0 }; }
+  }
+  for (const c of exChestsNear(p.x, p.y, 40)) if (!rg.looted.has(c.key) && dist2(c, p) < 24) exOpen(c);
+  for (const L of rg.loose) if (!L.taken && dist2(L, p) < 26) exTakeLoose(L);
+  rg.loose = rg.loose.filter(L => !L.taken);
+  if (XS.orbField && XS.orb && !rg.carryOrb && dist2(XS.orb, p) < 30) exTakeOrb();
+}
+
+// ---- drawing ----
+function drawChest(o, c, sx, sy) {
+  const rg = S.rg, open = rg && (rg.looted.has(o.key) || rg.left.has(o.key)), t = o.tier;
+  const w = (t === 3 ? 11 : 9) * Z, h = 8 * Z;
+  const body = ['#4e4d49', '#5a5954', '#7d7c75'][t - 1], top = ['#66655f', '#727169', '#a3a29a'][t - 1];
+  c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(sx, sy, w * 1.3, w * 0.5, 0, 0, 7); c.fill();
+  c.fillStyle = body; c.fillRect(sx - w, sy - h, 2 * w, h);
+  if (open) {
+    c.fillStyle = top; c.fillRect(sx - w, sy - h - 9 * Z, 2 * w, 7 * Z);       // lid thrown back
+    c.fillStyle = '#121211'; c.fillRect(sx - w + Z, sy - h - 2 * Z, 2 * w - 2 * Z, 2.5 * Z);
+  } else {
+    c.fillStyle = top; c.fillRect(sx - w, sy - h - 4 * Z, 2 * w, 4.5 * Z);
+    c.fillStyle = t === 3 ? '#e8e7de' : '#2a2a28'; c.fillRect(sx - 1.5 * Z, sy - h - 1.5 * Z, 3 * Z, 3.5 * Z);   // latch
+  }
+  if (t > 1) {                               // bands: dark iron, or pale on a relic chest
+    c.fillStyle = t === 3 ? '#d4d3ca' : '#333331';
+    c.fillRect(sx - w * 0.62, sy - h - (open ? 0 : 4 * Z), 2 * Z, h + (open ? 0 : 4 * Z));
+    c.fillRect(sx + w * 0.62 - 2 * Z, sy - h - (open ? 0 : 4 * Z), 2 * Z, h + (open ? 0 : 4 * Z));
+  }
+}
+function drawTele(o, c, sx, sy, col) {
+  c.fillStyle = col('#4a4a47'); c.beginPath(); c.ellipse(sx, sy, 28 * Z, 14 * Z, 0, 0, 7); c.fill();
+  c.fillStyle = col('#252523'); c.beginPath(); c.ellipse(sx, sy, 20 * Z, 10 * Z, 0, 0, 7); c.fill();
+  for (const i of [0, 2, 1]) {               // three standing stones, the far one first
+    const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 23 * Z, y = sy + Math.sin(a) * 11.5 * Z + (i === 1 ? 0 : 0);
+    c.fillStyle = col('#5e5e5a'); c.fillRect(x - 3.5 * Z, y - 24 * Z, 7 * Z, 24 * Z);
+    c.fillStyle = col('#7a7973'); c.fillRect(x - 3.5 * Z, y - 26 * Z, 7 * Z, 3 * Z);
+  }
+}
+function teleSockets(sx, sy) { return [0, 1, 2].map(i => { const a = -Math.PI / 2 + (i - 1) * 2.2; return [sx + Math.cos(a) * 23 * Z, sy + Math.sin(a) * 11.5 * Z - 31 * Z]; }); }
+function drawPackProp(o, c, sx, sy) {
+  c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(sx, sy, 10 * Z, 4 * Z, 0, 0, 7); c.fill();
+  c.fillStyle = '#5c5a52'; c.beginPath(); c.ellipse(sx, sy - 6 * Z, 8 * Z, 7 * Z, 0, 0, 7); c.fill();
+  c.fillStyle = '#46443e'; c.fillRect(sx - 6 * Z, sy - 12 * Z, 12 * Z, 3 * Z);
+  c.strokeStyle = '#2c2b27'; c.lineWidth = 1.5 * Z; c.beginPath(); c.arc(sx, sy - 12 * Z, 4 * Z, Math.PI, 0); c.stroke();
+}
+function drawOrb(x, y, s, a) {               // a levitating green crystal and its glow
+  const g = ctx.createRadialGradient(x, y, 0, x, y, 46 * s);
+  g.addColorStop(0, `rgba(${ORB_COL},${0.55 * a})`); g.addColorStop(1, `rgba(${ORB_COL},0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 46 * s, 0, 7); ctx.fill();
+  const w = 6 * s, h = 11 * s, sp = Math.sin(S.t * 1.7) * 0.25;
+  ctx.globalAlpha = a;
+  ctx.fillStyle = 'rgb(40,170,85)'; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x + w, y); ctx.lineTo(x, y + h); ctx.lineTo(x - w, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgb(150,255,185)'; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x + w * sp, y); ctx.lineTo(x, y + h); ctx.lineTo(x - w, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgb(230,255,235)'; ctx.beginPath(); ctx.arc(x - w * 0.3, y - h * 0.3, 1.3 * s, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+function exHoles(hole) {                     // light the orb puts out round itself
+  const rg = S.rg;
+  if (XS.orbField && XS.orb) hole(XS.orb.x, XS.orb.y, 95 * (1 + 0.05 * Math.sin(S.t * 2)), 0.8);
+  if (rg.carryOrb) hole(S.p.x, S.p.y, 70, 0.55);
+  for (const L of rg.loose) if (L.orb) hole(L.x, L.y, 70, 0.6);
+  if (XS.orbs) hole(TELE.x, TELE.y, 60 + 25 * XS.orbs, 0.5);
+  for (const l of rg.lamps) hole(l.x, l.y, 52 * (1 + 0.06 * Math.sin(S.t * 7 + l.seed)), 0.5);
+  if (rg.recall) hole(S.p.x, S.p.y, 60 + 60 * Math.min(1, rg.recall.t), 0.9);
+}
+function exPointer(px, py, tx, ty, col, glyph, a) {   // a chevron circling you, pointing at something
+  const cy0 = py - 18 * Z, ang = Math.atan2(ty - cy0, tx - px);
+  const cx = px + Math.cos(ang) * 46 * Z, cy = cy0 + Math.sin(ang) * 32 * Z;
+  ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = ctx.strokeStyle = col;
+  ctx.translate(cx, cy); ctx.rotate(ang);
+  ctx.beginPath(); ctx.moveTo(8 * Z, 0); ctx.lineTo(-4 * Z, -6.5 * Z); ctx.lineTo(-0.5 * Z, 0); ctx.lineTo(-4 * Z, 6.5 * Z); ctx.closePath(); ctx.fill();
+  ctx.rotate(-ang); ctx.translate(Math.cos(ang) * 16 * Z, Math.sin(ang) * 13 * Z);
+  ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+  const u = 4.2 * Z;
+  if (glyph === 'house') { ctx.beginPath(); ctx.moveTo(-u, u); ctx.lineTo(-u, -0.2 * u); ctx.lineTo(0, -1.3 * u); ctx.lineTo(u, -0.2 * u); ctx.lineTo(u, u); ctx.closePath(); ctx.stroke(); }
+  else if (glyph === 'orb') { ctx.beginPath(); ctx.moveTo(0, -1.4 * u); ctx.lineTo(0.8 * u, 0); ctx.lineTo(0, 1.4 * u); ctx.lineTo(-0.8 * u, 0); ctx.closePath(); ctx.fill(); }
+  else { ctx.beginPath(); ctx.ellipse(0, 0.2 * u, u, 0.9 * u, 0, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -0.7 * u, 0.5 * u, Math.PI, 0); ctx.stroke(); }
+  ctx.restore();
+}
+function drawExFx() {
+  const rg = S.rg; if (!rg || !XS) return;
+  const p = S.p, [px, py] = toScreen(p.x, p.y), alive = rg.phase === 'fight';
+  // chests catch a glint of light now and then, so you can find them in the dark
+  for (const c of exChestsNear(p.x, p.y, 440)) {
+    if (rg.looted.has(c.key)) continue;
+    const tw = Math.sin(S.t * 1.9 + c.tw); if (tw < 0.75) continue;
+    const a = (tw - 0.75) / 0.25 * Math.max(0, 1 - dist2(c, p) / 440) * (c.tier === 3 ? 1 : 0.65);
+    const [x, y] = toScreen(c.x, c.y), yy = y - 12 * Z, r = (c.tier === 3 ? 6 : 4) * Z;
+    ctx.strokeStyle = `rgba(250,250,240,${a})`; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x - r, yy); ctx.lineTo(x + r, yy); ctx.moveTo(x, yy - r); ctx.lineTo(x, yy + r); ctx.stroke();
+  }
+  // teleporter: lit sockets hold the orbs brought home
+  { const [tx, ty] = toScreen(TELE.x, TELE.y), sk = teleSockets(tx, ty);
+    for (let i = 0; i < 3; i++) if (i < XS.orbs) drawOrb(sk[i][0], sk[i][1] + Math.sin(S.t * 2 + i) * 1.5 * Z, Z * 0.7, 1);
+    if (XS.orbs) {
+      const g = ctx.createRadialGradient(tx, ty - 6 * Z, 0, tx, ty - 6 * Z, 26 * Z);
+      g.addColorStop(0, `rgba(${ORB_COL},${0.15 + 0.08 * XS.orbs + 0.05 * Math.sin(S.t * 3)})`); g.addColorStop(1, `rgba(${ORB_COL},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(tx, ty - 6 * Z, 26 * Z, 14 * Z, 0, 0, 7); ctx.fill();
+    } }
+  // the orb out in the deep: a beacon you can see from a long way off, then the crystal itself
+  if (XS.orbField && XS.orb) {
+    const [ox, oy0] = toScreen(XS.orb.x, XS.orb.y), d = dist2(XS.orb, p), oy = oy0 - (26 + 4 * Math.sin(S.t * 2)) * Z;
+    if (d < 2600) {
+      const k = Math.min(1, (2600 - d) / 900);
+      const g = ctx.createLinearGradient(0, oy - 520, 0, oy);
+      g.addColorStop(0, `rgba(${ORB_COL},0)`); g.addColorStop(1, `rgba(${ORB_COL},${0.16 * k})`);
+      ctx.fillStyle = g; ctx.fillRect(ox - 7 * Z, oy - 520, 14 * Z, 520);
+      const hg = ctx.createRadialGradient(ox, oy, 0, ox, oy, 220 * Z);
+      hg.addColorStop(0, `rgba(${ORB_COL},${0.22 * k})`); hg.addColorStop(1, `rgba(${ORB_COL},0)`);
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(ox, oy, 220 * Z, 0, 7); ctx.fill();
+    }
+    if (ox > -60 && ox < W + 60 && oy > -60 && oy < H + 60) drawOrb(ox, oy, Z, 1);
+  }
+  // dropped packs: a faint pale marker so you can find your things
+  for (const L of rg.loose) {
+    const [x, y] = toScreen(L.x, L.y), a = 0.25 + 0.15 * Math.sin(S.t * 3);
+    const g = ctx.createRadialGradient(x, y - 6 * Z, 0, x, y - 6 * Z, 22 * Z);
+    g.addColorStop(0, L.orb ? `rgba(${ORB_COL},${a + 0.2})` : `rgba(239,239,234,${a})`); g.addColorStop(1, 'rgba(239,239,234,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 6 * Z, 22 * Z, 0, 7); ctx.fill();
+  }
+  // path lamps: little posts with a dim flame
+  for (const l of rg.lamps) {
+    const [x, y] = toScreen(l.x, l.y);
+    if (x < -40 || x > W + 40 || y < -60 || y > H + 40) continue;
+    ctx.fillStyle = '#2f2f2d'; ctx.fillRect(x - 1.2 * Z, y - 14 * Z, 2.4 * Z, 14 * Z);
+    const g = ctx.createRadialGradient(x, y - 16 * Z, 0, x, y - 16 * Z, 12 * Z);
+    g.addColorStop(0, `rgba(255,235,200,${0.7 + 0.1 * Math.sin(S.t * 9 + l.seed)})`); g.addColorStop(1, 'rgba(255,220,170,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 16 * Z, 12 * Z, 0, 7); ctx.fill();
+  }
+  if (!alive) return;
+  // a recall flare burning: a white streak climbing from your hand, and a ring at your feet closing in
+  if (rg.recall) {
+    const k = Math.min(1, rg.recall.t / RECALL_T), top = py - 40 * Z - k * 260;
+    const g = ctx.createLinearGradient(0, top, 0, py - 40 * Z);
+    g.addColorStop(0, 'rgba(255,255,250,0.95)'); g.addColorStop(1, 'rgba(255,255,250,0)');
+    ctx.fillStyle = g; ctx.fillRect(px - 1.5 * Z, top, 3 * Z, py - 40 * Z - top);
+    ctx.fillStyle = 'rgba(255,255,250,1)'; ctx.beginPath(); ctx.arc(px, top, 3.5 * Z, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,250,${0.5 + 0.5 * k})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(px, py, (60 - 40 * k) * Z, (30 - 20 * k) * Z, 0, 0, 7); ctx.stroke();
+  }
+  // a carried orb rides over your shoulder
+  if (rg.carryOrb) drawOrb(px + 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4) * 2 * Z, Z * 0.75, 1);
+  // pointers round you: green to the orb, white to home, pale to a dropped pack
+  if (!rg.inCamp || rg.loose.length || (XS.orbField && XS.orb)) {
+    const on = (x, y) => x > 40 && x < W - 40 && y > 40 && y < H - 40;
+    if (XS.orbField && XS.orb && !rg.carryOrb) { const [x, y] = toScreen(XS.orb.x, XS.orb.y); exPointer(px, py, x, y, `rgb(${ORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
+    if (!rg.inCamp) { const [x, y] = toScreen(0, 0); exPointer(px, py, x, y, '#efefea', 'house', on(x, y) ? 0.25 : rg.carryOrb ? 0.95 : 0.7); }
+    for (const L of rg.loose) { const [x, y] = toScreen(L.x, L.y); exPointer(px, py, x, y, L.orb ? `rgb(${ORB_COL})` : 'rgba(239,239,234,0.9)', 'pack', on(x, y) ? 0.25 : 0.7); }
+  }
+  // the pack, as a row of small slots over your head
+  if (!rg.inCamp) {
+    const n = packMax(), used = packUsed(rg.pack), sw = 5, gap = 1.5, tw = n * sw + (n - 1) * gap, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
+    const full = used >= n, pulse = full ? 0.6 + 0.4 * Math.sin(S.t * 6) : 1;
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = i < used ? `rgba(239,239,234,${0.85 * pulse})` : 'rgba(239,239,234,0.18)';
+      ctx.fillRect(x0 + i * (sw + gap), y0, sw, 3);
+    }
+    if (rg.fullFx > 0) { ctx.strokeStyle = `rgba(239,239,234,${rg.fullFx})`; ctx.lineWidth = 1; ctx.strokeRect(x0 - 3 - 6 * (1 - rg.fullFx), y0 - 3 - 3 * (1 - rg.fullFx), tw + 6 + 12 * (1 - rg.fullFx), 9 + 6 * (1 - rg.fullFx)); }
+  } else if (S.running) {
+    ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(239,239,234,${0.55 + 0.15 * Math.sin(S.t * 2.5)})`;
+    ctx.fillText(matchMedia('(pointer: coarse)').matches ? 'TAP CAMP TO SHOP' : 'E · CAMP', px, py - 50 * Z - 4);
+  }
+  // notes rising over your head: loot taken, embers banked, pack full
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  rg.notes.forEach((n, i) => {
+    const a = Math.min(1, n.t * 5) * Math.max(0, 1 - Math.max(0, n.t - 1.6) / 0.8);
+    ctx.font = n.big ? '600 15px "IBM Plex Mono", monospace' : '600 12px "IBM Plex Mono", monospace';
+    ctx.fillStyle = `rgba(239,239,234,${a})`;
+    ctx.fillText(n.text.toUpperCase(), px, py - 74 * Z - 14 - (rg.notes.length - 1 - i) * 17 - n.t * 8);
+  });
+  // a ring's name as you cross into it, above you
+  if (rg.ringMsg && rg.ringMsg.t > 0) {
+    const m = rg.ringMsg, a = Math.min(1, m.t * 2) * Math.max(0, 1 - Math.max(0, m.t - 2) / 0.8);
+    ctx.font = '400 24px "Major Mono Display", monospace'; ctx.fillStyle = `rgba(239,239,234,${a})`;
+    ctx.fillText(m.text.toLowerCase(), px, py - 150 * Z - 24 - m.t * 4);
+    if (m.sub) { ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.fillText(m.sub.toUpperCase(), px, py - 150 * Z - 2 - m.t * 4); }
+  }
+  ctx.textAlign = 'left';
+}
+function drawExHud(top) {
+  const rg = S.rg; if (!rg || !XS) return;
+  ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(239,239,234,0.75)';
+  ctx.fillText(rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase(), 16, 16 + top);
+  for (let i = 0; i < rg.maxHp; i++) {
+    const x = 16 + i * 15, y = 37 + top;
+    heartPath(ctx, x + 5, y + 5, 11);
+    if (i < rg.hp) { ctx.fillStyle = rg.hp === 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); }
+    else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
+  }
+  ctx.fillStyle = 'rgba(239,239,234,0.4)';
+  ctx.fillText(`PACK ${packUsed(rg.pack)}/${packMax()} · ${XS.embers} EMBERS · ORBS ${XS.orbs}/3${XS.recall ? ' · FLARE' : ''}${XS.lanterns ? ' · LANTERN' : ''}`, 16, 54 + top);
+}
+
+// ---- the camp: shop and loadout at the fire ----
+const campEl = document.getElementById('camp'), campBtn = document.getElementById('campBtn'), recallBtn = document.getElementById('recallBtn'), lampBtn = document.getElementById('lampBtn');
+recallBtn.addEventListener('pointerdown', e => { e.preventDefault(); exRecall(); });
+lampBtn.addEventListener('pointerdown', e => { e.preventDefault(); exPlant(); });
+function openCamp() {
+  const rg = S.rg;
+  if (S.mode !== 'expedition' || !rg || !rg.inCamp || rg.phase !== 'fight' || !S.running) return;
+  S.running = false; menuBtn.hidden = true; campBtn.hidden = true; campEl.hidden = false;
+  renderCamp();
+  const first = campEl.querySelector('button:not([disabled])'); if (first) first.focus({ preventScroll: true });
+}
+function closeCamp() {
+  campEl.hidden = true; menuBtn.hidden = false; S.running = true; last = performance.now();
+}
+function exApply() {                         // loadout changed: rebuild the run's upgrades from what's equipped
+  const rg = S.rg;
+  rg.up = {}; for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
+  rg.maxHp = rg.hp = 3 + (rg.up.coat || 0); rg.shield = lv('wind');
+  exSave(); renderCamp();
+}
+function buyUp(id) {
+  const u = UP[id], have = XS.own[id] || 0, cost = upPrice(u, have);
+  if (have >= u.max || XS.embers < cost) return;
+  XS.embers -= cost; XS.own[id] = have + 1;
+  if (!XS.eq.includes(id) && eqUsed() + slotCost(id) <= slotMax()) XS.eq.push(id);   // equip it straight away if there's room
+  sfx(1.4, 0.5, 'bandpass', 1500, 0.3);
+  exApply();
+}
+function toggleEq(id) {
+  const i = XS.eq.indexOf(id);
+  if (i >= 0) XS.eq.splice(i, 1);
+  else if (XS.own[id] && eqUsed() + slotCost(id) <= slotMax()) XS.eq.push(id);
+  exApply();
+}
+function buyGear(g) {
+  const have = XS[g.id], cost = gearPrice(g);
+  if (have >= gearMax(g) || XS.embers < cost) return;
+  XS.embers -= cost; XS[g.id] = have + 1;
+  sfx(1.4, 0.5, 'bandpass', 1500, 0.3);
+  exApply();
+}
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+function shopCard(o) {                       // {rar, tag, name, desc, lvl, buy: [label, enabled, fn], eq: [label, enabled, fn] | null, cls}
+  const card = el('div', 'card-up shop ' + (o.cls || ''));
+  const top = el('span', 'rar'); top.append(el('span', '', o.rar), el('span', '', o.tag));
+  const row = el('div', 'acts');
+  const b = el('button', 'mini', o.buy[0]); b.type = 'button'; b.disabled = !o.buy[1]; b.addEventListener('click', o.buy[2]); row.append(b);
+  if (o.eq) { const q = el('button', 'mini alt', o.eq[0]); q.type = 'button'; q.disabled = !o.eq[1]; q.addEventListener('click', o.eq[2]); row.append(q); }
+  card.append(top, el('span', 'nm', o.name), el('span', 'ds', o.desc), el('span', 'lv', o.lvl), row);
+  return card;
+}
+function renderCamp() {
+  document.getElementById('campEyebrow').textContent = `${XS.embers} embers · ${XS.orbs} of 3 orbs home`;
+  document.getElementById('slotInfo').textContent = `${eqUsed()} of ${slotMax()} slots`;
+  const eq = document.getElementById('campEq');
+  eq.replaceChildren(...(XS.eq.length ? XS.eq.map(id => {
+    const b = el('button', 'chip', `${UP[id].name}${XS.own[id] > 1 ? ' ' + XS.own[id] : ''} ×`); b.type = 'button';
+    b.title = 'Unequip'; b.addEventListener('click', () => toggleEq(id)); return b;
+  }) : [el('p', 'small', 'Nothing equipped. Buy an upgrade below and it goes straight on.')]));
+  document.getElementById('campGear').replaceChildren(...GEAR.map(g => {
+    const have = XS[g.id], cost = gearPrice(g), maxed = have >= gearMax(g);
+    const tag = g.id === 'bag' ? `${packMax()} slots` : g.id === 'slot' ? `${slotMax()} slots` : g.id === 'lanterns' ? `${XS.outposts.length} of 3 planted` : 'One use';
+    const lvl = !g.use ? (maxed ? 'Maxed' : `Level ${have} of ${g.max}`) : have ? 'Carrying one' : maxed ? 'All three planted' : 'Carry one at a time';
+    return shopCard({ rar: g.use ? 'Supply' : 'Gear', tag, name: g.name, desc: g.desc, lvl,
+      buy: [maxed ? (g.use ? (have ? 'Carrying' : 'None left') : 'Maxed') : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyGear(g)] });
+  }));
+  document.getElementById('campShop').replaceChildren(...SHOP.map(u => {
+    const have = XS.own[u.id] || 0, maxed = have >= u.max, cost = upPrice(u, have), on = XS.eq.includes(u.id), room = eqUsed() + slotCost(u.id) <= slotMax();
+    return shopCard({ cls: u.r + (on ? ' on' : ''), rar: RARITY[u.r].label + (u.r === 'legendary' ? ' · 2 slots' : ''), tag: u.tag, name: u.name,
+      desc: u.desc.replace('per wave', 'per trip'),
+      lvl: have ? `Owned · level ${have} of ${u.max}${on ? ' · equipped' : ''}` : u.max === 1 ? 'Unique' : `Stacks to ${u.max}`,
+      buy: [maxed ? 'Maxed' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyUp(u.id)],
+      eq: have ? [on ? 'Unequip' : room ? 'Equip' : 'No room', on || room, () => toggleEq(u.id)] : null });
+  }));
+}
+campBtn.addEventListener('click', openCamp);
+document.getElementById('campGo').addEventListener('click', closeCamp);
+document.getElementById('campWipe').addEventListener('click', () => {
+  if (!confirm('Start a new expedition? Your embers, upgrades and orbs will all be lost.')) return;
+  try { localStorage.removeItem(EX_KEY); } catch (e) {}
+  campEl.hidden = true; begin('expedition');
+});
+addEventListener('keydown', e => {
+  if (!S || S.mode !== 'expedition' || e.repeat) return;
+  const k = e.key.toLowerCase();
+  if (k === 'e') { if (!campEl.hidden) closeCamp(); else openCamp(); }
+  if (k === 'r') exRecall();
+  if (k === 't') exPlant();
+  if (e.key === 'Escape' && !campEl.hidden) closeCamp();
+});
+
 function begin(mode) {
   reset(); S.mode = mode;
   if (mode === 'free') { S.q = null; }
   else if (mode === 'survive') { S.q = null; S.rg = newRun(); picker.hidden = true; startWave(); }
+  else if (mode === 'expedition') { S.q = null; picker.hidden = true; exBegin(); }
   else if (mode === 'blink') { S.blinkPhase = 'dark'; S.darkT = BLINK_DARK; S.torchOn = true; spawnQuarry(); S.q.hiddenUntilLit = true; }
   else spawnQuarry();
   overlay.hidden = true; last = performance.now();
-  initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive'; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
 document.getElementById('start4').addEventListener('click', () => begin('survive'));
+document.getElementById('start5').addEventListener('click', () => begin('expedition'));
 document.getElementById('start').addEventListener('click', () => begin('chase'));
 
 // if frames keep coming slower than ~45 a second, render fewer pixels (never gameplay changes, just a softer image)
