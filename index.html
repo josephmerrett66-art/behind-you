@@ -475,7 +475,11 @@ function makeProp(i, j) {
 }
 function propsNear(x, y, R) {
   const out = [];
-  if (inBeyond()) return out;
+  if (inBeyond()) {
+    for (let i = Math.floor((x - R) / T); i <= Math.ceil((x + R) / T); i++)
+      for (let j = Math.floor((y - R) / T); j <= Math.ceil((y + R) / T); j++) { const p = desertPropAt(i, j); if (p) out.push(p); }
+    return out;
+  }
   for (let i = Math.floor((x - R) / T); i <= Math.ceil((x + R) / T); i++)
     for (let j = Math.floor((y - R) / T); j <= Math.ceil((y + R) / T); j++) { const p = propAt(i, j); if (p) out.push(p); }
   return out;
@@ -1238,6 +1242,7 @@ function update(dt) {
 
   // bump into trees and rocks (and the camp's towers, tent and stores)
   for (const o of propsNear(p.x, p.y, 60).concat(lightsNear(p.x, p.y, 60).filter(L => L.r), S.mode === 'expedition' && Math.hypot(p.x, p.y) < CAMP_R + 40 ? CAMP_SOLID : [])) {
+    if (o.nocol) continue;
     const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = o.r * o.s + 7;
     if (d < min && d > 0) { p.x = o.x + dx / d * min; p.y = o.y + dy / d * min; }
   }
@@ -1731,6 +1736,352 @@ function sprite(kind, v, Ld = 1) {
   const [, w, h, ax, ay, paint] = SPRITE_KINDS[kind];
   return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld));
 }
+// ================= THE SUNLESS SANDS: the first world through the portal =================
+// A pale desert nothing human ever touched: black monoliths carved with writing no one can read, the ribs and skulls of
+// things far bigger than people, horned spires, standing rings of stone, rocks that hang in the air. All painted once as sprites.
+function glyphs(g, R, x0, y0, x1, y1, col, step = 6) {   // rows of unreadable carved marks
+  g.strokeStyle = col; g.lineWidth = 0.55;
+  for (let y = y0; y > y1; y -= step) for (let x = x0; x < x1; x += 4.5) {
+    if (R() < 0.25) continue;
+    const u = 1.5; g.beginPath();
+    switch (R() * 6 | 0) {
+      case 0: g.moveTo(x, y - u); g.lineTo(x, y + u); g.moveTo(x - u, y - u * 0.3); g.lineTo(x + u, y - u * 0.3); break;
+      case 1: g.arc(x, y, u * 0.7, 0, 7); break;
+      case 2: g.moveTo(x - u, y + u); g.lineTo(x, y - u); g.lineTo(x + u, y + u); break;
+      case 3: g.moveTo(x - u, y - u); g.lineTo(x + u, y - u); g.lineTo(x - u, y + u); g.lineTo(x + u, y + u); break;
+      case 4: g.moveTo(x, y - u); g.lineTo(x, y + u); g.arc(x, y - u * 0.4, u * 0.5, Math.PI, 0); break;
+      default: g.moveTo(x - u, y); g.lineTo(x + u, y); g.moveTo(x - u * 0.4, y - u); g.lineTo(x - u * 0.4, y + u); g.moveTo(x + u * 0.4, y - u); g.lineTo(x + u * 0.4, y + u);
+    }
+    g.stroke();
+  }
+}
+function sandFoot(g, R, w) {                     // sand drifted up against the foot of something: a soft mound, no hard edge
+  const h = Math.min(7, w * 0.16), gr = g.createRadialGradient(0, 0, 0, 0, 0, w);
+  gr.addColorStop(0, 'rgba(160,157,148,0.95)'); gr.addColorStop(0.6, 'rgba(160,157,148,0.6)'); gr.addColorStop(1, 'rgba(160,157,148,0)');
+  g.save(); g.scale(1, h / w); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, w, Math.PI, 0); g.fill(); g.restore();
+  g.strokeStyle = 'rgba(205,202,194,0.35)'; g.lineWidth = 0.4; g.beginPath(); g.moveTo(-w * 0.5, -h * 0.35); g.quadraticCurveTo(0, -h * 0.75, w * 0.5, -h * 0.35); g.stroke();
+}
+function paintMonolith(g, R, Ld) {               // a slab of black stone far too tall, its top sheared off at an angle
+  const H = 120 + R() * 40, wb = 10 + R() * 3, wt = wb * (0.72 + R() * 0.15), cut = (R() - 0.5) * 14;
+  g.fillStyle = grey(24);
+  g.beginPath(); g.moveTo(-wb, 0); g.lineTo(-wt, -H + cut); g.lineTo(wt, -H - cut); g.lineTo(wb, 0); g.closePath(); g.fill();
+  g.fillStyle = grey(40);                        // the face turned to the light
+  g.beginPath(); g.moveTo(Ld * wb * 0.25, 0); g.lineTo(Ld * wt * 0.25, -H + Ld * -cut * 0.25); g.lineTo(Ld * wt, -H - Ld * cut); g.lineTo(Ld * wb, 0); g.closePath(); g.fill();
+  g.strokeStyle = grey(96); g.lineWidth = 0.7; g.beginPath(); g.moveTo(Ld * wb, 0); g.lineTo(Ld * wt, -H - Ld * cut); g.stroke();
+  g.strokeStyle = grey(70); g.lineWidth = 0.5; g.beginPath(); g.moveTo(-wt, -H + cut); g.lineTo(wt, -H - cut); g.stroke();
+  g.save(); g.beginPath(); g.moveTo(-wb, 0); g.lineTo(-wt, -H + cut); g.lineTo(wt, -H - cut); g.lineTo(wb, 0); g.closePath(); g.clip();
+  glyphs(g, R, -wt * 0.6, -14, wt * 0.6, -H + 18, 'rgba(150,150,144,0.55)', 7);
+  g.restore();
+  shadeRound(g, Ld, wb, H);
+  sandFoot(g, R, wb * 1.8);
+}
+function paintSpire(g, R, Ld) {                  // a horned spire twisting up out of the ground like a shell
+  const H = 90 + R() * 40, w = 9 + R() * 3, turns = 7 + (R() * 3 | 0);
+  g.fillStyle = grey(118);
+  g.beginPath(); g.moveTo(-w, 0); g.quadraticCurveTo(-w * 0.6, -H * 0.5, R() * 6 - 3, -H); g.quadraticCurveTo(w * 0.6, -H * 0.5, w, 0); g.closePath(); g.fill();
+  g.save(); g.clip();
+  for (let k = 0; k < turns; k++) {              // the spiral ridges, each a band from one edge across to the other
+    const y = -k / turns * H, h2 = H / turns;
+    g.fillStyle = grey(150 + (k % 2) * 10); g.beginPath(); g.moveTo(-w * 1.2, y); g.lineTo(w * 1.2, y - h2 * 0.8); g.lineTo(w * 1.2, y - h2 * 0.8 - 2.2); g.lineTo(-w * 1.2, y - 2.2); g.closePath(); g.fill();
+    g.strokeStyle = grey(70); g.lineWidth = 0.5; g.beginPath(); g.moveTo(-w * 1.2, y + 0.4); g.lineTo(w * 1.2, y - h2 * 0.8 + 0.4); g.stroke();
+  }
+  g.restore();
+  shadeRound(g, Ld, w, H);
+  sandFoot(g, R, w * 2);
+}
+function paintRing(g, R, Ld) {                   // a ring of black stone standing on its edge, taller than a house, with a piece broken out
+  const ro = 36 + R() * 6, ri = ro - 8, cy = -ro + 4, gap = R() * 6.3;
+  g.fillStyle = grey(30);
+  g.beginPath(); g.arc(0, cy, ro, gap + 0.35, gap + 6.28); g.arc(0, cy, ri, gap + 6.28, gap + 0.35, true); g.closePath(); g.fill();
+  g.strokeStyle = grey(84); g.lineWidth = 0.8; g.beginPath(); g.arc(0, cy, ro - 0.4, Ld > 0 ? -1.2 : 1.95, Ld > 0 ? 1.2 : 4.35); g.stroke();
+  g.save(); g.beginPath(); g.arc(0, cy, ro, 0, 7); g.arc(0, cy, ri, 0, 7, true); g.clip('evenodd');
+  g.strokeStyle = 'rgba(150,150,144,0.5)'; g.lineWidth = 0.55;
+  for (let k = 0; k < 26; k++) { const a = k / 26 * 6.28, r = (ro + ri) / 2, x = Math.cos(a) * r, y = cy + Math.sin(a) * r; if (R() < 0.3) continue;
+    g.beginPath(); g.moveTo(x - Math.cos(a) * 2, y - Math.sin(a) * 2); g.lineTo(x + Math.cos(a) * 2, y + Math.sin(a) * 2); if (R() < 0.5) { g.moveTo(x - Math.sin(a) * 1.3, y + Math.cos(a) * 1.3); g.lineTo(x + Math.sin(a) * 1.3, y - Math.cos(a) * 1.3); } g.stroke(); }
+  g.restore();
+  shadeRound(g, Ld, ro, ro * 2, 0, cy, true);
+  sandFoot(g, R, ro * 0.7);
+}
+function paintShard(g, R, Ld) {                  // a rock torn loose and left hanging in the air
+  const n = 7, pts = [];
+  for (let k = 0; k < n; k++) { const a = k / n * 6.28, r = 9 + R() * 6; pts.push([Math.cos(a) * r, -16 + Math.sin(a) * r * 0.75 + (Math.sin(a) > 0 ? 6 : 0)]); }
+  g.fillStyle = grey(44); g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill();
+  g.fillStyle = grey(78); g.beginPath(); g.moveTo(0, -18); for (const [x, y] of pts) if (x * Ld > -2 && y < -10) g.lineTo(x, y); g.closePath(); g.fill();
+  g.fillStyle = grey(26); g.beginPath(); g.moveTo(-8, -10); g.lineTo(0, 0); g.lineTo(8, -10); g.closePath(); g.fill();   // the torn underside
+}
+function paintDStone(g, R, Ld) {                 // a flat stone half under the sand, a mark cut in it
+  const w = 6 + R() * 4; g.fillStyle = grey(70); g.beginPath(); g.ellipse(0, -1, w, w * 0.4, 0, Math.PI, 0); g.fill();
+  g.fillStyle = grey(96); g.beginPath(); g.ellipse(Ld * w * 0.3, -1.6, w * 0.5, w * 0.2, 0, Math.PI, 0); g.fill();
+  if (R() < 0.6) glyphs(g, R, -w * 0.4, -1.4, w * 0.4, -2.5, 'rgba(30,30,28,0.6)', 3);
+  sandFoot(g, R, w * 1.2);
+}
+function spines(g, R, x0, y0, x1, y1, n, len, col) {   // tiny pale thorns along an edge
+  g.strokeStyle = col; g.lineWidth = 0.3;
+  for (let k = 0; k < n; k++) { const u = R(), x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u, a = R() * 6.3; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); g.stroke(); }
+}
+function ribbedLimb(g, R, pts, w, tone, Ld) {    // a ribbed cactus limb along a path: dark body, lit flank, rib lines, thorns
+  const seg = (lw, col) => { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); };
+  seg(w, grey(tone)); 
+  g.save(); g.translate(Ld * w * 0.22, 0); seg(w * 0.45, grey(tone + 26)); g.restore();
+  for (const o of [-0.3, 0.05, 0.32]) { g.save(); g.translate(o * w, 0); seg(0.35, grey(tone - 22)); g.restore(); }
+  for (let i = 1; i < pts.length; i++) spines(g, R, pts[i - 1][0] - w / 2, pts[i - 1][1], pts[i][0] - w / 2, pts[i][1], 3, 1.6, 'rgba(225,222,212,0.8)'), spines(g, R, pts[i - 1][0] + w / 2, pts[i - 1][1], pts[i][0] + w / 2, pts[i][1], 3, 1.6, 'rgba(225,222,212,0.8)');
+}
+function paintCactusCurl(g, R, Ld) {             // a tall ribbed cactus whose arms curl round like a ram's horn, crowned with a pale spiked bloom
+  const H = 58 + R() * 30, w = 7 + R() * 2;
+  const trunk = []; for (let k = 0; k <= 8; k++) trunk.push([Math.sin(k * 0.6 + R()) * 1.2, -k / 8 * H]);
+  const arms = 2 + (R() * 2 | 0);
+  for (let a = 0; a < arms; a++) {
+    const sd = a % 2 ? -1 : 1, y0 = -H * (0.3 + R() * 0.35), r0 = 8 + R() * 5, pts = [[0, y0]];
+    for (let k = 1; k <= 14; k++) { const t = k / 14, ang = Math.PI - t * Math.PI * 1.55, r = r0 * (1 - t * 0.45); pts.push([sd * (r0 + Math.cos(ang) * r), y0 - 4 - Math.sin(ang) * r - t * 10]); }
+    ribbedLimb(g, R, pts, w * 0.65, 84 + R() * 10, Ld);
+  }
+  ribbedLimb(g, R, trunk, w, 88, Ld);
+  g.fillStyle = grey(212);                         // the bloom: long pale petals like knives
+  for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * 0.42, l = 5 + R() * 4; g.beginPath(); g.moveTo(-1.2, -H); g.lineTo(Math.cos(a) * l, -H + Math.sin(a) * l); g.lineTo(1.2, -H); g.closePath(); g.fill(); }
+  shadeRound(g, Ld, 18, H);
+  sandFoot(g, R, 14);
+}
+function paintCactusBarrel(g, R, Ld) {           // a knot of round, deeply ribbed barrels, each bristling with long hooked thorns
+  const n = 3 + (R() * 3 | 0), bs = [];
+  for (let k = 0; k < n; k++) bs.push([(R() - 0.5) * 22, (R() - 0.5) * 4, 5 + R() * 6]);
+  bs.sort((a, b) => b[2] - a[2] + (a[1] - b[1]));
+  for (const [x, y, r] of bs) {
+    const cy = y - r * 0.95;
+    g.fillStyle = grey(78); g.beginPath(); g.ellipse(x, cy, r, r * 1.05, 0, 0, 7); g.fill();
+    g.fillStyle = grey(104); g.beginPath(); g.ellipse(x + Ld * r * 0.3, cy - r * 0.1, r * 0.55, r * 0.9, 0, 0, 7); g.fill();
+    g.strokeStyle = grey(52); g.lineWidth = 0.4;
+    for (let m = -3; m <= 3; m++) { g.beginPath(); g.ellipse(x, cy, Math.abs(m) / 3.5 * r + 0.1, r * 1.04, 0, -Math.PI / 2, Math.PI / 2, m < 0); g.stroke(); }
+    g.strokeStyle = 'rgba(228,225,214,0.85)'; g.lineWidth = 0.35;   // long thorns from the crown, hooked at the tips
+    for (let m = 0; m < 9; m++) { const a = -Math.PI / 2 + (m - 4) * 0.33, l = r * (0.7 + R() * 0.6), x1 = x + Math.cos(a) * l, y1 = cy - r + Math.sin(a) * l * 0.9;
+      g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.3, cy - r * 0.8); g.lineTo(x1, y1); g.lineTo(x1 + (a > -Math.PI / 2 ? 1 : -1) * 0.8, y1 + 0.8); g.stroke(); }
+  }
+  shadeRound(g, Ld, 18, 18, 0, -9, true);
+  sandFoot(g, R, 18);
+}
+function paintCactusPods(g, R, Ld) {             // a twisted stalk whose drooping branches end in pale hanging pods
+  const H = 50 + R() * 20, stalk = [];
+  for (let k = 0; k <= 8; k++) stalk.push([Math.sin(k * 0.9) * 2.5, -k / 8 * H]);
+  for (let b = 0; b < 5; b++) {
+    const [bx, by] = stalk[3 + b % 5], sd = b % 2 ? -1 : 1, len = 10 + R() * 8, ex = bx + sd * len, ey = by - 6 + R() * 4;
+    g.strokeStyle = grey(76); g.lineWidth = 2.2; g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(bx + sd * len * 0.7, by - 10, ex, ey); g.stroke();
+    g.strokeStyle = grey(110); g.lineWidth = 0.5; g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex, ey + 5); g.stroke();
+    g.fillStyle = grey(200 + R() * 25); g.beginPath(); g.moveTo(ex, ey + 4); g.quadraticCurveTo(ex + 3, ey + 8, ex, ey + 12); g.quadraticCurveTo(ex - 3, ey + 8, ex, ey + 4); g.fill();   // the pod
+    g.fillStyle = grey(150); g.beginPath(); g.ellipse(ex - Ld * 0.8, ey + 9, 0.7, 1.8, 0, 0, 7); g.fill();
+  }
+  ribbedLimb(g, R, stalk, 5.5, 80, Ld);
+  shadeRound(g, Ld, 16, H);
+  sandFoot(g, R, 12);
+}
+function paintCactusWhips(g, R, Ld) {            // long thorny wands fanning out of the sand
+  const n = 7 + (R() * 5 | 0);
+  for (let k = 0; k < n; k++) {
+    const a = -Math.PI / 2 + (k / (n - 1) - 0.5) * 1.3 + (R() - 0.5) * 0.15, l = 40 + R() * 30, bend = (R() - 0.5) * 12;
+    const x1 = Math.cos(a) * l, y1 = Math.sin(a) * l, tone = 70 + (x1 * Ld > 0 ? 30 : 0);
+    g.strokeStyle = grey(tone); g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(x1 * 0.5 + bend, y1 * 0.5, x1, y1); g.stroke();
+    g.strokeStyle = 'rgba(225,222,212,0.7)'; g.lineWidth = 0.3;
+    for (let m = 1; m < 14; m++) { const u = m / 14, x = x1 * u + bend * 2 * u * (1 - u), y = y1 * u; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (m % 2 ? 1.6 : -1.6), y - 0.6); g.stroke(); }
+    if (R() < 0.5) { g.fillStyle = grey(210); g.beginPath(); g.ellipse(x1, y1 - 1, 1, 2.2, a + Math.PI / 2, 0, 7); g.fill(); }   // a pale bud at the tip
+  }
+  sandFoot(g, R, 10);
+}
+function paintHoodoo(g, R, Ld) {                 // a column of wind-cut rock, a great stone balanced on top of it where no stone should stay
+  const H = 40 + R() * 30, w = 9 + R() * 4; let y = 0;
+  for (let k = 0; k < 4; k++) {                   // banded layers, each pinched in at the waist
+    const h = H / 4, wl = w * (1 - k * 0.12) * (0.9 + R() * 0.2), tone = 70 + (k % 2) * 16;
+    g.fillStyle = grey(tone); g.beginPath(); g.moveTo(-wl, y); g.quadraticCurveTo(-wl * 0.65, y - h / 2, -wl * 0.95, y - h); g.lineTo(wl * 0.95, y - h); g.quadraticCurveTo(wl * 0.65, y - h / 2, wl, y); g.closePath(); g.fill();
+    g.strokeStyle = grey(tone - 22); g.lineWidth = 0.45; g.beginPath(); g.moveTo(-wl * 0.95, y - h); g.lineTo(wl * 0.95, y - h); g.stroke();
+    y -= h;
+  }
+  const br = 11 + R() * 6;                        // the cap stone, wider than the column under it
+  g.fillStyle = grey(56); g.beginPath(); g.ellipse(R() * 3 - 1.5, y - br * 0.7, br * 1.25, br * 0.8, (R() - 0.5) * 0.3, 0, 7); g.fill();
+  g.fillStyle = grey(90); g.beginPath(); g.ellipse(Ld * br * 0.35, y - br * 1.0, br * 0.7, br * 0.4, 0, 0, 7); g.fill();
+  shadeRound(g, Ld, w * 1.6, H + br * 1.6);
+  sandFoot(g, R, w * 1.8);
+}
+function paintArch(g, R, Ld) {                   // a natural bridge of banded rock, worn through by wind, lopsided and rough
+  const w = 40 + R() * 12, h = 50 + R() * 16, t = 12 + R() * 5, lean = (R() - 0.5) * 0.35, out = [], inn = [];
+  for (let k = 0; k <= 22; k++) {
+    const u = k / 22, a = Math.PI * (1 - u), sk = 1 + lean * Math.cos(a);   // one side a little higher than the other
+    const ro = 1 + (R() - 0.5) * 0.1, ri = 1 + (R() - 0.5) * 0.12, foot = Math.pow(Math.abs(Math.cos(a)), 6) * 7;   // the legs flare where they meet the sand
+    out.push([Math.cos(a) * (w + t * 0.5 + foot) * ro, -Math.sin(a) * (h + t * 0.5) * sk * ro]);
+    inn.push([Math.cos(a) * (w - t * 0.5) * ri, -Math.sin(a) * (h - t * 0.6) * sk * ri]);
+  }
+  out[0][1] = out[22][1] = 0; inn[0][1] = inn[22][1] = 0;
+  const shape = () => { g.beginPath(); out.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); for (let k = inn.length - 1; k >= 0; k--) g.lineTo(inn[k][0], inn[k][1]); g.closePath(); };
+  g.fillStyle = grey(64); shape(); g.fill();
+  g.save(); shape(); g.clip();
+  for (let k = 0; k < 10; k++) { const y = -k / 10 * (h + t); g.fillStyle = k % 2 ? 'rgba(255,255,250,0.07)' : 'rgba(0,0,0,0.1)'; g.beginPath(); g.moveTo(-w * 2, y); for (let x = -w * 2; x <= w * 2; x += 6) g.lineTo(x, y + Math.sin(x * 0.2 + k) * 1.2); g.lineTo(w * 2, y - (h + t) / 10); g.lineTo(-w * 2, y - (h + t) / 10); g.closePath(); g.fill(); }
+  const lg = g.createLinearGradient(-w, 0, w, 0); lg.addColorStop(0, Ld > 0 ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,245,0.16)'); lg.addColorStop(1, Ld > 0 ? 'rgba(255,255,245,0.16)' : 'rgba(0,0,0,0.28)');
+  g.fillStyle = lg; g.fillRect(-w * 2, -h * 2, w * 4, h * 2.2);
+  g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); inn.forEach(([x, y], i) => i ? g.lineTo(x, y + 3) : g.moveTo(x, y + 3)); g.lineTo(inn[22][0], inn[22][1]); for (let k = 22; k >= 0; k--) g.lineTo(inn[k][0], inn[k][1]); g.fill();   // the underside of the span in shadow
+  g.restore();
+  for (const x of [-w, w]) { g.save(); g.translate(x, 0); sandFoot(g, R, t * 1.4); g.restore(); }
+}
+function paintCrystal(g, R, Ld) {                // a cluster of pale glassy prisms pushing up through the sand at odd angles
+  const n = 4 + (R() * 4 | 0), cs = [];
+  for (let k = 0; k < n; k++) cs.push([(R() - 0.5) * 16, (R() - 0.5) * 0.9, 14 + R() * 26, 2.5 + R() * 2.5]);
+  cs.sort((a, b) => b[2] - a[2]);
+  for (const [x, a, l, w] of cs) {
+    const tx = x + Math.sin(a) * l, ty = -Math.cos(a) * l, nx = Math.cos(a) * w, ny = Math.sin(a) * w, tip = 4 + w;
+    const px = tx + Math.sin(a) * tip, py = ty - Math.cos(a) * tip;
+    g.fillStyle = grey(150); g.beginPath(); g.moveTo(x - nx, -ny); g.lineTo(tx - nx, ty - ny); g.lineTo(px, py); g.lineTo(tx + nx, ty + ny); g.lineTo(x + nx, ny); g.closePath(); g.fill();
+    const lit = Ld * a > 0 ? 1 : 0;   // one face catches the light, the other stays glassy grey
+    g.fillStyle = grey(lit ? 225 : 190); g.beginPath(); g.moveTo(x + Ld * nx * 0.1, 0); g.lineTo(tx + Ld * nx * 0.1, ty); g.lineTo(px, py); g.lineTo(tx + Ld * nx, ty + Ld * ny); g.lineTo(x + Ld * nx, Ld * ny); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.35; g.beginPath(); g.moveTo(x, 0); g.lineTo(tx, ty); g.lineTo(px, py); g.stroke();
+  }
+  sandFoot(g, R, 14);
+}
+function paintPillar(g, R, Ld) {                 // a tall finger of rock the wind has bored right through in places
+  const H = 70 + R() * 30, w = 10 + R() * 3, pts = [];
+  for (let k = 0; k <= 10; k++) pts.push([(Math.sin(k * 1.3 + R() * 2) * 0.25 + 1) * w * (1 - k / 10 * 0.45), -k / 10 * H]);
+  g.fillStyle = grey(72); g.beginPath(); g.moveTo(-pts[0][0], 0);
+  for (const [x, y] of pts) g.lineTo(-x, y); for (let k = pts.length - 1; k >= 0; k--) g.lineTo(pts[k][0], pts[k][1]); g.closePath(); g.fill();
+  g.save(); g.clip();
+  g.fillStyle = 'rgba(255,255,245,0.14)'; g.fillRect(Ld > 0 ? w * 0.1 : -w * 2, -H, w * 2, H);
+  for (let k = 0; k < 7; k++) { const y = -k / 7 * H; g.fillStyle = k % 2 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,250,0.05)'; g.fillRect(-w * 2, y - H / 7, w * 4, H / 7); }
+  g.restore();
+  for (let k = 0; k < 3; k++) {                   // holes worn through, sky-dark inside
+    const y = -H * (0.35 + k * 0.2 + R() * 0.05), r = 2 + R() * 2.5, x = (R() - 0.5) * w * 0.6;
+    g.fillStyle = grey(16); g.beginPath(); g.ellipse(x, y, r, r * 1.3, 0, 0, 7); g.fill();
+    g.strokeStyle = grey(110); g.lineWidth = 0.4; g.beginPath(); g.ellipse(x, y, r, r * 1.3, 0, Ld > 0 ? Math.PI * 0.6 : -Math.PI * 0.4, Ld > 0 ? Math.PI * 1.4 : Math.PI * 0.4); g.stroke();
+  }
+  shadeRound(g, Ld, w, H);
+  sandFoot(g, R, w * 1.9);
+}
+function paintDrift(g, R, Ld) {                  // a long low ridge of sand, sharp-crested on the windward side
+  const w = 26 + R() * 14, h = 4 + R() * 3;
+  const gr = g.createLinearGradient(0, -h, 0, 2); gr.addColorStop(0, grey(186)); gr.addColorStop(1, grey(150));
+  g.fillStyle = gr; g.beginPath(); g.moveTo(-w, 2); g.quadraticCurveTo(-w * 0.3, -h * 1.4, w * 0.2, -h); g.quadraticCurveTo(w * 0.7, -h * 0.4, w, 2); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(100,98,92,0.5)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(-w * 0.55, -h * 0.4); g.quadraticCurveTo(-w * 0.1, -h * 1.2, w * 0.2, -h); g.stroke();
+}
+function paintStoneRing(g, R, Ld) {              // small stones set in a careful circle, by no one
+  const n = 7 + (R() * 3 | 0), rr = 9 + R() * 4;
+  for (let k = 0; k < n; k++) { const a = k / n * 6.28, x = Math.cos(a) * rr, y = Math.sin(a) * rr * 0.45, r = 1.6 + R() * 1.2;
+    g.fillStyle = grey(66); g.beginPath(); g.ellipse(x, y - r * 0.6, r, r * 0.8, 0, 0, 7); g.fill(); g.fillStyle = grey(110); g.beginPath(); g.ellipse(x + Ld * r * 0.3, y - r * 0.9, r * 0.5, r * 0.35, 0, 0, 7); g.fill(); }
+}
+function paintCactusNub(g, R, Ld) {              // a small cactus, a single ribbed knob with a thorny crown
+  const h = 6 + R() * 6, w = 3 + R() * 1.5;
+  g.fillStyle = grey(82); g.beginPath(); g.ellipse(0, -h / 2, w, h / 2, 0, 0, 7); g.fill();
+  g.fillStyle = grey(108); g.beginPath(); g.ellipse(Ld * w * 0.35, -h / 2, w * 0.4, h * 0.42, 0, 0, 7); g.fill();
+  spines(g, R, -w, -h, w, -h, 7, 1.8, 'rgba(225,222,212,0.85)');
+}
+function paintDGrass(g, R, Ld) {                 // a few stiff pale blades, the only thing growing
+  for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (R() - 0.5) * 1.2, l = 4 + R() * 6; g.strokeStyle = grey(110 + R() * 50); g.lineWidth = 0.5; g.beginPath(); g.moveTo((R() - 0.5) * 3, 0); g.lineTo(Math.cos(a) * l, Math.sin(a) * l); g.stroke(); }
+}
+const DESERT_KINDS = {
+  mono: [5, 44, 186, 22, 176, paintMonolith], spire: [4, 36, 146, 18, 140, paintSpire], ring: [3, 90, 100, 45, 94, paintRing], shard: [5, 34, 32, 17, 26, paintShard],
+  cCurl: [5, 64, 110, 32, 100, paintCactusCurl], cBarrel: [4, 50, 40, 25, 32, paintCactusBarrel], cPods: [4, 52, 84, 26, 76, paintCactusPods], cWhips: [4, 100, 80, 50, 74, paintCactusWhips],
+  hoodoo: [4, 50, 104, 25, 96, paintHoodoo], arch: [3, 150, 92, 75, 84, paintArch], crystal: [5, 52, 56, 26, 48, paintCrystal], pillar: [4, 40, 116, 20, 108, paintPillar],
+  dstone: [4, 26, 12, 13, 8, paintDStone], dgrass: [3, 16, 12, 8, 10, paintDGrass], drift: [4, 84, 16, 42, 10, paintDrift], sring: [3, 34, 16, 17, 10, paintStoneRing], cNub: [4, 12, 16, 6, 14, paintCactusNub],
+};
+Object.assign(SPRITE_KINDS, DESERT_KINDS);
+// what stands where. The sands are split into regions, each with its own character, so walking any way you pass from one
+// kind of place into another: monolith fields, cactus groves, rock gardens, open dunes and crystal flats.
+const REGIONS = [
+  { name: 'monoliths', rate: 0.055, pick: [['mono', 6], ['ring', 2], ['shard', 2], ['spire', 1]], decor: [['dstone', 5], ['sring', 2], ['drift', 2]] },
+  { name: 'grove', rate: 0.095, pick: [['cCurl', 4], ['cBarrel', 4], ['cPods', 3], ['cWhips', 3], ['hoodoo', 1]], decor: [['cNub', 5], ['dgrass', 5], ['dstone', 1]] },
+  { name: 'rocks', rate: 0.07, pick: [['hoodoo', 4], ['pillar', 4], ['arch', 0.5], ['shard', 3], ['cBarrel', 1]], decor: [['dstone', 5], ['drift', 2], ['cNub', 1]] },
+  { name: 'dunes', rate: 0.022, pick: [['spire', 3], ['cWhips', 2], ['mono', 1], ['shard', 1]], decor: [['drift', 6], ['dgrass', 2]] },
+  { name: 'crystal', rate: 0.065, pick: [['crystal', 6], ['spire', 2], ['shard', 2], ['pillar', 1]], decor: [['dstone', 3], ['sring', 1], ['drift', 2]] },
+];
+const DESERT_R = { mono: 10, spire: 7, ring: 14, shard: 0, cCurl: 7, cBarrel: 11, cPods: 6, cWhips: 6, hoodoo: 10, arch: 0, crystal: 9, pillar: 9 };
+function regionAt(i, j) {                        // regions are blocks about 14 tiles across, with ragged edges
+  const bi = Math.floor((i + (hash(j * 0.31, 5) - 0.5) * 6) / 14), bj = Math.floor((j + (hash(i * 0.29, 9) - 0.5) * 6) / 14);
+  return REGIONS[(hash(bi * 3.7 + 11, bj * 5.3 - 2) * REGIONS.length) | 0];
+}
+function weighted(list, u) { let tot = 0; for (const [, w] of list) tot += w; let x = u * tot; for (const [k, w] of list) { if ((x -= w) < 0) return k; } return list[0][0]; }
+const desertCache = new Map();
+function desertPropAt(i, j) {
+  const key = i * 2097152 + j;
+  if (desertCache.has(key)) return desertCache.get(key);
+  if (desertCache.size > 100000) desertCache.clear();
+  let p = null;
+  const x = i * T + 8 + hash(j + 41, i - 13) * (T - 16), y = j * T + 8 + hash(i - 29, j + 3) * (T - 16);
+  if (Math.hypot(x - BEYOND_GATE.x, y - BEYOND_GATE.y) > 150) {
+    const h = hash(i * 0.913 + 51, j * 1.37 - 77), v = hash(i * 2.1 - 5, j * 0.7 + 9), s = 0.75 + hash(i * 4.3, j * 1.9) * 0.6, reg = regionAt(i, j);
+    const big = (((i % 7) + 7) % 7 === 0) && (((j % 7) + 7) % 7 === 0);   // the very large pieces only on a sparse grid
+    if (big && h > 0.6) { const k = reg.name === 'rocks' ? (h > 0.8 ? 'arch' : 'pillar') : reg.name === 'dunes' ? 'spire' : reg.name === 'monoliths' ? 'ring' : reg.name === 'grove' ? 'cCurl' : 'crystal'; p = { kind: 'dprop', dk: k, x, y, s: s * (k === 'arch' || k === 'ring' ? 1.6 : 1.4), r: DESERT_R[k], v: (v * 97 | 0) % DESERT_KINDS[k][0], nocol: k === 'arch' }; }
+    else if (h > 1 - reg.rate) {
+      const k = weighted(reg.pick, hash(i * 1.9 + 3, j * 2.7 - 8));
+      p = { kind: 'dprop', dk: k, x, y, s: s * (k[0] === 'c' ? 1.3 : 1), r: DESERT_R[k], v: (v * 97 | 0) % DESERT_KINDS[k][0] };
+      if (k === 'shard') { p.float = 26 + v * 40; p.nocol = true; p.s *= 1.1; }
+      if (k === 'mono' && v < 0.25) p.float = 10;
+      if (k === 'arch') p.nocol = true;          // you can walk under an arch
+    }
+  }
+  desertCache.set(key, p);
+  return p;
+}
+function desertDecorAt(i, j) {
+  const h = hash(i * 1.71 - 3, j * 0.53 + 21); if (h > 0.22 || desertPropAt(i, j)) return null;
+  const reg = regionAt(i, j), v = hash(i * 3.7, j * 1.3), dk = weighted(reg.decor, h / 0.22);
+  return { kind: 'decor', dk, x: i * T + 6 + hash(j, i + 2) * (T - 12), y: j * T + 6 + hash(i + 4, j) * (T - 12), s: 0.8 + hash(j * 1.3, i) * 0.6, v: (v * 97 | 0) % DESERT_KINDS[dk][0], seed: v };
+}
+function desertDecorInView() {                   // only what the torch can reach
+  const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60, out = [], R = viewR();
+  for (let i = Math.floor((S.cam.x - R) / T); i <= Math.ceil((S.cam.x + R) / T); i++)
+    for (let j = Math.floor((S.cam.y - R) / T); j <= Math.ceil((S.cam.y + R) / T); j++) {
+      const o = desertDecorAt(i, j); if (!o || Math.hypot(o.x - S.p.x, o.y - S.p.y) > reach) continue;
+      const [sx, sy] = toScreen(o.x, o.y); if (sx < -60 || sx > W + 60 || sy < -10 || sy - 50 * Z > H) continue;
+      o.sx = sx; o.sy = sy; out.push(o);
+    }
+  return out;
+}
+function drawDesertProp(o, c, mask, sx, sy, s) {
+  const bob = o.float ? Math.sin(S.t * 0.8 + o.x * 0.01) * 3 : 0, lift = (o.float || 0) + bob;
+  if (o.float && !mask) {                        // its shadow on the sand below, and a thin trickle of sand falling from it
+    c.fillStyle = 'rgba(20,20,18,0.35)'; c.beginPath(); c.ellipse(sx, sy, 12 * s * (o.dk === 'mono' ? 1.2 : 0.9), 5 * s, 0, 0, 7); c.fill();
+    c.fillStyle = 'rgba(200,198,190,0.5)';
+    for (let k = 0; k < 6; k++) { const u = (S.t * 0.9 + k / 6) % 1; c.fillRect(sx + (k - 2.5) * 1.6 * s, sy - lift * s * (1 - u), 0.9 * s, 1.6 * s); }
+  }
+  litStamp(c, o.dk, o.v, sx, sy - lift * s, s, mask);
+}
+// the sand itself: wind ripples, grains and soft hollows, painted into one tile like the forest floor
+let sandPat = null, sandT = null;
+function sandPattern() {
+  if (sandPat) return sandPat;
+  const P = 384, cv = document.createElement('canvas'); cv.width = cv.height = P;
+  const g = cv.getContext('2d'), R = sprRand(9191);
+  g.fillStyle = '#a8a59c'; g.fillRect(0, 0, P, P);
+  const wrap = f => { for (const ox of [-P, 0, P]) for (const oy of [-P, 0, P]) { g.save(); g.translate(ox, oy); f(); g.restore(); } };
+  for (let n = 0; n < 26; n++) {                    // hollows and pale drifts
+    const x = R() * P, y = R() * P, r = 30 + R() * 70, dark = R() < 0.5;
+    wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, dark ? 'rgba(80,78,72,0.14)' : 'rgba(215,212,204,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
+  }
+  for (let k = 0; k < 34; k++) {                    // wind ripples: a shaded trough and a lit crest, running right across and wrapping
+    const y0 = k / 34 * P + R() * 4, ph = R() * 6.3, a1 = 3 + R() * 3, amp2 = 1 + R() * 2;
+    const path = dy => { g.beginPath(); for (let x = 0; x <= P; x += 4) { const y = y0 + dy + Math.sin(x / P * Math.PI * 4 + ph) * a1 + Math.sin(x / P * Math.PI * 10 + ph * 2) * amp2; x ? g.lineTo(x, y) : g.moveTo(x, y); } };
+    for (const oy of [-P, 0, P]) { g.save(); g.translate(0, oy);
+      g.strokeStyle = 'rgba(96,94,88,0.32)'; g.lineWidth = 1.1; path(0); g.stroke();
+      g.strokeStyle = 'rgba(214,211,203,0.4)'; g.lineWidth = 0.9; path(-1.4); g.stroke(); g.restore(); }
+  }
+  for (let n = 0; n < 1800; n++) { const x = R() * P, y = R() * P, v = R() < 0.5 ? 120 : 200; g.fillStyle = `rgba(${v},${v},${v - 6},0.35)`; g.fillRect(x, y, 0.6, 0.6); }
+  for (let n = 0; n < 40; n++) { const x = R() * P, y = R() * P; g.fillStyle = 'rgba(70,68,64,0.45)'; g.beginPath(); g.ellipse(x, y, 0.8 + R(), 0.5 + R() * 0.5, R() * 3, 0, 7); g.fill(); }   // grit
+  return sandPat = ctx.createPattern(cv, 'repeat');
+}
+function sandTile() {
+  const k = K(), P = 384, w = Math.round(2 * k * P * DPR), h = Math.round(k * P * DPR);
+  if (sandT && sandT.w === w && sandT.h === h) return sandT;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d'), sx = w / (2 * P), sy = h / P;
+  g.setTransform(sx, sy / 2, -sx, sy / 2, 0, 0); g.fillStyle = sandPattern(); g.fillRect(-2 * P, -P, 4 * P, 4 * P);
+  return sandT = { w, h, pat: ctx.createPattern(cv, 'repeat') };
+}
+// blowing sand: streaks carried across on the wind, faint even in the dark
+const WIND = { a: -0.35 };
+function drawSandWind() {
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.lineCap = 'round';
+  const L = Math.max(W, H), ca = Math.cos(WIND.a), sa = Math.sin(WIND.a), t = S.t;
+  for (let k = 0; k < 70; k++) {
+    const sp = 160 + (k % 7) * 40, len = 10 + (k % 5) * 9;
+    const along = ((hash(k, 3) * L * 2 + t * sp - (S.cam.x - S.cam.y) * K()) % (L * 1.6) + L * 1.6) % (L * 1.6) - L * 0.3;
+    const across = ((hash(k, 7) * L * 1.6 - (S.cam.x + S.cam.y) * K() * 0.5) % (L * 1.6) + L * 1.6) % (L * 1.6) - L * 0.3;
+    const x = W / 2 - L * 0.5 + along * ca - across * sa * 0.3, y = across + along * sa * 0.5;
+    ctx.strokeStyle = `rgba(215,212,204,${0.05 + 0.1 * hash(k, 11)})`; ctx.lineWidth = 0.8 + hash(k, 13);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + ca * len, y + sa * len * 0.5); ctx.stroke();
+  }
+  ctx.restore();
+}
 // apply a transform [a 0 cc d e f], draw, then undo it exactly (cheaper than save/restore or reading the matrix back)
 function withXf(c, a, cc, d, e, f, draw) {
   c.transform(a, 0, cc, d, e, f); draw();
@@ -1780,7 +2131,7 @@ function decorNear(x, y, R) {
   return out;
 }
 function decorInView(lights) {   // ground cover only shows where some light reaches it, so skip the rest
-  if (inBeyond()) return [];
+  if (inBeyond()) return desertDecorInView();
   const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
   const out = [], near = lights.filter(L => Math.hypot(L.x - S.p.x, L.y - S.p.y) < viewR() + 200);
   for (const o of decorNear(S.cam.x, S.cam.y, viewR())) {
@@ -1804,6 +2155,7 @@ function drawDecor(o) {   // sets the transform directly (no save/restore): ther
 function caster(o) {
   if (o.kind === 'tree') return { r: (o.type === 'oak' ? 12 : o.type === 'dead' ? 4 : 9) * o.s, len: 1600 };
   if (o.kind === 'rock') return { r: 11 * o.s, len: 90 * o.s };
+  if (o.kind === 'dprop') return o.dk === 'shard' || o.dk === 'arch' ? null : { r: (DESERT_R[o.dk] || 6) * 0.9 * o.s, len: o.dk === 'cBarrel' || o.dk === 'crystal' ? 120 * o.s : 1600 };
   if (o.kind === 'post' || o.kind === 'lamp') return { r: 3.5, len: 1600 };
   if (o.kind === 'fence') return { r: 2.5, len: 45 };
   if (o.camp) return o.cast || null;
@@ -1842,9 +2194,10 @@ function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
 function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   const col = x => mask ? maskCol : x;
   const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
-  if (sx < -80 * s || sx > W + 80 * s || sy < -20 * s || sy - 130 * s > H) return;   // off screen
+  if (sx < -110 * s || sx > W + 110 * s || sy < -20 * s || sy - 200 * s > H) return;   // off screen
   if (o.kind === 'tree') {
     drawTree(o, c, mask, sx, sy, s);
+  } else if (o.kind === 'dprop') { drawDesertProp(o, c, mask, sx, sy, s);
   } else if (o.kind === 'rock') {
     if (!mask) shadow(sx, sy, 13 * s);
     litStamp(c, 'rock', (hash(o.x * 0.37, o.y * 0.91) * 50 | 0) % SPRITE_KINDS.rock[0], sx, sy, s * 0.95, mask);
@@ -2805,7 +3158,7 @@ function rgBurn() {
   return 1.05 * (1 + 0.08 * sr('searing')) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
 }
 function rgSpeed() { return 1.4 * (1 + 0.04 * sr('swift')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
-function rgDarkAlpha() { return 1; }
+function rgDarkAlpha() { return inBeyond() ? 0.94 : 1; }
 // Wave size: how many shades must burn before dawn. 11, 14, 17, 21, 25 ... 50 at wave 10, 83 at wave 15.
 function rgWaveCount(w) { return Math.max(6, Math.round(8 + 2.6 * w + 0.16 * w * w)); }
 function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
@@ -4564,77 +4917,104 @@ function warpArrive(dir) {
   rg.enemies = []; rg.fires = []; rg.wisps = []; rg.blasts = []; rg.echoes = [];
   if (dir === 'out') {
     rg.beyond = true; p.x = BEYOND_GATE.x; p.y = BEYOND_GATE.y + 34;
-    S.msg = { text: 'somewhere else', sub: 'Nothing here yet', t: 0 };
+    S.msg = { text: 'the sunless sands', sub: 'Nothing here was made by hands', t: 0 };
   } else {
     rg.beyond = false; p.x = TELE.x - 26; p.y = TELE.y + 26;   // stepped back out beside the shrine
     S.msg = { text: 'home', sub: 'Back by the fire', t: 0 };
   }
   S.cam.x = p.x; S.cam.y = p.y; addShake(0.5);
 }
-function drawBeyondGround() {                  // the other world, blank for now: pale flat ground under a strange sky
-  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const g = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
-  g.addColorStop(0, '#3a3c3b'); g.addColorStop(1, '#2b2d2c');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+function drawBeyondGround() {                  // the Sunless Sands: rippled pale sand, laid down like the forest floor
+  const st = sandTile(), k = K();
+  const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
+  st.pat.setTransform(new DOMMatrix().translate(Math.round(ox), Math.round(oy)));
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = st.pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
+  ctx.save(); worldMatrix(ctx, DPR);
+  for (const f of S.p.prints) { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a); ctx.fillStyle = `rgba(60,58,54,${0.5 * (1 - f.age / 10)})`; ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 2.2, 0, 0, 7); ctx.fill(); ctx.restore(); }
   ctx.restore();
 }
-// the portal: an upright tear of green light over the pit, swirling inward, edged in fire-bright rim light
+// the portal: a ragged tear standing on the pit. Through it you look down a deep green tunnel to a light at the far end;
+// its edge burns like cold green fire, and the dark around it is lit green
 function drawPortal(tx, ty, ZT, o, sockets) {
-  const t = S.t, cy = ty - 5 * ZT, G = a => `rgba(${ORB_COL},${Math.max(0, Math.min(1, a))})`, Wt = a => `rgba(215,255,228,${Math.max(0, Math.min(1, a))})`;
-  const oh = Math.min(1, o * 1.6), ow = Math.max(0, Math.min(1, (o - 0.15) / 0.85));   // tall slit first, then it widens
-  const ry = 40 * ZT * (0.05 + 0.95 * oh), rx = 23 * ZT * (0.04 + 0.96 * ow), pcy = cy - ry - 2 * ZT;   // it stands on the pit
   if (o <= 0) return;
-  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-  // the green it throws on everything round it
-  let g = ctx.createRadialGradient(tx, pcy, 0, tx, pcy, 90 * ZT);
-  g.addColorStop(0, G(0.35 * o)); g.addColorStop(0.5, G(0.12 * o)); g.addColorStop(1, G(0));
-  ctx.fillStyle = g; ctx.fillRect(tx - 90 * ZT, pcy - 90 * ZT, 180 * ZT, 180 * ZT);
-  g = ctx.createRadialGradient(tx, cy, 0, tx, cy, 60 * ZT);
-  g.addColorStop(0, G(0.3 * o)); g.addColorStop(1, G(0));
-  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(tx, cy, 60 * ZT, 30 * ZT, 0, 0, 7); ctx.fill();
-  // the face of it: bright at the heart, deep green toward the rim
-  ctx.save(); ctx.beginPath(); ctx.ellipse(tx, pcy, rx, ry, 0, 0, 7); ctx.clip();
-  g = ctx.createRadialGradient(tx, pcy, 0, tx, pcy, Math.max(rx, ry));
-  g.addColorStop(0, Wt(0.85 * o)); g.addColorStop(0.35, G(0.6 * o)); g.addColorStop(1, G(0.25 * o));
-  ctx.fillStyle = g; ctx.fillRect(tx - rx, pcy - ry, rx * 2, ry * 2);
-  // spiral arms turning in toward the middle
-  for (let k = 0; k < 5; k++) {
-    ctx.strokeStyle = k % 2 ? Wt(0.4 * o) : G(0.55 * o); ctx.lineWidth = (1.8 - k * 0.15) * ZT;
-    ctx.beginPath();
-    for (let u = 0; u <= 1; u += 0.04) {
-      const a = t * (1.6 + k * 0.15) + k * 1.2566 + u * 5.5, r = 1 - u;
-      const x = tx + Math.cos(a) * rx * r, y = pcy + Math.sin(a) * ry * r;
-      u ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  const t = S.t, cy = ty - 5 * ZT, G = a => `rgba(${ORB_COL},${Math.max(0, Math.min(1, a))})`, Wt = a => `rgba(220,255,232,${Math.max(0, Math.min(1, a))})`;
+  const oh = Math.min(1, o * 1.6), ow = Math.max(0, Math.min(1, (o - 0.15) / 0.85));   // tall slit first, then it widens
+  const ry = 40 * ZT * (0.05 + 0.95 * oh), rx = 23 * ZT * (0.04 + 0.96 * ow), pcy = cy - ry - 1 * ZT;
+  const edgeR = a => 1 + 0.045 * Math.sin(3 * a + t * 1.7) + 0.03 * Math.sin(7 * a - t * 2.9) + 0.018 * Math.sin(13 * a + t * 4.3);   // the edge never sits still
+  const edge = (c, k = 1) => { c.beginPath(); for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, r = edgeR(a) * k; i ? c.lineTo(tx + Math.cos(a) * rx * r, pcy + Math.sin(a) * ry * r) : c.moveTo(tx + Math.cos(a) * rx * r, pcy + Math.sin(a) * ry * r); } c.closePath(); };
+  const pulse = 0.85 + 0.15 * Math.sin(t * 2.1);
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // green light thrown on the ground and the air round it
+  ctx.globalCompositeOperation = 'lighter';
+  let g = ctx.createRadialGradient(tx, cy, 0, tx, cy, 70 * ZT);
+  g.addColorStop(0, G(0.42 * o * pulse)); g.addColorStop(0.45, G(0.14 * o)); g.addColorStop(1, G(0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(tx, cy, 70 * ZT, 34 * ZT, 0, 0, 7); ctx.fill();
+  g = ctx.createRadialGradient(tx, pcy, ry * 0.6, tx, pcy, ry * 2.1);
+  g.addColorStop(0, G(0.22 * o * pulse)); g.addColorStop(1, G(0));
+  ctx.fillStyle = g; ctx.fillRect(tx - ry * 2.1, pcy - ry * 2.1, ry * 4.2, ry * 4.2);
+  // the far side: a dark opening, not a bright disc
+  ctx.save(); edge(ctx); ctx.clip();
+  ctx.globalCompositeOperation = 'source-over';
+  g = ctx.createRadialGradient(tx, pcy, 0, tx, pcy, ry);
+  g.addColorStop(0, '#0f3a22'); g.addColorStop(0.55, '#06190e'); g.addColorStop(1, '#010503');
+  ctx.fillStyle = g; ctx.fillRect(tx - rx * 1.2, pcy - ry * 1.2, rx * 2.4, ry * 2.4);
+  // the tunnel: rings slide away from you toward the far end, slowly turning, so it reads deep
+  ctx.globalCompositeOperation = 'lighter';
+  const vx = tx + Math.sin(t * 0.6) * rx * 0.08, vy = pcy - ry * 0.06 + Math.cos(t * 0.5) * ry * 0.04;   // the far end drifts a little
+  g = ctx.createRadialGradient(vx, vy, 0, vx, vy, ry * 0.9);                 // mist hanging in the throat
+  g.addColorStop(0, G(0.28 * o)); g.addColorStop(0.6, G(0.08 * o)); g.addColorStop(1, G(0));
+  ctx.fillStyle = g; ctx.fillRect(tx - rx * 1.2, pcy - ry * 1.2, rx * 2.4, ry * 2.4);
+  for (let k = 0; k < 6; k++) {
+    const u = (k / 6 + t * 0.16) % 1, s = Math.pow(1 - u, 2.2), a = Math.sin(u * Math.PI) * (0.06 + 0.22 * (1 - s)) * (0.6 + 0.4 * Math.sin(t * 3 + k * 2));
+    const cx = vx + (tx - vx) * s, cyy = vy + (pcy - vy) * s;
+    ctx.strokeStyle = G(a * o); ctx.lineWidth = (0.5 + 3.5 * s) * ZT;
+    ctx.beginPath(); ctx.ellipse(cx, cyy, rx * s * 0.96, ry * s * 0.96, Math.sin(t * 0.4 + k) * 0.06, 0, 7); ctx.stroke();
+  }
+  // faint streams spiralling down it
+  for (let k = 0; k < 6; k++) {
+    ctx.strokeStyle = G(0.22 * o); ctx.lineWidth = 1.1 * ZT; ctx.beginPath();
+    for (let i = 0; i <= 20; i++) {
+      const u = i / 20, s = Math.pow(1 - u, 1.5), a = k * 1.047 + t * 0.5 + u * 2.6;
+      const x = vx + (tx - vx) * s + Math.cos(a) * rx * s * 0.9, y = vy + (pcy - vy) * s + Math.sin(a) * ry * s * 0.9;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     }
     ctx.stroke();
   }
+  // the light at the end
+  g = ctx.createRadialGradient(vx, vy, 0, vx, vy, rx * 0.55);
+  g.addColorStop(0, Wt(0.85 * o * pulse)); g.addColorStop(0.25, G(0.5 * o)); g.addColorStop(1, G(0));
+  ctx.fillStyle = g; ctx.fillRect(vx - rx * 0.55, vy - rx * 0.55, rx * 1.1, rx * 1.1);
+  // the inside of the edge falls into shadow, which gives the opening its thickness
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = 'rgba(1,6,3,0.55)'; ctx.lineWidth = 6 * ZT; edge(ctx, 1.02); ctx.stroke();
   ctx.restore();
-  // the rim, flickering
-  for (let k = 0; k < 3; k++) {
-    const j = 1 + 0.03 * Math.sin(t * (11 + k * 4) + k);
-    ctx.strokeStyle = k === 2 ? Wt(0.8 * o) : G((0.6 - k * 0.15) * o); ctx.lineWidth = (5 - k * 1.8) * ZT;
-    ctx.beginPath(); ctx.ellipse(tx, pcy, rx * j, ry * j, 0, 0, 7); ctx.stroke();
+  // the rim: cold green fire licking outward, with a hot white edge
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = G(0.22 * o); ctx.lineWidth = 9 * ZT; edge(ctx, 1.03); ctx.stroke();
+  ctx.strokeStyle = G(0.65 * o); ctx.lineWidth = 3 * ZT; edge(ctx); ctx.stroke();
+  ctx.strokeStyle = Wt(0.9 * o); ctx.lineWidth = 1.1 * ZT; edge(ctx, 0.985); ctx.stroke();
+  for (let i = 0; i < 40; i++) {
+    const a = i / 40 * Math.PI * 2 + Math.sin(i * 7.3) * 0.05, r = edgeR(a);
+    const lick = Math.max(0, Math.sin(t * (5 + (i % 5)) + i * 2.7) * 0.6 + Math.sin(t * 2.3 + i * 0.9) * 0.5);   // each tongue rises and falls on its own
+    if (lick < 0.15) continue;
+    const ex = tx + Math.cos(a) * rx * r, ey = pcy + Math.sin(a) * ry * r, nx = Math.cos(a) * rx, ny = Math.sin(a) * ry, nl = Math.hypot(nx, ny);
+    const len = (2.5 + 6 * lick) * ZT, ux = nx / nl, uy = ny / nl - 0.35 * lick;   // flames lean upward
+    ctx.strokeStyle = (i % 3 ? G : Wt)(0.55 * lick * o); ctx.lineWidth = (1.6 - 0.6 * lick) * ZT;
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.quadraticCurveTo(ex + ux * len * 0.5 + Math.sin(t * 9 + i) * ZT, ey + uy * len * 0.5, ex + ux * len, ey + uy * len); ctx.stroke();
   }
-  // motes pulled in from all round
-  for (let k = 0; k < 28; k++) {
-    const ph = (t * (0.35 + (k % 5) * 0.06) + k / 28) % 1, a = k * 2.399 + t * 0.4, R = 1.15 + (1 - ph) * 1.6;
-    const x = tx + Math.cos(a + ph * 1.5) * rx * R, y = pcy + Math.sin(a + ph * 1.5) * ry * R * 0.85;
-    ctx.fillStyle = (k % 4 ? G : Wt)(Math.sin(ph * Math.PI) * 0.9 * o);
-    ctx.beginPath(); ctx.arc(x, y, (k % 4 ? 1.1 : 1.6) * ZT, 0, 7); ctx.fill();
+  // a few cinders lifting off the rim and fading into the dark
+  for (let k = 0; k < 12; k++) {
+    const ph = (t * (0.22 + (k % 4) * 0.05) + k / 12) % 1, a = k * 2.399, r = edgeR(a);
+    const x = tx + Math.cos(a) * rx * r + Math.sin(t * 1.5 + k) * 4 * ZT * ph, y = pcy + Math.sin(a) * ry * r - ph * 30 * ZT;
+    ctx.fillStyle = (k % 3 ? G : Wt)(Math.sin(ph * Math.PI) * 0.8 * o);
+    ctx.beginPath(); ctx.arc(x, y, (1.4 - ph * 0.8) * ZT, 0, 7); ctx.fill();
   }
-  ctx.restore();
-  if (sockets) for (let i = 0; i < 3; i++) {   // the three orbs, circling the rim
-    const a = t * 0.7 + i * 2.094, x = tx + Math.cos(a) * (rx + 7 * ZT), y = pcy + Math.sin(a) * (ry + 5 * ZT);
-    drawOrb(x, y, ZT * 0.6 * Math.max(0.3, o), Math.min(1, o * 1.5));
-  }
-  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-  // now and then a crackle of light jumps from the rim out to the shards
-  if (sockets && Math.sin(t * 3.1) > 0.6) {
-    const i = Math.floor(t * 2.3) % 3, [sx2, sy2] = sockets[i], a0 = Math.atan2(sy2 - pcy, sx2 - tx);
-    let x = tx + Math.cos(a0) * rx, y = pcy + Math.sin(a0) * ry;
-    ctx.strokeStyle = Wt(0.7 * o); ctx.lineWidth = 1.2 * ZT; ctx.beginPath(); ctx.moveTo(x, y);
-    for (let m = 1; m <= 5; m++) { const u = m / 5; ctx.lineTo(x + (sx2 - x) * u + Math.sin(t * 50 + m * 7) * 3 * ZT, y + (sy2 - y) * u + Math.cos(t * 43 + m * 5) * 3 * ZT); }
-    ctx.stroke();
+  // threads of light from the three shards into the rim
+  if (sockets) for (let i = 0; i < 3; i++) {
+    const [sx2, sy2] = sockets[i], a0 = Math.atan2(sy2 + 5 * ZT - pcy, sx2 - tx), r = edgeR(a0);
+    const ex = tx + Math.cos(a0) * rx * r, ey = pcy + Math.sin(a0) * ry * r, j = Math.sin(t * 6 + i * 2) * 3 * ZT;
+    ctx.strokeStyle = G((0.3 + 0.2 * Math.sin(t * 4 + i)) * o); ctx.lineWidth = 1.1 * ZT;
+    ctx.beginPath(); ctx.moveTo(sx2, sy2 + 5 * ZT); ctx.quadraticCurveTo((sx2 + ex) / 2 + j, Math.min(sy2, ey) - 8 * ZT, ex, ey); ctx.stroke();
   }
   ctx.restore();
 }
@@ -4676,7 +5056,7 @@ function drawWarpVeil() {                      // stepping through: the world fo
 }
 function drawExFx() {
   const rg = S.rg; if (!rg || !XS) return;
-  if (rg.beyond) { const [gx, gy] = toScreen(BEYOND_GATE.x, BEYOND_GATE.y); drawPortal(gx, gy, Z * TELE_S, 1, null); drawWarpVeil(); return; }
+  if (rg.beyond) { drawSandWind(); const [gx, gy] = toScreen(BEYOND_GATE.x, BEYOND_GATE.y); drawPortal(gx, gy, Z * TELE_S, 1, null); drawWarpVeil(); return; }
   drawCampFlames();
   const p = S.p, [px, py] = toScreen(p.x, p.y), alive = rg.phase === 'fight';
   // chests catch a glint of light now and then, so you can find them in the dark
@@ -4721,15 +5101,18 @@ function drawExFx() {
     g.addColorStop(0, Wt(0.7 * pw)); g.addColorStop(1, Wt(0));
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(tx, cy, 4 * ZT, 2 * ZT, 0, 0, 7); ctx.fill();
     // a column of light climbs higher with every orb home; all three and it reaches the sky
-    if (n) {
+    const po = portalOpen(), colK = n >= 3 ? 1 - po : 1;
+    if (n && colK > 0.01) {
+      ctx.globalAlpha = colK;
       const top = n >= 3 ? cy - Math.max(ty, H) - 40 : cy - (40 + 50 * n) * ZT, bw = (3 + 2.5 * n) * ZT * (1 + 0.08 * Math.sin(t * 5));
       g = ctx.createLinearGradient(0, top, 0, cy);
       g.addColorStop(0, G(0)); g.addColorStop(0.7, G(0.18 + 0.06 * n)); g.addColorStop(1, G(0.4 + 0.1 * n));
       ctx.fillStyle = g; ctx.fillRect(tx - bw, top, bw * 2, cy - top);
       ctx.fillStyle = Wt(0.25 + 0.08 * n); ctx.fillRect(tx - bw * 0.25, top, bw * 0.5, cy - top);
+      ctx.globalAlpha = 1;
     }
     // threads of light from each orb down into the pit
-    for (let i = 0; i < Math.min(3, n); i++) {
+    for (let i = 0; i < Math.min(3, n) * (po > 0 ? 0 : 1); i++) {
       const [ox, oy] = sk[i], j = Math.sin(t * 13 + i * 3) * 2 * ZT;
       ctx.strokeStyle = G(0.35 + 0.2 * Math.sin(t * 7 + i)); ctx.lineWidth = 1.2 * ZT;
       ctx.beginPath(); ctx.moveTo(ox, oy); ctx.quadraticCurveTo((ox + tx) / 2 + j, Math.min(oy, cy) - 6 * ZT, tx, cy - 3 * ZT); ctx.stroke();
@@ -4875,7 +5258,7 @@ function drawExHud(top) {
   const rg = S.rg; if (!rg || !XS) return;
   ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(239,239,234,0.75)';
-  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.beyond ? 'SOMEWHERE ELSE' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
+  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.beyond ? 'THE SUNLESS SANDS' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
   for (let i = 0; i < rg.maxHp; i++) {
     const x = 16 + i * 15, y = 37 + top;
     heartPath(ctx, x + 5, y + 5, 11);
