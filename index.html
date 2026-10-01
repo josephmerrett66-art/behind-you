@@ -3177,7 +3177,7 @@ function rgBurn() {
   return 1.05 * (1 + 0.08 * sr('searing')) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
 }
 function rgSpeed() { return 1.4 * (1 + 0.04 * sr('swift')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
-function rgDarkAlpha() { return inBeyond() ? 0.94 : 1; }
+function rgDarkAlpha() { return 1; }   // the Dunes are as dark as the woods outside your light
 // Wave size: how many shades must burn before dawn. 11, 14, 17, 21, 25 ... 50 at wave 10, 83 at wave 15.
 function rgWaveCount(w) { return Math.max(6, Math.round(8 + 2.6 * w + 0.16 * w * w)); }
 function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
