@@ -1834,6 +1834,7 @@ const MUS_K = MUS.parts.length, MUS_PAD = MUS.P / 44100, MUS_LH = MUS.Lh / 44100
 const MUS_LEN = MUS.lens.map(n => n / 44100), MUS_START = [0];
 for (let k = 0; k < MUS_K; k++) MUS_START.push(MUS_START[k] + MUS_LEN[k]);
 const MUS_LB = MUS_START[MUS_K];
+const MUS_HOUSE_VOL = Math.pow(10, -3 / 20);   // the camp track sits 3 dB under the backing's level
 const mus = { gain: null, hGain: null, on: false, gen: 0, pos: 0, t0: 0, nextK: 0, nextAt: 0, busy: false, bufs: [], srcs: [],
   hBuf: null, hLoading: false, hSrc: null, hOn: false, hOffAt: 0 };
 function musLoad(b64) {
@@ -1909,7 +1910,7 @@ function musTick() {
     mus.hOn = want;
     const g = mus.hGain.gain, v = g.value;
     g.cancelScheduledValues(now); g.setValueAtTime(v, now);
-    g.linearRampToValueAtTime(want ? 1 : 0, now + (want ? 3 : 2.2) * (want ? 1 - v : v) + 0.01);
+    g.linearRampToValueAtTime(want ? MUS_HOUSE_VOL : 0, now + (want ? 3 : 2.2) * (want ? 1 - v / MUS_HOUSE_VOL : v / MUS_HOUSE_VOL) + 0.01);
     if (!want) mus.hOffAt = now + 2.3;
   }
   if (!mus.hOn && mus.hSrc && now > mus.hOffAt) musHouseStop();
