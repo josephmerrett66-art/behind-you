@@ -249,6 +249,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <p class="small">Starts by the second shrine with two teal orbs home and the third in your hands.</p>
       <button id="testStorm" class="alt">Test a dust storm</button>
       <p class="small">Starts in the Dunes with a dust storm two seconds away.</p>
+      <button id="testBoss" class="alt">Test the boss fight</button>
+      <p class="small">Starts in Expedition at the edge of the Woodwarden's stones, with two orbs home. Nothing from the test is saved.</p>
     </div>
   </section>
   <section class="card panel" id="pScores" hidden>
@@ -479,6 +481,7 @@ function makeProp(i, j) {
   if (Math.abs(i) < 2 && Math.abs(j) < 2) return null; // clear spawn
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2, j * T + T / 2) < CAMP_R + 60) return null;   // the camp clearing
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2 - TELE2.x, j * T + T / 2 - TELE2.y) < 120) return null;   // and round the second shrine
+  if (S && S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb && Math.hypot(i * T + T / 2 - XS.orb.x, j * T + T / 2 - XS.orb.y) < AR + 50) return null;   // and the boss's clearing
   const cx = i * T + T / 2, cy = j * T + T / 2;
   for (const L of chunkLights(Math.floor(cx / C), Math.floor(cy / C)))
     if (L.kind !== 'flies' && Math.hypot(cx - L.x, cy - L.y) < 80) return null; // keep a clearing round each light
@@ -1124,7 +1127,9 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
     }
     return [sh, el, ha];
   };
-  const L = leg(-1, Math.PI), Rg = leg(1, 0), LA = arm(-1, 0), RA = arm(1, Math.PI);
+  const legO = (side, off) => { const d = leg(side, off), o = opt && opt.legs && opt.legs(side, d); return o || d; };   // a pose can take over the limbs (the boss lifts a knee, grips his trunk)
+  const armO = (side, off) => { const d = arm(side, off), o = opt && opt.arms && opt.arms(side, d); return o || d; };
+  const L = legO(-1, Math.PI), Rg = legO(1, 0), LA = armO(-1, 0), RA = armO(1, Math.PI);
   let OUT = false;                        // dark outline pass first so the pale figure stands off the lit ground
   const EDGE = pal ? pal.edge : red ? '#3a0606' : '#262624';
   const line = (pts, w, col) => {
@@ -1213,6 +1218,7 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
       else for (const o of [-1.2, 1.2]) { c.beginPath(); c.arc(gx + o * Zs, gy, 1 * Zs, 0, 7); c.fill(); } }
   }
   if (facingUs) { line(nearLeg, 4.2, NEAR); legKit(nearLeg, true); }
+  if (opt && opt.prop) opt.prop(P, Zs, OUT, c);
   line(nearArm, 3.2, NEAR); armKit(nearArm, true);
   };
   OUT = true; paint(); OUT = false; paint();
@@ -2201,6 +2207,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
     c.fillStyle = col('#2f2f2d'); c.fillRect(sx - 2 * Z, sy - 19 * Z, 4 * Z, 19 * Z);
   } else if (o.kind === 'chest') { if (!mask) drawChest(o, c, sx, sy);
   } else if (o.kind === 'tele') { drawTele(o, c, sx, sy, col);
+  } else if (o.kind === 'stone') { drawStone(o, c, sx, sy, col);
   } else if (o.kind === 'pack') { if (!mask) drawPackProp(o, c, sx, sy);
   } else if (o.kind === 'lamp') {
     if (!mask) shadow(sx, sy, 6 * Z);
@@ -3651,6 +3658,7 @@ function cutSurviveLights(bx, by, br) {
 }
 function surviveLight(bx, by, br, casters, lx, ly) {
   const rg = S.rg; if (!rg) return;
+  S.beamInfo = { bx, by, br };
   const on = S.torchLvl > 0.6, [px, py] = toScreen(S.p.x, S.p.y);
   for (const e of rg.enemies) {
     const f = FOES[e.type], [sx, sy0] = toScreen(e.x, e.y), sy = sy0 - f.h * 0.5 * Z;
@@ -4288,7 +4296,7 @@ function exRead() {
   return exFresh();
 }
 let EX_TEST = false;                         // a playtest run: nothing it does is saved
-function exSave() { if (EX_TEST) return; try { localStorage.setItem(EX_KEY, JSON.stringify(XS, (k, v) => k === 'light' ? undefined : v)); } catch (e) {} }
+function exSave() { if (EX_TEST) return; try { localStorage.setItem(EX_KEY, JSON.stringify(XS, (k, v) => k === 'light' || k === 'stones' ? undefined : v)); } catch (e) {} }
 const packMax = () => 6 + 2 * XS.bag, slotMax = () => 3 + XS.slot;
 const packUsed = items => items.reduce((a, k) => a + ITEMS[k].slots, 0);
 const eqUsed = () => XS.eq.reduce((a, id) => a + slotCost(id), 0);
@@ -4335,6 +4343,7 @@ function exNewOrb() {                        // the next orb wakes further out, 
   do a = Math.random() * Math.PI * 2; while (XS.orbA !== null && XS.orbA !== undefined && Math.abs(angDiff(a, XS.orbA)) < Math.PI / 2 && ++tries < 50);
   const d = 8000 + 1200 * XS.orbs + Math.random() * 800;
   XS.orbA = a; XS.orb = { x: Math.cos(a) * d, y: Math.sin(a) * d }; XS.orbField = true;
+  propCache.clear();                         // the last orb's clearing is cut out of the woods
 }
 function exRecall() {
   const rg = S.rg;
@@ -4609,7 +4618,7 @@ function drawCampFlames() {
 }
 function exItems() {   // camp, chests and dropped packs, drawn in with the trees
   const rg = S.rg; if (!rg || rg.beyond) return [];
-  return CAMP.concat([TELE, TELE2], exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose);
+  return CAMP.concat([TELE, TELE2], exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones());
 }
 
 // ---- personal stats: kills drop violet wisps, wisps buy small boosts that last for good (Nightfall and Expedition) ----
@@ -4814,6 +4823,10 @@ function exDeath() {
 function exWake() {
   S.rg = exNewRun(); exPlaceHome(); S.msg = null;
   S.rg.pop = { t: 0, refill: 0 };
+  if (XS.grace && XS.orbs === 2 && !XS.wardenDead) {   // killed near the Woodwarden: wake at the lantern by his stones
+    const p = S.p; p.x = XS.grace.x; p.y = XS.grace.y; S.cam.x = p.x; S.cam.y = p.y; S.rg.inCamp = false; S.rg.ringMax = 3;
+    exNote('you wake at the lantern'); return;
+  }
   exNote('back by the fire');
 }
 function exSpawn(type) {
@@ -4937,7 +4950,7 @@ function exStep(dt) {
   exOilStep(dt, !!outpost);                  // an outpost's lamp tops the torch up
   if (outpost) {                             // safe in an outpost's light: nothing new comes, the ranged ones back off
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }
-  } else {
+  } else if (!bossLive()) {                  // nothing else comes into the mist while the Woodwarden fights
     rg.spawnT -= dt;
     const bait = rg.carryOrb || rg.carryDorb ? 5 : 0;         // a carried orb draws them in from all round
     const cap = EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3);   // and so does a heavy pack
@@ -4946,16 +4959,429 @@ function exStep(dt) {
       if (rg.enemies.length < cap) exSpawn(exPickFoe(ring));
     }
   }
-  if (ring === 3 && !rg.enemies.some(e => e.type === 'tall') && (rg.tallCd -= dt) <= 0) {
+  if (ring === 3 && !bossLive() && !rg.enemies.some(e => e.type === 'tall') && (rg.tallCd -= dt) <= 0) {
     exSpawn('tall'); rg.tallCd = 45;
     if (!rg.tallSeen) { rg.tallSeen = true; rg.ringMsg = { text: 'something tall', sub: 'walks the deep', t: 0 }; }
   }
   for (const c of exChestsNear(p.x, p.y, 40)) if (!rg.looted.has(c.key) && dist2(c, p) < 24) exOpen(c);
   for (const L of rg.loose) if (!L.taken && dist2(L, p) < 26) exTakeLoose(L);
   rg.loose = rg.loose.filter(L => !L.taken);
-  if (XS.orbField && XS.orb && !rg.carryOrb && dist2(XS.orb, p) < 30) exTakeOrb();
+  bossStep(dt);
+  if (XS.orbField && XS.orb && !rg.carryOrb && dist2(XS.orb, p) < 30 && (XS.orbs !== 2 || XS.wardenDead)) exTakeOrb();   // the last orb is caged until he falls
   if (rg.carryDorb && dist2(p, TELE2) < 46) exDepositD();                    // the second shrine, out past the wall
   if (portal2Open() >= 1 && !rg.warp && dist2(p, TELE2) < 16) warpStart('next');
+}
+
+// ---- the forest boss: the Woodwarden keeps the last green orb in a ring of standing stones ----
+// Four moves, each with a wind-up you can see and hear and a red mark on the ground; after each he is open, and the light burns him three times as hard.
+const AR = 260, BS = 3.6, B_HP = 140, B_LEN = 40;            // arena radius, his size against yours, his health, the trunk's length (in his own units)
+const B_TELL = { slam: 1.0, sweep: 0.8, quake: 0.9, leap: 1.2 };
+const B_SLAM = (10 + B_LEN) * BS, B_SWEEP = (7 + B_LEN) * BS;   // how far the trunk reaches when it comes down, and when it swings
+const bossArena = () => S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb ? XS.orb : null;
+const bossLive = () => { const b = S.rg && S.rg.boss; return b && b.st !== 'gone' ? b : null; };
+function bossGrace() {                          // the checkpoint lantern, just outside the stones on the side toward camp
+  const c = bossArena(); if (!c) return null;
+  const d = Math.hypot(c.x, c.y) || 1, k = AR + OUT_R + 40;
+  return { x: c.x - c.x / d * k, y: c.y - c.y / d * k };
+}
+function bossStones() {
+  const c = bossArena(); if (!c) return [];
+  if (!c.stones) c.stones = Array.from({ length: 11 }, (_, i) => { const a = i / 11 * Math.PI * 2 + 0.2; return { kind: 'stone', x: c.x + Math.cos(a) * (AR + 14), y: c.y + Math.sin(a) * (AR + 14), s: 0.9 + hash(i, 3.3) * 0.5, seed: hash(i, 7.1), r: 0, nocol: true }; });
+  return c.stones;
+}
+function drawStone(o, c, sx, sy, col) {          // a leaning standing stone, worn smooth, a darker band carved round it
+  const s = o.s * Z, lean = (o.seed - 0.5) * 6 * s, h = 46 * s, w = 9 * s;
+  c.fillStyle = col('#1d1d1f'); c.beginPath(); c.ellipse(sx, sy, w * 1.4, w * 0.6, 0, 0, 7); c.fill();
+  c.fillStyle = col('#56565a'); c.beginPath(); c.moveTo(sx - w, sy); c.lineTo(sx - w * 0.8 + lean, sy - h * 0.92); c.lineTo(sx + lean * 1.1, sy - h); c.lineTo(sx + w * 0.1, sy + 1); c.closePath(); c.fill();
+  c.fillStyle = col('#2c2c30'); c.beginPath(); c.moveTo(sx + w * 0.1, sy + 1); c.lineTo(sx + lean * 1.1, sy - h); c.lineTo(sx + w * 0.8 + lean, sy - h * 0.9); c.lineTo(sx + w, sy); c.closePath(); c.fill();
+  c.strokeStyle = col('#1f1f22'); c.lineWidth = 1.2 * s;
+  c.beginPath(); c.moveTo(sx - w * 0.9 + lean * 0.4, sy - h * 0.42); c.lineTo(sx + w * 0.9 + lean * 0.4, sy - h * 0.4); c.stroke();
+}
+// ---- poses: where his hands grip the trunk, which way it points, how low he is ----
+const BP = {
+  drag:    { g: [3, 5.5, 13], d: [-0.75, 0.35, -0.55], kneel: 0, lean: 0 },
+  over:    { g: [0, 1, 47], d: [-0.55, 0.1, 0.83], kneel: 0, lean: -3 },
+  slammed: { g: [10, 1, 11], d: [0.97, 0, -0.24], kneel: 0.25, lean: 6 },
+  back:    { g: [-3, 7, 20], d: [-0.6, 0.8, 0], kneel: 0.1, lean: -2 },
+  planted: { g: [5, 5, 22], d: [0.3, 0.2, -0.93], kneel: 0, lean: 1 },
+  crouch:  { g: [-2, 4, 25], d: [-0.3, 0.3, 0.9], kneel: 0.6, lean: 5 },
+  down:    { g: [9, 4, 8], d: [0.9, 0.25, -0.35], kneel: 0.75, lean: 7 },
+};
+const lerp3 = (a, b, u) => a.map((v, i) => v + (b[i] - v) * u);
+function mixPose(A, B, u) {
+  u = Math.max(0, Math.min(1, u)); u = u * u * (3 - 2 * u);
+  const d = lerp3(A.d, B.d, u), m = Math.hypot(...d) || 1;
+  return { g: lerp3(A.g, B.g, u), d: d.map(v => v / m), kneel: A.kneel + (B.kneel - A.kneel) * u, lean: A.lean + (B.lean - A.lean) * u };
+}
+function bossPose(b) {
+  const u = b.len ? b.t / b.len : 0;
+  if (b.st === 'rise') return Object.assign(mixPose(BP.down, BP.drag, (b.t - 1.2) / 1.6), { pain: 0 });
+  if (b.st === 'roar') return { g: [5, 10, 3], d: [0.95, 0.1, -0.05], kneel: 0.55, lean: -4, pain: Math.min(1, b.t * 2), free: true };
+  if (b.st === 'dying') return { g: [6, 10, 3], d: [0.9, 0.3, -0.05], kneel: Math.min(1, b.t / 1.2), lean: 4, pain: 1, free: true };
+  if (b.st === 'tell') {
+    if (b.move === 'slam') return mixPose(BP.drag, BP.over, u / 0.8);
+    if (b.move === 'sweep') return mixPose(BP.drag, BP.back, u / 0.7);
+    if (b.move === 'quake') return Object.assign(mixPose(BP.drag, BP.planted, u / 0.5), { lift: Math.min(1, u * 1.6) });
+    if (b.move === 'leap') return mixPose(BP.drag, BP.crouch, u / 0.8);
+  }
+  if (b.st === 'act') {
+    if (b.move === 'slam') return mixPose(BP.over, BP.slammed, u);
+    if (b.move === 'sweep') {
+      const th = 2.2 - 4.1 * Math.min(1, u * u * (3 - 2 * u));
+      return { g: [3 + 4 * Math.cos(th), 6 * Math.sin(th), 19], d: [Math.cos(th), Math.sin(th), -0.05], kneel: 0.1, lean: 3, th };
+    }
+    if (b.move === 'quake') { const c = (b.t % 0.5) / 0.5; return Object.assign(mixPose(BP.planted, BP.planted, 0), { lift: c < 0.55 ? c / 0.55 : Math.max(0, 1 - (c - 0.55) / 0.1), side: Math.floor(b.t / 0.5) % 2 ? -1 : 1 }); }
+    if (b.move === 'leap') return mixPose(BP.crouch, BP.down, 1);
+  }
+  if (b.st === 'recover') {
+    const from = { slam: BP.slammed, sweep: { g: [5, -7, 18], d: [0.25, -0.97, -0.05], kneel: 0.1, lean: 3 }, quake: BP.planted, leap: BP.down }[b.move] || BP.drag;
+    return mixPose(from, BP.drag, (u - 0.7) / 0.3);
+  }
+  return mixPose(BP.drag, BP.drag, 0);
+}
+// ---- the fight ----
+function bossStart() {
+  const rg = S.rg, c = bossArena(), p = S.p, a = Math.atan2(c.y - p.y, c.x - p.x);
+  for (const e of rg.enemies) if (!e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 8, 20); }   // the mist drives everything else out
+  rg.enemies = [];
+  rg.boss = { x: c.x + Math.cos(a) * 70, y: c.y + Math.sin(a) * 70, dir: a + Math.PI, hp: B_HP, shown: B_HP, phase: 1, st: 'rise', t: 0, len: 2.8, ph: 0, cd: 1.2, far: 0, last: '', fires: [], rings: [], mist: 0, flinchAt: B_HP * 0.9, flinch: 0, beat: 0, lit: 0 };
+  addShake(0.6);
+  S.msg = { text: 'the woodwarden', sub: 'Keeper of the last light', t: 0 };
+  if (actx) { const t = actx.currentTime; boomAt(t, 55, 25, 3, 0.9, sfxGain); noiseAt(t, 400, 60, 3, 0.5, sfxGain); }
+}
+function bossHurt(n, knock, from) {
+  const rg = S.rg, b = rg.boss, p = S.p;
+  if (rg.inv > 0 || rg.phase !== 'fight') return false;
+  const hp0 = rg.hp; hurt(from || { x: b.x, y: b.y });
+  if (rg.hp >= hp0) return false;               // rolled through it, or a Second Wind took it
+  if (n > 1 && rg.hp > 0) { rg.hp--; rg.pop = { t: 0, lost: rg.hp }; if (rg.hp <= 0) nightOver(); }
+  if (knock) { const f = from || b, dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy) || 1; p.x += dx / d * knock; p.y += dy / d * knock; }
+  return true;
+}
+function bossSay(kind) {                        // every wind-up has its own sound, so you can hear the tell as well as see it
+  if (!actx) return; const t = actx.currentTime, o = sfxGain;
+  if (kind === 'slam') { boomAt(t, 95, 45, 1.1, 0.45, o); noiseAt(t, 320, 90, 1.0, 0.3, o); }
+  if (kind === 'sweep') { noiseAt(t, 5000, 1200, 0.8, 0.28, o); noiseAt(t + 0.1, 3000, 800, 0.6, 0.15, o); }
+  if (kind === 'quake') { noiseAt(t, 700, 180, 0.5, 0.25, o); boomAt(t + 0.2, 70, 50, 0.6, 0.25, o); }
+  if (kind === 'leap' || kind === 'roar') { noiseAt(t, 900, 140, 1.4, 0.55, o); boomAt(t, 130, 55, 1.4, 0.45, o); boomAt(t + 0.05, 260, 90, 1.2, 0.2, o); }
+  if (kind === 'impact') { boomAt(t, 70, 28, 1.3, 0.95, o); noiseAt(t, 2600, 200, 0.9, 0.5, o); }
+  if (kind === 'whoosh') noiseAt(t, 1800, 300, 0.4, 0.45, o);
+  if (kind === 'stomp') { boomAt(t, 62, 30, 0.7, 0.75, o); noiseAt(t, 1200, 150, 0.4, 0.3, o); }
+  if (kind === 'step') boomAt(t, 50, 32, 0.35, 0.3, o);
+  if (kind === 'pain') { noiseAt(t, 1400, 300, 0.7, 0.35, o); boomAt(t, 180, 90, 0.6, 0.25, o); }
+}
+const bm = { g: null, osc: null, at: 0 };
+function bossMusic(on, k2) {                    // placeholder fight music: a low drone under slow war drums, faster in the second phase
+  if (!actx) return;
+  if (!bm.g) {
+    bm.g = actx.createGain(); bm.g.gain.value = 0; bm.g.connect(actx.destination);
+    bm.osc = actx.createOscillator(); bm.osc.type = 'sawtooth'; bm.osc.frequency.value = 55;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 240;
+    const dg = actx.createGain(); dg.gain.value = 0.25; bm.osc.connect(lp); lp.connect(dg); dg.connect(bm.g); bm.osc.start();
+    setInterval(() => { if (bm.g && performance.now() - bm.at > 400) { bm.g.gain.setTargetAtTime(0, actx.currentTime, 0.6); if (mus.gain && bm.ducked) { bm.ducked = false; applyVolumes(); } } }, 300);
+  }
+  if (!on) return;
+  bm.at = performance.now();
+  bm.g.gain.setTargetAtTime(0.7 * volK('music'), actx.currentTime, 0.8);
+  bm.osc.frequency.setTargetAtTime(k2 ? 58.3 : 55, actx.currentTime, 2);
+  if (mus.gain && !bm.ducked) { bm.ducked = true; mus.gain.gain.setTargetAtTime(0.08 * volK('music'), actx.currentTime, 0.8); }   // the backing track drops away under the fight
+}
+function bossNext(b, d) {                       // what he does next depends on how far away you are
+  let m;
+  if (b.far > 2.5 || d > 330) m = 'leap';
+  else if (d < B_SLAM - 10) m = Math.random() < 0.5 ? 'slam' : 'sweep';
+  else if (d < 300) m = Math.random() < (b.last === 'quake' ? 0.25 : 0.65) ? 'quake' : null;   // mid range: a quake, or walk in for a swing
+  if (m && m === b.last && m !== 'leap' && Math.random() < 0.6) m = m === 'slam' ? 'sweep' : m === 'sweep' ? 'slam' : m;
+  return m;
+}
+function bossTell(b, m, quick) {
+  b.st = 'tell'; b.move = m; b.t = 0; b.len = B_TELL[m] * (b.phase === 2 ? 0.75 : 1) * (quick ? 0.6 : 1); b.hit = false; b.last = m;
+  bossSay(m);
+}
+function bossStep(dt) {
+  const rg = S.rg, p = S.p, c = bossArena();
+  if (!c) return;
+  const g = bossGrace();
+  if (g && !XS.wardenDead && !XS.grace && dist2(p, c) < AR + 420) {     // the lantern at the edge of the stones: wake here if he kills you
+    XS.grace = g; XS.outposts.push({ x: g.x, y: g.y, n: 0, grace: true }); exSave();
+    exNote('a lantern stirs · you will wake here', true);
+  }
+  if (!rg.boss && !XS.wardenDead && !rg.carryOrb && rg.phase === 'fight' && dist2(p, c) < AR - 40) bossStart();
+  const b = rg.boss; if (!b || b.st === 'gone') { bossMusic(false); return; }
+  b.t += dt; b.mist = b.st === 'dying' || b.st === 'dead' ? Math.max(0, b.mist - dt * 0.5) : Math.min(1, b.mist + dt * 1.5);
+  b.flinch = Math.max(0, b.flinch - dt * 1.6);
+  b.shown += (b.hp - b.shown) * Math.min(1, dt * (b.shown - b.hp > 0 ? 1.2 : 8));
+  for (const f of b.fires) f.life -= dt; b.fires = b.fires.filter(f => f.life > 0);
+  for (const f of b.fires) if (dist2(f, p) < 22) bossHurt(1, 0, f);
+  for (const r of b.rings) { r.r += 290 * dt; if (!r.hit && Math.abs(dist2(r, p) - r.r) < 14) { r.hit = true; bossHurt(1, 20, r); } }
+  b.rings = b.rings.filter(r => r.r < 340);
+  if (b.st === 'dying' || b.st === 'dead') { bossDie(b, dt); return; }
+  if (rg.phase !== 'fight') return;
+  bossMusic(true, b.phase === 2);
+  if ((b.beat -= dt) <= 0 && actx && bm.g) { b.beat = b.phase === 2 ? 0.42 : 0.6; b.bars = (b.bars || 0) + 1; const t = actx.currentTime; boomAt(t, 70, 34, 0.45, 0.6, bm.g); if (b.bars % 2 === 0) noiseAt(t, 900, 250, 0.16, 0.12, bm.g); if (b.bars % 8 === 7) boomAt(t + b.beat / 2, 70, 34, 0.4, 0.45, bm.g); }
+  { const d = dist2(p, c); if (d > AR - 14) { p.x = c.x + (p.x - c.x) / d * (AR - 14); p.y = c.y + (p.y - c.y) / d * (AR - 14); } }   // the mist won't let you out
+  const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy), toP = Math.atan2(dy, dx);
+  const turn = (rate) => { b.dir += Math.max(-rate * dt, Math.min(rate * dt, angDiff(toP, b.dir))); };
+  b.far = d > 300 ? b.far + dt : Math.max(0, b.far - dt);
+  // the torch: he doesn't freeze in it and it burns him slowly, except when he's open after a move
+  const air = b.st === 'act' && b.move === 'leap';
+  let lit = 0;
+  const bi = S.beamInfo;
+  if (bi && S.torchLvl > 0.6 && !air && b.st !== 'rise' && b.st !== 'roar') {
+    const [sx, sy0] = toScreen(b.x, b.y);
+    for (const hgt of [0.12, 0.5, 0.85]) {
+      const sy = sy0 - hgt * 40 * BS * Z, dd = Math.hypot(sx - bi.bx, sy - bi.by);
+      if (dd < bi.br * 0.95 && Math.abs(angDiff(Math.atan2(sy - bi.by, sx - bi.bx), S.aim)) < HALF) lit = Math.max(lit, 1 - 0.5 * dd / bi.br);
+    }
+  }
+  b.lit += (lit - b.lit) * Math.min(1, dt * 8);
+  const open = b.st === 'recover';
+  if (lit > 0) {
+    b.hp -= dt * rgBurn() * lit * (open ? 1 : 0.3);
+    if (rg.embers.length < 320 && Math.random() < dt * (open ? 30 : 10)) rg.embers.push({ x: b.x + (Math.random() - 0.5) * 30, y: b.y + (Math.random() - 0.5) * 30, z: 30 + Math.random() * 150, vz: 30 + Math.random() * 50, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.6 + Math.random() * 0.6, ember: true });
+  }
+  if (b.hp <= b.flinchAt && b.hp > 0) { b.flinchAt -= B_HP * 0.1; b.flinch = 1; ashBurst(b.x, b.y, 14, 120); bossSay('pain'); addShake(0.15); }
+  if (b.hp <= 0) { b.hp = 0; b.st = 'dying'; b.t = 0; hitStop(0.3); addShake(1); bossSay('roar'); return; }
+  if (b.phase === 1 && b.hp <= B_HP * 0.5 && (b.st === 'walk' || b.st === 'recover')) { b.st = 'roar'; b.t = 0; b.len = 2.4; bossSay('roar'); addShake(0.7); return; }
+  // his body is solid
+  if (!air && d < 34) { p.x = b.x + dx / (d || 1) * 34; p.y = b.y + dy / (d || 1) * 34; }
+  const step = (sp) => {
+    const mv = Math.min(sp * dt, Math.max(0, d - 90));
+    b.x += Math.cos(b.dir) * mv; b.y += Math.sin(b.dir) * mv;
+    const p0 = b.ph; b.ph += mv * 0.045;
+    if (Math.floor(p0 / Math.PI) !== Math.floor(b.ph / Math.PI)) { bossSay('step'); addShake(0.12 * Math.max(0, 1 - d / 600)); }
+  };
+  const fwd = (f, r) => [b.x + Math.cos(b.dir) * f - Math.sin(b.dir) * r, b.y + Math.sin(b.dir) * f + Math.cos(b.dir) * r];
+  if (b.st === 'rise') { if (b.t >= b.len) { b.st = 'walk'; b.t = 0; } return; }
+  if (b.st === 'roar') {                         // half health: he drops to a knee and roars, and the trunk catches fire
+    if (b.t > 1.1 && !b.lit2) { b.lit2 = true; b.phase = 2; addShake(0.8); hitStop(0.15); rg.blasts.push({ x: b.x, y: b.y, t: 0, life: 0.8, r: 240, col: 'white' }); }
+    if (b.t >= b.len) { b.st = 'walk'; b.t = 0; b.cd = 0.4; }
+    return;
+  }
+  if (b.st === 'walk') {
+    turn(2.2); step(b.phase === 2 ? 46 : 34);
+    if ((b.cd -= dt) <= 0) { const m = bossNext(b, d); if (m) bossTell(b, m); else b.cd = 0.4; }
+    return;
+  }
+  if (b.st === 'tell') {
+    if (b.move === 'slam' || b.move === 'sweep') { if (b.t < b.len * 0.75) turn(2.6); }
+    else if (b.move === 'quake') turn(1.2);
+    if (b.t >= b.len) {
+      b.st = 'act'; b.t = 0; b.hit = false;
+      b.len = { slam: 0.14, sweep: 0.34, quake: 1.5, leap: 2.0 }[b.move];
+      if (b.move === 'sweep') bossSay('whoosh');
+      if (b.move === 'leap') { b.mk = { x: p.x, y: p.y }; b.from = { x: b.x, y: b.y }; addShake(0.4); bossSay('stomp'); }
+    }
+    return;
+  }
+  if (b.st === 'act') {
+    if (b.move === 'slam' && b.t >= b.len && !b.hit) {
+      b.hit = true; bossSay('impact'); addShake(0.9); hitStop(0.07);
+      const [ex, ey] = fwd(B_SLAM * 0.6, 0); rg.blasts.push({ x: ex, y: ey, t: 0, life: 0.5, r: 120, col: 'white' });
+      for (let f = 40; f <= B_SLAM; f += 34) { const [x, y] = fwd(f, 0); ashBurst(x, y, 4, 14); if (b.phase === 2) b.fires.push({ x, y, life: 3.5 + Math.random(), max: 4.5 }); }
+      const lf = dx * Math.cos(b.dir) + dy * Math.sin(b.dir), lr = -dx * Math.sin(b.dir) + dy * Math.cos(b.dir);
+      if ((lf > 10 && lf < B_SLAM + 10 && Math.abs(lr) < 34) || d < 40) bossHurt(1, 30);
+    }
+    if (b.move === 'sweep') {
+      const pose = bossPose(b), wa = b.dir + pose.th;
+      if (!b.hit && d > 25 && d < B_SWEEP + 12 && Math.abs(angDiff(toP, wa)) < 0.25) { b.hit = true; if (bossHurt(1, 70)) { addShake(0.6); hitStop(0.08); } }
+    }
+    if (b.move === 'quake') {
+      const n = Math.floor(b.t / 0.5), c0 = b.t % 0.5;
+      if (c0 >= 0.3 && (b.stomp || 0) <= n && n < 3) { b.stomp = n + 1; bossSay('stomp'); addShake(0.5); b.rings.push({ x: b.x, y: b.y, r: 30 }); for (let i = 0; i < 6; i++) { const a = i / 6 * 7; ashBurst(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 40, 2, 10); } }
+    }
+    if (b.move === 'leap') {                     // up and out of sight; his shadow hunts you, then locks, then he comes down
+      if (b.t < 1.4) { b.mk.x += (p.x - b.mk.x) * Math.min(1, dt * 3.2); b.mk.y += (p.y - b.mk.y) * Math.min(1, dt * 3.2); }
+      else if (!b.locked) { b.locked = true; if (actx) noiseAt(actx.currentTime, 2500, 600, 0.6, 0.2, sfxGain); }
+      if (b.t >= b.len && !b.hit) {
+        b.hit = true; b.locked = false; b.x = b.mk.x; b.y = b.mk.y; b.dir = Math.atan2(p.y - b.y, p.x - b.x);
+        { const cd = dist2(b, c); if (cd > AR - 40) { b.x = c.x + (b.x - c.x) / cd * (AR - 40); b.y = c.y + (b.y - c.y) / cd * (AR - 40); } }
+        bossSay('impact'); addShake(1); hitStop(0.1); rg.blasts.push({ x: b.x, y: b.y, t: 0, life: 0.6, r: 170, col: 'white' }); ashBurst(b.x, b.y, 20, 30);
+        if (dist2(b, p) < 95) bossHurt(2, 80);
+      }
+    }
+    if (b.t >= b.len && (b.move !== 'leap' || b.hit)) {
+      b.st = 'recover'; b.t = 0; b.stomp = 0;
+      b.len = { slam: 1.5, sweep: 1.0, quake: 1.2, leap: 2.0 }[b.move] * (b.phase === 2 ? 0.8 : 1);
+      if (b.phase === 2 && (b.move === 'slam' || b.move === 'sweep') && Math.random() < 0.55 && !b.chained) {   // second phase: he chains a second blow straight after
+        b.chained = true; b.len = 0.35;
+      } else b.chained = false;
+    }
+    return;
+  }
+  if (b.st === 'recover' && b.t >= b.len) {
+    if (b.chained) { turn(20); bossTell(b, b.move === 'slam' ? 'sweep' : 'slam', true); b.chained = 'done'; return; }
+    b.st = 'walk'; b.t = 0; b.cd = b.phase === 2 ? 0.25 + Math.random() * 0.35 : 0.5 + Math.random() * 0.5;
+  }
+}
+function bossDie(b, dt) {                        // he falls to his knees, burns from the inside out, and goes to ash
+  const rg = S.rg;
+  if (b.st === 'dying') {
+    if (rg.embers.length < 320 && Math.random() < dt * 40) rg.embers.push({ x: b.x + (Math.random() - 0.5) * 40, y: b.y + (Math.random() - 0.5) * 40, z: 20 + Math.random() * 160, vz: 40 + Math.random() * 60, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40, life: 0.8 + Math.random() * 0.8, ember: true });
+    if (Math.random() < dt * 6) { ashBurst(b.x, b.y, 6, 140); addShake(0.12); }
+    if (b.t > 3.2) {
+      b.st = 'dead'; b.t = 0; hitStop(0.25); addShake(1);
+      rg.blasts.push({ x: b.x, y: b.y, t: 0, life: 1.2, r: 320, col: 'white' }); rg.echoes.push({ r: 0, x: b.x, y: b.y, max: 600, burst: true });
+      for (let i = 0; i < 6; i++) ashBurst(b.x + (Math.random() - 0.5) * 50, b.y + (Math.random() - 0.5) * 50, 12, 180);
+      const c = bossArena(); if (c) { ashBurst(c.x, c.y, 16, 40); rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.7, r: 160, col: 'green' }); }
+      XS.wardenDead = true; XS.embers += 60; exSave();
+      S.msg = { text: 'warden felled', sub: '+60 embers banked · the orb is free', t: 0 };
+      if (actx) { const t = actx.currentTime; boomAt(t, 45, 20, 3, 1, sfxGain); noiseAt(t, 3000, 100, 2.5, 0.5, sfxGain); }
+    }
+  } else if (b.t > 3) b.st = 'gone';
+}
+// ---- drawing the fight ----
+function worldPoly(pts) { ctx.beginPath(); pts.forEach(([x, y], i) => { const [sx, sy] = toScreen(x, y); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }); ctx.closePath(); }
+const circlePts = (x, y, r, n = 40) => Array.from({ length: n }, (_, i) => [x + Math.cos(i / n * 7.2832) * r, y + Math.sin(i / n * 7.2832) * r]);
+function drawFlame(x, y, s, seed) {             // a small licking flame, warm like every other light
+  const f = Math.sin(S.t * 13 + seed) * 0.25 + Math.sin(S.t * 23 + seed * 3) * 0.15;
+  const g = ctx.createRadialGradient(x, y - 6 * s, 0, x, y - 6 * s, 18 * s);
+  g.addColorStop(0, 'rgba(255,170,80,0.35)'); g.addColorStop(1, 'rgba(255,120,40,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 6 * s, 18 * s, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,150,60,0.9)'; ctx.beginPath(); ctx.moveTo(x - 4 * s, y); ctx.quadraticCurveTo(x - 4 * s, y - 8 * s, x + f * 4 * s, y - (13 + f * 4) * s); ctx.quadraticCurveTo(x + 4 * s, y - 8 * s, x + 4 * s, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,230,170,0.9)'; ctx.beginPath(); ctx.moveTo(x - 2 * s, y); ctx.quadraticCurveTo(x - 2 * s, y - 5 * s, x + f * 2 * s, y - (8 + f * 2) * s); ctx.quadraticCurveTo(x + 2 * s, y - 5 * s, x + 2 * s, y); ctx.closePath(); ctx.fill();
+}
+function drawBossFigure(b) {
+  const pose = bossPose(b), air = b.st === 'act' && b.move === 'leap' && !b.hit;
+  let yOff = 0;
+  if (air) { const land = b.len - b.t; if (land > 0.3) return; b.x = b.mk.x; b.y = b.mk.y; yOff = -(land / 0.3) * 700; }
+  const burn = Math.min(1, (1 - b.hp / B_HP) * 0.5 + b.flinch * 0.35 + b.lit * 0.3 + (b.st === 'dying' ? Math.min(1, b.t / 2) : 0));
+  const vis = b.st === 'dying' ? 1 : 0.55 + 0.45 * Math.min(1, b.lit * 2);   // unlit he's a dim hulk; the beam shows him whole
+  const pl = foePalette(burn), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
+  let alpha = 1;
+  if (b.st === 'rise') alpha = Math.min(1, b.t / 1.2);
+  if (b.st === 'dying') alpha = Math.max(0, 1 - Math.max(0, b.t - 2.4) / 0.8);
+  if (alpha <= 0) return;
+  const [sx, sy] = toScreen(b.x, b.y);
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(0, yOff);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(sx, sy, 34 * Z * 1.4, 34 * Z * 0.7, 0, 0, 7); ctx.fill();
+  const lift = pose.lift || 0, side = pose.side || 1;
+  const grip = pose.g, dir = pose.d;
+  const opt = {
+    scale: BS, jx: b.flinch ? (Math.random() - 0.5) * 6 * Z * b.flinch : 0, pal, pain: pose.pain ? pose.pain : b.flinch * 0.5, reach: 0, leanAdd: pose.lean || 0, kneel: pose.kneel || 0, kit: { head: 'hood', coat: 2, vest: 1 },
+    arms: pose.free ? null : (sd, def) => {
+      const ha = sd === 1 ? grip : lerp3(grip, grip.map((v, i) => v + dir[i] * 3.5), 1);
+      const sh = def[0], el = [(sh[0] + ha[0]) / 2 - 1.5, (sh[1] + ha[1]) / 2 + sd * 2, (sh[2] + ha[2]) / 2 - 2.5];
+      return [sh, el, ha];
+    },
+    legs: lift ? (sd, def) => {
+      if (sd !== side) return null;
+      const [hip] = def, hgt = 10 * lift;
+      return [hip, [hip[0] + 4 + 4 * lift, hip[1], hip[2] - 7 + 6 * lift], [hip[0] + 3 + 3 * lift, sd * 2.4, hgt]];
+    } : null,
+    prop: (P, Zs, OUT, c) => {                   // the trunk: a whole felled tree, bark dark, bound with iron
+      const butt = grip.map((v, i) => v - dir[i] * 5), tip = grip.map((v, i) => v + dir[i] * B_LEN);
+      const [x0, y0] = P(...butt), [x1, y1] = P(...tip);
+      c.lineCap = 'round';
+      if (OUT) { c.strokeStyle = '#111110'; c.lineWidth = 7.8 * Zs; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); return; }
+      c.strokeStyle = shadeC(pal.body, 0.34); c.lineWidth = 6 * Zs; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+      c.strokeStyle = shadeC(pal.body, 0.5); c.lineWidth = 2 * Zs; c.beginPath(); c.moveTo(x0 - 1.2 * Zs, y0 - 1.2 * Zs); c.lineTo(x1 - 1.2 * Zs, y1 - 1.2 * Zs); c.stroke();
+      c.strokeStyle = shadeC(pal.body, 0.22); c.lineWidth = 0.9 * Zs;            // bark furrows
+      for (const o of [-1.6, 1.4]) { c.beginPath(); c.moveTo(x0 + o * Zs, y0 + o * 0.5 * Zs); c.lineTo(x1 + o * Zs, y1 + o * 0.5 * Zs); c.stroke(); }
+      const nx = (y1 - y0), ny = -(x1 - x0), nl = Math.hypot(nx, ny) || 1;
+      c.strokeStyle = shadeC(pal.near, 0.75); c.lineWidth = 1.4 * Zs;              // iron bands
+      for (const f of [0.35, 0.62, 0.86]) { const x = x0 + (x1 - x0) * f, y = y0 + (y1 - y0) * f; c.beginPath(); c.moveTo(x - nx / nl * 3.2 * Zs, y - ny / nl * 3.2 * Zs); c.lineTo(x + nx / nl * 3.2 * Zs, y + ny / nl * 3.2 * Zs); c.stroke(); }
+      c.fillStyle = shadeC(pal.body, 0.6); c.beginPath(); c.ellipse(x1, y1, 3 * Zs, 2.6 * Zs, 0, 0, 7); c.fill();   // pale end grain where it was cut
+      b.trunk = [[x0, y0], [x1, y1]];
+    },
+  };
+  drawQuarry({ x: b.x, y: b.y, dir: b.dir, phase: b.ph, state: 'run', t: 0 }, ctx, false, opt);
+  // the eyes: red, the only colour on him
+  if (Math.sin(b.dir) > -0.35 && b.st !== 'dying') {
+    const Zs = Z * BS, a = b.dir, hh = 36 - 14 * (pose.kneel || 0) + 3.4 * (pose.lean || 0) * 0;
+    const hx = sx + (1.2 + 0.5 * (pose.lean || 0) * 0.5) * Math.cos(a) * Zs + 3 * Math.cos(a) * Zs, hy = sy + (3 * Math.sin(a) - hh) * Zs;
+    for (const o of [-1, 1]) {
+      const ex = hx + -Math.sin(a) * o * 1.4 * Zs, ey = hy + Math.cos(a) * 0.5 * o * 1.4 * Zs;
+      const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, 2.4 * Zs); g.addColorStop(0, 'rgba(230,40,40,0.6)'); g.addColorStop(1, 'rgba(230,40,40,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, 2.4 * Zs, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgb(255,70,60)'; ctx.beginPath(); ctx.arc(ex, ey, 0.55 * Zs, 0, 7); ctx.fill();
+    }
+  }
+  if (b.phase === 2 && b.trunk && b.st !== 'dying') {   // the burning trunk
+    const [[x0, y0], [x1, y1]] = b.trunk;
+    for (let i = 0; i < 6; i++) { const f = 0.3 + i * 0.13; drawFlame(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, Z * 1.3, i * 2.1); }
+  }
+  ctx.restore();
+}
+function drawBossGround(b, c) {                 // red marks on the ground: where the next blow will land
+  const red = a => `rgba(220,40,35,${a})`, u = b.len ? Math.min(1, b.t / b.len) : 0;
+  const fwd = (f, r) => [b.x + Math.cos(b.dir) * f - Math.sin(b.dir) * r, b.y + Math.sin(b.dir) * f + Math.cos(b.dir) * r];
+  ctx.save();
+  if (b.st === 'tell' || (b.st === 'act' && b.t < 0.2)) {
+    if (b.move === 'slam') { worldPoly([fwd(15, -34), fwd(B_SLAM + 10, -34), fwd(B_SLAM + 10, 34), fwd(15, 34)]); ctx.fillStyle = red(0.08 + 0.22 * u); ctx.fill(); ctx.strokeStyle = red(0.35 + 0.5 * u); ctx.lineWidth = 1.5; ctx.stroke(); }
+    if (b.move === 'sweep') {
+      const pts = []; for (let i = 0; i <= 24; i++) { const a = -1.9 + 3.8 * i / 24; pts.push([b.x + Math.cos(b.dir + a) * (B_SWEEP + 12), b.y + Math.sin(b.dir + a) * (B_SWEEP + 12)]); }
+      for (let i = 24; i >= 0; i--) { const a = -1.9 + 3.8 * i / 24; pts.push([b.x + Math.cos(b.dir + a) * 30, b.y + Math.sin(b.dir + a) * 30]); }
+      worldPoly(pts); ctx.fillStyle = red(0.07 + 0.2 * u); ctx.fill(); ctx.strokeStyle = red(0.3 + 0.5 * u); ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    if (b.move === 'quake') { worldPoly(circlePts(b.x, b.y, 50 + 40 * u)); ctx.fillStyle = red(0.12 + 0.25 * u); ctx.fill(); }
+  }
+  if (b.st === 'act' && b.move === 'quake') { worldPoly(circlePts(b.x, b.y, 70)); ctx.fillStyle = red(0.18); ctx.fill(); }
+  for (const r of b.rings) {                     // the shockwaves: a bright band rolling out along the ground
+    worldPoly(circlePts(r.x, r.y, r.r, 48)); ctx.strokeStyle = `rgba(235,230,220,${0.7 * (1 - r.r / 340)})`; ctx.lineWidth = 5 * Z; ctx.stroke();
+    ctx.strokeStyle = red(0.6 * (1 - r.r / 340)); ctx.lineWidth = 2 * Z; ctx.stroke();
+  }
+  if (b.st === 'act' && b.move === 'leap' && !b.hit) {
+    const lk = b.t >= 1.4, k = Math.min(1, b.t / b.len), pulse = 0.5 + 0.5 * Math.sin(S.t * 14);
+    worldPoly(circlePts(b.mk.x, b.mk.y, 95)); ctx.fillStyle = `rgba(0,0,0,${0.15 + 0.4 * k})`; ctx.fill();   // his shadow, growing as he falls
+    ctx.strokeStyle = red(lk ? 0.85 : 0.35 + 0.3 * pulse); ctx.lineWidth = lk ? 3 : 1.5; ctx.stroke();
+    if (lk) { worldPoly(circlePts(b.mk.x, b.mk.y, 95 * (b.t - 1.4) / (b.len - 1.4))); ctx.fillStyle = red(0.3); ctx.fill(); }
+  }
+  for (const f of b.fires) { const [x, y] = toScreen(f.x, f.y); ctx.globalAlpha = Math.min(1, f.life / 0.6); drawFlame(x, y, Z * 1.6, f.x); }
+  ctx.restore();
+}
+function drawMist(c, k) {                        // a wall of grey mist round the stones, like a fog gate
+  if (k <= 0.01) return;
+  const n = 140;
+  ctx.save();
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, [sx, sy] = toScreen(c.x + Math.cos(a) * AR, c.y + Math.sin(a) * AR);
+    const h = (75 + 22 * Math.sin(S.t * 0.7 + a * 5) + 12 * Math.sin(S.t * 1.6 - a * 11)) * Z, al = k * (0.05 + 0.025 * Math.sin(S.t * 0.9 + a * 7));
+    const g = ctx.createLinearGradient(0, sy - h, 0, sy + 6 * Z);
+    g.addColorStop(0, 'rgba(205,205,200,0)'); g.addColorStop(0.6, `rgba(205,205,200,${al})`); g.addColorStop(1, `rgba(205,205,200,${al * 0.6})`);
+    ctx.fillStyle = g; const w = (2 * Math.PI * AR / n) * K() * 3.2;
+    ctx.fillRect(sx - w / 2, sy - h, w, h + 6 * Z);
+  }
+  worldPoly(circlePts(c.x, c.y, AR, 72)); ctx.strokeStyle = `rgba(215,215,210,${0.18 * k})`; ctx.lineWidth = 6 * Z; ctx.stroke();
+  ctx.restore();
+}
+function drawRootCage(c) {                       // roots grown up and over the orb, holding it until he falls
+  const [ox, oy] = toScreen(c.x, c.y);
+  ctx.save(); ctx.lineCap = 'round';
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * Math.PI * 2 + 0.4, [bx, by] = toScreen(c.x + Math.cos(a) * 24, c.y + Math.sin(a) * 24);
+    for (const [w, col] of [[4.2, '#141312'], [2.6, '#4a4641']]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w * Z; ctx.beginPath(); ctx.moveTo(bx, by);
+      ctx.bezierCurveTo(bx + (bx - ox) * 0.6, by - 30 * Z, ox + (bx - ox) * 0.5, oy - 62 * Z, ox + (bx - ox) * 0.08, oy - 54 * Z); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function drawBossFx() {
+  const c = bossArena(); if (!c) return;
+  const rg = S.rg, b = rg.boss;
+  if (!XS.wardenDead || (b && b.st === 'dead' && b.t < 0.3)) drawRootCage(c);
+  if (!b || b.st === 'gone') return;
+  // the stones flare when the mist rises: a flame on each, warm like every other light
+  for (const o of bossStones()) { const [sx, sy] = toScreen(o.x, o.y); ctx.globalAlpha = b.mist; drawFlame(sx + (o.seed - 0.5) * 6 * o.s * Z, sy - 46 * o.s * Z, Z * 1.1, o.seed * 30); }
+  ctx.globalAlpha = 1;
+  drawBossGround(b, c);
+  const [, psy] = toScreen(S.p.x, S.p.y), [, bsy] = toScreen(b.x, b.y);
+  if (b.st !== 'dead') { drawBossFigure(b); if (bsy < psy) drawPlayer(); }   // he's behind you on screen: draw you over him
+  drawMist(c, b.mist);
+}
+function drawBossBar() {                         // his name and a long thin health bar across the top
+  const b = bossLive(); if (!b || b.st === 'dead' || b.st === 'gone') return;
+  const a = b.st === 'rise' ? Math.min(1, b.t / 1.5) : b.st === 'dying' ? Math.max(0, 1 - b.t / 1.5) : 1;
+  const w = Math.min(W - 64, 560), x = (W - w) / 2, y = SAFE_TOP + (W < 600 ? 168 : 96);
+  ctx.save(); ctx.globalAlpha = a;
+  ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)';
+  ctx.fillText('THE WOODWARDEN', x, y - 5);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - 1, y - 1, w + 2, 7);
+  ctx.fillStyle = 'rgba(200,60,50,0.75)'; ctx.fillRect(x, y, w * Math.max(0, b.shown) / B_HP, 5);   // the chunk you just burned off, draining away
+  ctx.fillStyle = 'rgba(239,239,234,0.9)'; ctx.fillRect(x, y, w * Math.max(0, b.hp) / B_HP, 5);
+  ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(x + w / 2 - 0.5, y, 1, 5);                        // the halfway mark: past it, he changes
+  ctx.restore();
 }
 
 // ---- drawing ----
@@ -5508,6 +5934,7 @@ function drawExFx() {
   drawWarpVeil();
   // the orb out in the deep: a beacon you can see from a long way off, then the crystal itself
   if (XS.orbField && XS.orb) drawOrbBeacon(XS.orb);
+  drawBossFx();                               // the Woodwarden, his stones and mist, drawn over the orb he keeps
   // dropped packs: a faint pale marker so you can find your things
   for (const L of rg.loose) {
     const [x, y] = toScreen(L.x, L.y), a = 0.25 + 0.15 * Math.sin(S.t * 3);
@@ -5586,6 +6013,7 @@ function drawExFx() {
   ctx.textAlign = 'left';
 }
 function drawExHud(top) {
+  drawBossBar();
   const rg = S.rg; if (!rg || !XS) return;
   ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(239,239,234,0.75)';
@@ -5830,6 +6258,12 @@ document.getElementById('testDunes').addEventListener('click', () => {
   exTestCopy(3, 0); exNewDorb();
   const rg = S.rg; rg.beyond = true; rg.next = false; rg.inCamp = false; S.p.x = BEYOND_GATE.x; S.p.y = BEYOND_GATE.y + 34; S.cam.x = S.p.x; S.cam.y = S.p.y;
   S.msg = { text: 'playtest', sub: 'Find the teal orb and bring it home', t: 0 };
+});
+document.getElementById('testBoss').addEventListener('click', () => {
+  exTestCopy(2, 0); XS.wardenDead = false; XS.grace = null; XS.outposts = XS.outposts.filter(o => !o.grace); exNewOrb();
+  const c = XS.orb, d = Math.hypot(c.x, c.y), p = S.p, rg = S.rg;
+  p.x = c.x - c.x / d * (AR + 60); p.y = c.y - c.y / d * (AR + 60); S.cam.x = p.x; S.cam.y = p.y; rg.inCamp = false; rg.ringMax = 3; rg.tallCd = 999;
+  S.msg = { text: 'playtest', sub: 'Walk into the stones to face the Woodwarden', t: 0 };
 });
 document.getElementById('testStorm').addEventListener('click', () => {
   document.getElementById('testDunes').click();
