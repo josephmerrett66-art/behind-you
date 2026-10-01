@@ -34,6 +34,8 @@ button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14
 #torch { position: fixed; right: 16px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; }
 #dodge { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #dodge[data-cool="1"] { opacity: 0.4; }
+#autorun { position: fixed; right: 24px; bottom: calc(214px + env(safe-area-inset-bottom, 0px)); width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
+#autorun[aria-pressed="true"] { color: var(--void); background: var(--bone); border-color: var(--bone); }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 #sound { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding: 0.5rem 0.75rem; font-size: 0.7rem; letter-spacing: 0.12em; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 .modes { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -184,6 +186,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <canvas id="game"></canvas>
 <button id="torch" hidden aria-pressed="true">Torch</button>
 <button id="dodge" hidden>Dodge</button>
+<button id="autorun" hidden aria-pressed="false">Auto<br>run</button>
 <button id="campBtn" hidden>Camp</button>
 <button id="recallBtn" class="exuse" hidden>Flare</button>
 <button id="lampBtn" class="exuse" hidden>Lantern</button>
@@ -366,7 +369,7 @@ function worldMatrix(c, scale) {
 
 // ---- input ----
 const keys = {};
-addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
+addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; if (e.key.toLowerCase() === 'r' && !e.repeat && S && S.running) toggleAutoRun(); keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
 cv.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); dodge(); } });
 cv.addEventListener('contextmenu', e => { if (S && isRg()) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -390,7 +393,11 @@ cv.addEventListener('touchmove', e => {
 const endTouch = e => { for (const t of e.changedTouches) delete sticks[t.identifier]; };
 cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
 
-const AUTO_HOLD = 5;             // seconds of holding go before the auto run locks on
+// auto run: only ever on by choice, with the Auto run button (or R); the button, W, or a thumb on the move side turns it off
+const autoBtn = document.getElementById('autorun');
+const autoRunOK = () => S && S.running && !S.over && (S.mode === 'free' || (isRg() && S.rg && S.rg.phase === 'fight'));
+function toggleAutoRun() { if (!autoRunOK()) return; S.autoRun = !S.autoRun; S.autoAt = S.t; playTick(); }
+autoBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleAutoRun(); });
 // returns [worldX, worldY, speed]
 function moveInput() {
   // one control: go forward, toward wherever the torch points
@@ -401,12 +408,10 @@ function moveInput() {
     if (s.side === 'move' && !s.stop) { go = true; speed = m > 60 ? RUN : WALK; }   // hold to walk, drag your thumb out to run
     if (s.side === 'aim' && m > 12) S.aim = Math.atan2(s.y - s.oy, s.x - s.ox);
   }
-  // auto run: hold go for 5 seconds and it locks on; lift your thumb and you keep running until you touch the move side again
+  // auto run: on only while the button is on; it runs you toward the torch until you turn it off
   if (S.mode === 'free' || isRg()) {
-    if (S.over || (isRg() && S.rg && S.rg.phase !== 'fight')) { S.autoRun = false; S.holdFrom = null; }
-    else if (S.autoRun) { if (!go) { go = true; speed = RUN; } }
-    else if (go) { if (S.holdFrom == null) S.holdFrom = S.t; if (S.t - S.holdFrom >= AUTO_HOLD) { S.autoRun = true; S.autoAt = S.t; S.holdFrom = null; playTick(); } }
-    else S.holdFrom = null;
+    if (!autoRunOK()) S.autoRun = false;
+    else if (S.autoRun && !go) { go = true; speed = RUN; }
   }
   // dash rule: pressing go starts a 4 second run you can't stop; you can still steer with the torch
   if (S.running && S.mode !== 'free' && !isRg()) {            // free roam: plain walking, hold to walk, drag further to run
@@ -2869,16 +2874,14 @@ function renderScene() {
     ctx.beginPath(); ctx.arc(s.ox, s.oy, 44, 0, 7); ctx.stroke();
     const dx = s.x - s.ox, dy = s.y - s.oy, m = Math.hypot(dx, dy), c = Math.min(1, 44 / (m || 1));
     ctx.fillStyle = 'rgba(239,239,234,0.25)'; ctx.beginPath(); ctx.arc(s.ox + dx * c, s.oy + dy * c, 14, 0, 7); ctx.fill();
-    if (s.side === 'move' && S.holdFrom != null && !S.autoRun) {   // the ring fills as the auto run gets closer
-      const f = Math.min(1, (S.t - S.holdFrom) / AUTO_HOLD);
-      if (f > 0.15) { ctx.strokeStyle = `rgba(239,239,234,${0.35 + 0.4 * f})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.ox, s.oy, 44, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke(); }
-    }
   }
+  const showAuto = !!autoRunOK() && overlay.hidden; if (autoBtn.hidden === showAuto) autoBtn.hidden = !showAuto;   // the button only shows where auto run works
+  const pressed = S.autoRun ? 'true' : 'false'; if (autoBtn.getAttribute('aria-pressed') !== pressed) autoBtn.setAttribute('aria-pressed', pressed);
   if (S.autoRun) {                                // above your head: you're running on your own
     const [px, py] = toScreen(S.p.x, S.p.y), fresh = S.t - (S.autoAt || 0) < 2.5;
     ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillStyle = `rgba(239,239,234,${fresh ? 0.85 : 0.45 + 0.1 * Math.sin(S.t * 3)})`;
-    ctx.fillText(fresh ? 'AUTO RUN · touch left to stop' : 'AUTO RUN', px, py - 74 * Z);
+    ctx.fillText(fresh ? 'AUTO RUN · tap again to stop' : 'AUTO RUN', px, py - 74 * Z);
   }
 }
 
