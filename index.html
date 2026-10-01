@@ -1143,17 +1143,62 @@ function update(dt) {
 }
 
 // ---- draw ----
+// forest floor: fallen needles, leaves, twigs and damp patches, painted once into a big tile that repeats across the ground
+let floorPat = null, floorT = null;
+function floorPattern() {
+  if (floorPat) return floorPat;
+  const P = 384, q = 1, cv = document.createElement('canvas'); cv.width = cv.height = P * q;
+  const g = cv.getContext('2d'), R = sprRand(4242); g.scale(q, q); g.lineCap = 'round';
+  g.fillStyle = '#9a9a96'; g.fillRect(0, 0, P, P);   // the bare ground colour is part of the tile, so the floor is one fill
+  const wrap = f => { for (const ox of [-P, 0, P]) for (const oy of [-P, 0, P]) { g.save(); g.translate(ox, oy); f(); g.restore(); } };
+  for (let n = 0; n < 34; n++) {                    // damp dark and dry pale patches
+    const x = R() * P, y = R() * P, r = 18 + R() * 50, dark = R() < 0.6;
+    wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, dark ? 'rgba(60,60,56,0.16)' : 'rgba(190,190,184,0.12)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
+  }
+  for (let n = 0; n < 1400; n++) {                  // pine needles
+    const x = R() * P, y = R() * P, a = R() * 6.3, l = 1.5 + R() * 2.5, v = 105 + R() * 40 | 0;
+    wrap(() => { g.strokeStyle = `rgba(${v},${v},${v - 3},0.7)`; g.lineWidth = 0.45; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); });
+  }
+  for (let n = 0; n < 380; n++) {                   // dead leaves, each with a midrib
+    const x = R() * P, y = R() * P, a = R() * 6.3, l = 1.6 + R() * 1.6, v = 112 + R() * 46 | 0;
+    wrap(() => { g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = `rgba(${v},${v},${v - 4},0.7)`; g.beginPath(); g.ellipse(0, 0, l, l * 0.5, 0, 0, 7); g.fill();
+      g.strokeStyle = 'rgba(80,80,76,0.5)'; g.lineWidth = 0.25; g.beginPath(); g.moveTo(-l, 0); g.lineTo(l, 0); g.stroke(); g.restore(); });
+  }
+  for (let n = 0; n < 50; n++) {                    // twigs
+    const x = R() * P, y = R() * P, a = R() * 6.3, l = 5 + R() * 9, b = R() * 0.6 + 0.3;
+    wrap(() => { g.strokeStyle = 'rgba(78,78,74,0.75)'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+      g.moveTo(x + Math.cos(a) * l * 0.5, y + Math.sin(a) * l * 0.5); g.lineTo(x + Math.cos(a) * l * 0.5 + Math.cos(a + b) * l * 0.35, y + Math.sin(a) * l * 0.5 + Math.sin(a + b) * l * 0.35); g.stroke(); });
+  }
+  for (let n = 0; n < 500; n++) {                   // grit
+    const x = R() * P, y = R() * P, v = R() < 0.5 ? 70 : 180;
+    wrap(() => { g.fillStyle = `rgba(${v},${v},${v},0.35)`; g.fillRect(x, y, 0.6, 0.6); });
+  }
+  floorPat = ctx.createPattern(cv, 'repeat'); floorPat.setTransform(new DOMMatrix().scale(1 / q));
+  return floorPat;
+}
+function floorTile() {
+  const k = K(), P = 384, w = Math.round(2 * k * P * DPR), h = Math.round(k * P * DPR);
+  if (floorT && floorT.w === w && floorT.h === h) return floorT;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d'), sx = w / (2 * P), sy = h / P;   // world -> tile pixels, nudged so the tile repeats exactly
+  g.setTransform(sx, sy / 2, -sx, sy / 2, 0, 0); g.fillStyle = floorPattern(); g.fillRect(-2 * P, -P, 4 * P, 4 * P);
+  return floorT = { w, h, pat: ctx.createPattern(cv, 'repeat') };
+}
 function drawGround() {
   ctx.save(); worldMatrix(ctx, DPR);
   const R = viewR();
   const x0 = Math.floor((S.cam.x - R) / T), x1 = Math.ceil((S.cam.x + R) / T);
   const y0 = Math.floor((S.cam.y - R) / T), y1 = Math.ceil((S.cam.y + R) / T);
-  ctx.fillStyle = '#9a9a96'; ctx.fillRect(x0 * T, y0 * T, (x1 - x0) * T, (y1 - y0) * T);
+  // the floor texture: the ground's slant never changes, only where the camera is, so the slanted tile is drawn once in screen
+  // pixels and then laid down flat each frame, which is about as cheap as a plain fill
+  { const ft = floorTile(), k = K();
+    const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
+    ft.pat.setTransform(new DOMMatrix().translate(Math.round(ox), Math.round(oy)));
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = ft.pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); }
   const k = K(), mu = W / 2 / k + T * 1.5, mv = H / k + T * 1.5;   // how far a tile can be from the camera and still show
   for (let i = x0; i < x1; i++) for (let j = y0; j < y1; j++) {
     const du = (i + 0.5) * T - S.cam.x, dv = (j + 0.5) * T - S.cam.y;
     if (Math.abs(du - dv) > mu || Math.abs(du + dv) > mv) continue;
-    if ((i + j) & 1) { ctx.fillStyle = '#939390'; ctx.fillRect(i * T, j * T, T, T); }
     const h = hash(i + 11, j - 5);
     if (h > 0.8) { ctx.fillStyle = '#7a7a77'; ctx.beginPath(); ctx.arc(i * T + hash(j, i + 2) * T, j * T + h * T * 0.9, 1.5 + h * 3, 0, 7); ctx.fill(); }
     else if (h < 0.14) { ctx.strokeStyle = '#5c5c5a'; ctx.lineWidth = 1.2; ctx.beginPath(); const bx = i * T + 10 + h * 150, by = j * T + 24; ctx.moveTo(bx, by); ctx.lineTo(bx + 4, by - 6); ctx.moveTo(bx + 5, by); ctx.lineTo(bx + 9, by - 7); ctx.moveTo(bx + 2, by); ctx.lineTo(bx + 1, by - 8); ctx.stroke(); }
@@ -1170,71 +1215,237 @@ function drawGround() {
 
 function shadow() {}   // round blob shadows removed; real shadows come from the lights
 
-// ---- trees: pines, broadleaf and dead snags; the side facing the player catches the torch ----
-function drawTree(o, c, mask, sx, sy, s, maskCol = '#000') {
-  const col = x => mask ? maskCol : x;
-  const sway = Math.sin(S.t * 0.7 + o.seed * 20) * 1.6 * s + Math.sin(S.t * 1.9 + o.seed * 7) * 0.5 * s;
-  const lit = toScreen(S.p.x, S.p.y)[0] < sx ? -1 : 1;           // which side faces the player
-  const rnd = k => hash(o.seed * 91 + k, k * 3.7);
-
-  if (o.type === 'pine') {
-    if (!mask) shadow(sx, sy, 15 * s);
-    c.fillStyle = col('#1f1f1e');                                  // tapered trunk with a root flare
-    c.beginPath(); c.moveTo(sx - 4.5 * s, sy); c.lineTo(sx - 2.2 * s, sy - 3 * s); c.lineTo(sx - 1.6 * s, sy - 30 * s);
-    c.lineTo(sx + 1.6 * s, sy - 30 * s); c.lineTo(sx + 2.2 * s, sy - 3 * s); c.lineTo(sx + 4.5 * s, sy); c.closePath(); c.fill();
-    const tiers = 5;
-    for (let t = 0; t < tiers; t++) {
-      const k = (t + 1) / tiers, ox = sway * k;
-      const base = sy - (16 + t * 14.5) * s, w = (25 - t * 4.3 + rnd(t) * 3) * s, h = (25 - t * 1.5) * s;
-      const ax = sx + ox, ay = base - h;
-      // bough: drooping tips and a ragged underside
-      const teeth = 7, pts = [[sx + ox * 0.8 - w, base + 3.5 * s]];
-      for (let n = 1; n < teeth; n++) pts.push([sx + ox * 0.8 - w + 2 * w * n / teeth, base + (n % 2 ? -1.5 : 2.2) * s + rnd(t * 10 + n) * 1.5 * s]);
-      pts.push([sx + ox * 0.8 + w, base + 3.5 * s]);
-      c.fillStyle = col('#262625');
-      c.beginPath(); c.moveTo(ax, ay); for (const [x, y] of pts) c.lineTo(x, y); c.closePath(); c.fill();
-      if (!mask) {
-        c.fillStyle = '#3c3c39';                                    // torch-side half of the bough
-        c.beginPath(); c.moveTo(ax, ay); c.lineTo(sx + ox * 0.8, base + 1 * s);
-        for (const [x, y] of (lit > 0 ? pts.slice(teeth / 2 | 0) : pts.slice(0, (teeth / 2 | 0) + 1).reverse())) c.lineTo(x, y);
-        c.closePath(); c.fill();
-        c.strokeStyle = 'rgba(80,80,76,0.8)'; c.lineWidth = 1 * s;   // needle ridges
-        c.beginPath();
-        for (let n = -1; n <= 1; n += 2) { c.moveTo(ax, ay + 3 * s); c.lineTo(ax + n * w * 0.45, base - 2 * s); }
-        c.stroke();
+// ---- trees and ground cover: each kind is painted once, in detail, onto its own small canvas, then stamped into the world ----
+// Painting hundreds of needles and leaves every frame would be far too slow; stamping a finished picture is cheaper than the old
+// simple shapes. Every picture is lit from the right; it is mirrored when the torch is on the other side.
+let SPR = 0;                                     // sprite pixels per world unit: matched to the screen, so stamping never shrinks a big picture
+let SPRITES = {};
+function sprRand(seed) { let a = seed * 2654435761 >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const grey = v => { v = Math.max(0, Math.min(255, v | 0)); return `rgb(${v},${v},${v - 2})`; };
+function makeSprite(key, w, h, ax, ay, paint) { // w, h, ax, ay in world units; (ax, ay) is where it meets the ground
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(w * SPR); cv.height = Math.ceil(h * SPR);
+  const g = cv.getContext('2d'); g.scale(SPR, SPR); g.translate(ax, ay); g.lineCap = 'round'; g.lineJoin = 'round';
+  paint(g);
+  const mk = document.createElement('canvas'); mk.width = cv.width; mk.height = cv.height;   // a solid silhouette of it, for cutting light
+  const m = mk.getContext('2d'); m.drawImage(cv, 0, 0); m.globalCompositeOperation = 'source-in'; m.fillStyle = '#000'; m.fillRect(0, 0, mk.width, mk.height);
+  return SPRITES[key] = { cv, mk, ax, ay, h };
+}
+// bark: a tapered trunk with a root flare, streaked, the right side catching light
+function paintTrunk(g, R, base, top, wb, wt, tone) {
+  g.fillStyle = grey(tone);
+  g.beginPath(); g.moveTo(-wb * 1.9, 0); g.quadraticCurveTo(-wb, -2, -wb, -5); g.lineTo(-wt, top); g.lineTo(wt, top); g.lineTo(wb, -5); g.quadraticCurveTo(wb, -2, wb * 1.9, 0); g.closePath(); g.fill();
+  g.fillStyle = grey(tone + 16);
+  g.beginPath(); g.moveTo(wb * 0.2, 0); g.lineTo(wt * 0.25, top); g.lineTo(wt, top); g.lineTo(wb, -5); g.quadraticCurveTo(wb, -2, wb * 1.9, 0); g.closePath(); g.fill();
+  g.lineWidth = 0.35;
+  for (let n = 0; n < 14; n++) {                 // bark fissures
+    const f = R() * 2 - 1, y0 = -R() * (-top) * 0.9, len = 3 + R() * 8, x0 = f * (wb + (wt - wb) * (-y0 / -top)) * 0.85;
+    g.strokeStyle = grey(tone - 10 + (f > 0 ? 18 : 0)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + (R() - 0.5), y0 - len); g.stroke();
+  }
+}
+function paintPine(g, R) {
+  const H = 92 + R() * 14, wMax = 25 + R() * 6;
+  paintTrunk(g, R, 0, -34, 3.6, 1.6, 30);
+  const layers = 15 + (R() * 4 | 0);
+  for (let pass = 0; pass < 2; pass++)           // a dark mass behind first, so the tree reads as solid; then the boughs over it
+    for (let L = 0; L < layers; L++) {
+      const t = L / (layers - 1), y = -14 - t * (H - 20), wl = wMax * Math.pow(1 - t, 0.85) + 2;
+      for (const sd of [-1, 1]) {
+        const w = wl * (0.7 + R() * 0.55);
+        if (pass === 1 && t > 0.1 && t < 0.8 && R() < 0.12) continue;   // a missing bough here and there lets the trunk show
+        const droop = 4 + R() * 4 + (1 - t) * 3, tipX = sd * w, tipY = y + droop;
+        if (pass === 0) {
+          g.fillStyle = grey(24 + R() * 6);
+          g.beginPath(); g.moveTo(0, y - 6); g.quadraticCurveTo(tipX * 0.6, y - 2, tipX, tipY); g.lineTo(tipX * 0.7, tipY + 3); g.lineTo(0, y + 5); g.closePath(); g.fill();
+          continue;
+        }
+        g.strokeStyle = grey(22); g.lineWidth = 0.8;   // the branch itself
+        g.beginPath(); g.moveTo(0, y); g.quadraticCurveTo(tipX * 0.55, y - 1.5, tipX, tipY); g.stroke();
+        const n = 10 + w * 1.4 | 0;
+        for (let k = 0; k < n; k++) {                // needle sprays hanging off it
+          const f = k / n, bx = tipX * f, by = y + (tipY - y) * f * f - 1.5 * Math.sin(f * Math.PI);
+          const lit = sd > 0 ? 0.35 + 0.65 * f : 0.1 * f, top = R() < 0.55;
+          const len = 2.5 + R() * 3.5 * (1 - f * 0.4), ang = Math.PI / 2 + sd * (0.3 + R() * 0.7) * (top ? -1 : 1);
+          g.strokeStyle = grey(26 + R() * 12 + lit * (top ? 50 : 18)); g.lineWidth = 0.55 + R() * 0.4;
+          g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + Math.cos(ang) * len * 0.6 * sd, by + (top ? -0.8 : 1) * Math.sin(ang) * len * 0.7); g.stroke();
+        }
+        if (sd > 0 && R() < 0.8) {                   // a frosted, light-catching rim along the top of the right-hand boughs
+          g.strokeStyle = 'rgba(120,120,114,0.55)'; g.lineWidth = 0.6;
+          g.beginPath(); g.moveTo(w * 0.25, y - 1); g.quadraticCurveTo(tipX * 0.6, y - 2, tipX * 0.95, tipY - 0.6); g.stroke();
+        }
       }
     }
-  } else if (o.type === 'oak') {
-    if (!mask) shadow(sx, sy, 20 * s);
-    c.fillStyle = col('#222220');
-    c.beginPath(); c.moveTo(sx - 5.5 * s, sy); c.lineTo(sx - 3 * s, sy - 4 * s); c.lineTo(sx - 2.6 * s, sy - 28 * s);
-    c.lineTo(sx + 2.6 * s, sy - 28 * s); c.lineTo(sx + 3 * s, sy - 4 * s); c.lineTo(sx + 5.5 * s, sy); c.closePath(); c.fill();
-    c.strokeStyle = col('#222220'); c.lineCap = 'round';
-    c.lineWidth = 2.6 * s; c.beginPath();
-    c.moveTo(sx, sy - 24 * s); c.lineTo(sx - 10 * s + sway * 0.5, sy - 36 * s);
-    c.moveTo(sx, sy - 26 * s); c.lineTo(sx + 11 * s + sway * 0.5, sy - 38 * s); c.stroke();
-    const blobs = [];
-    for (let n = 0; n < 8; n++)
-      blobs.push({ x: sx + sway + (rnd(n) - 0.5) * 34 * s, y: sy - (46 + (rnd(n + 20) - 0.5) * 22) * s, r: (9 + rnd(n + 40) * 6) * s });
-    blobs.sort((a, b) => a.y - b.y).reverse();                      // lower clumps behind upper ones reads as a rounded crown
-    for (const b of blobs) { c.fillStyle = col('#282826'); c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.fill(); }
-    if (!mask) for (const b of blobs) {
-      c.fillStyle = '#3d3d3a';
-      c.beginPath(); c.arc(b.x + lit * b.r * 0.3, b.y - b.r * 0.3, b.r * 0.62, 0, 7); c.fill();
+  g.fillStyle = grey(30); g.beginPath(); g.moveTo(-1.5, -H + 8); g.lineTo(0.3, -H - 3); g.lineTo(1.5, -H + 8); g.closePath(); g.fill();   // leader
+}
+function paintOak(g, R) {
+  const cy = -54 - R() * 6, rx = 28 + R() * 6, ry = 22 + R() * 5;
+  paintTrunk(g, R, 0, -30, 5, 3, 30);
+  const limbs = [];
+  for (let n = 0; n < 4; n++) { const a = -Math.PI / 2 + (n - 1.5) * 0.45 + (R() - 0.5) * 0.25; limbs.push([Math.cos(a) * (14 + R() * 10), -28 + Math.sin(a) * (16 + R() * 10)]); }
+  const clumps = [];
+  for (let n = 0; n < 13; n++) { const a = R() * Math.PI * 2, d = Math.sqrt(R()); clumps.push({ x: Math.cos(a) * rx * d * 0.8, y: cy + Math.sin(a) * ry * d * 0.8, r: 8 + R() * 6 }); }
+  clumps.sort((a, b) => a.y - b.y);
+  const leafy = (c, back) => {
+    g.fillStyle = grey(back ? 22 : 26); g.beginPath(); g.ellipse(c.x, c.y, c.r, c.r * 0.85, 0, 0, 7); g.fill();
+    const n = c.r * c.r * 0.9 | 0;
+    for (let k = 0; k < n; k++) {
+      const a = R() * Math.PI * 2, d = Math.sqrt(R()) * c.r, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d * 0.85;
+      const light = Math.max(0, ((x - c.x) * 0.6 - (y - c.y)) / c.r) * 0.5 + Math.max(0, x / rx) * 0.5 + Math.max(0, (cy - y) / ry) * 0.25;
+      g.fillStyle = grey(22 + R() * 10 + light * (back ? 22 : 56));
+      g.beginPath(); g.ellipse(x, y, 0.9 + R() * 1.1, 0.6 + R() * 0.7, R() * 3, 0, 7); g.fill();
     }
-  } else {                                                          // dead snag: bare forking branches
-    if (!mask) shadow(sx, sy, 10 * s);
-    c.strokeStyle = col('#343431'); c.lineCap = 'round';
-    const branch = (x, y, ang, len, w, d, k) => {
-      const ex = x + Math.cos(ang) * len + sway * 0.15 * (4 - d), ey = y + Math.sin(ang) * len;
-      c.lineWidth = w; c.beginPath(); c.moveTo(x, y); c.lineTo(ex, ey); c.stroke();
-      if (d <= 0) return;
-      const spread = 0.35 + rnd(k) * 0.4;
-      branch(ex, ey, ang - spread, len * (0.62 + rnd(k + 1) * 0.15), w * 0.62, d - 1, k * 2 + 1);
-      branch(ex, ey, ang + spread * 0.9, len * (0.58 + rnd(k + 2) * 0.15), w * 0.62, d - 1, k * 2 + 2);
-    };
-    branch(sx, sy, -Math.PI / 2 + (rnd(99) - 0.5) * 0.2, 30 * s, 5 * s, 3, 1);
+  };
+  for (const c of clumps.slice(0, 7)) leafy(c, true);
+  g.strokeStyle = grey(30); g.lineCap = 'round';  // limbs show through between the back and front leaves
+  for (const [lx, ly] of limbs) {
+    g.lineWidth = 2.4; g.beginPath(); g.moveTo(0, -24); g.quadraticCurveTo(lx * 0.4, (ly - 24) / 2 - 4, lx, ly); g.stroke();
+    g.lineWidth = 1; g.beginPath(); g.moveTo(lx, ly); g.lineTo(lx + (R() - 0.5) * 12, ly - 6 - R() * 8); g.stroke();
   }
+  for (const c of clumps.slice(7)) leafy(c, false);
+}
+function paintSnag(g, R) {
+  paintTrunk(g, R, 0, -40, 3.4, 1.8, 44);
+  g.strokeStyle = grey(52); g.lineWidth = 2; g.beginPath(); g.moveTo(-1.8, -40); g.lineTo(-0.5, -45); g.lineTo(0.6, -41); g.lineTo(1.8, -43); g.stroke();   // snapped top
+  const branch = (x, y, ang, len, w, d) => {
+    const ex = x + Math.cos(ang) * len, ey = y + Math.sin(ang) * len;
+    g.strokeStyle = grey(40 + (Math.cos(ang) > 0 ? 14 : 0)); g.lineWidth = w;
+    g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo((x + ex) / 2 + (R() - 0.5) * len * 0.3, (y + ey) / 2, ex, ey); g.stroke();
+    if (d <= 0 || len < 2) return;
+    const kids = R() < 0.3 ? 1 : 2;
+    for (let k = 0; k < kids; k++) branch(ex, ey, ang + (k ? 1 : -1) * (0.3 + R() * 0.5) + (R() - 0.5) * 0.3, len * (0.55 + R() * 0.2), w * 0.62, d - 1);
+  };
+  for (let n = 0; n < 4; n++) { const y = -14 - n * 7 - R() * 4, sd = n % 2 ? 1 : -1; branch(sd * 1.5, y, -Math.PI / 2 + sd * (0.7 + R() * 0.5), 10 + R() * 8, 1.6, 4); }
+}
+function paintBush(g, R) {
+  const blobs = [];
+  for (let n = 0; n < 6; n++) blobs.push({ x: (R() - 0.5) * 18, y: -5 - R() * 7, r: 4 + R() * 3.5 });
+  blobs.sort((a, b) => a.y - b.y);
+  for (const c of blobs) {
+    g.fillStyle = grey(30); g.beginPath(); g.ellipse(c.x, c.y, c.r, c.r * 0.8, 0, 0, 7); g.fill();
+    for (let k = 0; k < c.r * c.r * 1.4; k++) {
+      const a = R() * Math.PI * 2, d = Math.sqrt(R()) * c.r, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d * 0.8;
+      g.fillStyle = grey(30 + R() * 12 + Math.max(0, (x - c.x) - (y - c.y)) / c.r * 34);
+      g.beginPath(); g.ellipse(x, y, 0.7 + R() * 0.8, 0.5 + R() * 0.5, R() * 3, 0, 7); g.fill();
+    }
+  }
+}
+function paintFern(g, R) {
+  const n = 7 + (R() * 4 | 0);
+  for (let k = 0; k < n; k++) {
+    const a = Math.PI + (k + 0.5) / n * Math.PI + (R() - 0.5) * 0.3, len = 9 + R() * 6, ex = Math.cos(a) * len, ey = Math.sin(a) * len * 0.55 - 1;
+    const midx = ex * 0.5, midy = ey * 0.5 - 4 - R() * 2;
+    g.strokeStyle = grey(68 + (ex > 0 ? 14 : 0)); g.lineWidth = 0.45;
+    g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(midx, midy, ex, ey); g.stroke();
+    for (let f = 0.15; f < 1; f += 0.09) {          // leaflets along the frond
+      const x = 2 * (1 - f) * f * midx + f * f * ex, y = 2 * (1 - f) * f * midy + f * f * ey, l = (1 - f) * 2.6 + 0.6;
+      g.strokeStyle = grey(74 + (ex > 0 ? 24 : 0) + R() * 14); g.lineWidth = 0.5;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x - 0.4 * l, y - l); g.moveTo(x, y); g.lineTo(x + 0.6 * l, y + 0.2 * l); g.stroke();
+    }
+  }
+}
+function paintGrass(g, R) {
+  const n = 16 + (R() * 10 | 0);
+  for (let k = 0; k < n; k++) {
+    const x = (R() - 0.5) * 10, h = 5 + R() * 7, lean = (R() - 0.5) * 4;
+    g.strokeStyle = grey(62 + R() * 30 + (lean > 0 ? 14 : 0)); g.lineWidth = 0.6;
+    g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + lean * 0.3, -h * 0.6, x + lean, -h); g.stroke();
+  }
+}
+function paintStump(g, R) {
+  const r = 5 + R() * 2, h = 4 + R() * 3;
+  g.fillStyle = grey(44); g.beginPath(); g.moveTo(-r - 1.5, 0); g.lineTo(-r, -h); g.lineTo(r, -h); g.lineTo(r + 1.5, 0); g.closePath(); g.fill();
+  g.fillStyle = grey(58); g.fillRect(r * 0.2, -h, r * 0.8, h);
+  g.fillStyle = grey(96); g.beginPath(); g.ellipse(0, -h, r, r * 0.5, 0, 0, 7); g.fill();
+  g.strokeStyle = grey(76); g.lineWidth = 0.35;
+  for (let k = 1; k < 4; k++) { g.beginPath(); g.ellipse(0.4, -h, r * k / 4, r * k / 8, 0, 0, 7); g.stroke(); }
+  g.strokeStyle = grey(40); g.lineWidth = 1; g.beginPath(); g.moveTo(-r, 0); g.lineTo(-r - 4, 1.5); g.moveTo(r, 0); g.lineTo(r + 3.5, 1.2); g.stroke();   // roots
+}
+function paintLog(g, R) {                        // a fallen log lying across the screen-diagonal
+  const L = 16 + R() * 8, r = 2.6 + R() * 1.2, dx = L * 0.9, dy = L * 0.45;
+  g.lineCap = 'butt'; g.strokeStyle = grey(40); g.lineWidth = r * 2;
+  g.beginPath(); g.moveTo(-dx, dy - r); g.lineTo(dx, -dy - r); g.stroke();
+  g.strokeStyle = grey(58); g.lineWidth = r * 0.7; g.beginPath(); g.moveTo(-dx, dy - r * 1.6); g.lineTo(dx, -dy - r * 1.6); g.stroke();
+  g.strokeStyle = grey(32); g.lineWidth = 0.4;
+  for (let k = 0; k < 7; k++) { const f = R() * 2 - 1; g.beginPath(); g.moveTo(dx * f, -dy * f - r * 0.5); g.lineTo(dx * (f + 0.15), -dy * (f + 0.15) - r * 0.7); g.stroke(); }
+  g.fillStyle = grey(94); g.beginPath(); g.ellipse(dx, -dy - r, r * 0.7, r, 0, 0, 7); g.fill();
+  g.strokeStyle = grey(72); g.lineWidth = 0.3; g.beginPath(); g.ellipse(dx, -dy - r, r * 0.35, r * 0.5, 0, 0, 7); g.stroke();
+  g.strokeStyle = grey(36); g.lineWidth = 0.8; g.beginPath(); g.moveTo(-dx * 0.2, dy * 0.2 - r * 1.8); g.lineTo(-dx * 0.2 - 2, dy * 0.2 - r * 1.8 - 4); g.stroke();   // a broken-off branch stub
+}
+function paintShrooms(g, R) {
+  for (let k = 0; k < 3 + (R() * 3 | 0); k++) {
+    const x = (R() - 0.5) * 8, y = (R() - 0.5) * 2.5, h = 2 + R() * 3, r = 1.4 + R() * 1.6;
+    g.strokeStyle = grey(170); g.lineWidth = 0.55; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - h); g.stroke();
+    g.fillStyle = grey(196); g.beginPath(); g.ellipse(x, y - h, r, r * 0.55, 0, Math.PI, 0); g.fill();
+  }
+}
+const SPRITE_KINDS = {                           // kind: [variants, w, h, ax, ay, painter]
+  pine: [6, 70, 118, 35, 112, paintPine], oak: [5, 84, 96, 42, 90, paintOak], dead: [4, 76, 72, 38, 66, paintSnag],
+  bush: [4, 28, 20, 14, 17, paintBush], fern: [4, 34, 16, 17, 13, paintFern], grass: [5, 16, 13, 8, 12, paintGrass],
+  stump: [3, 22, 13, 11, 10, paintStump], log: [3, 56, 34, 28, 19, paintLog], shrooms: [3, 14, 11, 7, 8, paintShrooms],
+};
+function sprite(kind, v) {
+  const want = Math.max(0.75, Math.min(3, Math.round(Z * DPR * 1.3 * 4) / 4));
+  if (want !== SPR) { SPR = want; SPRITES = {}; }   // zoom or quality changed: repaint at the new size
+  const key = kind + v; if (SPRITES[key]) return SPRITES[key];
+  const [, w, h, ax, ay, paint] = SPRITE_KINDS[kind];
+  return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7)));
+}
+function stamp(c, spr, sx, sy, s, flip, sway, mask) {  // draw a sprite with its foot at (sx, sy), leaning with the wind
+  const k = s / SPR, m = c.getTransform();
+  c.transform(flip * k, 0, -sway / (spr.h * s) * k, k, sx, sy);
+  c.drawImage(mask ? spr.mk : spr.cv, -spr.ax * SPR, -spr.ay * SPR);
+  c.setTransform(m);
+}
+function drawTree(o, c, mask, sx, sy, s) {
+  const sway = Math.sin(S.t * 0.7 + o.seed * 20) * 1.6 * s + Math.sin(S.t * 1.9 + o.seed * 7) * 0.5 * s;
+  const flip = toScreen(S.p.x, S.p.y)[0] < sx ? -1 : 1;   // the side facing the player catches the torch
+  const kind = o.type === 'pine' ? 'pine' : o.type === 'oak' ? 'oak' : 'dead';
+  if (!mask) shadow(sx, sy, (kind === 'pine' ? 15 : kind === 'oak' ? 20 : 10) * s);
+  stamp(c, sprite(kind, (o.seed * 997 | 0) % SPRITE_KINDS[kind][0]), sx, sy, s, flip, sway * (kind === 'dead' ? 0.4 : 1), mask);
+}
+// ground cover: grass, ferns, bushes, stumps, fallen logs and mushrooms; never in the way, never casts a shadow
+const decorCache = new Map();
+function decorAt(i, j) {
+  const key = i * 2097152 + j;
+  if (decorCache.has(key)) return decorCache.get(key);
+  if (decorCache.size > 60000) decorCache.clear();
+  let d = null;
+  const h = hash(i * 1.31 + 17, j * 0.77 - 9);
+  if (h < 0.27 && !(Math.abs(i) < 2 && Math.abs(j) < 2) && !propAt(i, j)) {
+    const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
+    if (!(S && S.mode === 'expedition' && Math.hypot(x, y) < CAMP_R + 45)) {
+      const r = h / 0.27, v = hash(i * 3.3, j * 5.1);
+      const kind = r < 0.42 ? 'grass' : r < 0.6 ? 'fern' : r < 0.74 ? 'bush' : r < 0.84 ? 'shrooms' : r < 0.93 ? 'stump' : 'log';
+      d = { kind: 'decor', dk: kind, x, y, s: 1 + hash(j * 1.7, i) * 0.55, v: (v * 97 | 0) % SPRITE_KINDS[kind][0], seed: v };
+    }
+  }
+  decorCache.set(key, d);
+  return d;
+}
+function decorNear(x, y, R) {
+  const out = [];
+  for (let i = Math.floor((x - R) / T); i <= Math.ceil((x + R) / T); i++)
+    for (let j = Math.floor((y - R) / T); j <= Math.ceil((y + R) / T); j++) { const d = decorAt(i, j); if (d) out.push(d); }
+  return out;
+}
+function decorInView(lights) {   // ground cover only shows where some light reaches it, so skip the rest
+  const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
+  const out = [], near = lights.filter(L => Math.hypot(L.x - S.p.x, L.y - S.p.y) < viewR() + 200);
+  for (const o of decorNear(S.cam.x, S.cam.y, viewR())) {
+    if (QUALITY < 0.75 && (o.dk === 'grass' || o.dk === 'shrooms')) continue;   // a slow machine drops the smallest bits first
+    const [sx, sy] = toScreen(o.x, o.y);
+    if (sx < -60 || sx > W + 60 || sy < -10 || sy - 50 * Z > H) continue;
+    if (Math.hypot(o.x - S.p.x, o.y - S.p.y) < reach || near.some(L => Math.hypot(o.x - L.x, o.y - L.y) < 170)) { o.sx = sx; o.sy = sy; out.push(o); }
+  }
+  return out;
+}
+function drawDecor(o) {   // sets the transform directly (no save/restore): there are a lot of these each frame
+  const s = o.s * Z, spr = sprite(o.dk, o.v), k = s / SPR, f = o.seed > 0.5 ? k : -k;
+  const sh = o.dk === 'grass' || o.dk === 'fern' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
+  if (o.dk === 'bush' || o.dk === 'stump') shadow(o.sx, o.sy, 9 * s);
+  const m = ctx.getTransform();
+  ctx.transform(f, 0, sh * k, k, o.sx, o.sy);
+  ctx.drawImage(spr.cv, -spr.ax * SPR, -spr.ay * SPR);
+  ctx.setTransform(m);
 }
 
 // ---- torch shadows ----
@@ -1266,7 +1477,7 @@ function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
   const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
   if (sx < -80 * s || sx > W + 80 * s || sy < -20 * s || sy - 130 * s > H) return;   // off screen
   if (o.kind === 'tree') {
-    drawTree(o, c, mask, sx, sy, s, maskCol);
+    drawTree(o, c, mask, sx, sy, s);
   } else if (o.kind === 'rock') {
     if (!mask) shadow(sx, sy, 13 * s);
     c.fillStyle = col('#5a5a57');
@@ -1727,9 +1938,9 @@ function renderScene() {
   drawGround();
 
   const lights = lightsNear(S.cam.x, S.cam.y, viewR() + 200);
-  const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : [], S.mode === 'expedition' && S.rg ? S.rg.enemies.concat(exItems()) : []).map(o => ({ o, k: o.x + o.y }));
+  const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(decorInView(lights), lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : [], S.mode === 'expedition' && S.rg ? S.rg.enemies.concat(exItems()) : []).map(o => ({ o, k: o.x + o.y }));
   items.sort((a, b) => a.k - b.k);
-  for (const it of items) it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
+  for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
 
@@ -2173,15 +2384,21 @@ function pickFoe() {
 }
 // Vampire Survivors style: shades appear on a ring all around you, weighted toward where you are running,
 // so running away never leaves the whole wave stacked up behind you.
+function seenAt(x, y) {                      // would a figure standing here be anywhere on screen? (it is drawn upward from its feet)
+  const [sx, sy] = toScreen(x, y);
+  return sx > -70 && sx < W + 70 && sy > -40 && sy - 120 * Z < H + 30;
+}
 function spawnSpot() {
   const p = S.p, mv = Math.hypot(p.vx, p.vy);
   const a = mv > 20 && Math.random() < 0.6 ? Math.atan2(p.vy, p.vx) + (Math.random() - 0.5) * 2.4 : Math.random() * Math.PI * 2;
-  const d = 400 + Math.random() * 160;   // past the end of the beam (RANGE), so nothing pops into existence in the light
-  return { x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d };
+  // past the end of the beam, and always off the edge of the screen, so you never see one appear
+  let d = 400 + Math.random() * 160, at;
+  do { at = { x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, d }; d += 50; } while (seenAt(at.x, at.y) && d < 3000);
+  return at;
 }
 function spawnFoe(type, at = spawnSpot()) {
   const rg = S.rg, f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
-  rg.enemies.push({ kind: 'shade', type, x: at.x, y: at.y, hp, maxHp: hp,
+  rg.enemies.push({ kind: 'shade', type, x: at.x, y: at.y, hp, maxHp: hp, spawnD: at.d || 500,
     beam: 0, lit: false, after: 0, scarred: false, blink: Math.random() * 4, jit: 0, reveal: 0, fly: 0, flare: 0, phase: Math.random() * 6, face: 1 });
   const e = rg.enemies[rg.enemies.length - 1];
   if (type === 'bomber') bomberReset(e);
@@ -2533,9 +2750,11 @@ function updateSurvive(dt) {
     const reachTo = e.type === 'kamikaze' ? (e.ai === 'run' ? 1 : 0.4) : (!e.lit && d < 140 && !NO_TOUCH[e.type] && !(e.type === 'laser' && e.ai !== 'move')) ? 1 : 0;
     e.reach = (e.reach || 0) + (reachTo - (e.reach || 0)) * Math.min(1, dt * 6);
     e.kick = Math.max(0, (e.kick || 0) - dt * 4);
-    if (S.mode === 'expedition' && d > 900 && !e.lit) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
-    if (d > 700 && !e.lit) { const at = spawnSpot(); e.x = at.x; e.y = at.y; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
+    const farOff = !e.lit && d > Math.max(700, (e.spawnD || 500) + 300) && !seenAt(e.x, e.y);   // well out of reach and out of sight
+    if (S.mode === 'expedition' && farOff && d > 900) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
+    if (farOff) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; continue; }   // left far behind: bring it back around you
     let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
+    if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
     if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
     else chase(e, sp, d, dt);
