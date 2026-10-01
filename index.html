@@ -139,21 +139,20 @@ button.mini:disabled { opacity: 0.35; cursor: default; }
   #overlay.title .card { margin-block: auto; }
 }
 .brand { width: 100%; max-width: 46rem; display: grid; gap: 0.35rem; }
-.brand h1 { font-size: clamp(2.8rem, 14vw, 5.2rem); white-space: nowrap; }
+.brand h1 { font-size: clamp(2rem, 8.6vw, 5.2rem); white-space: nowrap; }   /* sized so 'behind you' always fits the screen width */
 .brand h1 .b1 { color: rgba(239,239,234,0.55); }
 .brand h1 .b2 { animation: flick 7s infinite; }
 @keyframes flick { 0%, 91%, 94%, 97%, 100% { opacity: 1; } 92%, 96% { opacity: 0.25; } }
 .brand .tag { text-transform: uppercase; letter-spacing: 0.22em; font-size: 0.7rem; color: rgba(239,239,234,0.6); }
 #overlay:not(.title) .brand h1 { font-size: clamp(2rem, 9vw, 3rem); }
-.modegrid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
-@media (min-width: 26rem) { .modegrid { grid-template-columns: 1fr 1fr; } }
+.modegrid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }   /* the two big modes stack on every screen, so their names never get cut off */
 .modegrid.three { grid-template-columns: repeat(3, 1fr); }
 button.mode { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem; border: 1px solid rgba(138,138,138,0.4); background: rgba(14,14,13,0.92); color: var(--bone); min-width: 0; transition: border-color .15s, background .15s; }
 button.mode:hover, button.mode:focus-visible { border-color: var(--bone); background: rgba(30,30,28,0.95); outline: none; }
 button.mode.big { padding: 0.9rem; border-color: rgba(239,239,234,0.6); }
 .modegrid.three button.mode { flex-direction: column; text-align: center; gap: 0.45rem; padding: 0.7rem 0.4rem; }
 .mode .mt { display: grid; gap: 0.15rem; min-width: 0; }
-.mode .nm { font: 400 1.15rem/1.15 var(--display); }
+.mode .nm { font: 400 1.15rem/1.15 var(--display); text-transform: lowercase; }   /* Major Mono draws capitals as odd half-filled letters, so names stay lowercase */
 .mode.big .nm { font-size: 1.35rem; }
 .modegrid.three .nm { font-size: 0.95rem; }
 .mode .sh { font-size: 0.78rem; line-height: 1.35; color: var(--ash); }
