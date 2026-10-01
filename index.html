@@ -490,7 +490,7 @@ const MON_WAV = {
 const mon = {};
 const BURN_PEAK = 0.42;       // seconds into the burn recording where it hits full force: the shade dies right there
 const BURN_MAX = 6, GRAIN = 0.09, HOP = 0.045;   // at most 6 burning at once are heard; the hiss is stretched from overlapping grains
-const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05, laser: 0.95, kamikaze: 1.3 };   // bigger things sound lower
+const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.05, laser: 0.95, kamikaze: 1.3, splitter: 0.9, splitling: 1.55 };   // bigger things sound lower
 const burnVoices = new Set(), monLast = { death: 0, small: 0 };
 let hann = null;
 function monOut(x, y, gain) {       // a gain node panned toward where the monster is on screen
@@ -1802,6 +1802,8 @@ const FOES = {
   bomber:  { hp: 1.6,  sp: 40, lightSp: 0,    h: 32, w: 16 },
   laser:   { hp: 1.3,  sp: 34, lightSp: 0,    h: 40, w: 11 },
   kamikaze:{ hp: 0.5,  sp: 84, lightSp: 0,    h: 26, w: 11 },
+  splitter:{ hp: 1.8,  sp: 32, lightSp: 0,    h: 42, w: 14 },
+  splitling:{ hp: 0.35, sp: 80, lightSp: 0,   h: 21, w: 8 },
 };
 
 const lv = id => (S.rg && S.rg.up[id]) || 0;
@@ -1840,6 +1842,7 @@ const SPAWNS = [
   { type: 'bomber',   from: 3, weight: 15, max: w => Math.min(6, 2 + Math.floor((w - 3) / 2)) },
   { type: 'laser',    from: 4, weight: 14, max: w => Math.min(6, 2 + Math.floor((w - 4) / 2)) },
   { type: 'brute',    from: 5, weight: 10 },
+  { type: 'splitter', from: 6, weight: 11, max: w => 2 + Math.floor((w - 6) / 3) },   // splitlings only come out of these
 ];
 const spawnWeight = (s, w) => typeof s.weight === 'function' ? s.weight(w) : s.weight;
 function pickFoe() {
@@ -1877,6 +1880,7 @@ function startWave() {
   else if (rg.wave === 2) S.msg = { text: 'Wave 2', sub: 'The yellow ones burst', t: 0 };
   else if (rg.wave === 3) S.msg = { text: 'Wave 3', sub: 'Watch the sky for red', t: 0 };
   else if (rg.wave === 4) S.msg = { text: 'Wave 4', sub: 'When blue dots flash, move', t: 0 };
+  else if (rg.wave === 6) S.msg = { text: 'Wave 6', sub: 'Pink ones split when they burn', t: 0 };
   else S.msg = { text: 'Wave ' + rg.wave, t: 0 };
 }
 function ashBurst(x, y, n, hgt = 20) {
@@ -1903,8 +1907,23 @@ function hurt(e) {
   sfx(0.45, 0.9, 'lowpass', 500, 0.35);
   if (rg.hp <= 0) nightOver();
 }
+// ---- the splitter: burn it and it bursts into three small, fast pink ones that scatter and come at you ----
+function splitApart(e) {
+  const rg = S.rg, base = Math.atan2(e.y - S.p.y, e.x - S.p.x);
+  for (let i = 0; i < 3; i++) {
+    spawnFoe('splitling');
+    const k = rg.enemies[rg.enemies.length - 1], a = base + (i - 1) * 1.1 + (Math.random() - 0.5) * 0.4, v = 150 + Math.random() * 60;
+    k.x = e.x; k.y = e.y; k.pvx = Math.cos(a) * v; k.pvy = Math.sin(a) * v; k.popT = 0.35;
+    k.grace = 0.6;                         // a moment to scatter before the light can touch them
+    k.phase = Math.random() * 6;
+  }
+  rg.waveTotal += 3;
+  rg.blasts.push({ x: e.x, y: e.y, t: 0, life: 0.35, r: 70, col: 'pink' });
+  addShake(0.15);
+}
 function killFoe(e) {
   const rg = S.rg;
+  if (e.type === 'splitter') splitApart(e);
   e.dead = true; rg.kills++; rg.waveKills++;
   rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0 });   // it drops to its knees and crumbles
   for (let i = 0; i < 14 * FOES[e.type].h / 38; i++) rg.embers.push({ x: e.x, y: e.y, z: Math.random() * FOES[e.type].h, vz: 30 + Math.random() * 70, vx: (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, life: 0.5 + Math.random() * 0.8, ember: true });
@@ -2130,6 +2149,8 @@ function updateSurvive(dt) {
     else if (e.after > 0) { e.after -= dt; dmg += burn * 0.6; }
     if (e.flare) dmg += 0.9;
     if (e.fly) dmg += 1.5;
+    if (e.grace > 0) { e.grace -= dt; dmg = 0; }
+    if (e.popT > 0) { e.popT -= dt; e.x += e.pvx * dt; e.y += e.pvy * dt; e.pvx *= 0.9; e.pvy *= 0.9; }   // flung out of the split
     e.hp -= dmg * dt;
     e.dps = e.burning ? e.dps + (dmg - e.dps) * Math.min(1, dt * 6) : dmg; e.burning = dmg > 0;
     e.jit = dmg > 0 ? 1 : Math.max(0, e.jit - dt * 4);
@@ -2241,7 +2262,7 @@ function surviveLight(bx, by, br, casters, lx, ly) {
   }
 }
 const HUNCH = { stalker: 0.35, bomber: 0.2, kamikaze: 0.45 };
-const EYES = { tall: '210,40,40', laser: '90,170,255', kamikaze: '255,215,60' };   // each kind has its colour
+const EYES = { tall: '210,40,40', laser: '90,170,255', kamikaze: '255,215,60', splitter: '255,110,200', splitling: '255,110,200' };   // each kind has its colour
 // Enemies are the same pale figure as the one you chase in Chase and Blink, sized by kind.
 // As they burn they glow hotter, from white through amber to ember red.
 const mixC = (c0, c1, k) => `rgb(${c0.map((v, i) => Math.round(v + (c1[i] - v) * k)).join(',')})`;
@@ -2332,6 +2353,13 @@ function drawSurviveFx(bx, by, br) {
       ctx.restore();
     }
   }
+  // splitters: three pink cores in the chest, the three it will become
+  for (const e of rg.enemies) {
+    if (e.type !== 'splitter') continue;
+    const sc = FOES.splitter.h / 38, [x, y0] = toScreen(e.x, e.y), y = y0 - 25 * Z * sc;
+    ctx.fillStyle = `rgba(255,120,205,${0.55 + 0.25 * Math.sin(S.t * 5 + e.phase)})`;
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.arc(x + i * 2.6 * Z * sc, y + Math.abs(i) * 1.2 * Z, 1.4 * Z * sc, 0, 7); ctx.fill(); }
+  }
   // kamikazes: a yellow glow in the chest, flaring as the fuse burns
   for (const e of rg.enemies) {
     if (e.type !== 'kamikaze') continue;
@@ -2355,7 +2383,8 @@ function drawSurviveFx(bx, by, br) {
   for (const b of rg.blasts) {
     const [x, y] = toScreen(b.x, b.y), k = 1 - b.t / b.life, r = b.r * Z * (b.muzzle ? 0.5 : 0.6 + 0.4 * (b.t / b.life));
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    if (b.col === 'yellow') { g.addColorStop(0, `rgba(255,250,200,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,210,40,${0.55 * k})`); g.addColorStop(1, 'rgba(240,170,0,0)'); }
+    if (b.col === 'pink') { g.addColorStop(0, `rgba(255,220,240,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,90,190,${0.5 * k})`); g.addColorStop(1, 'rgba(220,40,160,0)'); }
+    else if (b.col === 'yellow') { g.addColorStop(0, `rgba(255,250,200,${0.9 * k})`); g.addColorStop(0.4, `rgba(255,210,40,${0.55 * k})`); g.addColorStop(1, 'rgba(240,170,0,0)'); }
     else { g.addColorStop(0, `rgba(255,${b.muzzle ? 120 : 170},90,${0.8 * k})`); g.addColorStop(0.4, `rgba(230,50,25,${0.45 * k})`); g.addColorStop(1, 'rgba(200,20,10,0)'); }
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
   }
