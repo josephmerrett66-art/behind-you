@@ -107,6 +107,14 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .it .nm { font: 400 1rem/1.2 var(--display); }
 .ct .sh, .it .sh { font-size: 0.8rem; color: var(--ash); }
 .ct .cnt { font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(138,138,138,0.85); }
+.wallets { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.8rem; margin-top: 0.6rem; }
+.wallet { all: unset; box-sizing: border-box; cursor: pointer; display: grid; justify-items: center; text-align: center; gap: 0.5rem; padding: 1.4rem 1rem; border: 2px solid var(--wc); background: rgba(22,22,21,0.95); color: var(--bone); font-family: var(--mono); }
+.wallet:hover, .wallet:focus-visible { background: rgba(40,40,38,0.95); outline: none; }
+.wallet .ic { width: 4rem; height: 4rem; color: var(--wc); border-color: var(--wc); } .wallet .ic svg { width: 2.3rem; height: 2.3rem; }
+.wallet .nm { font: 400 1.5rem/1.1 var(--display); }
+.wallet .bal { font: 600 1rem var(--mono); color: var(--wc); }
+.wallet .sh { font-size: 0.8rem; color: var(--ash); }
+.wallet.ember { --wc: rgb(255,150,60); } .wallet.wisp { --wc: rgb(185,130,255); }
 .cathead { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.4rem; }
 #camp .cathead h3, #stats .cathead h3 { margin: 0; font: 400 1.35rem var(--display); text-transform: none; letter-spacing: 0; }
 .items { display: grid; gap: 0.45rem; margin-top: 0.6rem; }
@@ -193,7 +201,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <button id="torch" hidden aria-pressed="true">Torch</button>
 <button id="dodge" hidden>Dodge</button>
 <button id="autorun" hidden aria-pressed="false">Auto<br>run</button>
-<button id="campBtn" hidden>Camp</button>
+<button id="campBtn" hidden>Shop</button>
 <button id="recallBtn" class="exuse" hidden>Flare</button>
 <button id="lampBtn" class="exuse" hidden>Lantern</button>
 <button id="sound" hidden>Sound on</button>
@@ -209,7 +217,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <div id="camp" hidden>
   <div class="pick">
     <p class="eyebrow" id="campEyebrow"></p>
-    <h2>Camp</h2>
+    <h2>Shop</h2>
     <h3>Equipped <span id="slotInfo"></span></h3>
     <div id="campEq" class="chips"></div>
     <div id="campBody"></div>
@@ -295,7 +303,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-5 7h3l-4 6h12l-4-6h3z"/><path d="M12 16v5"/></svg></span>Free roam<span class="sh">No goals</span></summary><p>Walk the woods with rabbits, birds and fireflies.</p></details>
     </div>
     <div class="controls">
-      <span>Phone</span><span>Right thumb aims. Left thumb walks. Tap Dodge to roll. Tap Camp at the fire to shop.</span>
+      <span>Phone</span><span>Right thumb aims. Left thumb walks. Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
       <span>Desktop</span><span>Mouse aims. W or Space walks. Right-click or Q dodges. Shift runs in Free roam. At camp: E shop, R recall flare, T outpost lantern.</span>
     </div>
   </section>
@@ -5054,6 +5062,8 @@ function statsLabel() { const b = document.getElementById('statsLbl'); if (b) b.
 function openStats(from) {
   statsFrom = from; statCat = null; statOpen = null;
   if (from === 'camp') campEl.hidden = true;
+  document.getElementById('statsGo').textContent = from === 'camp' ? '‹ Back to shop' : 'Done';
+  statsEl.querySelector('h2').textContent = from === 'camp' ? 'Wisp upgrades' : 'Stats';
   statsEl.hidden = false; renderStats();
   const b = statsEl.querySelector('button:not([disabled])'); if (b) b.focus({ preventScroll: true });
 }
@@ -6515,7 +6525,6 @@ const CATS = [
   { id: 'Allies', line: 'Fire that fights for you', icon: 'fireflies' },
   { id: 'Senses', line: 'See what hides out there', icon: 'dread' },
   { id: 'Gear', line: 'Oil, pack, slots and supplies', icon: 'bag' },
-  { id: 'Stats', line: 'Wisps buy lasting boosts', icon: 'wisp' },
 ];
 let campCat = null, campOpen = null;
 const svgIcon = id => { const s = el('span', 'ic'); s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] || ''}</svg>`; return s; };
@@ -6552,24 +6561,40 @@ function renderCamp() {
     b.addEventListener('click', () => toggleEq(id)); return b;
   }) : [el('p', 'small', 'Nothing equipped yet. Anything you buy goes straight on if there is room.')]));
   const body = document.getElementById('campBody');
-  if (!campCat) {                            // the categories
-    body.replaceChildren(el('div', 'cats', undefined));
-    body.firstChild.append(...CATS.map(c => {
+  if (!campCat) {                            // first: which currency are you spending?
+    const w = el('div', 'wallets');
+    const tile = (cls, icon, nm, bal, line, go) => {
+      const b = el('button', 'wallet ' + cls); b.type = 'button';
+      b.append(svgIcon(icon), el('span', 'nm', nm), el('span', 'bal', bal), el('span', 'sh', line));
+      b.addEventListener('click', go); return b;
+    };
+    w.append(
+      tile('ember', 'embers', 'ember upgrades', `${XS.embers} embers`, 'Torch, kit and gear', () => { campCat = 'embers'; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); }),
+      tile('wisp', 'wisp', 'wisp upgrades', `${ST.w} wisps`, 'Your personal stats', () => openStats('camp')));
+    body.replaceChildren(w);
+    return;
+  }
+  if (campCat === 'embers') {                // the ember categories
+    const head = el('div', 'cathead'), back = el('button', 'mini alt', '‹ Shop'); back.type = 'button';
+    back.addEventListener('click', () => { campCat = null; campOpen = null; renderCamp(); });
+    head.append(back, el('h3', '', 'Ember upgrades'));
+    const cats = el('div', 'cats');
+    body.replaceChildren(head, cats);
+    cats.append(...CATS.map(c => {
       const b = el('button', 'cat'); b.type = 'button';
       let count;
       if (c.id === 'Gear') count = `${packMax()} pack · ${slotMax()} slots`;
-      else if (c.id === 'Stats') count = `${ST.w} wisps to spend`;
       else if (c.id === 'Flame') count = `${TORCH_UP.reduce((a, t) => a + (XS.torch[t.id] || 0), 0)} of ${TORCH_UP.reduce((a, t) => a + t.max, 0)} levels`;
       else { const all = SHOP.filter(u => u.tag === c.id); count = `${all.filter(u => XS.own[u.id]).length} of ${all.length} owned`; }
       const t = el('span', 'ct'); t.append(el('span', 'nm', c.nm || c.id), el('span', 'sh', c.line), el('span', 'cnt', count));
       b.append(svgIcon(c.icon), t);
-      b.addEventListener('click', () => { if (c.id === 'Stats') return openStats('camp'); campCat = c.id; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); });
+      b.addEventListener('click', () => { campCat = c.id; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); });
       return b;
     }));
     return;
   }
-  const head = el('div', 'cathead'), back = el('button', 'mini alt', '‹ All'); back.type = 'button';
-  back.addEventListener('click', () => { campCat = null; campOpen = null; renderCamp(); });
+  const head = el('div', 'cathead'), back = el('button', 'mini alt', '‹ Back'); back.type = 'button';
+  back.addEventListener('click', () => { campCat = 'embers'; campOpen = null; renderCamp(); });
   head.append(back, el('h3', '', (CATS.find(c => c.id === campCat) || {}).nm || campCat));
   const list = el('div', 'items');
   list.append(...campItems(campCat).map(it => {
