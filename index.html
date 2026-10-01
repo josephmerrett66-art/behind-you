@@ -118,6 +118,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .cathead { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.4rem; }
 #camp .cathead h3, #stats .cathead h3 { margin: 0; font: 400 1.35rem var(--display); text-transform: none; letter-spacing: 0; }
 .items { display: grid; gap: 0.45rem; margin-top: 0.6rem; }
+.items .grp { margin: 0.7rem 0 0; font: 600 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); }
 .item { border: 1px solid rgba(138,138,138,0.35); background: rgba(22,22,21,0.95); }
 .item.rare { border-color: rgba(239,239,234,0.55); }
 .item.legendary { border-color: var(--blood); }
@@ -218,7 +219,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
   <div class="pick">
     <p class="eyebrow" id="campEyebrow"></p>
     <h2>Shop</h2>
-    <h3>Equipped <span id="slotInfo"></span></h3>
+    <h3>Power-ups on <span id="slotInfo"></span></h3>
     <div id="campEq" class="chips"></div>
     <div id="campBody"></div>
     <div class="pickfoot"><button id="campGo">Back to the fire</button><button id="campWipe" class="alt">Start over</button></div>
@@ -3198,7 +3199,7 @@ const EX_KIT = {
   glare: { lv: ['Spears and arrows burn up', 'Bomber shells too', 'A wider catch, past the beam\'s edge'] },
   mirror: { lv: ['The laser burns its owner', 'It bounces on to a second enemy'] },
 };
-const EX_CUT = ['kindling', 'afterglow', 'adrenaline', 'salt', 'echo', 'scar', 'embers'];   // folded into other items, or dropped
+const EX_CUT = ['kindling', 'afterglow', 'adrenaline', 'salt', 'echo', 'scar', 'embers', 'coat', 'wind'];   // coat and wind live on as Armour   // folded into other items, or dropped
 const kitMax = u => (EX_KIT[u.id] && EX_KIT[u.id].max) || u.max;
 const kitDesc = u => (EX_KIT[u.id] && EX_KIT[u.id].desc) || u.desc;
 const UP = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
@@ -3221,10 +3222,12 @@ const FOES = {
 const rawLv = id => (S.rg && S.rg.up[id]) || 0;
 // Expedition's kit folds some of Nightfall's small cards into bigger items: Echo lives in Dread Sense 2, Kindling in Chain Ignition 3,
 // Ember Trail in Smoulder; Adrenaline is part of Close Call; Salt Pockets and Scorch Marks are gone. Nightfall is untouched.
-const EX_LV = { echo: () => +(rawLv('dread') >= 2), kindling: () => +(rawLv('chain') >= 3), embers: () => rawLv('smoulder'), afterglow: () => 0, adrenaline: () => 0, salt: () => 0, scar: () => 0 };
+const EX_LV = { echo: () => +(rawLv('dread') >= 2), kindling: () => +(rawLv('chain') >= 3), embers: () => rawLv('smoulder'), afterglow: () => 0, adrenaline: () => 0, salt: () => 0, scar: () => 0,
+  coat: () => 0, wind: () => (XS && XS.arm && XS.arm.shield) || 0 };   // Armour's Shield drives Second Wind's code
 const isEx = () => S && S.mode === 'expedition';
 const lv = id => isEx() && EX_LV[id] ? EX_LV[id]() : rawLv(id);
 const tu = id => isEx() && XS && XS.torch ? XS.torch[id] || 0 : 0;   // Expedition's torch upgrades, bought with embers
+const steelMax = () => isEx() && XS && XS.arm ? XS.arm.steel || 0 : 0;   // Armour: steel hearts on top of your own
 const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const lastHeart = () => lv('lastlight') && S.rg.hp === 1;
 // Sweep: flares while you swing fast. Spotlight: tightens the longer you hold still.
@@ -3326,6 +3329,23 @@ function ashBurst(x, y, n, hgt = 20) {
 }
 function shove(e, amt) { if (e.type === 'centi') return;   // too long and dug in to be knocked about
   const dx = e.x - S.p.x, dy = e.y - S.p.y, d = Math.hypot(dx, dy) || 1; e.x += dx / d * amt; e.y += dy / d * amt; }
+function laserHits(x, y, h) {               // is this spot (feet, middle or head) on the Red Laser's line?
+  const bi = S.beamInfo; if (!bi) return false;
+  const [sx, sy0] = toScreen(x, y), w = (tu('laser') > 1 ? 9 : 6) * Z + 4;
+  for (const hg of [0.1, 0.5, 0.9]) {
+    const sy = sy0 - hg * h * Z, dx = sx - bi.bx, dy = sy - bi.by, along = dx * Math.cos(S.aim) + dy * Math.sin(S.aim);
+    if (along > 0 && along < bi.br * 0.95 && Math.abs(-dx * Math.sin(S.aim) + dy * Math.cos(S.aim)) < w) return true;
+  }
+  return false;
+}
+function drawRedLaser() {
+  const rg = S.rg, bi = S.beamInfo; if (!rg || !rg.laserOn || !bi) return;
+  const L = bi.br * 0.95, x1 = bi.bx + Math.cos(S.aim) * L, y1 = bi.by + Math.sin(S.aim) * L, thick = tu('laser') > 1 ? 1.6 : 1, fl = 0.85 + 0.15 * Math.random();
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  const line = (wd, col) => { ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath(); ctx.moveTo(bi.bx, bi.by); ctx.lineTo(x1, y1); ctx.stroke(); };
+  line(14 * thick * Z, `rgba(255,30,20,${0.12 * fl})`); line(6 * thick * Z, `rgba(255,40,30,${0.35 * fl})`); line(2 * thick * Z + 1, `rgba(255,200,190,${0.9 * fl})`);
+  ctx.restore();
+}
 function hurt(e) {
   const rg = S.rg;
   if (S.mode === 'expedition' && exSafeAt(S.p.x, S.p.y)) return;   // nothing reaches you inside the firelight or an outpost
@@ -3340,6 +3360,15 @@ function hurt(e) {
     rg.shield--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.pop = { t: 0, blocked: true }; rg.windT = 0;
     if (isEx() && lv('wind') > 2) { lightBurst(S.p.x, S.p.y, 150, 0.4, 'white'); for (const o of rg.enemies) if (dist2(o, S.p) < 150) o.frozen = 2; }   // Second Wind 3: breaking it flashes
     addShake(0.35); hitStop(0.05); shove(e, 90); sfx(1.4, 0.6, 'bandpass', 1500, 0.3);
+    return;
+  }
+  rg.regenT = 0;
+  if (rg.steel > 0) {                      // Armour: a steel heart takes it
+    rg.steel--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = 0.6;
+    rg.pop = { t: 0, steelLost: rg.steel };
+    addShake(0.55); hitStop(0.08);
+    { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }
+    shove(e, 90); sfx(2.6, 0.5, 'bandpass', 2600, 0.35); sfx(0.6, 0.6, 'lowpass', 700, 0.25);
     return;
   }
   rg.hp--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = 1;
@@ -3809,8 +3838,14 @@ function updateSurvive(dt) {
   }
   if (isEx() && lv('wind') && rg.shield < 1 && rg.phase === 'fight' && !rg.inCamp) {   // Expedition's Second Wind comes back while you're out
     rg.windT = (rg.windT || 0) + dt;
-    if (rg.windT >= [90, 90, 60, 30][Math.min(3, lv('wind'))]) { rg.windT = 0; rg.shield = 1; rg.pop = { t: 0, blocked: true }; exNote('second wind is back'); }
+    if (rg.windT >= [60, 60, 40, 25][Math.min(3, lv('wind'))]) { rg.windT = 0; rg.shield = 1; rg.pop = { t: 0, blocked: true }; exNote('shield is back'); }
   }
+  if (sr('regen') && rg.phase === 'fight' && rg.hp > 0) {   // Regen (a wisp stat): a while without a hit heals a heart
+    rg.regenT = (rg.regenT || 0) + dt;
+    if (rg.hp < rg.maxHp && rg.regenT >= [30, 30, 20, 12][Math.min(3, sr('regen'))]) { rg.regenT = 0; rg.hp++; rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
+  }
+  // the Red Laser: a thin line down the middle of the beam that burns hard
+  rg.laserOn = isEx() && tu('laser') > 0 && S.torchLvl > 0.6;
   // strobe
   if (lv('strobe')) {
     rg.strobeT -= dt;
@@ -3837,6 +3872,7 @@ function updateSurvive(dt) {
     const worldLit = campLit || exLit || (hr && d < hr) || e.flare || inFire || e.frozen > 0 || rg.candles.some(c => dist2(c, e) < 55);
     e.lit = e.beam > 0 || !!worldLit;
     let dmg = 0;
+    if (e.beam > 0 && rg.laserOn && laserHits(e.x, e.y, f.h * (e.k || 1))) { dmg += burn * (tu('laser') > 1 ? 4.5 : 3); e.lasered = 0.1; }
     if (e.beam > 0) { dmg += burn * e.beam; e.after = isEx() ? [0, 2, 3, 3][rawLv('smoulder')] : 0.6 * lv('afterglow'); if (lv('scar')) e.scarred = true; }
     else if (e.after > 0) { e.after -= dt; dmg += burn * 0.6; }
     if (e.flare) dmg += 0.9;
@@ -4426,7 +4462,7 @@ function heartPath(c, x, y, s) {           // a heart centred on x,y, s wide
 }
 function drawHeartPop() {
   const rg = S.rg, P = rg && rg.pop; if (!P || rg.phase === 'dawn') return;
-  const t = P.t, n = rg.maxHp, sz = 15, gap = 20, [px, py] = toScreen(S.p.x, S.p.y);
+  const t = P.t, n = rg.maxHp + steelMax(), sz = 15, gap = 20, [px, py] = toScreen(S.p.x, S.p.y);
   const cx = px, cy = py - 62 * Z - 6;
   const fade = t < HEART_POP - 0.45 ? 1 : Math.max(0, (HEART_POP - t) / 0.45);
   const last = rg.hp === 1;
@@ -4435,16 +4471,17 @@ function drawHeartPop() {
     const pop = Math.min(1, (t - i * 0.05) / 0.14);                     // each heart springs up in turn
     if (pop <= 0) continue;
     const bounce = pop < 1 ? 0.5 + 0.7 * pop : 1 + 0.12 * Math.max(0, 1 - (t - 0.14 - i * 0.05) / 0.2);
-    let x = cx + (i - (n - 1) / 2) * gap, y = cy, s = sz * bounce, a = fade, full = i < rg.hp, col = last ? '#e03434' : '#efefea';
+    const st = i >= rg.maxHp, si = i - rg.maxHp;           // steel hearts sit after your own
+    let x = cx + (i - (n - 1) / 2) * gap, y = cy, s = sz * bounce, a = fade, full = st ? si < (rg.steel || 0) : i < rg.hp, col = st ? '#9ca3a9' : last ? '#e03434' : '#efefea';
     if (P.refill !== undefined && i >= P.refill) full = t > 0.25 + (i - P.refill) * 0.18;   // refilling one by one
-    if (P.gained === i) full = t > 0.25;
-    if (P.lost === i) {                    // the heart you lost: flashes red, cracks, then drops away
+    if (!st && P.gained === i) full = t > 0.25;
+    if (st ? P.steelLost === si : P.lost === i) {                    // the heart you lost: flashes red, cracks, then drops away
       const k = t - 0.35;
-      if (k < 0) { full = true; col = '#ff4a4a'; x += (Math.random() - 0.5) * 3; }
+      if (k < 0) { full = true; col = st ? '#e8ecef' : '#ff4a4a'; x += (Math.random() - 0.5) * 3; }
       else {
         ctx.save(); ctx.globalAlpha = Math.max(0, 1 - k / 0.7) * fade;
         ctx.translate(x + k * 18, y + 140 * k * k); ctx.rotate(k * 2.4);
-        heartPath(ctx, 0, 0, s); ctx.fillStyle = '#b02020'; ctx.fill();
+        heartPath(ctx, 0, 0, s); ctx.fillStyle = st ? '#6c7277' : '#b02020'; ctx.fill();
         ctx.restore();
         full = false;
       }
@@ -4454,7 +4491,8 @@ function drawHeartPop() {
     if (full) {
       ctx.fillStyle = col; ctx.fill();
       ctx.strokeStyle = 'rgba(10,10,10,0.8)'; ctx.lineWidth = 2; ctx.stroke();
-      if (last && P.lost === undefined || last && t > 0.35) { ctx.globalAlpha = a * (0.3 + 0.3 * Math.sin(t * 9)); heartPath(ctx, x, y, s * 1.35); ctx.strokeStyle = '#e03434'; ctx.lineWidth = 1.5; ctx.stroke(); }
+      if (st) { ctx.globalAlpha = a * 0.8; ctx.strokeStyle = '#eef1f3'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x - s * 0.32, y - s * 0.05); ctx.lineTo(x - s * 0.08, y - s * 0.28); ctx.stroke(); }   // a glint on the steel
+      else if (last && P.lost === undefined || last && t > 0.35) { ctx.globalAlpha = a * (0.3 + 0.3 * Math.sin(t * 9)); heartPath(ctx, x, y, s * 1.35); ctx.strokeStyle = '#e03434'; ctx.lineWidth = 1.5; ctx.stroke(); }
     } else { ctx.fillStyle = 'rgba(10,10,10,0.55)'; ctx.fill(); ctx.strokeStyle = 'rgba(239,239,234,0.55)'; ctx.lineWidth = 1.5; ctx.stroke(); }
   }
   if (P.blocked && t < 0.6) {              // Second Wind: a ring flashes out round the hearts
@@ -4580,13 +4618,25 @@ const TORCH_UP = [
   { id: 'heat', name: 'Heat', desc: 'Your beam burns 10% hotter per level.', base: 15, max: 5, lvl: n => `${10 * n}% hotter` },
   { id: 'reach', name: 'Reach', desc: 'Your beam is 8% longer per level.', base: 15, max: 4, lvl: n => `${8 * n}% longer` },
   { id: 'width', name: 'Width', desc: 'Your beam is 6% wider per level.', base: 15, max: 4, lvl: n => `${6 * n}% wider` },
-  { id: 'quick', name: 'Quick Light', desc: 'Your torch comes on faster and steadier when you switch it on, so a flick of the light catches things sooner.', base: 18, max: 3, lvl: n => `${80 * n}% faster on` },
-  { id: 'clean', name: 'Clean Burn', desc: 'Your beam uses less oil while it is on. The Oil Tank makes the tank bigger; this makes each drop last longer.', base: 18, max: 3, lvl: n => `${15 * n}% less oil` },
+  { id: 'clean', name: 'Oil Saver', desc: 'Your beam uses less oil while it is on. The Oil Tank makes the tank bigger; this makes each drop last longer.', base: 18, max: 3, lvl: n => `${15 * n}% less oil` },
+  { id: 'laser', name: 'Red Laser', desc: 'A thin red laser runs down the middle of your beam. Anything it touches burns hard, like a laser gun, even the bosses. It drinks a little more oil. Unlocks once your first orb is home.', base: 150, max: 2, lock: () => XS.orbs < 1 && !XS.dorbs, lvl: n => n > 1 ? 'thicker, hotter laser' : 'laser on' },
 ];
+const ARMOUR = [
+  { id: 'steel', name: 'Steel Hearts', desc: 'Grey steel hearts sit on top of your own, like armour. Hits break steel first. They don\'t heal out in the dark, but camp makes them whole again.', base: 25, max: 4, lvl: n => `${n} steel heart${n > 1 ? 's' : ''}` },
+  { id: 'shield', name: 'Shield', desc: 'Blocks one hit completely, then recharges while you\'re out. At level 3, breaking it sets off a flash that freezes everything near you.', base: 30, max: 3, lvl: n => `recharges in ${[60, 40, 25][n - 1]} s` },
+];
+const armPrice = t => Math.round(t.base * Math.pow(1.8, XS.arm[t.id] || 0));
+function buyArm(t) {
+  const have = XS.arm[t.id] || 0, cost = armPrice(t);
+  if (have >= t.max || XS.embers < cost) return;
+  XS.embers -= cost; XS.arm[t.id] = have + 1;
+  sfx(1.4, 0.5, 'bandpass', 1500, 0.3);
+  exApply();
+}
 const torchPrice = t => Math.round(t.base * Math.pow(1.8, XS.torch[t.id] || 0));
 function buyTorch(t) {
   const have = XS.torch[t.id] || 0, cost = torchPrice(t);
-  if (have >= t.max || XS.embers < cost) return;
+  if (have >= t.max || XS.embers < cost || (t.lock && t.lock())) return;
   XS.embers -= cost; XS.torch[t.id] = have + 1;
   sfx(1.4, 0.5, 'bandpass', 1500, 0.3);
   exApply();
@@ -4598,7 +4648,7 @@ const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
 // ---- saving: everything banked lives on this device ----
 const EX_KEY = 'behind-you-expedition';
 let XS = null;
-function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, torch: {}, shop2: true, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
+function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, torch: {}, arm: {}, shop2: true, shop3: true, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
 function exRead() {
   try {
     const s = JSON.parse(localStorage.getItem(EX_KEY) || 'null');
@@ -4615,6 +4665,12 @@ function exRead() {
         }
         x.eq = x.eq.filter(id => x.own[id]);
         x.shop2 = true; x.torch = x.torch || {};
+      }
+      if (!s.shop3) {                                // v64: Thick Coat and Second Wind became Armour, Quick Light was dropped: refund them
+        for (const id of ['coat', 'wind']) if (x.own[id]) { const u = UP[id]; for (let i = 0; i < x.own[id]; i++) x.embers += upPrice(u, i); delete x.own[id]; }
+        x.eq = x.eq.filter(id => x.own[id]);
+        if (x.torch && x.torch.quick) { for (let i = 0; i < x.torch.quick; i++) x.embers += Math.round(18 * Math.pow(1.8, i)); delete x.torch.quick; }
+        x.shop3 = true; x.arm = x.arm || {};
       }
       return x;
     }
@@ -4955,6 +5011,7 @@ const STATS = [
   { id: 'swift', g: 'Body', name: 'Swift', max: 5, sh: 'Walk and run faster', desc: 'You move 4% faster per rank.' },
   { id: 'hardy', g: 'Body', name: 'Hardy', max: 2, cost: [120, 300], sh: 'One more heart', desc: 'One more heart per rank, every run and every trip.' },
   { id: 'nimble', g: 'Body', name: 'Nimble', max: 4, sh: 'Dodge again sooner', desc: 'Your dodge recharges 8% faster per rank.' },
+  { id: 'regen', g: 'Body', name: 'Regen', max: 3, cost: [60, 140, 260], sh: 'Hearts heal over time', desc: 'Go a while without being hit and you heal a heart: every 30 s, then 20 s, then 12 s.' },
   { id: 'steady', g: 'Body', name: 'Steady', max: 3, sh: 'Longer safety after hits', desc: 'After a hit you stay safe 0.15 seconds longer per rank.' },
   { id: 'pull', g: 'Spirit', name: 'Pull', max: 3, sh: 'Wisps come to you', desc: 'Wisps fly to you from further away.' },
   { id: 'linger', g: 'Spirit', name: 'Linger', max: 2, sh: 'Wisps fade slower', desc: 'Wisps last 4 seconds longer per rank before they fade.' },
@@ -4963,7 +5020,7 @@ const STATS = [
 const STAT = Object.fromEntries(STATS.map(s => [s.id, s]));
 const STAT_COST = [15, 35, 70, 120, 190];
 const STAT_GROUPS = [
-  { id: 'Body', line: 'Speed, hearts and dodging', icon: 'hardy' },
+  { id: 'Body', line: 'Speed, hearts, healing and dodging', icon: 'hardy' },
   { id: 'Spirit', line: 'Gathering wisps', icon: 'wisp' },
 ];
 function stRead() { try { const s = JSON.parse(localStorage.getItem(ST_KEY)); if (s && typeof s.w === 'number' && s.r) return s; } catch (e) {} return { w: 0, r: {} }; }
@@ -5115,7 +5172,7 @@ function exNewRun() {
   const rg = newRun();
   rg.wave = 1; rg.up = {};
   for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
-  rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = rg.up.wind || 0;
+  rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = lv('wind'); rg.steel = steelMax();
   rg.pack = []; rg.carryOrb = false; rg.carryDorb = false; rg.looted = new Set(); rg.left = new Map(); rg.loose = []; rg.notes = [];
   rg.inCamp = true; rg.oil = oilMax(); rg.oilWarn = 0; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
   return rg;
@@ -5235,8 +5292,8 @@ function exHome() {                          // stepped inside the fence: bank t
   if (rg.wispCarry) {
     ST.w += rg.wispCarry; stSave(); exNote(`+${rg.wispCarry} wisps`, true); rg.wispCarry = 0; wispChime(0.75);
   }
-  if (rg.hp < rg.maxHp) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = rg.maxHp; }
-  rg.shield = lv('wind'); rg.looted.clear(); rg.left.clear(); rg.cleared = false;   // home again: the woods fill back up
+  if (rg.hp < rg.maxHp || (rg.steel || 0) < steelMax()) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = rg.maxHp; }
+  rg.steel = steelMax(); rg.shield = lv('wind'); rg.looted.clear(); rg.left.clear(); rg.cleared = false;   // home again: the woods fill back up
   rg.oil = oilMax(); rg.oilWarn = 0;
   XS.out = null; exSave();
 }
@@ -5489,6 +5546,7 @@ function bossStep(dt) {
   const open = b.st === 'recover';
   if (lit > 0) {
     b.hp -= dt * rgBurn() * lit * (open ? 1 : 0.3);
+    if (S.rg.laserOn && laserHits(b.x, b.y, 40 * BS)) b.hp -= dt * rgBurn() * (tu('laser') > 1 ? 2.2 : 1.5) * (open ? 1 : 0.5);   // the Red Laser cuts him too
     if (rg.embers.length < 320 && Math.random() < dt * (open ? 30 : 10)) rg.embers.push({ x: b.x + (Math.random() - 0.5) * 30, y: b.y + (Math.random() - 0.5) * 30, z: 30 + Math.random() * 150, vz: 30 + Math.random() * 50, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.6 + Math.random() * 0.6, ember: true });
   }
   if (b.hp <= b.flinchAt && b.hp > 0) { b.flinchAt -= B_HP * 0.1; b.flinch = 1; ashBurst(b.x, b.y, 14, 120); bossSay('pain'); addShake(0.15); }
@@ -5937,7 +5995,7 @@ function portalStep(dt) {                      // returns true when the rest of 
 function exOilStep(dt, refill) {
   const rg = S.rg;
   if (refill) { rg.oil = Math.min(oilMax(), rg.oil + OIL_REFILL * dt); return; }
-  rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT * (1 - 0.15 * tu('clean')) : OIL_IDLE));   // Clean Burn: the beam sips less
+  rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT * (1 - 0.15 * tu('clean')) * (tu('laser') ? 1.25 : 1) : OIL_IDLE));   // Clean Burn: the beam sips less
   const f = rg.oil / oilMax();
   if (f < 0.3 && rg.oilWarn < 1) { rg.oilWarn = 1; exNote('oil low, head back', true); }
   if (f < 0.1 && rg.oilWarn < 2) { rg.oilWarn = 2; exNote('the torch is guttering', true); }
@@ -6389,20 +6447,21 @@ function drawExFx() {
   ctx.textAlign = 'left';
 }
 function drawExHud(top) {
-  drawBossBar();
+  drawRedLaser(); drawBossBar();
   const rg = S.rg; if (!rg || !XS) return;
   ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(239,239,234,0.75)';
   ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.next ? 'SOMEWHERE ELSE' : rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
-  for (let i = 0; i < rg.maxHp; i++) {
-    const x = 16 + i * 15, y = 37 + top;
+  for (let i = 0; i < rg.maxHp + steelMax(); i++) {
+    const x = 16 + i * 15, y = 37 + top, st = i >= rg.maxHp;
     heartPath(ctx, x + 5, y + 5, 11);
-    if (i < rg.hp) { ctx.fillStyle = rg.hp === 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); }
+    if (st) { if (i - rg.maxHp < (rg.steel || 0)) { ctx.fillStyle = '#9ca3a9'; ctx.fill(); } else { ctx.strokeStyle = 'rgba(156,163,169,0.4)'; ctx.lineWidth = 1; ctx.stroke(); } }
+    else if (i < rg.hp) { ctx.fillStyle = rg.hp === 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); }
     else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
   }
   ctx.fillStyle = 'rgba(239,239,234,0.4)';
   const bits = [`PACK ${packUsed(rg.pack)}/${packMax()}`, `${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`, `OIL ${Math.round(100 * rg.oil / oilMax())}%`];
-  if (XS.recall) bits.push('FLARE'); if (XS.lanterns) bits.push('LANTERN');
+  if (lv('wind')) bits.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's'); if (XS.recall) bits.push('FLARE'); if (XS.lanterns) bits.push('LANTERN');
   let ln = '', y = 54 + top; const room = W - 16 - 110;   // wrap before it reaches the Menu button
   for (const b of bits) { const t = ln ? ln + ' · ' + b : b; if (ln && ctx.measureText(t).width > room) { ctx.fillText(ln, 16, y); y += 17; ln = b; } else ln = t; }
   ctx.fillText(ln, 16, y);
@@ -6425,7 +6484,7 @@ function closeCamp() {
 function exApply() {                         // loadout changed: rebuild the run's upgrades from what's equipped
   const rg = S.rg;
   rg.up = {}; for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
-  rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = lv('wind');
+  rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = lv('wind'); rg.steel = steelMax();
   if (rg.inCamp) rg.oil = oilMax();
   exSave(); renderCamp();
 }
@@ -6503,6 +6562,11 @@ const ICONS = {
   bag: '<path d="M5.5 8.5h13l1 12.5h-15z"/><path d="M9 8.5a3 3 0 0 1 6 0M9.5 13h5"/>',
   slot: '<rect x="2.5" y="7" width="5.5" height="10"/><rect x="10" y="7" width="5.5" height="10"/><path d="M19.8 9v6M16.8 12h6"/>',
   recall: '<path d="M4 11l8-7 8 7v10H4z"/><path d="M12 18.5v-6M9.5 15L12 12.5l2.5 2.5"/>',
+  steel: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7.5 2.3C19.5 15.4 12 20 12 20z"/><path d="M7.5 10.5h9M8.5 14h7"/>',
+  shield: '<path d="M12 3l7.5 3v5.2c0 5-3.6 8.3-7.5 9.8-3.9-1.5-7.5-4.8-7.5-9.8V6z"/><path d="M12 7v10"/>',
+  laser: '<path d="M3 12l17-6M3 12l17 6"/><path d="M3 12h19" stroke-width="2.4"/>',
+  regen: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7.5 2.3C19.5 15.4 12 20 12 20z"/><path d="M8 13.5h2l1-2 2 4 1-2h2"/>',
+  power: '<path d="M13 2L5 13h6l-1 9 8-12h-6z"/>',
   lanterns: '<path d="M6.5 21V4h8"/><rect x="11.5" y="7.5" width="6" height="8.5"/><path d="M14.5 4v3.5"/><path d="M14.5 10v3" stroke-width="2.4"/>',
 };
 const SHORT = {
@@ -6516,32 +6580,36 @@ const SHORT = {
   scar: 'Burned enemies stay slower', wildfire: 'Bigger bursts, free flares', embers: 'Kills leave burning ground',
   heat: 'Burns hotter', reach: 'A longer beam', width: 'A wider beam', quick: 'Comes on faster', clean: 'Uses less oil',
   smoulder: 'Burn lingers, fire where they fall', glare: 'Burn spears and arrows mid-air', mirror: 'Bend lasers back at them',
-  tank: 'More oil, go further', frame: 'Heavy loot slows you less', bag: 'Two more pack slots', slot: 'Equip one more upgrade', recall: 'One use: home now', lanterns: 'Plant a safe light',
+  steel: 'Armour hearts on top of yours', shield: 'Blocks a hit, then recharges', laser: 'A burning laser down the beam', regen: 'Hearts heal over time',
+  tank: 'More oil, go further', frame: 'Heavy loot slows you less', bag: 'Two more pack slots', slot: 'Hold one more power-up', recall: 'One use: home now', lanterns: 'Plant a safe light',
 };
 const CATS = [
-  { id: 'Flame', nm: 'Torch upgrades', line: 'Always on, no slot needed', icon: 'searing' },
-  { id: 'Torch', nm: 'Beam', line: 'Beam tricks for your slots', icon: 'torch' },
-  { id: 'Body', line: 'Hearts, hits and dodging', icon: 'coat' },
-  { id: 'Allies', line: 'Fire that fights for you', icon: 'fireflies' },
-  { id: 'Senses', line: 'See what hides out there', icon: 'dread' },
-  { id: 'Gear', line: 'Oil, pack, slots and supplies', icon: 'bag' },
+  { id: 'Flame', nm: 'Torch', line: 'Burn, reach, width and oil', icon: 'searing' },
+  { id: 'Armour', line: 'Steel hearts and a shield', icon: 'shield' },
+  { id: 'Power', nm: 'Power-ups', line: 'Special powers that fill your slots', icon: 'power' },
+  { id: 'Gear', line: 'Oil tank, pack and supplies', icon: 'bag' },
 ];
+const POWER_GROUPS = [['Torch', 'Beam'], ['Body', 'Body'], ['Allies', 'Allies'], ['Senses', 'Senses']];
 let campCat = null, campOpen = null;
 const svgIcon = id => { const s = el('span', 'ic'); s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] || ''}</svg>`; return s; };
 function campItems(cat) {                    // everything in a category, in one shape for drawing
-  if (cat === 'Flame') return TORCH_UP.map(t => {
-    const have = XS.torch[t.id] || 0, cost = torchPrice(t), maxed = have >= t.max;
-    return { id: t.id, name: t.name, desc: t.desc, cls: have ? 'own' : '', lvl: `${have ? t.lvl(have) + ' · ' : ''}level ${have} of ${t.max} · always on`, tag: maxed ? 'MAX' : String(cost), have, max: t.max,
-      buy: [maxed ? 'Maxed' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyTorch(t)] };
+  const levelled = (list, own, price, buy, extra) => list.map(t => {
+    const have = own[t.id] || 0, cost = price(t), maxed = have >= t.max, locked = !have && t.lock && t.lock();
+    return { id: t.id, name: t.name, desc: t.desc, cls: have ? 'own' : '', lvl: locked ? 'Locked · bring your first orb home' : `${have ? t.lvl(have) + ' · ' : ''}level ${have} of ${t.max} · ${extra}`, tag: maxed ? 'MAX' : locked ? 'LOCKED' : String(cost), have, max: t.max,
+      buy: [maxed ? 'Maxed' : locked ? 'Locked' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && !locked && XS.embers >= cost, () => buy(t)] };
   });
-  if (cat === 'Gear') return GEAR.map(g => {
+  if (cat === 'Flame') return levelled(TORCH_UP, XS.torch, torchPrice, buyTorch, 'always on');
+  if (cat === 'Armour') return levelled(ARMOUR, XS.arm, armPrice, buyArm, 'always on');
+  const gearItem = g => {
     const have = XS[g.id], cost = gearPrice(g), maxed = have >= gearMax(g);
-    const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : g.id === 'tank' ? Math.round(oilMax()) + ' oil' : g.id === 'frame' ? Math.round(20 * (XS.frame || 0)) + '% lighter loads' : slotMax() + ' equip slots'} · level ${have} of ${g.max}`
+    const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : g.id === 'tank' ? Math.round(oilMax()) + ' oil' : g.id === 'frame' ? Math.round(20 * (XS.frame || 0)) + '% lighter loads' : slotMax() + ' power-up slots'} · level ${have} of ${g.max}`
       : g.id === 'lanterns' ? `${XS.outposts.length} of 3 planted · ${have ? 'carrying one' : 'carry one at a time'}` : have ? 'Carrying one' : 'Carry one at a time';
-    return { id: g.id, name: g.name, desc: g.desc, lvl, cls: '', tag: maxed ? (g.use && have ? 'HAVE' : g.use ? 'NONE' : 'MAX') : String(cost),
+    return { id: g.id, name: g.id === 'slot' ? 'Power-up Slot' : g.name, desc: g.id === 'slot' ? 'Hold one more power-up at a time.' : g.desc, lvl, cls: '', tag: maxed ? (g.use && have ? 'HAVE' : g.use ? 'NONE' : 'MAX') : String(cost),
+      have: g.use ? 0 : have, max: g.use ? 0 : gearMax(g),
       buy: [maxed ? (g.use ? (have ? 'Carrying' : 'None left') : 'Maxed') : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyGear(g)] };
-  });
-  return SHOP.filter(u => u.tag === cat).map(u => {
+  };
+  if (cat === 'Gear') return GEAR.filter(g => g.id !== 'slot').map(gearItem);
+  const kitItem = u => {
     const mx = kitMax(u), have = XS.own[u.id] || 0, maxed = have >= mx, cost = upPrice(u, have), on = XS.eq.includes(u.id), room = eqUsed() + slotCost(u.id) <= slotMax();
     const ladder = EX_KIT[u.id] && EX_KIT[u.id].lv;   // what each level adds
     const lvTxt = ladder ? ladder.map((t, i) => `${i < have ? '✓' : i === have ? '›' : '·'} ${i + 1}: ${t}`).join('\n') : '';
@@ -6550,7 +6618,10 @@ function campItems(cat) {                    // everything in a category, in one
       tag: on ? 'ON' : maxed ? 'MAX' : String(cost), have, max: mx,
       buy: [maxed ? 'Maxed' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyUp(u.id)],
       eq: have ? [on ? 'Unequip' : room ? 'Equip' : 'No room', on || room, () => toggleEq(u.id)] : null };
-  });
+  };
+  if (cat === 'Power') return [{ ...gearItem(GEAR.find(g => g.id === 'slot')), grp: 'Slots' },
+    ...POWER_GROUPS.flatMap(([tag, nm]) => SHOP.filter(u => u.tag === tag).map(u => ({ ...kitItem(u), grp: nm })))];
+  return SHOP.filter(u => u.tag === cat).map(kitItem);
 }
 function renderCamp() {
   document.getElementById('campEyebrow').textContent = `${XS.embers} embers · ${XS.orbs} of 3 orbs home`;
@@ -6559,7 +6630,7 @@ function renderCamp() {
     const b = el('button', 'chip'); b.type = 'button'; b.title = 'Unequip';
     b.append(svgIcon(id), el('span', '', `${UP[id].name}${XS.own[id] > 1 ? ' ' + XS.own[id] : ''}`), el('span', 'x', '×'));
     b.addEventListener('click', () => toggleEq(id)); return b;
-  }) : [el('p', 'small', 'Nothing equipped yet. Anything you buy goes straight on if there is room.')]));
+  }) : [el('p', 'small', 'No power-ups on yet. Anything you buy goes straight on if there is room.')]));
   const body = document.getElementById('campBody');
   if (!campCat) {                            // first: which currency are you spending?
     const w = el('div', 'wallets');
@@ -6583,9 +6654,10 @@ function renderCamp() {
     cats.append(...CATS.map(c => {
       const b = el('button', 'cat'); b.type = 'button';
       let count;
-      if (c.id === 'Gear') count = `${packMax()} pack · ${slotMax()} slots`;
+      if (c.id === 'Gear') count = `${packMax()} pack · ${Math.round(oilMax())} oil`;
       else if (c.id === 'Flame') count = `${TORCH_UP.reduce((a, t) => a + (XS.torch[t.id] || 0), 0)} of ${TORCH_UP.reduce((a, t) => a + t.max, 0)} levels`;
-      else { const all = SHOP.filter(u => u.tag === c.id); count = `${all.filter(u => XS.own[u.id]).length} of ${all.length} owned`; }
+      else if (c.id === 'Armour') count = `${XS.arm.steel || 0} steel · shield ${XS.arm.shield ? 'level ' + XS.arm.shield : 'none'}`;
+      else { const all = SHOP.filter(u => POWER_GROUPS.some(g => g[0] === u.tag)); count = `${all.filter(u => XS.own[u.id]).length} of ${all.length} owned · ${slotMax()} slots`; }
       const t = el('span', 'ct'); t.append(el('span', 'nm', c.nm || c.id), el('span', 'sh', c.line), el('span', 'cnt', count));
       b.append(svgIcon(c.icon), t);
       b.addEventListener('click', () => { campCat = c.id; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); });
@@ -6597,7 +6669,9 @@ function renderCamp() {
   back.addEventListener('click', () => { campCat = 'embers'; campOpen = null; renderCamp(); });
   head.append(back, el('h3', '', (CATS.find(c => c.id === campCat) || {}).nm || campCat));
   const list = el('div', 'items');
-  list.append(...campItems(campCat).map(it => {
+  let grp = null;
+  list.append(...campItems(campCat).flatMap(it => {
+    const pre = it.grp && it.grp !== grp ? [el('p', 'grp', (grp = it.grp))] : [];
     const open = campOpen === it.id, wrap = el('div', 'item ' + it.cls + (open ? ' open' : ''));
     const row = el('button', 'itemrow'); row.type = 'button'; row.setAttribute('aria-expanded', open ? 'true' : 'false');
     const t = el('span', 'it'); t.append(el('span', 'nm', it.name), el('span', 'sh', SHORT[it.id] || ''));
@@ -6612,7 +6686,7 @@ function renderCamp() {
       more.append(el('p', 'ds', it.desc), el('p', 'lv', it.lvl), acts);
       wrap.append(more);
     }
-    return wrap;
+    return [...pre, wrap];
   }));
   body.replaceChildren(head, list);
 }
