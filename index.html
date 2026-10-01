@@ -331,7 +331,7 @@ function viewR() { return Math.hypot(W, H * 2) / K() * 0.6; }
 // ---- world ----
 function hash(i, j) { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); }
 function angDiff(a, b) { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
-function flicker() { return 1 + Math.sin(S.t * 13) * 0.015 + Math.sin(S.t * 29.3) * 0.012 + (Math.random() - 0.5) * 0.02; }
+function flicker() { return 1 + Math.sin(S.t * 13) * 0.005 + Math.sin(S.t * 29.3) * 0.004 + Math.sin(S.t * 7.1) * 0.004; }   // a gentle, smooth waver (no random jumps)
 
 // ---- lights: at most one campfire or lantern per chunk, plus the odd firefly swarm ----
 const C = 13 * T;
@@ -1647,7 +1647,7 @@ function drawTorchWarmth() {
   ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = 0.32 * Math.min(1, b.a); ctx.fillStyle = g;
   ctx.beginPath(); ctx.moveTo(b.bx, b.by);
-  for (let t = -HALF - 0.04; t <= HALF + 0.041; t += HALF / 8) ctx.lineTo(b.bx + Math.cos(S.aim + t) * b.br, b.by + Math.sin(S.aim + t) * b.br);
+  for (let t = -HALF - 0.12; t <= HALF + 0.121; t += HALF / 8) ctx.lineTo(b.bx + Math.cos(S.aim + t) * b.br, b.by + Math.sin(S.aim + t) * b.br);
   ctx.closePath(); ctx.fill();
   ctx.restore();
 }
@@ -1901,7 +1901,7 @@ function drawFilm() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   // exposure flicker, like an uneven old projector
-  film.flick += (Math.random() - 0.5) * 0.02; film.flick *= 0.85;
+  film.flick += (Math.random() - 0.5) * 0.01; film.flick *= 0.85;
   ctx.fillStyle = film.flick > 0 ? `rgba(255,255,250,${film.flick * 0.6})` : `rgba(0,0,0,${-film.flick * 1.5})`;
   ctx.fillRect(0, 0, W, H);
   ctx.drawImage(vig, 0, 0, W, H);
@@ -1951,12 +1951,35 @@ function renderScene() {
   dctx.globalCompositeOperation = 'destination-out';
   // beam is drawn in screen space so its width and length never change with direction
   const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * ZOOM() * flicker() * (0.2 + 0.8 * torchFade()) * (isRg() ? rgRange() : 1); // beam starts at the torch lens and reaches most of the way across the screen
-  let grad = dctx.createRadialGradient(bx, by, 0, bx, by, br);
-  grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(0.7, 'rgba(0,0,0,0.9)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
-  dctx.fillStyle = grad; dctx.globalAlpha = S.torchLvl * (0.55 + 0.45 * torchFade());
-  dctx.beginPath(); dctx.moveTo(bx, by);
-  for (let t = -HALF; t <= HALF + 0.001; t += HALF / 16) dctx.lineTo(bx + Math.cos(S.aim + t) * br, by + Math.sin(S.aim + t) * br);
-  dctx.closePath(); dctx.fill(); dctx.globalAlpha = 1;
+  // soft sides: the beam is drawn small as stacked wedges of slightly different widths, blurred, then stretched over the dark,
+  // so the light fades out over its edges instead of stopping dead (the shadow canvases are free until the shadow pass below)
+  const beamA = S.torchLvl * (0.55 + 0.45 * torchFade()), FEATHER = 0.06 + HALF * 0.14, NW = 9;
+  shActx.setTransform(1, 0, 0, 1, 0, 0); shActx.clearRect(0, 0, shA.width, shA.height); shActx.setTransform(1 / SH, 0, 0, 1 / SH, 0, 0);
+  const bre = br * 1.15;   // the light trails off a little past where it used to stop
+  const grad = shActx.createRadialGradient(bx, by, 0, bx, by, bre);   // a long, eased fade instead of a short drop
+  for (const [t, a] of [[0, 1], [0.35, 0.97], [0.5, 0.88], [0.62, 0.72], [0.72, 0.52], [0.82, 0.3], [0.91, 0.12], [1, 0]]) grad.addColorStop(t, `rgba(0,0,0,${a})`);
+  shActx.fillStyle = grad; shActx.globalAlpha = 1 - Math.pow(1 - Math.min(0.995, beamA), 1 / NW);
+  for (let n = 0; n < NW; n++) {
+    const hw = HALF + FEATHER * (2 * n / (NW - 1) - 1);
+    shActx.beginPath(); shActx.moveTo(bx, by);
+    for (let t = -hw; t <= hw + 0.001; t += hw / 16) shActx.lineTo(bx + Math.cos(S.aim + t) * bre, by + Math.sin(S.aim + t) * bre);
+    shActx.closePath(); shActx.fill();
+  }
+  shActx.globalAlpha = 1;
+  shBctx.setTransform(1, 0, 0, 1, 0, 0); shBctx.clearRect(0, 0, shB.width, shB.height);
+  shBctx.globalCompositeOperation = 'lighter'; shBctx.globalAlpha = 0.2;   // one small blur to melt the steps between wedges
+  for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) shBctx.drawImage(shA, ox, oy);
+  shBctx.globalCompositeOperation = 'source-over'; shBctx.globalAlpha = 1;
+  { // only the part of the screen the beam covers
+    let x0 = bx, x1 = bx, y0 = by, y1 = by;
+    for (let t = -1; t <= 1; t += 0.25) { const a = S.aim + t * (HALF + FEATHER); x0 = Math.min(x0, bx + Math.cos(a) * bre); x1 = Math.max(x1, bx + Math.cos(a) * bre); y0 = Math.min(y0, by + Math.sin(a) * bre); y1 = Math.max(y1, by + Math.sin(a) * bre); }
+    const sx0 = Math.max(0, Math.floor(x0 / SH) - 2), sy0 = Math.max(0, Math.floor(y0 / SH) - 2);
+    const sx1 = Math.min(shB.width, Math.ceil(x1 / SH) + 2), sy1 = Math.min(shB.height, Math.ceil(y1 / SH) + 2);
+    if (sx1 > sx0 && sy1 > sy0) {
+      dctx.save(); dctx.setTransform(1, 0, 0, 1, 0, 0); dctx.imageSmoothingEnabled = true;
+      dctx.drawImage(shB, sx0, sy0, sx1 - sx0, sy1 - sy0, sx0 * SH * DPR, sy0 * SH * DPR, (sx1 - sx0) * SH * DPR, (sy1 - sy0) * SH * DPR); dctx.restore();
+    }
+  }
   beamGeo = { bx, by, br, a: S.torchLvl * (0.55 + 0.45 * torchFade()) };
   if (isRg()) cutSurviveLights(bx, by, br);
 
