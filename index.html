@@ -250,7 +250,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <button id="testStorm" class="alt">Test a dust storm</button>
       <p class="small">Starts in the Dunes with a dust storm two seconds away.</p>
       <button id="testBoss" class="alt">Test the boss fight</button>
-      <p class="small">Starts in Expedition at the edge of the Woodwarden's stones, with two orbs home. Nothing from the test is saved.</p>
+      <p class="small">Starts in Expedition by the Woodwarden's stones, with two orbs home. Nothing from the test is saved.</p>
     </div>
   </section>
   <section class="card panel" id="pScores" hidden>
@@ -316,10 +316,12 @@ const wT = document.createElement('canvas'), wTctx = wT.getContext('2d');
 const wH = document.createElement('canvas'), wHctx = wH.getContext('2d');
 let warmHoles = false, warmHoleBox = null;
 let warmOn = false, warmBox = null, beamGeo = null;
-let W = 0, H = 0, DPR = 1, Z = 1, SAFE_TOP = 0;
+let W = 0, H = 0, DPR = 1, Z = 1, ZB = 1, SAFE_TOP = 0;   // ZB: the usual zoom; Z eases away from it when a boss fight frames its arena
 let FOV = 1;   // field of view from the menu slider: above 1 sees more (zoomed out), below 1 is closer
 try { const f = parseFloat(localStorage.getItem('behind-you-fov')); if (f >= 0.75 && f <= 1.4) FOV = f; } catch (e) {}
 const ZOOM = () => 1 / FOV; // camera zoom: bigger is closer
+let camZv = 1;                 // extra zoom for a framed boss arena (1 = normal)
+const CAMZ = () => camZv;
 // big laptop screens have 4x the pixels of a phone; past about 1080p the extra sharpness costs smoothness,
 // so the canvas renders at most this many pixels and the browser scales it up
 const PIXEL_BUDGET = 2.2e6;
@@ -332,7 +334,7 @@ function resize() {
   SAFE_TOP = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0;
   shA.width = shB.width = lA.width = lAcc.width = lB.width = wA.width = wT.width = wH.width = Math.ceil(W / SH) + 2;
   shA.height = shB.height = lA.height = lAcc.height = lB.height = wA.height = wT.height = wH.height = Math.ceil(H / SH) + 2;
-  Z = ZOOM() * Math.max(0.55, Math.min(W, H) / 720);
+  ZB = ZOOM() * Math.max(0.55, Math.min(W, H) / 720); Z = ZB * CAMZ();
 }
 window.addEventListener('resize', resize); resize();
 
@@ -481,7 +483,7 @@ function makeProp(i, j) {
   if (Math.abs(i) < 2 && Math.abs(j) < 2) return null; // clear spawn
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2, j * T + T / 2) < CAMP_R + 60) return null;   // the camp clearing
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2 - TELE2.x, j * T + T / 2 - TELE2.y) < 120) return null;   // and round the second shrine
-  if (S && S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb && Math.hypot(i * T + T / 2 - XS.orb.x, j * T + T / 2 - XS.orb.y) < AR + 50) return null;   // and the boss's clearing
+  if (S && S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb && Math.hypot(i * T + T / 2 - XS.orb.x, j * T + T / 2 - XS.orb.y) < RC + 60) return null;   // and the boss's field
   const cx = i * T + T / 2, cy = j * T + T / 2;
   for (const L of chunkLights(Math.floor(cx / C), Math.floor(cy / C)))
     if (L.kind !== 'flies' && Math.hypot(cx - L.x, cy - L.y) < 80) return null; // keep a clearing round each light
@@ -1280,8 +1282,15 @@ function update(dt) {
   // camera leads toward the torch, so the player sits opposite the beam and the beam gets the screen
   const lead = isRg() ? 0.4 : 1;   // Nightfall keeps you nearer the middle so you can see what is behind you
   const [lx, ly] = screenDirToWorld(Math.cos(S.aim) * W * 0.32 * lead, Math.sin(S.aim) * H * 0.3 * lead);
-  const ck = 1 - Math.exp(-3 * dt);
-  S.cam.x += (p.x + lx - S.cam.x) * ck; S.cam.y += (p.y + ly - S.cam.y) * ck;
+  const ck = 1 - Math.exp(-3 * dt), fc = bossCam();
+  if (fc) {                                    // a boss fight: the camera frames the whole arena and holds still
+    const k2 = 1 - Math.exp(-2.5 * dt);
+    camZv += (fc.z - camZv) * k2; S.cam.x += (fc.x - S.cam.x) * k2; S.cam.y += (fc.y - S.cam.y) * k2;
+  } else {
+    if (camZv !== 1) { camZv += (1 - camZv) * (1 - Math.exp(-2.5 * dt)); if (Math.abs(camZv - 1) < 0.002) camZv = 1; }
+    S.cam.x += (p.x + lx - S.cam.x) * ck; S.cam.y += (p.y + ly - S.cam.y) * ck;
+  }
+  Z = ZB * CAMZ();
 
   const v = screenSpeed(p);
   const before = Math.floor((p.phase - Math.PI / 2) / Math.PI);
@@ -1886,7 +1895,7 @@ function desertDecorAt(i, j) {
   return { kind: 'decor', dk, x, y, s: 0.8 + hash(j * 1.3, i) * 0.6, v: (v * 97 | 0) % DESERT_KINDS[dk][0], seed: v };
 }
 function desertDecorInView() {                   // only what the torch can reach
-  const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60, out = [], R = viewR();
+  const reach = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * (isRg() ? rgRange() : 1) / K() + 60, out = [], R = viewR();
   for (let i = Math.floor((S.cam.x - R) / T); i <= Math.ceil((S.cam.x + R) / T); i++)
     for (let j = Math.floor((S.cam.y - R) / T); j <= Math.ceil((S.cam.y + R) / T); j++) {
       const o = desertDecorAt(i, j); if (!o || Math.hypot(o.x - S.p.x, o.y - S.p.y) > reach) continue;
@@ -2126,7 +2135,7 @@ function decorNear(x, y, R) {
 function decorInView(lights) {   // ground cover only shows where some light reaches it, so skip the rest
   if (inNext()) return [];
   if (inBeyond()) return desertDecorInView();
-  const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
+  const reach = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
   const out = [], near = lights.filter(L => Math.hypot(L.x - S.p.x, L.y - S.p.y) < viewR() + 200);
   for (const o of decorNear(S.cam.x, S.cam.y, viewR())) {
     if (QUALITY < 0.75 && (o.dk === 'grass' || o.dk === 'shrooms' || o.dk === 'pebbles')) continue;   // a slow machine drops the smallest bits first
@@ -2719,7 +2728,7 @@ function renderScene() {
   dctx.fillStyle = '#050505'; dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
   // beam is drawn in screen space so its width and length never change with direction
-  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * ZOOM() * flicker() * (0.2 + 0.8 * torchFade()) * (isRg() ? rgRange() : 1); // beam starts at the torch lens and reaches most of the way across the screen
+  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * flicker() * (0.2 + 0.8 * torchFade()) * (isRg() ? rgRange() : 1); // beam starts at the torch lens and reaches most of the way across the screen
   // soft sides: the beam is drawn small as stacked wedges of slightly different widths, blurred, then stretched over the dark,
   // so the light fades out over its edges instead of stopping dead (the shadow canvases are free until the shadow pass below)
   const beamA = S.torchLvl * (0.55 + 0.45 * torchFade()), FEATHER = 0.06 + HALF * 0.14, NW = 9;
@@ -2843,7 +2852,7 @@ function renderScene() {
     const hidden = casters.some(c => c.d < qd && Math.abs(angDiff(qth, c.th)) < Math.asin(Math.min(1, c.r / c.d)));
     // trees no longer hide them: if they're in the beam they count, and they're drawn clearly on top
     q.lit = inCone && S.torchLvl > 0.6 ? 1 : 0;
-    const fullBr = Math.max(W, H) * 0.72 * ZOOM();
+    const fullBr = Math.max(W, H) * 0.72 * ZOOM() * CAMZ();
     q.aimed = d < fullBr * 0.95 && Math.abs(angDiff(Math.atan2(qy - 10 * Z - by, qx - bx), S.aim)) < HALF;
     q.fall = Math.min(1, (br * 0.95 - d) / (br * 0.25));
   }
@@ -4974,14 +4983,35 @@ function exStep(dt) {
 
 // ---- the forest boss: the Woodwarden keeps the last green orb in a ring of standing stones ----
 // Four moves, each with a wind-up you can see and hear and a red mark on the ground; after each he is open, and the light burns him three times as hard.
-const AR = 260, BS = 3.6, B_HP = 140, B_LEN = 40;            // arena radius, his size against yours, his health, the trunk's length (in his own units)
+const AR = 420, RC = 1800, BS = 3.6, B_HP = 140, B_LEN = 40;   // the ring of stones you walk into; how far the cleared field reaches
+const B_AREA = 2.5e6;                          // how much ground the fight camera shows, whatever the screen's shape            // arena radius, his size against yours, his health, the trunk's length (in his own units)
 const B_TELL = { slam: 1.0, sweep: 0.8, quake: 0.9, leap: 1.2 };
 const B_SLAM = (10 + B_LEN) * BS, B_SWEEP = (7 + B_LEN) * BS;   // how far the trunk reaches when it comes down, and when it swings
 const bossArena = () => S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb ? XS.orb : null;
 const bossLive = () => { const b = S.rg && S.rg.boss; return b && b.st !== 'gone' ? b : null; };
+function bossCam() {                            // while he fights, the camera frames the whole field and holds still
+  const b = S && S.mode === 'expedition' && S.rg && S.rg.boss, c = bossArena();
+  if (!b || !c || b.st === 'dead' || b.st === 'gone') return null;
+  const k = Math.sqrt(W * H / B_AREA);         // same amount of ground on every screen
+  return { x: c.x, y: c.y, z: Math.max(0.45, Math.min(1.3, k / (0.78 * ZB))), k };
+}
+function arenaBox(m = 0) {                       // the screen is the arena: its edges, inside the HUD and the health bar
+  return { l: 26 + m, r: W - 26 - m, t: SAFE_TOP + (W < 600 ? 196 : 128) + m, b: H - 34 - m };
+}
+function arenaClamp(o, m = 0) {                  // keep something inside the framed arena (worked out with the held camera, not the easing one)
+  const fc = bossCam(); if (!fc) return;
+  const k = fc.k, bx = arenaBox(m), dx = o.x - fc.x, dy = o.y - fc.y;
+  let sx = W / 2 + (dx - dy) * k, sy = H / 2 + (dx + dy) * k / 2;
+  sx = Math.max(bx.l, Math.min(bx.r, sx)); sy = Math.max(bx.t, Math.min(bx.b, sy));
+  const a = (sx - W / 2) / k, bb = 2 * (sy - H / 2) / k;
+  let nx = (a + bb) / 2, ny = (bb - a) / 2;
+  const r = Math.hypot(nx, ny), cap = RC - 30 - m * 2;   // and never past the edge of the cleared field
+  if (r > cap) { nx *= cap / r; ny *= cap / r; }
+  o.x = fc.x + nx; o.y = fc.y + ny;
+}
 function bossGrace() {                          // the checkpoint lantern, just outside the stones on the side toward camp
   const c = bossArena(); if (!c) return null;
-  const d = Math.hypot(c.x, c.y) || 1, k = AR + OUT_R + 40;
+  const d = Math.hypot(c.x, c.y) || 1, k = RC + OUT_R + 40;
   return { x: c.x - c.x / d * k, y: c.y - c.y / d * k };
 }
 function bossStones() {
@@ -5088,9 +5118,9 @@ function bossMusic(on, k2) {                    // placeholder fight music: a lo
 }
 function bossNext(b, d) {                       // what he does next depends on how far away you are
   let m;
-  if (b.far > 2.5 || d > 330) m = 'leap';
+  if (b.far > 3 || d > 470) m = 'leap';
   else if (d < B_SLAM - 10) m = Math.random() < 0.5 ? 'slam' : 'sweep';
-  else if (d < 300) m = Math.random() < (b.last === 'quake' ? 0.25 : 0.65) ? 'quake' : null;   // mid range: a quake, or walk in for a swing
+  else if (d < 380) m = Math.random() < (b.last === 'quake' ? 0.25 : 0.65) ? 'quake' : null;   // mid range: a quake, or walk in for a swing
   if (m && m === b.last && m !== 'leap' && Math.random() < 0.6) m = m === 'slam' ? 'sweep' : m === 'sweep' ? 'slam' : m;
   return m;
 }
@@ -5102,7 +5132,7 @@ function bossStep(dt) {
   const rg = S.rg, p = S.p, c = bossArena();
   if (!c) return;
   const g = bossGrace();
-  if (g && !XS.wardenDead && !XS.grace && dist2(p, c) < AR + 420) {     // the lantern at the edge of the stones: wake here if he kills you
+  if (g && !XS.wardenDead && !XS.grace && dist2(p, c) < RC + 300) {     // the lantern at the edge of the stones: wake here if he kills you
     XS.grace = g; XS.outposts.push({ x: g.x, y: g.y, n: 0, grace: true }); exSave();
     exNote('a lantern stirs · you will wake here', true);
   }
@@ -5119,10 +5149,10 @@ function bossStep(dt) {
   if (rg.phase !== 'fight') return;
   bossMusic(true, b.phase === 2);
   if ((b.beat -= dt) <= 0 && actx && bm.g) { b.beat = b.phase === 2 ? 0.42 : 0.6; b.bars = (b.bars || 0) + 1; const t = actx.currentTime; boomAt(t, 70, 34, 0.45, 0.6, bm.g); if (b.bars % 2 === 0) noiseAt(t, 900, 250, 0.16, 0.12, bm.g); if (b.bars % 8 === 7) boomAt(t + b.beat / 2, 70, 34, 0.4, 0.45, bm.g); }
-  { const d = dist2(p, c); if (d > AR - 14) { p.x = c.x + (p.x - c.x) / d * (AR - 14); p.y = c.y + (p.y - c.y) / d * (AR - 14); } }   // the mist won't let you out
+  arenaClamp(p);                                // the mist at the screen's edge won't let you out
   const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy), toP = Math.atan2(dy, dx);
   const turn = (rate) => { b.dir += Math.max(-rate * dt, Math.min(rate * dt, angDiff(toP, b.dir))); };
-  b.far = d > 300 ? b.far + dt : Math.max(0, b.far - dt);
+  b.far = d > 380 ? b.far + dt : Math.max(0, b.far - dt);
   // the torch: he doesn't freeze in it and it burns him slowly, except when he's open after a move
   const air = b.st === 'act' && b.move === 'leap';
   let lit = 0;
@@ -5147,7 +5177,7 @@ function bossStep(dt) {
   if (!air && d < 34) { p.x = b.x + dx / (d || 1) * 34; p.y = b.y + dy / (d || 1) * 34; }
   const step = (sp) => {
     const mv = Math.min(sp * dt, Math.max(0, d - 90));
-    b.x += Math.cos(b.dir) * mv; b.y += Math.sin(b.dir) * mv;
+    b.x += Math.cos(b.dir) * mv; b.y += Math.sin(b.dir) * mv; arenaClamp(b, 30);
     const p0 = b.ph; b.ph += mv * 0.045;
     if (Math.floor(p0 / Math.PI) !== Math.floor(b.ph / Math.PI)) { bossSay('step'); addShake(0.12 * Math.max(0, 1 - d / 600)); }
   };
@@ -5191,11 +5221,11 @@ function bossStep(dt) {
       if (c0 >= 0.3 && (b.stomp || 0) <= n && n < 3) { b.stomp = n + 1; bossSay('stomp'); addShake(0.5); b.rings.push({ x: b.x, y: b.y, r: 30 }); for (let i = 0; i < 6; i++) { const a = i / 6 * 7; ashBurst(b.x + Math.cos(a) * 40, b.y + Math.sin(a) * 40, 2, 10); } }
     }
     if (b.move === 'leap') {                     // up and out of sight; his shadow hunts you, then locks, then he comes down
-      if (b.t < 1.4) { b.mk.x += (p.x - b.mk.x) * Math.min(1, dt * 3.2); b.mk.y += (p.y - b.mk.y) * Math.min(1, dt * 3.2); }
+      if (b.t < 1.4) { b.mk.x += (p.x - b.mk.x) * Math.min(1, dt * 3.2); b.mk.y += (p.y - b.mk.y) * Math.min(1, dt * 3.2); arenaClamp(b.mk, 30); }
       else if (!b.locked) { b.locked = true; if (actx) noiseAt(actx.currentTime, 2500, 600, 0.6, 0.2, sfxGain); }
       if (b.t >= b.len && !b.hit) {
         b.hit = true; b.locked = false; b.x = b.mk.x; b.y = b.mk.y; b.dir = Math.atan2(p.y - b.y, p.x - b.x);
-        { const cd = dist2(b, c); if (cd > AR - 40) { b.x = c.x + (b.x - c.x) / cd * (AR - 40); b.y = c.y + (b.y - c.y) / cd * (AR - 40); } }
+        arenaClamp(b, 30);
         bossSay('impact'); addShake(1); hitStop(0.1); rg.blasts.push({ x: b.x, y: b.y, t: 0, life: 0.6, r: 170, col: 'white' }); ashBurst(b.x, b.y, 20, 30);
         if (dist2(b, p) < 95) bossHurt(2, 80);
       }
@@ -5330,8 +5360,31 @@ function drawBossGround(b, c) {                 // red marks on the ground: wher
   for (const f of b.fires) { const [x, y] = toScreen(f.x, f.y); ctx.globalAlpha = Math.min(1, f.life / 0.6); drawFlame(x, y, Z * 1.6, f.x); }
   ctx.restore();
 }
-function drawMist(c, k) {                        // a wall of grey mist round the stones, like a fog gate
+function drawMist(c, k) {                        // a wall of grey mist round the edge of the framed arena, like a fog gate
   if (k <= 0.01) return;
+  const fc = bossCam(), bx = arenaBox(), t = S.t;
+  ctx.save();
+  const edge = (x0, y0, x1, y1, w) => {          // one side: thick at the boundary, thinning toward the middle, drifting
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, `rgba(200,200,196,${0.3 * k})`); g.addColorStop(0.45, `rgba(200,200,196,${0.09 * k})`); g.addColorStop(1, 'rgba(200,200,196,0)');
+    return g;
+  };
+  const F = 70;
+  ctx.fillStyle = edge(bx.l - 26, 0, bx.l + F, 0); ctx.fillRect(0, 0, bx.l + F, H);
+  ctx.fillStyle = edge(bx.r + 26, 0, bx.r - F, 0); ctx.fillRect(bx.r - F, 0, W - bx.r + F, H);
+  ctx.fillStyle = edge(0, bx.b + 34, 0, bx.b - F); ctx.fillRect(0, bx.b - F, W, H - bx.b + F);
+  ctx.fillStyle = edge(0, bx.t - 30, 0, bx.t + F); ctx.fillRect(0, 0, W, bx.t + F);
+  for (let i = 0; i < 26; i++) {                 // slow drifting puffs along the walls
+    const u = (hash(i, 4.4) + t * 0.012 * (1 + hash(i, 2) )) % 1, side = i % 4, r = (40 + 50 * hash(i, 9)) * Math.max(0.6, Z);
+    const x = side === 0 ? bx.l : side === 1 ? bx.r : bx.l + u * (bx.r - bx.l), y = side < 2 ? bx.t + u * (bx.b - bx.t) : side === 2 ? bx.t : bx.b;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(205,205,200,${0.14 * k * (0.6 + 0.4 * Math.sin(t * 0.8 + i))})`); g.addColorStop(1, 'rgba(205,205,200,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  if (!fc) return;
+  const capOn = H / 2 / (fc.k / Math.SQRT2) > RC - 60 || W / 2 / (fc.k * Math.SQRT2) > RC - 60;
+  if (!capOn) return;                            // on a tall screen the field's own edge shows too: mist round it
+  const AR = RC - 30;
   const n = 140;
   ctx.save();
   for (let i = 0; i < n; i++) {
