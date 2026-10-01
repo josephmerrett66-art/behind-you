@@ -1195,14 +1195,6 @@ function drawGround() {
     const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
     ft.pat.setTransform(new DOMMatrix().translate(Math.round(ox), Math.round(oy)));
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = ft.pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); }
-  const k = K(), mu = W / 2 / k + T * 1.5, mv = H / k + T * 1.5;   // how far a tile can be from the camera and still show
-  for (let i = x0; i < x1; i++) for (let j = y0; j < y1; j++) {
-    const du = (i + 0.5) * T - S.cam.x, dv = (j + 0.5) * T - S.cam.y;
-    if (Math.abs(du - dv) > mu || Math.abs(du + dv) > mv) continue;
-    const h = hash(i + 11, j - 5);
-    if (h > 0.8) { ctx.fillStyle = '#7a7a77'; ctx.beginPath(); ctx.arc(i * T + hash(j, i + 2) * T, j * T + h * T * 0.9, 1.5 + h * 3, 0, 7); ctx.fill(); }
-    else if (h < 0.14) { ctx.strokeStyle = '#5c5c5a'; ctx.lineWidth = 1.2; ctx.beginPath(); const bx = i * T + 10 + h * 150, by = j * T + 24; ctx.moveTo(bx, by); ctx.lineTo(bx + 4, by - 6); ctx.moveTo(bx + 5, by); ctx.lineTo(bx + 9, by - 7); ctx.moveTo(bx + 2, by); ctx.lineTo(bx + 1, by - 8); ctx.stroke(); }
-  }
   // footprints
   for (const f of S.p.prints) {
     ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a);
@@ -1231,24 +1223,26 @@ function makeSprite(key, w, h, ax, ay, paint) { // w, h, ax, ay in world units; 
   return SPRITES[key] = { cv, mk, ax, ay, h };
 }
 // bark: a tapered trunk with a root flare, streaked, the right side catching light
-function paintTrunk(g, R, base, top, wb, wt, tone) {
+function paintTrunk(g, R, base, top, wb, wt, tone, Ld) {
   g.fillStyle = grey(tone);
   g.beginPath(); g.moveTo(-wb * 1.9, 0); g.quadraticCurveTo(-wb, -2, -wb, -5); g.lineTo(-wt, top); g.lineTo(wt, top); g.lineTo(wb, -5); g.quadraticCurveTo(wb, -2, wb * 1.9, 0); g.closePath(); g.fill();
   g.fillStyle = grey(tone + 16);
-  g.beginPath(); g.moveTo(wb * 0.2, 0); g.lineTo(wt * 0.25, top); g.lineTo(wt, top); g.lineTo(wb, -5); g.quadraticCurveTo(wb, -2, wb * 1.9, 0); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(Ld * wb * 0.2, 0); g.lineTo(Ld * wt * 0.25, top); g.lineTo(Ld * wt, top); g.lineTo(Ld * wb, -5); g.quadraticCurveTo(Ld * wb, -2, Ld * wb * 1.9, 0); g.closePath(); g.fill();
   g.lineWidth = 0.35;
   for (let n = 0; n < 14; n++) {                 // bark fissures
     const f = R() * 2 - 1, y0 = -R() * (-top) * 0.9, len = 3 + R() * 8, x0 = f * (wb + (wt - wb) * (-y0 / -top)) * 0.85;
-    g.strokeStyle = grey(tone - 10 + (f > 0 ? 18 : 0)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + (R() - 0.5), y0 - len); g.stroke();
+    g.strokeStyle = grey(tone - 10 + (f * Ld > 0 ? 18 : 0)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + (R() - 0.5), y0 - len); g.stroke();
   }
 }
-function paintPine(g, R) {
+function paintPine(g, R, Ld) {
   const H = 92 + R() * 14, wMax = 25 + R() * 6;
-  paintTrunk(g, R, 0, -34, 3.6, 1.6, 30);
+  paintTrunk(g, R, 0, -34, 3.6, 1.6, 30, Ld);
   const layers = 15 + (R() * 4 | 0);
   for (let pass = 0; pass < 2; pass++)           // a dark mass behind first, so the tree reads as solid; then the boughs over it
     for (let L = 0; L < layers; L++) {
-      const t = L / (layers - 1), y = -14 - t * (H - 20), wl = wMax * Math.pow(1 - t, 0.85) + 2;
+      const t = L / (layers - 1), y = -21 - t * (H - 27), wl = wMax * Math.pow(1 - t, 0.85) + 2;
+      const erx = wl * 0.72, ery = wl * 0.28;   // seen from above, each tier of boughs is a ring: its front edge curves down toward you
+      if (pass === 0) { g.fillStyle = grey(22 + R() * 5); g.beginPath(); g.ellipse(0, y + 1, erx, ery, 0, 0, Math.PI); g.fill(); }
       for (const sd of [-1, 1]) {
         const w = wl * (0.7 + R() * 0.55);
         if (pass === 1 && t > 0.1 && t < 0.8 && R() < 0.12) continue;   // a missing bough here and there lets the trunk show
@@ -1263,22 +1257,47 @@ function paintPine(g, R) {
         const n = 10 + w * 1.4 | 0;
         for (let k = 0; k < n; k++) {                // needle sprays hanging off it
           const f = k / n, bx = tipX * f, by = y + (tipY - y) * f * f - 1.5 * Math.sin(f * Math.PI);
-          const lit = sd > 0 ? 0.35 + 0.65 * f : 0.1 * f, top = R() < 0.55;
+          const lit = sd === Ld ? 0.35 + 0.65 * f : 0.1 * f, top = R() < 0.55;
           const len = 2.5 + R() * 3.5 * (1 - f * 0.4), ang = Math.PI / 2 + sd * (0.3 + R() * 0.7) * (top ? -1 : 1);
           g.strokeStyle = grey(26 + R() * 12 + lit * (top ? 50 : 18)); g.lineWidth = 0.55 + R() * 0.4;
           g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + Math.cos(ang) * len * 0.6 * sd, by + (top ? -0.8 : 1) * Math.sin(ang) * len * 0.7); g.stroke();
         }
-        if (sd > 0 && R() < 0.8) {                   // a frosted, light-catching rim along the top of the right-hand boughs
+        if (R() < 0.8 && sd === Ld) {                // a frosted, light-catching rim along the top of the boughs facing the light
           g.strokeStyle = 'rgba(120,120,114,0.55)'; g.lineWidth = 0.6;
-          g.beginPath(); g.moveTo(w * 0.25, y - 1); g.quadraticCurveTo(tipX * 0.6, y - 2, tipX * 0.95, tipY - 0.6); g.stroke();
+          g.beginPath(); g.moveTo(tipX * 0.25, y - 1); g.quadraticCurveTo(tipX * 0.6, y - 2, tipX * 0.95, tipY - 0.6); g.stroke();
+        }
+      }
+      if (pass === 1 && t < 0.85) {                  // boughs reaching toward you: short, foreshortened sprays over the middle, so the tree has a front
+        for (let k = 0; k < 5 + wl * 0.35; k++) {      // sprays along the front of the ring
+          const ox = (R() * 2 - 1) * erx * 0.95, fy = y + 1 + ery * Math.sqrt(Math.max(0, 1 - (ox / erx) ** 2)) * (0.6 + R() * 0.3);
+          const len = 2 + R() * 3, a = Math.PI / 2 + (R() - 0.5) * 1.6, lit = Math.max(0, 0.35 + 0.65 * Ld * ox / erx);
+          g.strokeStyle = grey(30 + R() * 10 + lit * 40); g.lineWidth = 0.6 + R() * 0.3;
+          g.beginPath(); g.moveTo(ox * 0.6, fy); g.lineTo(ox + Math.cos(a) * len, fy + Math.sin(a) * len); g.stroke();
         }
       }
     }
   g.fillStyle = grey(30); g.beginPath(); g.moveTo(-1.5, -H + 8); g.lineTo(0.3, -H - 3); g.lineTo(1.5, -H + 8); g.closePath(); g.fill();   // leader
+  shadeRound(g, Ld, wMax, H);
 }
-function paintOak(g, R) {
+// rounds a flat painting into a solid: the side away from the light falls into shade, the light side catches a little sheen,
+// and the foot darkens where it meets the ground
+function shadeRound(g, Ld, hw, H, cx = 0, cy = -H * 0.5, round = false) {
+  g.save(); g.globalCompositeOperation = 'source-atop';
+  let gr;
+  if (round) { gr = g.createRadialGradient(cx + Ld * hw * 0.45, cy - hw * 0.35, 0, cx, cy, hw * 1.5); gr.addColorStop(0, 'rgba(255,255,240,0.1)'); gr.addColorStop(0.4, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.55)'); }
+  else { gr = g.createLinearGradient(-Ld * hw, 0, Ld * hw, 0); gr.addColorStop(0, 'rgba(0,0,0,0.5)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.05)'); gr.addColorStop(0.8, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(255,255,240,0.08)'); }
+  g.fillStyle = gr; g.fillRect(-hw * 2, -H * 1.3, hw * 4, H * 1.4);
+  const foot = g.createLinearGradient(0, 0, 0, -Math.min(30, H * 0.35));
+  foot.addColorStop(0, 'rgba(0,0,0,0.4)'); foot.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = foot; g.fillRect(-hw * 2, -H * 1.3, hw * 4, H * 1.4);
+  g.restore();
+}
+function paintOak(g, R, Ld) {
   const cy = -54 - R() * 6, rx = 28 + R() * 6, ry = 22 + R() * 5;
-  paintTrunk(g, R, 0, -30, 5, 3, 30);
+  paintTrunk(g, R, 0, -30, 5, 3, 30, Ld);
+  g.save(); g.globalCompositeOperation = 'source-atop';   // the crown shades the top of the trunk (painted before the leaves, so only the bark darkens)
+  const under = g.createLinearGradient(0, -34, 0, -16); under.addColorStop(0, 'rgba(0,0,0,0.6)'); under.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = under; g.fillRect(-10, -40, 20, 26); g.restore();
   const limbs = [];
   for (let n = 0; n < 4; n++) { const a = -Math.PI / 2 + (n - 1.5) * 0.45 + (R() - 0.5) * 0.25; limbs.push([Math.cos(a) * (14 + R() * 10), -28 + Math.sin(a) * (16 + R() * 10)]); }
   const clumps = [];
@@ -1289,7 +1308,7 @@ function paintOak(g, R) {
     const n = c.r * c.r * 0.9 | 0;
     for (let k = 0; k < n; k++) {
       const a = R() * Math.PI * 2, d = Math.sqrt(R()) * c.r, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d * 0.85;
-      const light = Math.max(0, ((x - c.x) * 0.6 - (y - c.y)) / c.r) * 0.5 + Math.max(0, x / rx) * 0.5 + Math.max(0, (cy - y) / ry) * 0.25;
+      const light = Math.max(0, (Ld * (x - c.x) * 0.6 - (y - c.y)) / c.r) * 0.5 + Math.max(0, Ld * x / rx) * 0.5 + Math.max(0, (cy - y) / ry) * 0.25;
       g.fillStyle = grey(22 + R() * 10 + light * (back ? 22 : 56));
       g.beginPath(); g.ellipse(x, y, 0.9 + R() * 1.1, 0.6 + R() * 0.7, R() * 3, 0, 7); g.fill();
     }
@@ -1301,21 +1320,23 @@ function paintOak(g, R) {
     g.lineWidth = 1; g.beginPath(); g.moveTo(lx, ly); g.lineTo(lx + (R() - 0.5) * 12, ly - 6 - R() * 8); g.stroke();
   }
   for (const c of clumps.slice(7)) leafy(c, false);
+  shadeRound(g, Ld, rx * 0.9, 90, 0, cy, true);
 }
-function paintSnag(g, R) {
-  paintTrunk(g, R, 0, -40, 3.4, 1.8, 44);
+function paintSnag(g, R, Ld) {
+  paintTrunk(g, R, 0, -40, 3.4, 1.8, 44, Ld);
   g.strokeStyle = grey(52); g.lineWidth = 2; g.beginPath(); g.moveTo(-1.8, -40); g.lineTo(-0.5, -45); g.lineTo(0.6, -41); g.lineTo(1.8, -43); g.stroke();   // snapped top
   const branch = (x, y, ang, len, w, d) => {
     const ex = x + Math.cos(ang) * len, ey = y + Math.sin(ang) * len;
-    g.strokeStyle = grey(40 + (Math.cos(ang) > 0 ? 14 : 0)); g.lineWidth = w;
+    g.strokeStyle = grey(40 + (Ld * Math.cos(ang) > 0 ? 14 : 0)); g.lineWidth = w;
     g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo((x + ex) / 2 + (R() - 0.5) * len * 0.3, (y + ey) / 2, ex, ey); g.stroke();
     if (d <= 0 || len < 2) return;
     const kids = R() < 0.3 ? 1 : 2;
     for (let k = 0; k < kids; k++) branch(ex, ey, ang + (k ? 1 : -1) * (0.3 + R() * 0.5) + (R() - 0.5) * 0.3, len * (0.55 + R() * 0.2), w * 0.62, d - 1);
   };
   for (let n = 0; n < 4; n++) { const y = -14 - n * 7 - R() * 4, sd = n % 2 ? 1 : -1; branch(sd * 1.5, y, -Math.PI / 2 + sd * (0.7 + R() * 0.5), 10 + R() * 8, 1.6, 4); }
+  shadeRound(g, Ld, 22, 66);
 }
-function paintBush(g, R) {
+function paintBush(g, R, Ld) {
   const blobs = [];
   for (let n = 0; n < 6; n++) blobs.push({ x: (R() - 0.5) * 18, y: -5 - R() * 7, r: 4 + R() * 3.5 });
   blobs.sort((a, b) => a.y - b.y);
@@ -1327,6 +1348,7 @@ function paintBush(g, R) {
       g.beginPath(); g.ellipse(x, y, 0.7 + R() * 0.8, 0.5 + R() * 0.5, R() * 3, 0, 7); g.fill();
     }
   }
+  shadeRound(g, Ld, 12, 16, 0, -8, true);
 }
 function paintFern(g, R) {
   const n = 7 + (R() * 4 | 0);
@@ -1377,30 +1399,199 @@ function paintShrooms(g, R) {
     g.fillStyle = grey(196); g.beginPath(); g.ellipse(x, y - h, r, r * 0.55, 0, Math.PI, 0); g.fill();
   }
 }
+// ---- rocks, posts, lamps, fire pits, chests and packs, painted in the same hand as the trees ----
+function paintRock(g, R, Ld) {                   // a faceted boulder: planes catch the light by which way they face
+  const rx = 11 + R() * 3, hgt = 10 + R() * 6, n = 11, pts = [];
+  for (let k = 0; k < n; k++) {
+    const a = Math.PI + k / (n - 1) * Math.PI, r = 0.85 + R() * 0.25;
+    pts.push([Math.cos(a) * rx * r, Math.sin(a) * hgt * r]);
+  }
+  const peak = [(R() - 0.5) * rx * 0.5, -hgt * (0.75 + R() * 0.2)], base = [[rx * 0.9, 2.5], [0, 4], [-rx * 0.9, 2.5]];
+  g.fillStyle = grey(58); g.beginPath(); g.moveTo(pts[0][0], 0);
+  for (const [x, y] of pts) g.lineTo(x, y);
+  for (const [x, y] of base) g.lineTo(x, y);
+  g.closePath(); g.fill();
+  for (let k = 0; k < n - 1; k++) {               // facets fanned from the peak
+    const [x0, y0] = pts[k], [x1, y1] = pts[k + 1], mx = (x0 + x1) / 2, face = Math.max(0, Ld * mx / rx), up = Math.max(0, -(y0 + y1) / 2 / hgt);
+    g.fillStyle = grey(54 + face * 46 + up * 20 + R() * 10);
+    g.beginPath(); g.moveTo(peak[0], peak[1]); g.lineTo(x0, y0); g.lineTo(x1, y1); g.closePath(); g.fill();
+  }
+  g.fillStyle = grey(52);                          // the front face, turned toward you and down, in shade
+  g.beginPath(); g.moveTo(-rx * 0.95, 0); g.quadraticCurveTo(0, -hgt * 0.22, rx * 0.95, 0); for (const [x, y] of base) g.lineTo(x, y); g.closePath(); g.fill();
+  g.save(); g.globalCompositeOperation = 'source-atop';   // cracks, lichen and moss stay on the stone
+  g.strokeStyle = grey(34); g.lineWidth = 0.4;    // cracks
+  for (let k = 0; k < 3; k++) { let x = (R() - 0.5) * rx, y = -R() * hgt * 0.6; g.beginPath(); g.moveTo(x, y); for (let s = 0; s < 3; s++) { x += (R() - 0.5) * 4; y += 1.5 + R() * 2; g.lineTo(x, y); } g.stroke(); }
+  for (let k = 0; k < 40; k++) {                   // lichen on top, moss at the foot
+    const x = (R() - 0.5) * rx * 1.6, y = -R() * hgt * 0.9, top = y < -hgt * 0.4;
+    g.fillStyle = top ? 'rgba(170,170,162,0.3)' : 'rgba(30,30,28,0.4)';
+    g.beginPath(); g.arc(x, top ? y : y * 0.3 + 1, 0.25 + R() * 0.4, 0, 7); g.fill();
+  }
+  g.restore();
+  shadeRound(g, Ld, rx, hgt + 4, 0, -hgt * 0.5, true);
+}
+function paintWood(g, R, Ld, x0, x1, top, tone) {  // an upright piece of weathered wood: grain, a lit edge, a knot or two
+  const w = x1 - x0;
+  g.fillStyle = grey(tone); g.fillRect(x0, top, w, -top);
+  g.fillStyle = grey(tone + 18); Ld > 0 ? g.fillRect(x0 + w * 0.6, top, w * 0.4, -top) : g.fillRect(x0, top, w * 0.4, -top);
+  g.fillStyle = grey(tone - 14); Ld > 0 ? g.fillRect(x0, top, w * 0.22, -top) : g.fillRect(x1 - w * 0.22, top, w * 0.22, -top);
+  g.lineWidth = 0.3;
+  for (let k = 0; k < 6; k++) { const x = x0 + w * (0.15 + R() * 0.7); g.strokeStyle = grey(tone - 12 + R() * 8); g.beginPath(); g.moveTo(x, -R() * 3); g.lineTo(x + (R() - 0.5), top * (0.4 + R() * 0.6)); g.stroke(); }
+  for (let k = 0; k < 2; k++) { g.fillStyle = grey(tone - 18); g.beginPath(); g.ellipse(x0 + w * (0.3 + R() * 0.4), top * (0.2 + R() * 0.7), 0.7, 1.1, 0, 0, 7); g.fill(); }
+}
+function paintPost(g, R, Ld) {                   // an old trail marker: a split stake with a rag tied round it
+  const top = -28 - R() * 4;
+  paintWood(g, R, Ld, -2.5, 2.5, top, 60);
+  g.fillStyle = grey(70); g.beginPath(); g.moveTo(-2.5, top); g.lineTo(2.5, top - 2.5 * (R() < 0.5 ? 1 : -0.3)); g.lineTo(2.5, top + 1); g.lineTo(-2.5, top + 1); g.closePath(); g.fill();   // cut top
+  g.strokeStyle = grey(30); g.lineWidth = 0.5; g.beginPath(); g.moveTo(0.5, top + 0.5); g.lineTo(0.2, top + 6); g.stroke();   // split
+  const ry = top + 7 + R() * 4;
+  g.fillStyle = grey(150); g.fillRect(-2.7, ry, 5.4, 2.2);                                   // the rag, pale and frayed
+  g.beginPath(); g.moveTo(2.5, ry); g.lineTo(6.5, ry + 3 + R() * 2); g.lineTo(5.2, ry + 4.5); g.lineTo(2.5, ry + 2.2); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(-2.7, ry + 1.4, 5.4, 0.8);
+  shadeRound(g, Ld, 4, -top);
+}
+function paintLamp(g, R, Ld) {                   // a lantern post: a squared timber, an iron arm and hook
+  paintWood(g, R, Ld, -2.5, 2.5, -50, 54);
+  g.fillStyle = grey(52); g.fillRect(-3, -51, 6, 2);
+  g.fillStyle = grey(30); g.fillRect(-2.5, -50, 14, 2.4); g.fillStyle = grey(56); g.fillRect(-2.5, -50, 14, 0.7);   // iron arm
+  g.strokeStyle = grey(30); g.lineWidth = 0.8; g.beginPath(); g.moveTo(-1, -47.6); g.lineTo(6, -50); g.stroke();   // brace
+  g.fillStyle = grey(28); g.fillRect(9, -48, 1.5, 5);                                         // hook
+  shadeRound(g, Ld, 6, 52);
+}
+function paintFirePit(g, R) {                    // a ring of stones round two charred logs and a bed of ash
+  g.fillStyle = 'rgba(40,40,38,0.8)'; g.beginPath(); g.ellipse(0, 0, 13, 6.5, 0, 0, 7); g.fill();
+  for (let k = 0; k < 60; k++) { const a = R() * 7, d = Math.sqrt(R()); g.fillStyle = `rgba(${150 + R() * 60 | 0},${150 + R() * 60 | 0},${145 + R() * 60 | 0},0.5)`; g.fillRect(Math.cos(a) * d * 11, Math.sin(a) * d * 5.5, 0.6, 0.6); }
+  const log = (x0, y0, x1, y1) => {
+    g.strokeStyle = grey(22); g.lineWidth = 3.4; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    g.strokeStyle = grey(44); g.lineWidth = 0.8; g.beginPath(); g.moveTo(x0, y0 - 1.1); g.lineTo(x1, y1 - 1.1); g.stroke();
+    g.fillStyle = 'rgba(200,200,190,0.5)'; for (let k = 0; k < 6; k++) { const f = R(); g.fillRect(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f - 1, 0.7, 0.5); }
+  };
+  log(-9, 3, 9, -3); log(-8, -3, 8, 3);
+  const stones = [];
+  for (let n = 0; n < 9; n++) { const a = n / 9 * Math.PI * 2 + R() * 0.2; stones.push([Math.cos(a) * 15, Math.sin(a) * 7.5, 3.5 + R() * 1.5]); }
+  stones.sort((a, b) => a[1] - b[1]);
+  for (const [x, y, r] of stones) {
+    g.fillStyle = grey(52); g.beginPath(); g.ellipse(x, y, r, r * 0.75, 0, 0, 7); g.fill();
+    g.fillStyle = grey(84 + R() * 16); g.beginPath(); g.ellipse(x + r * 0.2, y - r * 0.3, r * 0.6, r * 0.38, -0.3, 0, 7); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(x, y + r * 0.45, r * 0.9, r * 0.3, 0, 0, Math.PI); g.fill();
+  }
+}
+function paintChest(t, open) {                   // a box seen from above and in front: lid, front, the side catching the light
+  const body = [56, 66, 120][t - 1], top = [80, 92, 160][t - 1], band = t === 3 ? 212 : 46;
+  return (g, R) => {
+    const w = t === 3 ? 11 : 9, h = 8, d = 5;
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(0, 1, w * 1.3, w * 0.5, 0, 0, 7); g.fill();
+    g.fillStyle = grey(body); g.fillRect(-w, -h, 2 * w, h);                                  // front
+    g.fillStyle = grey(body - 14); g.beginPath(); g.moveTo(w, 0); g.lineTo(w + 3, -2); g.lineTo(w + 3, -h - 2); g.lineTo(w, -h); g.closePath(); g.fill();   // side
+    g.strokeStyle = grey(body - 18); g.lineWidth = 0.35;
+    for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(-w, -h * k / 4); g.lineTo(w, -h * k / 4); g.stroke(); }   // planks
+    for (let k = 0; k < 10; k++) { const x = -w + R() * 2 * w, y = -R() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 2 + R() * 3, y); g.stroke(); }
+    if (open) {
+      g.fillStyle = grey(14); g.beginPath(); g.moveTo(-w, -h); g.lineTo(w, -h); g.lineTo(w + 3, -h - 2); g.lineTo(-w + 3, -h - d); g.lineTo(-w, -h - d + 1); g.closePath(); g.fill();   // the empty inside
+      g.fillStyle = grey(top - 10); g.beginPath(); g.moveTo(-w + 2, -h - d); g.lineTo(w + 3, -h - 2.5); g.lineTo(w + 3, -h - 11); g.lineTo(-w + 2, -h - 13); g.closePath(); g.fill();   // lid thrown back
+      g.fillStyle = grey(top + 10); g.fillRect(-w + 2, -h - 13, 2 * w + 1, 1.2);
+    } else {
+      g.fillStyle = grey(top); g.beginPath(); g.moveTo(-w, -h); g.lineTo(w, -h); g.lineTo(w + 3, -h - 2); g.lineTo(-w + 3, -h - d); g.lineTo(-w, -h - d + 1); g.closePath(); g.fill();   // lid
+      g.fillStyle = grey(top + 18); g.beginPath(); g.moveTo(-w, -h - d + 1); g.lineTo(-w + 3, -h - d); g.lineTo(w + 3, -h - 2); g.lineTo(w + 1, -h - 1.4); g.closePath(); g.fill();
+      g.fillStyle = grey(t === 3 ? 235 : 40); g.fillRect(-1.5, -h - 1.5, 3, 3.5);                // latch
+    }
+    if (t > 1) { g.fillStyle = grey(band); g.fillRect(-w * 0.62, -h, 2, h); g.fillRect(w * 0.62 - 2, -h, 2, h); g.fillRect(-w, -h, 1.2, h); g.fillRect(w - 1.2, -h, 1.2, h); }
+    g.save(); g.globalCompositeOperation = 'source-atop';
+    const gr = g.createLinearGradient(0, -h - d, 0, 0); gr.addColorStop(0, 'rgba(255,255,240,0.06)'); gr.addColorStop(1, 'rgba(0,0,0,0.35)');
+    g.fillStyle = gr; g.fillRect(-w - 2, -h - 14, 2 * w + 8, h + 16); g.restore();
+  };
+}
+function paintPack(g, R) {                       // a canvas pack slumped on the ground
+  g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(0, 0, 10, 4, 0, 0, 7); g.fill();
+  g.fillStyle = grey(78); g.beginPath(); g.ellipse(0, -6, 8, 7, 0, 0, 7); g.fill();
+  g.fillStyle = grey(96); g.beginPath(); g.ellipse(2, -8, 5, 4.5, 0, 0, 7); g.fill();
+  g.strokeStyle = grey(60); g.lineWidth = 0.4; for (let k = 0; k < 5; k++) { g.beginPath(); g.moveTo(-6 + k * 3, -1); g.quadraticCurveTo(-5 + k * 3, -6, -4 + k * 3, -12); g.stroke(); }
+  g.fillStyle = grey(64); g.fillRect(-6, -12, 12, 3); g.fillStyle = grey(84); g.fillRect(-6, -12, 12, 0.8);
+  g.strokeStyle = grey(40); g.lineWidth = 1.5; g.beginPath(); g.arc(0, -12, 4, Math.PI, 0); g.stroke();
+}
+function paintPebbles(g, R) {
+  for (let k = 0; k < 3 + (R() * 3 | 0); k++) {
+    const x = (R() - 0.5) * 10, y = (R() - 0.5) * 3, r = 0.8 + R() * 1.6;
+    g.fillStyle = grey(70); g.beginPath(); g.ellipse(x, y, r, r * 0.7, 0, 0, 7); g.fill();
+    g.fillStyle = grey(110 + R() * 30); g.beginPath(); g.ellipse(x + r * 0.15, y - r * 0.25, r * 0.55, r * 0.35, 0, 0, 7); g.fill();
+  }
+}
+function paintCrate(big) {                       // a nailed plank crate seen corner-on
+  return (g, R) => {
+    const s2 = big ? 9 : 7, h = big ? 13 : 10;
+    const face = (pts, tone) => { g.fillStyle = grey(tone); g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath(); g.fill(); };
+    face([[-s2, -h], [0, -h - s2 / 2], [s2, -h], [0, -h + s2 / 2]], 96);              // lid
+    face([[-s2, -h], [0, -h + s2 / 2], [0, s2 / 2], [-s2, 0]], 74);                    // left side
+    face([[s2, -h], [0, -h + s2 / 2], [0, s2 / 2], [s2, 0]], 52);                      // right side
+    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 0.35;                             // plank seams
+    for (let k = 1; k < 3; k++) { const y = -h * k / 3; g.beginPath(); g.moveTo(-s2, y); g.lineTo(0, y + s2 / 2); g.lineTo(s2, y); g.stroke(); }
+    for (let k = 1; k < 3; k++) { const f = k / 3; g.beginPath(); g.moveTo(-s2 + s2 * f, -h - s2 / 2 * f); g.lineTo(s2 * f, -h + s2 / 2 - s2 / 2 * f); g.stroke(); }
+    g.strokeStyle = grey(40); g.lineWidth = 1;                                           // cross braces
+    g.beginPath(); g.moveTo(-s2 + 0.6, -h + 0.6); g.lineTo(-0.6, s2 / 2 - 0.6); g.moveTo(s2 - 0.6, -h + 0.6); g.lineTo(0.6, s2 / 2 - 0.6); g.stroke();
+    g.fillStyle = grey(30); for (const [x, y] of [[-s2 + 1, -h + 1.2], [-1, s2 / 2 - 1], [s2 - 1, -h + 1.2], [1, s2 / 2 - 1]]) g.fillRect(x - 0.3, y - 0.3, 0.6, 0.6);   // nails
+    g.strokeStyle = grey(116); g.lineWidth = 0.4; g.beginPath(); g.moveTo(-s2, -h); g.lineTo(0, -h + s2 / 2); g.lineTo(s2, -h); g.stroke();   // worn top edge
+  };
+}
+function paintBarrel(g, R) {                     // staves, two iron hoops, a lid catching the light
+  const r = 5.5, h = 13;
+  const body = g.createLinearGradient(-r, 0, r, 0);
+  body.addColorStop(0, grey(38)); body.addColorStop(0.55, grey(74)); body.addColorStop(0.8, grey(62)); body.addColorStop(1, grey(40));
+  g.fillStyle = body; g.beginPath(); g.moveTo(-r, -h); g.quadraticCurveTo(-r - 1.2, -h / 2, -r, 0); g.ellipse(0, 0, r, r / 2, 0, Math.PI, 0, true); g.quadraticCurveTo(r + 1.2, -h / 2, r, -h); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.3;
+  for (let k = -2; k <= 2; k++) { const x = k * r * 0.38; g.beginPath(); g.moveTo(x, -h + Math.sqrt(1 - (x / r) ** 2) * r / 2); g.lineTo(x * 1.08, Math.sqrt(1 - (x / r) ** 2) * r / 2); g.stroke(); }
+  for (const f of [0.22, 0.78]) { g.strokeStyle = grey(32); g.lineWidth = 1.1; g.beginPath(); g.ellipse(0, -h * (1 - f), r + 0.9 * Math.sin(f * Math.PI), r / 2, 0, 0, Math.PI); g.stroke(); }
+  g.fillStyle = grey(88); g.beginPath(); g.ellipse(0, -h, r, r / 2, 0, 0, 7); g.fill();
+  g.strokeStyle = grey(60); g.lineWidth = 0.4; g.beginPath(); g.ellipse(0, -h, r * 0.8, r * 0.38, 0, 0, 7); g.stroke();
+  g.beginPath(); g.moveTo(-r * 0.7, -h); g.lineTo(r * 0.7, -h); g.stroke();
+}
+function paintWoodpile(g, R) {                   // split logs stacked three high, end grain showing
+  for (let row = 0; row < 3; row++) for (let m = 0; m < 4 - row; m++) {
+    const x = (m - (3 - row) / 2) * 5 + (R() - 0.5) * 0.6, y = -3 - row * 4.4, r = 2.5 + R() * 0.4;
+    g.fillStyle = grey(44); g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    g.fillStyle = grey(116 + R() * 20); g.beginPath(); g.arc(x - 0.1, y - 0.1, r * 0.78, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(70,64,56,0.6)'; g.lineWidth = 0.25;
+    for (const q of [0.25, 0.5]) { g.beginPath(); g.arc(x - 0.1, y - 0.1, r * q, 0, 7); g.stroke(); }
+    if (R() < 0.6) { g.strokeStyle = 'rgba(40,36,32,0.6)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R() - 0.5) * r * 1.4, y - r * 0.7); g.stroke(); }
+  }
+}
 const SPRITE_KINDS = {                           // kind: [variants, w, h, ax, ay, painter]
   pine: [6, 70, 118, 35, 112, paintPine], oak: [5, 84, 96, 42, 90, paintOak], dead: [4, 76, 72, 38, 66, paintSnag],
   bush: [4, 28, 20, 14, 17, paintBush], fern: [4, 34, 16, 17, 13, paintFern], grass: [5, 16, 13, 8, 12, paintGrass],
-  stump: [3, 22, 13, 11, 10, paintStump], log: [3, 56, 34, 28, 19, paintLog], shrooms: [3, 14, 11, 7, 8, paintShrooms],
+  stump: [3, 22, 13, 11, 10, paintStump], pebbles: [4, 16, 8, 8, 5, paintPebbles],
+  rock: [5, 36, 26, 18, 21, paintRock], post: [3, 16, 38, 8, 35, paintPost], lamp: [1, 22, 58, 6, 55, paintLamp],
+  firepit: [1, 40, 22, 20, 12, paintFirePit], crateS: [1, 20, 22, 10, 18, paintCrate(false)], crateB: [1, 24, 26, 12, 22, paintCrate(true)],
+  barrel: [1, 16, 22, 8, 19, paintBarrel], woodpile: [1, 26, 20, 13, 17, paintWoodpile], pack: [1, 24, 22, 12, 18, paintPack],
+  chest1: [1, 32, 26, 13, 19, paintChest(1, false)], chest2: [1, 32, 26, 13, 19, paintChest(2, false)], chest3: [1, 36, 26, 15, 19, paintChest(3, false)],
+  chest1o: [1, 32, 30, 13, 23, paintChest(1, true)], chest2o: [1, 32, 30, 13, 23, paintChest(2, true)], chest3o: [1, 36, 30, 15, 23, paintChest(3, true)], log: [3, 56, 34, 28, 19, paintLog], shrooms: [3, 14, 11, 7, 8, paintShrooms],
 };
-function sprite(kind, v) {
+function sprite(kind, v, Ld = 1) {
   const want = Math.max(0.75, Math.min(3, Math.round(Z * DPR * 1.3 * 4) / 4));
   if (want !== SPR) { SPR = want; SPRITES = {}; }   // zoom or quality changed: repaint at the new size
-  const key = kind + v; if (SPRITES[key]) return SPRITES[key];
+  const key = kind + v + (Ld > 0 ? 'r' : 'l'); if (SPRITES[key]) return SPRITES[key];
   const [, w, h, ax, ay, paint] = SPRITE_KINDS[kind];
-  return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7)));
+  return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld));
+}
+// apply a transform [a 0 cc d e f], draw, then undo it exactly (cheaper than save/restore or reading the matrix back)
+function withXf(c, a, cc, d, e, f, draw) {
+  c.transform(a, 0, cc, d, e, f); draw();
+  c.transform(1 / a, 0, -cc / (a * d), 1 / d, -(e / a - cc * f / (a * d)), -f / d);
 }
 function stamp(c, spr, sx, sy, s, flip, sway, mask) {  // draw a sprite with its foot at (sx, sy), leaning with the wind
-  const k = s / SPR, m = c.getTransform();
-  c.transform(flip * k, 0, -sway / (spr.h * s) * k, k, sx, sy);
-  c.drawImage(mask ? spr.mk : spr.cv, -spr.ax * SPR, -spr.ay * SPR);
-  c.setTransform(m);
+  const k = s / SPR;
+  withXf(c, flip * k, -sway / (spr.h * s) * k, k, sx, sy, () => c.drawImage(mask ? spr.mk : spr.cv, -spr.ax * SPR, -spr.ay * SPR));
 }
 function drawTree(o, c, mask, sx, sy, s) {
   const sway = Math.sin(S.t * 0.7 + o.seed * 20) * 1.6 * s + Math.sin(S.t * 1.9 + o.seed * 7) * 0.5 * s;
-  const flip = toScreen(S.p.x, S.p.y)[0] < sx ? -1 : 1;   // the side facing the player catches the torch
-  const kind = o.type === 'pine' ? 'pine' : o.type === 'oak' ? 'oak' : 'dead';
+  const kind = o.type === 'pine' ? 'pine' : o.type === 'oak' ? 'oak' : 'dead', v = (o.seed * 997 | 0) % SPRITE_KINDS[kind][0];
+  const m = (o.seed * 7919 % 1) < 0.5 ? 1 : -1;   // each tree keeps its own facing; only its lighting turns with you
+  // the side facing the player catches the torch; as you pass a tree the light slides across it instead of the tree flipping over
+  const wR = Math.max(0, Math.min(1, 0.5 - (sx - toScreen(S.p.x, S.p.y)[0]) / (90 * Z)));   // 1 = lit from the right of the screen
+  const sw = sway * (kind === 'dead' ? 0.4 : 1);
   if (!mask) shadow(sx, sy, (kind === 'pine' ? 15 : kind === 'oak' ? 20 : 10) * s);
-  stamp(c, sprite(kind, (o.seed * 997 | 0) % SPRITE_KINDS[kind][0]), sx, sy, s, flip, sway * (kind === 'dead' ? 0.4 : 1), mask);
+  if (mask || wR <= 0.02 || wR >= 0.98) { stamp(c, sprite(kind, v, wR >= 0.5 ? m : -m), sx, sy, s, m, sw, mask); return; }
+  stamp(c, sprite(kind, v, -m), sx, sy, s, m, sw, false);
+  const ga = c.globalAlpha; c.globalAlpha = ga * wR;
+  stamp(c, sprite(kind, v, m), sx, sy, s, m, sw, false);
+  c.globalAlpha = ga;
 }
 // ground cover: grass, ferns, bushes, stumps, fallen logs and mushrooms; never in the way, never casts a shadow
 const decorCache = new Map();
@@ -1414,7 +1605,7 @@ function decorAt(i, j) {
     const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
     if (!(S && S.mode === 'expedition' && Math.hypot(x, y) < CAMP_R + 45)) {
       const r = h / 0.27, v = hash(i * 3.3, j * 5.1);
-      const kind = r < 0.42 ? 'grass' : r < 0.6 ? 'fern' : r < 0.74 ? 'bush' : r < 0.84 ? 'shrooms' : r < 0.93 ? 'stump' : 'log';
+      const kind = r < 0.36 ? 'grass' : r < 0.52 ? 'fern' : r < 0.64 ? 'pebbles' : r < 0.76 ? 'bush' : r < 0.85 ? 'shrooms' : r < 0.93 ? 'stump' : 'log';
       d = { kind: 'decor', dk: kind, x, y, s: 1 + hash(j * 1.7, i) * 0.55, v: (v * 97 | 0) % SPRITE_KINDS[kind][0], seed: v };
     }
   }
@@ -1431,7 +1622,7 @@ function decorInView(lights) {   // ground cover only shows where some light rea
   const reach = Math.max(W, H) * 0.72 * ZOOM() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
   const out = [], near = lights.filter(L => Math.hypot(L.x - S.p.x, L.y - S.p.y) < viewR() + 200);
   for (const o of decorNear(S.cam.x, S.cam.y, viewR())) {
-    if (QUALITY < 0.75 && (o.dk === 'grass' || o.dk === 'shrooms')) continue;   // a slow machine drops the smallest bits first
+    if (QUALITY < 0.75 && (o.dk === 'grass' || o.dk === 'shrooms' || o.dk === 'pebbles')) continue;   // a slow machine drops the smallest bits first
     const [sx, sy] = toScreen(o.x, o.y);
     if (sx < -60 || sx > W + 60 || sy < -10 || sy - 50 * Z > H) continue;
     if (Math.hypot(o.x - S.p.x, o.y - S.p.y) < reach || near.some(L => Math.hypot(o.x - L.x, o.y - L.y) < 170)) { o.sx = sx; o.sy = sy; out.push(o); }
@@ -1442,10 +1633,8 @@ function drawDecor(o) {   // sets the transform directly (no save/restore): ther
   const s = o.s * Z, spr = sprite(o.dk, o.v), k = s / SPR, f = o.seed > 0.5 ? k : -k;
   const sh = o.dk === 'grass' || o.dk === 'fern' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
   if (o.dk === 'bush' || o.dk === 'stump') shadow(o.sx, o.sy, 9 * s);
-  const m = ctx.getTransform();
-  ctx.transform(f, 0, sh * k, k, o.sx, o.sy);
-  ctx.drawImage(spr.cv, -spr.ax * SPR, -spr.ay * SPR);
-  ctx.setTransform(m);
+  const [l, hy] = lean(o.sx, o.sy);   // combined lean and wind sway, applied as one transform
+  withXf(ctx, f, sh * k - l * k, hy * k, o.sx, o.sy, () => ctx.drawImage(spr.cv, -spr.ax * SPR, -spr.ay * SPR));
 }
 
 // ---- torch shadows ----
@@ -1472,7 +1661,23 @@ function shadowPoly(c, lx, ly, o, r, len, extra) {
 }
 
 // c: canvas to draw on; mask: draw a solid silhouette (used to cut lit shapes out of the dark)
+// a sprite lit on the side facing the player, the light sliding across as they pass (both versions share one outline)
+function litStamp(c, kind, v, sx, sy, s, mask) {
+  const wR = Math.max(0, Math.min(1, 0.5 - (sx - toScreen(S.p.x, S.p.y)[0]) / (60 * Z)));
+  if (mask || wR <= 0.02 || wR >= 0.98) { stamp(c, sprite(kind, v, wR >= 0.5 ? 1 : -1), sx, sy, s, 1, 0, mask); return; }
+  stamp(c, sprite(kind, v, -1), sx, sy, s, 1, 0, false);
+  const ga = c.globalAlpha; c.globalAlpha = ga * wR; stamp(c, sprite(kind, v, 1), sx, sy, s, 1, 0, false); c.globalAlpha = ga;
+}
+// a touch of perspective: we look down on the world from above the player, so anything standing up leans gently away from
+// the middle of the screen and stands a little taller toward the top; as you walk past, things turn and shift like solid objects
+function lean(sx, sy) {
+  return [Math.max(-1.3, Math.min(1.3, (sx - W / 2) / 600)) * 0.2, 1 + Math.max(-1, Math.min(1, (H / 2 - sy) / 600)) * 0.08];
+}
 function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
+  const [sx, sy] = toScreen(o.x, o.y), [l, hy] = lean(sx, sy);
+  withXf(c, 1, -l, hy, l * sy, sy - hy * sy, () => drawPropFlat(o, c, mask, maskCol));   // shear and stretch about the object's foot
+}
+function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   const col = x => mask ? maskCol : x;
   const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
   if (sx < -80 * s || sx > W + 80 * s || sy < -20 * s || sy - 130 * s > H) return;   // off screen
@@ -1480,18 +1685,9 @@ function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
     drawTree(o, c, mask, sx, sy, s);
   } else if (o.kind === 'rock') {
     if (!mask) shadow(sx, sy, 13 * s);
-    c.fillStyle = col('#5a5a57');
-    c.beginPath(); c.moveTo(sx - 12 * s, sy); c.lineTo(sx - 9 * s, sy - 9 * s); c.lineTo(sx - 1 * s, sy - 14 * s); c.lineTo(sx + 10 * s, sy - 8 * s); c.lineTo(sx + 12 * s, sy); c.closePath(); c.fill();
-    c.fillStyle = col('#747471');
-    c.beginPath(); c.moveTo(sx - 9 * s, sy - 9 * s); c.lineTo(sx - 1 * s, sy - 14 * s); c.lineTo(sx + 2 * s, sy - 7 * s); c.closePath(); c.fill();
+    litStamp(c, 'rock', (hash(o.x * 0.37, o.y * 0.91) * 50 | 0) % SPRITE_KINDS.rock[0], sx, sy, s * 0.95, mask);
   } else if (o.kind === 'fire') {
-    for (let n = 0; n < 8; n++) {                       // ring of stones
-      const a = n / 8 * Math.PI * 2;
-      c.fillStyle = col(n % 2 ? '#5a5a57' : '#6a6a67');
-      c.beginPath(); c.ellipse(sx + Math.cos(a) * 15 * Z, sy + Math.sin(a) * 7.5 * Z, 4.5 * Z, 3 * Z, 0, 0, 7); c.fill();
-    }
-    c.strokeStyle = col('#2a2a28'); c.lineWidth = 3.5 * Z; c.lineCap = 'round';   // logs
-    c.beginPath(); c.moveTo(sx - 9 * Z, sy + 3 * Z); c.lineTo(sx + 9 * Z, sy - 3 * Z); c.moveTo(sx - 8 * Z, sy - 3 * Z); c.lineTo(sx + 8 * Z, sy + 3 * Z); c.stroke();
+    stamp(c, sprite('firepit', 0), sx, sy, Z, 1, 0, mask);
   } else if (o.camp) { drawCampPiece(o, c, sx, sy, col, mask);
   } else if (o.kind === 'fence') {               // camp fence: a post and two rails to the next one
     if (!o.gate) {
@@ -1505,12 +1701,10 @@ function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
   } else if (o.kind === 'pack') { if (!mask) drawPackProp(o, c, sx, sy);
   } else if (o.kind === 'lamp') {
     if (!mask) shadow(sx, sy, 6 * Z);
-    c.fillStyle = col('#2f2f2d'); c.fillRect(sx - 2.5 * Z, sy - 50 * Z, 5 * Z, 50 * Z);
-    c.fillRect(sx - 2.5 * Z, sy - 50 * Z, 14 * Z, 3 * Z);                  // arm
-    c.fillRect(sx + 9 * Z, sy - 48 * Z, 1.5 * Z, 5 * Z);                   // hook
+    stamp(c, sprite('lamp', 0, toScreen(S.p.x, S.p.y)[0] < sx ? -1 : 1), sx, sy, Z, 1, 0, mask);
   } else {
     if (!mask) shadow(sx, sy, 5 * Z);
-    c.fillStyle = col('#2f2f2d'); c.fillRect(sx - 2.5 * Z, sy - 30 * Z, 5 * Z, 30 * Z);
+    litStamp(c, 'post', (hash(o.x * 0.53, o.y * 0.29) * 50 | 0) % SPRITE_KINDS.post[0], sx, sy, Z, mask);
   }
 }
 
@@ -3553,6 +3747,14 @@ function drawCampPiece(o, c, sx, sy, col, mask) {
       c.strokeStyle = col('#46413a'); c.lineWidth = 6 * Z; c.lineCap = 'round';
       c.beginPath(); c.moveTo(x0, y0 - 3 * Z); c.lineTo(x1, y1 - 3 * Z); c.stroke();
       c.strokeStyle = col('#57524a'); c.lineWidth = 2 * Z; c.beginPath(); c.moveTo(x0, y0 - 5 * Z); c.lineTo(x1, y1 - 5 * Z); c.stroke(); c.lineCap = 'butt';
+      if (!mask) {                                // bark, a worn seat along the top, and pale end grain
+        c.strokeStyle = 'rgba(30,28,25,0.6)'; c.lineWidth = 0.6 * Z; c.beginPath();
+        for (let m = 1; m < 8; m++) { const f = m / 8, x = x0 + (x1 - x0) * f, y = y0 + (y1 - y0) * f - 3 * Z; c.moveTo(x - Z, y - 1.5 * Z); c.lineTo(x + Z, y + 1.5 * Z); } c.stroke();
+        c.strokeStyle = 'rgba(150,145,135,0.5)'; c.lineWidth = 0.8 * Z; c.beginPath(); c.moveTo(x0 + (x1 - x0) * 0.1, y0 + (y1 - y0) * 0.1 - 6 * Z); c.lineTo(x0 + (x1 - x0) * 0.9, y0 + (y1 - y0) * 0.9 - 6 * Z); c.stroke();
+        const [ex, ey] = y0 > y1 ? [x0, y0] : [x1, y1];
+        c.fillStyle = '#8d877c'; c.beginPath(); c.ellipse(ex, ey - 3 * Z, 2.1 * Z, 2.8 * Z, 0, 0, 7); c.fill();
+        c.strokeStyle = '#6a645a'; c.lineWidth = 0.4 * Z; c.beginPath(); c.ellipse(ex, ey - 3 * Z, 1.1 * Z, 1.5 * Z, 0, 0, 7); c.stroke();
+      }
       break;
     }
     case 'tent': {                              // a canvas tent: ridge pole, two slopes, a dark way in at the near end
@@ -3570,27 +3772,15 @@ function drawCampPiece(o, c, sx, sy, col, mask) {
       break;
     }
     case 'crate': {
-      const s2 = (o.big ? 9 : 7) * Z, h = (o.big ? 13 : 10) * Z;
-      c.fillStyle = col('#57514a'); c.beginPath(); c.moveTo(sx - s2, sy - h); c.lineTo(sx, sy - h - s2 / 2); c.lineTo(sx + s2, sy - h); c.lineTo(sx, sy - h + s2 / 2); c.closePath(); c.fill();
-      c.fillStyle = col('#47423c'); c.beginPath(); c.moveTo(sx - s2, sy - h); c.lineTo(sx, sy - h + s2 / 2); c.lineTo(sx, sy + s2 / 2); c.lineTo(sx - s2, sy); c.closePath(); c.fill();
-      c.fillStyle = col('#36322d'); c.beginPath(); c.moveTo(sx + s2, sy - h); c.lineTo(sx, sy - h + s2 / 2); c.lineTo(sx, sy + s2 / 2); c.lineTo(sx + s2, sy); c.closePath(); c.fill();
-      c.strokeStyle = col('#2a2724'); c.lineWidth = 1 * Z; c.beginPath(); c.moveTo(sx - s2, sy - h); c.lineTo(sx, sy + s2 / 2); c.moveTo(sx + s2, sy - h); c.lineTo(sx, sy + s2 / 2); c.stroke();
+      stamp(c, sprite(o.big ? 'crateB' : 'crateS', 0), sx, sy, Z, 1, 0, mask);
       break;
     }
     case 'barrel': {
-      const r = 5.5 * Z, h = 13 * Z;
-      c.fillStyle = col('#3f3b35'); c.fillRect(sx - r, sy - h, 2 * r, h);
-      c.beginPath(); c.ellipse(sx, sy, r, r / 2, 0, 0, Math.PI); c.fill();
-      c.fillStyle = col('#54504a'); c.beginPath(); c.ellipse(sx, sy - h, r, r / 2, 0, 0, 7); c.fill();
-      c.fillStyle = col('#2a2724'); c.fillRect(sx - r, sy - h * 0.75, 2 * r, 1.3 * Z); c.fillRect(sx - r, sy - h * 0.3, 2 * r, 1.3 * Z);
+      stamp(c, sprite('barrel', 0), sx, sy, Z, 1, 0, mask);
       break;
     }
-    case 'wood': {                              // split firewood stacked against the wall
-      for (let row = 0; row < 3; row++) for (let m = 0; m < 4 - row; m++) {
-        const x = sx + (m - (3 - row) / 2) * 5 * Z, y = sy - 3 * Z - row * 4.4 * Z;
-        c.fillStyle = col('#47423b'); c.beginPath(); c.arc(x, y, 2.6 * Z, 0, 7); c.fill();
-        c.fillStyle = col('#6b655c'); c.beginPath(); c.arc(x, y, 1.4 * Z, 0, 7); c.fill();
-      }
+    case 'wood': {
+      stamp(c, sprite('woodpile', 0), sx, sy, Z, 1, 0, mask);
       break;
     }
     case 'rack': {                              // spears waiting on a rack
@@ -3980,23 +4170,8 @@ function exStep(dt) {
 
 // ---- drawing ----
 function drawChest(o, c, sx, sy) {
-  const rg = S.rg, open = rg && (rg.looted.has(o.key) || rg.left.has(o.key)), t = o.tier;
-  const w = (t === 3 ? 11 : 9) * Z, h = 8 * Z;
-  const body = ['#4e4d49', '#5a5954', '#7d7c75'][t - 1], top = ['#66655f', '#727169', '#a3a29a'][t - 1];
-  c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(sx, sy, w * 1.3, w * 0.5, 0, 0, 7); c.fill();
-  c.fillStyle = body; c.fillRect(sx - w, sy - h, 2 * w, h);
-  if (open) {
-    c.fillStyle = top; c.fillRect(sx - w, sy - h - 9 * Z, 2 * w, 7 * Z);       // lid thrown back
-    c.fillStyle = '#121211'; c.fillRect(sx - w + Z, sy - h - 2 * Z, 2 * w - 2 * Z, 2.5 * Z);
-  } else {
-    c.fillStyle = top; c.fillRect(sx - w, sy - h - 4 * Z, 2 * w, 4.5 * Z);
-    c.fillStyle = t === 3 ? '#e8e7de' : '#2a2a28'; c.fillRect(sx - 1.5 * Z, sy - h - 1.5 * Z, 3 * Z, 3.5 * Z);   // latch
-  }
-  if (t > 1) {                               // bands: dark iron, or pale on a relic chest
-    c.fillStyle = t === 3 ? '#d4d3ca' : '#333331';
-    c.fillRect(sx - w * 0.62, sy - h - (open ? 0 : 4 * Z), 2 * Z, h + (open ? 0 : 4 * Z));
-    c.fillRect(sx + w * 0.62 - 2 * Z, sy - h - (open ? 0 : 4 * Z), 2 * Z, h + (open ? 0 : 4 * Z));
-  }
+  const rg = S.rg, open = rg && (rg.looted.has(o.key) || rg.left.has(o.key));
+  stamp(c, sprite('chest' + o.tier + (open ? 'o' : ''), 0), sx, sy, Z, 1, 0, false);
 }
 const TELE_S = 1.45;                         // the shrine is drawn bigger than everyday props
 function drawTele(o, c, sx, sy, col) {       // an ancient dais of black stone; three leaning shards reach in over a pit to the other side
@@ -4028,12 +4203,7 @@ function drawTele(o, c, sx, sy, col) {       // an ancient dais of black stone; 
   }
 }
 function teleSockets(sx, sy) { const ZT = Z * TELE_S; return [0, 1, 2].map(i => { const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 26 * ZT, y = sy + Math.sin(a) * 13 * ZT; return [x + (sx - x) * 0.3, y - 70 * ZT]; }); }
-function drawPackProp(o, c, sx, sy) {
-  c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(sx, sy, 10 * Z, 4 * Z, 0, 0, 7); c.fill();
-  c.fillStyle = '#5c5a52'; c.beginPath(); c.ellipse(sx, sy - 6 * Z, 8 * Z, 7 * Z, 0, 0, 7); c.fill();
-  c.fillStyle = '#46443e'; c.fillRect(sx - 6 * Z, sy - 12 * Z, 12 * Z, 3 * Z);
-  c.strokeStyle = '#2c2b27'; c.lineWidth = 1.5 * Z; c.beginPath(); c.arc(sx, sy - 12 * Z, 4 * Z, Math.PI, 0); c.stroke();
-}
+function drawPackProp(o, c, sx, sy) { stamp(c, sprite('pack', 0), sx, sy, Z, 1, 0, false); }
 function drawOrb(x, y, s, a) {               // a levitating green crystal and its glow
   const g = ctx.createRadialGradient(x, y, 0, x, y, 46 * s);
   g.addColorStop(0, `rgba(${ORB_COL},${0.55 * a})`); g.addColorStop(1, `rgba(${ORB_COL},0)`);
