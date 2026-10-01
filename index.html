@@ -223,7 +223,7 @@ const lB = document.createElement('canvas'), lBctx = lB.getContext('2d');
 // the camp fire's own light, kept apart so only what it reaches gets its warm colour
 const wA = document.createElement('canvas'), wActx = wA.getContext('2d');
 const wT = document.createElement('canvas'), wTctx = wT.getContext('2d');
-let warmOn = false, warmBox = null;
+let warmOn = false, warmBox = null, beamGeo = null;
 let W = 0, H = 0, DPR = 1, Z = 1, SAFE_TOP = 0;
 let FOV = 1;   // field of view from the menu slider: above 1 sees more (zoomed out), below 1 is closer
 try { const f = parseFloat(localStorage.getItem('behind-you-fov')); if (f >= 0.75 && f <= 1.4) FOV = f; } catch (e) {}
@@ -1414,6 +1414,18 @@ function drawPlayer() {
   OUT = false; paint();
 }
 
+// the torch beam gets a slight warm cast too, strongest near the lens and fading out along the beam
+function drawTorchWarmth() {
+  const b = beamGeo; if (!b || b.a < 0.02) return;
+  const g = ctx.createRadialGradient(b.bx, b.by, 0, b.bx, b.by, b.br);
+  g.addColorStop(0, 'rgba(255,196,120,1)'); g.addColorStop(0.6, 'rgba(255,196,120,0.7)'); g.addColorStop(1, 'rgba(255,196,120,0)');
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = 0.32 * Math.min(1, b.a); ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(b.bx, b.by);
+  for (let t = -HALF - 0.04; t <= HALF + 0.041; t += HALF / 8) ctx.lineTo(b.bx + Math.cos(S.aim + t) * b.br, b.by + Math.sin(S.aim + t) * b.br);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
 // the camp fire's warm colour: everything its light reaches, and only that, takes on an orange glow; the woods stay grey
 function drawWarmth() {
   if (!warmOn) return;
@@ -1712,6 +1724,7 @@ function renderScene() {
   dctx.beginPath(); dctx.moveTo(bx, by);
   for (let t = -HALF; t <= HALF + 0.001; t += HALF / 16) dctx.lineTo(bx + Math.cos(S.aim + t) * br, by + Math.sin(S.aim + t) * br);
   dctx.closePath(); dctx.fill(); dctx.globalAlpha = 1;
+  beamGeo = { bx, by, br, a: S.torchLvl * (0.55 + 0.45 * torchFade()) };
   if (isRg()) cutSurviveLights(bx, by, br);
 
   // shadows: everything behind an obstacle (seen from the torch) goes back to dark
@@ -1792,6 +1805,7 @@ function renderScene() {
     p.x = x0; p.y = y0;
   }
   drawPlayer(); // drawn over the dark so the whole figure stays readable
+  drawTorchWarmth();
   drawWarmth();
   if (isRg()) drawDodgeFx();
   if (isRg()) { surviveLight(bx, by, br, casters, lx, ly); drawSurviveFx(bx, by, br); }
@@ -3488,16 +3502,36 @@ function drawChest(o, c, sx, sy) {
     c.fillRect(sx + w * 0.62 - 2 * Z, sy - h - (open ? 0 : 4 * Z), 2 * Z, h + (open ? 0 : 4 * Z));
   }
 }
-function drawTele(o, c, sx, sy, col) {
-  c.fillStyle = col('#4a4a47'); c.beginPath(); c.ellipse(sx, sy, 28 * Z, 14 * Z, 0, 0, 7); c.fill();
-  c.fillStyle = col('#252523'); c.beginPath(); c.ellipse(sx, sy, 20 * Z, 10 * Z, 0, 0, 7); c.fill();
-  for (const i of [0, 2, 1]) {               // three standing stones, the far one first
-    const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 23 * Z, y = sy + Math.sin(a) * 11.5 * Z + (i === 1 ? 0 : 0);
-    c.fillStyle = col('#5e5e5a'); c.fillRect(x - 3.5 * Z, y - 24 * Z, 7 * Z, 24 * Z);
-    c.fillStyle = col('#7a7973'); c.fillRect(x - 3.5 * Z, y - 26 * Z, 7 * Z, 3 * Z);
+const TELE_S = 1.45;                         // the shrine is drawn bigger than everyday props
+function drawTele(o, c, sx, sy, col) {       // an ancient dais of black stone; three leaning shards reach in over a pit to the other side
+  const ZT = Z * TELE_S;
+  const el = (x, y, rx, ry, f) => { c.fillStyle = col(f); c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 7); c.fill(); };
+  el(sx, sy + 3 * ZT, 36 * ZT, 18 * ZT, '#232327');     // lower step: its side, then its top
+  el(sx, sy, 35 * ZT, 17 * ZT, '#45454c');
+  c.strokeStyle = col('#2e2e33'); c.lineWidth = 1.1 * ZT;   // worn carvings round the lower step
+  for (let n = 0; n < 18; n++) {
+    const a = n / 18 * Math.PI * 2, x = sx + Math.cos(a) * 30 * ZT, y = sy + Math.sin(a) * 14.6 * ZT, u = 1.8 * ZT;
+    c.beginPath();
+    if (n % 3 === 0) { c.moveTo(x - u, y); c.lineTo(x + u, y); c.moveTo(x, y - u * 0.6); c.lineTo(x, y + u * 0.6); }
+    else if (n % 3 === 1) { c.moveTo(x - u, y - u * 0.5); c.lineTo(x, y + u * 0.5); c.lineTo(x + u, y - u * 0.5); }
+    else c.ellipse(x, y, u * 0.8, u * 0.45, 0, 0, 7);
+    c.stroke();
+  }
+  el(sx, sy - 2 * ZT, 22 * ZT, 11 * ZT, '#1c1c20');     // upper step
+  el(sx, sy - 5 * ZT, 21 * ZT, 10.5 * ZT, '#38383f');
+  el(sx, sy - 5 * ZT, 12 * ZT, 6 * ZT, '#0b0b0d');      // the pit
+  for (const i of [1, 0, 2]) {                 // three leaning shards, the far one first
+    const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 26 * ZT, y = sy + Math.sin(a) * 13 * ZT, lean = (sx - x) * 0.3;
+    const tx = x + lean, ty = y - 62 * ZT;
+    c.fillStyle = col('#5b5b65');               // lit face
+    c.beginPath(); c.moveTo(x - 7 * ZT, y); c.lineTo(x - 5 * ZT + lean * 0.8, y - 46 * ZT); c.lineTo(tx, ty); c.lineTo(x + 0.5 * ZT, y + 1 * ZT); c.closePath(); c.fill();
+    c.fillStyle = col('#2a2a30');               // shadowed face
+    c.beginPath(); c.moveTo(x + 0.5 * ZT, y + 1 * ZT); c.lineTo(tx, ty); c.lineTo(x + 5.5 * ZT + lean * 0.8, y - 44 * ZT); c.lineTo(x + 7 * ZT, y); c.closePath(); c.fill();
+    c.strokeStyle = col('#1d1d22'); c.lineWidth = 1 * ZT;   // a carved channel running up the shard
+    c.beginPath(); c.moveTo(x - 1.5 * ZT, y - 6 * ZT); c.lineTo(x - 1.5 * ZT + lean * 0.35, y - 18 * ZT); c.lineTo(x + lean * 0.5, y - 22 * ZT); c.lineTo(x - 1 * ZT + lean * 0.7, y - 33 * ZT); c.lineTo(x - 0.5 * ZT + lean * 0.85, y - 44 * ZT); c.stroke();
   }
 }
-function teleSockets(sx, sy) { return [0, 1, 2].map(i => { const a = -Math.PI / 2 + (i - 1) * 2.2; return [sx + Math.cos(a) * 23 * Z, sy + Math.sin(a) * 11.5 * Z - 31 * Z]; }); }
+function teleSockets(sx, sy) { const ZT = Z * TELE_S; return [0, 1, 2].map(i => { const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 26 * ZT, y = sy + Math.sin(a) * 13 * ZT; return [x + (sx - x) * 0.3, y - 70 * ZT]; }); }
 function drawPackProp(o, c, sx, sy) {
   c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(sx, sy, 10 * Z, 4 * Z, 0, 0, 7); c.fill();
   c.fillStyle = '#5c5a52'; c.beginPath(); c.ellipse(sx, sy - 6 * Z, 8 * Z, 7 * Z, 0, 0, 7); c.fill();
@@ -3551,14 +3585,96 @@ function drawExFx() {
     ctx.strokeStyle = `rgba(250,250,240,${a})`; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(x - r, yy); ctx.lineTo(x + r, yy); ctx.moveTo(x, yy - r); ctx.lineTo(x, yy + r); ctx.stroke();
   }
-  // teleporter: lit sockets hold the orbs brought home
-  { const [tx, ty] = toScreen(TELE.x, TELE.y), sk = teleSockets(tx, ty);
-    for (let i = 0; i < 3; i++) if (i < XS.orbs) drawOrb(sk[i][0], sk[i][1] + Math.sin(S.t * 2 + i) * 1.5 * Z, Z * 0.7, 1);
-    if (XS.orbs) {
-      const g = ctx.createRadialGradient(tx, ty - 6 * Z, 0, tx, ty - 6 * Z, 26 * Z);
-      g.addColorStop(0, `rgba(${ORB_COL},${0.15 + 0.08 * XS.orbs + 0.05 * Math.sin(S.t * 3)})`); g.addColorStop(1, `rgba(${ORB_COL},0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(tx, ty - 6 * Z, 26 * Z, 14 * Z, 0, 0, 7); ctx.fill();
-    } }
+  // the shrine: runes that wake, a pit that opens onto somewhere else, stones that float, and the orbs brought home
+  { const ZT = Z * TELE_S, [tx, ty] = toScreen(TELE.x, TELE.y), onScreen = tx > -150 && tx < W + 150 && ty > -150 && ty < H + 400;
+    if (onScreen) { const sk = teleSockets(tx, ty), t = S.t, n = XS.orbs, pw = 0.3 + 0.7 * n / 3, cy = ty - 5 * ZT;
+    const G = (a) => `rgba(${ORB_COL},${Math.max(0, Math.min(1, a))})`, Wt = (a) => `rgba(215,255,228,${Math.max(0, Math.min(1, a))})`;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    // glow pooled on the dais
+    let g = ctx.createRadialGradient(tx, cy, 0, tx, cy, 44 * ZT);
+    g.addColorStop(0, G(0.22 * pw + 0.04 * Math.sin(t * 2.3))); g.addColorStop(1, G(0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(tx, cy, 44 * ZT, 22 * ZT, 0, 0, 7); ctx.fill();
+    // a slow ring of runes round the pit, each one breathing on its own
+    ctx.lineWidth = 1.3 * ZT;
+    for (let k = 0; k < 14; k++) {
+      const a = k / 14 * Math.PI * 2 + t * 0.12, x = tx + Math.cos(a) * 17 * ZT, y = cy + Math.sin(a) * 8.5 * ZT, u = 2.1 * ZT;
+      ctx.strokeStyle = G((0.35 + 0.35 * Math.sin(t * 1.7 + k * 2.1)) * pw * 1.4);
+      ctx.beginPath();
+      switch (k % 4) {
+        case 0: ctx.moveTo(x, y - u); ctx.lineTo(x, y + u * 0.4); ctx.moveTo(x - u * 0.7, y - u * 0.4); ctx.lineTo(x + u * 0.7, y - u * 0.4); break;
+        case 1: ctx.moveTo(x - u * 0.7, y - u * 0.6); ctx.lineTo(x, y + u * 0.4); ctx.lineTo(x + u * 0.7, y - u * 0.6); break;
+        case 2: ctx.ellipse(x, y - u * 0.2, u * 0.55, u * 0.4, 0, 0, 7); break;
+        default: ctx.moveTo(x - u * 0.7, y + u * 0.3); ctx.lineTo(x - u * 0.2, y - u * 0.7); ctx.lineTo(x + u * 0.3, y + u * 0.3); ctx.lineTo(x + u * 0.7, y - u * 0.7);
+      }
+      ctx.stroke();
+    }
+    // the pit: a slow whirl of light turning in on itself
+    for (let k = 0; k < 4; k++) {
+      const r = (11 - k * 2.4) * ZT, a0 = t * (0.9 + k * 0.45) * (k % 2 ? -1 : 1) + k;
+      ctx.strokeStyle = k === 3 ? Wt(0.5 * pw) : G((0.3 + 0.12 * k) * pw); ctx.lineWidth = (1.6 - k * 0.2) * ZT;
+      ctx.beginPath(); ctx.ellipse(tx, cy, r, r / 2, 0, a0, a0 + 3.6); ctx.stroke();
+    }
+    g = ctx.createRadialGradient(tx, cy, 0, tx, cy, 4 * ZT);
+    g.addColorStop(0, Wt(0.7 * pw)); g.addColorStop(1, Wt(0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(tx, cy, 4 * ZT, 2 * ZT, 0, 0, 7); ctx.fill();
+    // a column of light climbs higher with every orb home; all three and it reaches the sky
+    if (n) {
+      const top = n >= 3 ? cy - Math.max(ty, H) - 40 : cy - (40 + 50 * n) * ZT, bw = (3 + 2.5 * n) * ZT * (1 + 0.08 * Math.sin(t * 5));
+      g = ctx.createLinearGradient(0, top, 0, cy);
+      g.addColorStop(0, G(0)); g.addColorStop(0.7, G(0.18 + 0.06 * n)); g.addColorStop(1, G(0.4 + 0.1 * n));
+      ctx.fillStyle = g; ctx.fillRect(tx - bw, top, bw * 2, cy - top);
+      ctx.fillStyle = Wt(0.25 + 0.08 * n); ctx.fillRect(tx - bw * 0.25, top, bw * 0.5, cy - top);
+    }
+    // threads of light from each orb down into the pit
+    for (let i = 0; i < Math.min(3, n); i++) {
+      const [ox, oy] = sk[i], j = Math.sin(t * 13 + i * 3) * 2 * ZT;
+      ctx.strokeStyle = G(0.35 + 0.2 * Math.sin(t * 7 + i)); ctx.lineWidth = 1.2 * ZT;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.quadraticCurveTo((ox + tx) / 2 + j, Math.min(oy, cy) - 6 * ZT, tx, cy - 3 * ZT); ctx.stroke();
+    }
+    // sparks drifting up out of the pit
+    for (let k = 0; k < 16; k++) {
+      const ph = (t * (0.18 + (k % 4) * 0.04) + k / 16) % 1, sw = Math.sin(t * 1.3 + k * 4.7);
+      const x = tx + (Math.sin(k * 12.9) * 9 + sw * 6 * ph) * ZT, y = cy - ph * (55 + (k % 3) * 25) * ZT;
+      ctx.fillStyle = (k % 3 ? G : Wt)(Math.sin(ph * Math.PI) * 0.8 * pw);
+      ctx.beginPath(); ctx.arc(x, y, (k % 3 ? 1.1 : 1.5) * ZT, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    // the carved channels up each shard glow, brighter as the orbs come home
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1.3 * ZT; ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const a = -Math.PI / 2 + (i - 1) * 2.2, x = tx + Math.cos(a) * 26 * ZT, y = ty + Math.sin(a) * 13 * ZT, lean = (tx - x) * 0.3;
+      const k = (Math.sin(t * 1.1 - i * 0.9) * 0.5 + 0.5), lit = i < n ? 1 : 0.45;
+      ctx.strokeStyle = G((0.25 + 0.45 * k) * lit);
+      ctx.beginPath(); ctx.moveTo(x - 1.5 * ZT, y - 6 * ZT); ctx.lineTo(x - 1.5 * ZT + lean * 0.35, y - 18 * ZT); ctx.lineTo(x + lean * 0.5, y - 22 * ZT); ctx.lineTo(x - 1 * ZT + lean * 0.7, y - 33 * ZT); ctx.lineTo(x - 0.5 * ZT + lean * 0.85, y - 44 * ZT); ctx.stroke();
+    }
+    ctx.restore();
+    // a broken halo of light turning slowly high above the pit
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    for (let k = 0; k < 2; k++) {
+      const hy = cy - (80 + k * 9 + 2 * Math.sin(t * 1.2 + k)) * ZT, r = (24 - k * 7) * ZT;
+      ctx.strokeStyle = k ? Wt(0.35 * pw) : G(0.25 + 0.35 * pw); ctx.lineWidth = (1.6 - k * 0.5) * ZT;
+      for (let m = 0; m < 5; m++) {
+        const a0 = m / 5 * Math.PI * 2 + t * (k ? -0.5 : 0.35);
+        ctx.beginPath(); ctx.ellipse(tx, hy, r, r * 0.35, 0, a0, a0 + 0.8); ctx.stroke();
+      }
+    }
+    ctx.restore();
+    // splinters of stone hanging in the air, turning slowly round the shrine, lit green from underneath
+    for (let k = 0; k < 6; k++) {
+      const a = k / 6 * Math.PI * 2 + t * 0.18, h = (34 + 14 * Math.sin(k * 2.7) + 3 * Math.sin(t * 1.4 + k)) * ZT;
+      const x = tx + Math.cos(a) * 38 * ZT, y = cy + Math.sin(a) * 19 * ZT - h, s = (2.4 + (k % 3) * 0.9) * ZT, sp = t * 0.7 + k * 1.9;
+      const p1 = [x + Math.sin(sp) * s * 0.5, y - s * 2], p2 = [x + s * Math.cos(sp), y + s * 0.6], p3 = [x - s * Math.cos(sp + 0.8), y + s * 0.9];
+      ctx.fillStyle = '#1b1b20'; ctx.beginPath(); ctx.moveTo(...p1); ctx.lineTo(...p2); ctx.lineTo(...p3); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = G(0.4 * pw + 0.25); ctx.lineWidth = 1.1 * ZT;
+      ctx.beginPath(); ctx.moveTo(...p3); ctx.lineTo(...p2); ctx.stroke();
+    }
+    for (let i = 0; i < 3; i++) {
+      const [sx2, sy2] = sk[i];
+      if (i < n) drawOrb(sx2, sy2 + Math.sin(t * 2 + i) * 1.5 * ZT, ZT * 0.7, 1);
+      else {                                     // an empty socket: a faint ember waiting for its orb
+        ctx.fillStyle = G(0.25 + 0.2 * Math.sin(t * 2.4 + i * 2)); ctx.beginPath(); ctx.arc(sx2, sy2 + 5 * ZT, 1.6 * ZT, 0, 7); ctx.fill();
+      }
+    } } }
   // the orb out in the deep: a beacon you can see from a long way off, then the crystal itself
   if (XS.orbField && XS.orb) {
     const [ox, oy0] = toScreen(XS.orb.x, XS.orb.y), d = dist2(XS.orb, p), oy = oy0 - (26 + 4 * Math.sin(S.t * 2)) * Z;
