@@ -1132,13 +1132,15 @@ function update(dt) {
   }
   // trial: the torch only shines while you stand still
   if (screenSpeed(p) > 4) S.stillT = 0; else S.stillT = (S.stillT || 0) + dt;
-  const want = S.mode === 'free' || isRg() ? S.torchOn : S.mode === 'blink' ? S.torchOn && (S.blinkPhase === 'look' || S.blinkPhase === 'found') : S.torchOn && S.stillT > 0.25;
+  const dry = S.mode === 'expedition' && S.rg && S.rg.oil !== undefined && !S.rg.inCamp ? S.rg.oil / oilMax() : 1;   // Expedition: the torch needs oil
+  const want = S.mode === 'free' || isRg() ? S.torchOn && dry > 0 : S.mode === 'blink' ? S.torchOn && (S.blinkPhase === 'look' || S.blinkPhase === 'found') : S.torchOn && S.stillT > 0.25;
   if (want !== !!S.wasLit) { S.wasLit = want; S.torchOnT = 0; playClick(want); }
   if (want) {
     S.torchOnT += dt;
     // a couple of stutters as it comes on, then full
     const sputter = S.torchOnT < 0.25 && Math.random() < 0.35 ? 0.2 : 1;
-    S.torchLvl = Math.min(1, S.torchLvl + dt * 10) * sputter;
+    const gutter = dry < 0.1 && Math.random() < 0.18 * (1 - dry * 10) ? 0.15 + Math.random() * 0.4 : 1;   // nearly dry: it gutters
+    S.torchLvl = Math.min(1, S.torchLvl + dt * 10) * sputter * gutter;
   } else S.torchLvl = Math.max(0, S.torchLvl - dt * 25);
 }
 
@@ -3493,6 +3495,8 @@ const upPrice = (u, have) => Math.round(PRICE[u.r] * Math.pow(1.8, have));
 const GEAR = [
   { id: 'bag', name: 'Bigger Backpack', desc: 'Two more pack slots.', base: 12, max: 4 },
   { id: 'slot', name: 'Equip Slot', desc: 'Equip one more upgrade at a time.', base: 18, max: 5 },
+  { id: 'tank', name: 'Oil Tank', desc: 'Your torch burns oil while you are out, faster with the beam on. A bigger tank takes you deeper before it gutters out. Camp and outposts refill it.', base: 14, max: 5 },
+  { id: 'frame', name: 'Pack Frame', desc: 'Heavy loot slows you down. A frame spreads the load, so relics and orbs slow you less.', base: 20, max: 3 },
   { id: 'recall', use: true, name: 'Recall Flare', desc: "One use. Light it out in the dark and two seconds later you're home with your pack. You stand still while it burns, and a hit puts it out.", base: 20, max: 1 },
   { id: 'lanterns', use: true, name: 'Outpost Lantern', desc: 'Plant it past the near woods. Its light is safe ground, and over time it lays a trail of lamps toward the orb. Three in all.', base: 30, max: 1 },
 ];
@@ -3503,7 +3507,7 @@ const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
 // ---- saving: everything banked lives on this device ----
 const EX_KEY = 'behind-you-expedition';
 let XS = null;
-function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [] }; }
+function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0 }; }
 function exRead() {
   try {
     const s = JSON.parse(localStorage.getItem(EX_KEY) || 'null');
@@ -3520,9 +3524,18 @@ function exSave() { try { localStorage.setItem(EX_KEY, JSON.stringify(XS, (k, v)
 const packMax = () => 6 + 2 * XS.bag, slotMax = () => 3 + XS.slot;
 const packUsed = items => items.reduce((a, k) => a + ITEMS[k].slots, 0);
 const eqUsed = () => XS.eq.reduce((a, id) => a + slotCost(id), 0);
-function exWeight() {                       // a full pack slows you a little; a burning recall flare roots you
+// Oil and weight keep the deep earned: the torch burns oil while you're out, so a small tank can't reach the deep and back,
+// and heavy loot (relics, the orb) slows you, so carrying the prize home is the tense part.
+const OIL_BASE = 60, OIL_IDLE = 0.6, OIL_LIT = 1, OIL_REFILL = 25;
+const WEIGHT = { s: 0.5, c: 1, r: 3 }, ORB_WEIGHT = 4;
+const oilMax = () => OIL_BASE * (1 + 0.4 * (XS ? XS.tank || 0 : 0));
+function exLoad() {                           // how much you're carrying, in weight
+  const rg = S.rg; return rg.pack.reduce((a, k) => a + (WEIGHT[k] || 0), 0) + (rg.carryOrb ? ORB_WEIGHT : 0);
+}
+function exWeight() {                       // heavy loot slows you; a burning recall flare roots you
   const rg = S.rg; if (S.mode !== 'expedition' || !rg || !rg.pack) return 1;
-  return rg.recall ? 0 : 1 - 0.1 * packUsed(rg.pack) / packMax();
+  if (rg.recall) return 0;
+  return Math.max(0.6, 1 - 0.04 * exLoad() * (1 - 0.2 * (XS.frame || 0)));
 }
 function exSafeAt(x, y, pad = 0) {           // inside the camp fence or an outpost's light?
   if (Math.hypot(x, y) < CAMP_R + pad) return { x: 0, y: 0, r: CAMP_R };
@@ -3999,7 +4012,7 @@ function exNewRun() {
   for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
   rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = rg.up.wind || 0;
   rg.pack = []; rg.carryOrb = false; rg.looted = new Set(); rg.left = new Map(); rg.loose = []; rg.notes = [];
-  rg.inCamp = true; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
+  rg.inCamp = true; rg.oil = oilMax(); rg.oilWarn = 0; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
   return rg;
 }
 function exBegin() {
@@ -4112,6 +4125,7 @@ function exHome() {                          // stepped inside the fence: bank t
   }
   if (rg.hp < rg.maxHp) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = rg.maxHp; }
   rg.shield = lv('wind'); rg.looted.clear(); rg.left.clear();
+  rg.oil = oilMax(); rg.oilWarn = 0;
   XS.out = null; exSave();
 }
 function exLeave() {
@@ -4147,6 +4161,15 @@ function exStep(dt) {
     return;
   }
   const outpost = exSafeAt(p.x, p.y);
+  if (outpost) rg.oil = Math.min(oilMax(), rg.oil + OIL_REFILL * dt);   // an outpost's lamp tops the torch up
+  else {
+    rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT : OIL_IDLE));
+    const f = rg.oil / oilMax();
+    if (f < 0.3 && rg.oilWarn < 1) { rg.oilWarn = 1; exNote('oil low, head back', true); }
+    if (f < 0.1 && rg.oilWarn < 2) { rg.oilWarn = 2; exNote('the torch is guttering', true); }
+    if (rg.oil <= 0 && rg.oilWarn < 3) { rg.oilWarn = 3; exNote('out of oil', true); if (actx) { const t = actx.currentTime; noiseAt(t, 600, 150, 0.6, 0.3, sfxGain); } }
+    if (f > 0.35) rg.oilWarn = 0;
+  }
   if (outpost) {                             // safe in an outpost's light: nothing new comes, the ranged ones back off
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }
   } else {
@@ -4402,6 +4425,14 @@ function drawExFx() {
       ctx.fillRect(x0 + i * (sw + gap), y0, sw, 3);
     }
     if (rg.fullFx > 0) { ctx.strokeStyle = `rgba(239,239,234,${rg.fullFx})`; ctx.lineWidth = 1; ctx.strokeRect(x0 - 3 - 6 * (1 - rg.fullFx), y0 - 3 - 3 * (1 - rg.fullFx), tw + 6 + 12 * (1 - rg.fullFx), 9 + 6 * (1 - rg.fullFx)); }
+    const f = rg.oil / oilMax(), low = f < 0.3, op = low ? 0.55 + 0.45 * Math.sin(S.t * (f < 0.1 ? 14 : 7)) : 1;   // oil, a thin warm bar over the pack
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x0 - 1, y0 - 6, tw + 2, 4);
+    ctx.fillStyle = low ? `rgba(255,141,58,${0.95 * op})` : 'rgba(255,205,150,0.7)'; ctx.fillRect(x0, y0 - 5, tw * f, 2);
+    const slow = exWeight();
+    if (slow > 0 && slow < 0.8) {               // weighed down: say so, right there
+      ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = `rgba(239,239,234,${slow < 0.7 ? 0.8 : 0.5})`; ctx.fillText('HEAVY', px, y0 - 9);
+    }
   } else if (S.running) {
     ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = `rgba(239,239,234,${0.55 + 0.15 * Math.sin(S.t * 2.5)})`;
@@ -4436,7 +4467,7 @@ function drawExHud(top) {
     else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
   }
   ctx.fillStyle = 'rgba(239,239,234,0.4)';
-  ctx.fillText(`PACK ${packUsed(rg.pack)}/${packMax()} · ${XS.embers} EMBERS · ${rg.wispCarry || 0} WISPS · ORBS ${XS.orbs}/3${XS.recall ? ' · FLARE' : ''}${XS.lanterns ? ' · LANTERN' : ''}`, 16, 54 + top);
+  ctx.fillText(`PACK ${packUsed(rg.pack)}/${packMax()} · ${XS.embers} EMBERS · ${rg.wispCarry || 0} WISPS · ORBS ${XS.orbs}/3 · OIL ${Math.round(100 * rg.oil / oilMax())}%${XS.recall ? ' · FLARE' : ''}${XS.lanterns ? ' · LANTERN' : ''}`, 16, 54 + top);
 }
 
 // ---- the camp: shop and loadout at the fire ----
@@ -4457,6 +4488,7 @@ function exApply() {                         // loadout changed: rebuild the run
   const rg = S.rg;
   rg.up = {}; for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
   rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = lv('wind');
+  if (rg.inCamp) rg.oil = oilMax();
   exSave(); renderCamp();
 }
 function buyUp(id) {
@@ -4521,6 +4553,8 @@ const ICONS = {
   scar: '<path d="M6 19L14 5M10.5 19l8-14"/>',
   wildfire: '<path d="M12 22c-4.2 0-7.2-3.4-6-7.4 1 1 3 1 3-1.2 0-4.2 3-7 6-8.9-1 4 4.3 6 4.3 10.4A7.2 7.2 0 0 1 12 22z"/><path d="M12 22c-1.8 0-2.8-1.6-2.2-3.2.6.4 1.4.2 1.4-.6 0-1.4 1-2.4 2-3-.2 1.6 1.4 2.4 1.4 4A2.6 2.6 0 0 1 12 22z"/>',
   embers: '<path d="M3 21h18"/><path d="M8 21c-2 0-2.4-2-1.4-3.2.5.5 1.1.4 1.1-.4 0-1.2 1-2.2 2-2.7-.3 1.3 1 2 1 3.4A2.5 2.5 0 0 1 8 21zM16 21c-2 0-2.4-2-1.4-3.2.5.5 1.1.4 1.1-.4 0-1.2 1-2.2 2-2.7-.3 1.3 1 2 1 3.4A2.5 2.5 0 0 1 16 21z"/>',
+  tank: '<path d="M8 21h8a2 2 0 0 0 2-2v-9l-3-4H9L6 10v9a2 2 0 0 0 2 2z"/><path d="M10 6V3h4v3"/><path d="M9 15h6"/>',
+  frame: '<path d="M7 3v18M17 3v18M7 8h10M7 14h10"/><path d="M4 21h6M14 21h6"/>',
   bag: '<path d="M5.5 8.5h13l1 12.5h-15z"/><path d="M9 8.5a3 3 0 0 1 6 0M9.5 13h5"/>',
   slot: '<rect x="2.5" y="7" width="5.5" height="10"/><rect x="10" y="7" width="5.5" height="10"/><path d="M19.8 9v6M16.8 12h6"/>',
   recall: '<path d="M4 11l8-7 8 7v10H4z"/><path d="M12 18.5v-6M9.5 15L12 12.5l2.5 2.5"/>',
@@ -4535,14 +4569,14 @@ const SHORT = {
   dread: 'See eyes from anywhere', echo: 'Pulses reveal hidden things',
   fireflies: 'Fireflies orbit and burn', candles: 'Drop candles as you walk', flare: 'Auto flares at lurkers', chain: 'Kills scorch their neighbours',
   scar: 'Burned enemies stay slower', wildfire: 'Bigger bursts, free flares', embers: 'Kills leave burning ground',
-  bag: 'Two more pack slots', slot: 'Equip one more upgrade', recall: 'One use: home now', lanterns: 'Plant a safe light',
+  tank: 'More oil, go further', frame: 'Heavy loot slows you less', bag: 'Two more pack slots', slot: 'Equip one more upgrade', recall: 'One use: home now', lanterns: 'Plant a safe light',
 };
 const CATS = [
   { id: 'Torch', line: 'How your beam burns', icon: 'torch' },
   { id: 'Body', line: 'Hearts, hits and dodging', icon: 'coat' },
   { id: 'Allies', line: 'Fire that fights for you', icon: 'fireflies' },
   { id: 'Senses', line: 'See what hides out there', icon: 'dread' },
-  { id: 'Gear', line: 'Pack, slots and supplies', icon: 'bag' },
+  { id: 'Gear', line: 'Oil, pack, slots and supplies', icon: 'bag' },
   { id: 'Stats', line: 'Wisps buy lasting boosts', icon: 'wisp' },
 ];
 let campCat = null, campOpen = null;
@@ -4550,7 +4584,7 @@ const svgIcon = id => { const s = el('span', 'ic'); s.innerHTML = `<svg viewBox=
 function campItems(cat) {                    // everything in a category, in one shape for drawing
   if (cat === 'Gear') return GEAR.map(g => {
     const have = XS[g.id], cost = gearPrice(g), maxed = have >= gearMax(g);
-    const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : slotMax() + ' equip slots'} · level ${have} of ${g.max}`
+    const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : g.id === 'tank' ? Math.round(oilMax()) + ' oil' : g.id === 'frame' ? Math.round(20 * (XS.frame || 0)) + '% lighter loads' : slotMax() + ' equip slots'} · level ${have} of ${g.max}`
       : g.id === 'lanterns' ? `${XS.outposts.length} of 3 planted · ${have ? 'carrying one' : 'carry one at a time'}` : have ? 'Carrying one' : 'Carry one at a time';
     return { id: g.id, name: g.name, desc: g.desc, lvl, cls: '', tag: maxed ? (g.use && have ? 'HAVE' : g.use ? 'NONE' : 'MAX') : String(cost),
       buy: [maxed ? (g.use ? (have ? 'Carrying' : 'None left') : 'Maxed') : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyGear(g)] };
