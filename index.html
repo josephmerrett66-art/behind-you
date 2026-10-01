@@ -248,6 +248,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <p class="small">Starts in the Dunes with the green portal open and no teal orbs home yet, so you can hunt the first one.</p>
       <button id="testPortal2" class="alt">Test the second portal</button>
       <p class="small">Starts by the second shrine with two teal orbs home and the third in your hands.</p>
+      <button id="testStorm" class="alt">Test a dust storm</button>
+      <p class="small">Starts in the Dunes with a dust storm two seconds away.</p>
     </div>
   </section>
   <section class="card panel" id="pScores" hidden>
@@ -361,7 +363,7 @@ function worldMatrix(c, scale) {
 
 // ---- input ----
 const keys = {};
-addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
+addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
 cv.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); dodge(); } });
 cv.addEventListener('contextmenu', e => { if (S && isRg()) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -373,7 +375,10 @@ cv.addEventListener('mousemove', e => {
 const sticks = {};
 cv.addEventListener('touchstart', e => {
   e.preventDefault();
-  for (const t of e.changedTouches) sticks[t.identifier] = { side: S && S.mode === 'blink' ? 'aim' : (t.clientX < W / 2 ? 'move' : 'aim'), ox: t.clientX, oy: t.clientY, x: t.clientX, y: t.clientY };
+  for (const t of e.changedTouches) {
+    const st = sticks[t.identifier] = { side: S && S.mode === 'blink' ? 'aim' : (t.clientX < W / 2 ? 'move' : 'aim'), ox: t.clientX, oy: t.clientY, x: t.clientX, y: t.clientY };
+    if (st.side === 'move' && S && S.autoRun) { S.autoRun = false; st.stop = true; }   // a thumb back on the move side stops the auto run (and stands you still until you lift it)
+  }
 }, { passive: false });
 cv.addEventListener('touchmove', e => {
   e.preventDefault();
@@ -382,6 +387,7 @@ cv.addEventListener('touchmove', e => {
 const endTouch = e => { for (const t of e.changedTouches) delete sticks[t.identifier]; };
 cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
 
+const AUTO_HOLD = 5;             // seconds of holding go before the auto run locks on
 // returns [worldX, worldY, speed]
 function moveInput() {
   // one control: go forward, toward wherever the torch points
@@ -389,8 +395,15 @@ function moveInput() {
   let speed = keys['shift'] ? RUN : WALK;
   for (const id in sticks) {
     const s = sticks[id], m = Math.hypot(s.x - s.ox, s.y - s.oy);
-    if (s.side === 'move') { go = true; speed = m > 60 ? RUN : WALK; }   // hold to walk, drag your thumb out to run
+    if (s.side === 'move' && !s.stop) { go = true; speed = m > 60 ? RUN : WALK; }   // hold to walk, drag your thumb out to run
     if (s.side === 'aim' && m > 12) S.aim = Math.atan2(s.y - s.oy, s.x - s.ox);
+  }
+  // auto run: hold go for 5 seconds and it locks on; lift your thumb and you keep running until you touch the move side again
+  if (S.mode === 'free' || isRg()) {
+    if (S.over || (isRg() && S.rg && S.rg.phase !== 'fight')) { S.autoRun = false; S.holdFrom = null; }
+    else if (S.autoRun) { if (!go) { go = true; speed = RUN; } }
+    else if (go) { if (S.holdFrom == null) S.holdFrom = S.t; if (S.t - S.holdFrom >= AUTO_HOLD) { S.autoRun = true; S.autoAt = S.t; S.holdFrom = null; playTick(); } }
+    else S.holdFrom = null;
   }
   // dash rule: pressing go starts a 4 second run you can't stop; you can still steer with the torch
   if (S.running && S.mode !== 'free' && !isRg()) {            // free roam: plain walking, hold to walk, drag further to run
@@ -1244,6 +1257,7 @@ function update(dt) {
   if (p.ghosts) { for (const g of p.ghosts) g.a -= dt * 2.2; p.ghosts = p.ghosts.filter(g => g.a > 0); }
   const ox = p.x, oy = p.y;
   p.x += p.vx * dt; p.y += p.vy * dt;
+  { const sk = stormK(); if (sk > 0.01 && S.rg.phase === 'fight') { const [wx, wy] = windVec(), m = sk * (Math.hypot(p.vx, p.vy) > 5 ? 15 : 8); p.x += wx * m * dt; p.y += wy * m * dt; } }   // the storm leans on you
   if (S.mode === 'expedition' && !inBeyond()) exWall(p, ox, oy);
 
   // bump into trees and rocks (and the camp's towers, tent and stores)
@@ -2002,15 +2016,56 @@ function sandTile() {
 }
 // blowing sand: streaks carried across on the wind, faint even in the dark
 const WIND = { a: -0.35 };
+// ---- dust storms in the Dunes: the wind rises, the sand closes in, the beam shrinks to half, then it passes ----
+function stormK() { const rg = S.rg; return rg && rg.storm && rg.beyond && !rg.next && S.mode === 'expedition' ? rg.storm.k : 0; }
+function windVec() {                             // the screen-space wind direction, turned into a world direction
+  const ca = Math.cos(WIND.a), sa = Math.sin(WIND.a), x = (ca + sa) / 2, y = (sa - ca) / 2, m = Math.hypot(x, y);
+  return [x / m, y / m];
+}
+function stormStep(dt) {
+  const rg = S.rg, s = rg.storm || (rg.storm = { st: 'calm', t: 25 + Math.random() * 20, k: 0 });
+  s.t -= dt;
+  if (s.t <= 0) {
+    if (s.st === 'calm') { s.st = 'rising'; s.t = 5; rg.ringMsg = { text: 'the wind is rising', sub: 'a storm is coming', t: 0 }; }
+    else if (s.st === 'rising') { s.st = 'storm'; s.t = 16 + Math.random() * 8; addShake(0.25); }
+    else if (s.st === 'storm') { s.st = 'easing'; s.t = 4; }
+    else { s.st = 'calm'; s.t = 40 + Math.random() * 30; rg.ringMsg = { text: 'the wind drops', t: 0 }; }
+  }
+  const want = s.st === 'storm' ? 1 : s.st === 'rising' ? 0.3 : 0;
+  s.k += (want - s.k) * Math.min(1, dt * (want > s.k ? 0.9 : 0.5));
+  if (s.k < 0.002) s.k = 0;
+}
+const storm = { g: null, at: 0 };
+function stormSound(k) {                         // a howl of filtered noise that swells and gusts with the storm
+  if (!actx || !noiseBuf || !sfxGain) return;
+  if (!storm.g) {
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 0.8;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
+    storm.g = actx.createGain(); storm.g.gain.value = 0; storm.bp = bp;
+    src.connect(bp); bp.connect(lp); lp.connect(storm.g); storm.g.connect(sfxGain); src.start();
+    setInterval(() => { if (storm.g && performance.now() - storm.at > 400) storm.g.gain.setTargetAtTime(0, actx.currentTime, 0.3); }, 250);   // falls silent when nothing keeps it going (menu, death, home)
+  }
+  storm.at = performance.now();
+  const gust = 0.75 + 0.25 * Math.sin(S.t * 1.3) * Math.sin(S.t * 0.41 + 1);
+  storm.g.gain.setTargetAtTime(0.42 * k * gust, actx.currentTime, 0.25);
+  storm.bp.frequency.setTargetAtTime(380 + 420 * gust * k, actx.currentTime, 0.4);
+}
 function drawSandWind() {
   ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.lineCap = 'round';
-  const L = Math.max(W, H), ca = Math.cos(WIND.a), sa = Math.sin(WIND.a), t = S.t;
-  for (let k = 0; k < 70; k++) {
-    const sp = 160 + (k % 7) * 40, len = 10 + (k % 5) * 9;
+  const L = Math.max(W, H), ca = Math.cos(WIND.a), sa = Math.sin(WIND.a), sk = stormK(), t = S.t * (1 + 1.6 * sk);
+  if (sk > 0.01) {                                // the storm: a grey wall of dust closing in round you, thinnest where you stand
+    const [px, py] = toScreen(S.p.x, S.p.y), gust = 0.85 + 0.15 * Math.sin(S.t * 1.3) * Math.sin(S.t * 0.41 + 1);
+    const g = ctx.createRadialGradient(px, py - 20 * Z, L * 0.06, px, py - 20 * Z, L * 0.62);
+    g.addColorStop(0, `rgba(118,120,122,${0.04 * sk * gust})`); g.addColorStop(0.5, `rgba(118,120,122,${0.24 * sk * gust})`); g.addColorStop(1, `rgba(110,112,114,${0.48 * sk * gust})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  for (let k = 0, n = 70 + Math.round(260 * sk); k < n; k++) {
+    const sp = 160 + (k % 7) * 40, len = (10 + (k % 5) * 9) * (1 + 1.8 * sk);
     const along = ((hash(k, 3) * L * 2 + t * sp - (S.cam.x - S.cam.y) * K()) % (L * 1.6) + L * 1.6) % (L * 1.6) - L * 0.3;
     const across = ((hash(k, 7) * L * 1.6 - (S.cam.x + S.cam.y) * K() * 0.5) % (L * 1.6) + L * 1.6) % (L * 1.6) - L * 0.3;
     const x = W / 2 - L * 0.5 + along * ca - across * sa * 0.3, y = across + along * sa * 0.5;
-    ctx.strokeStyle = `rgba(215,212,204,${0.05 + 0.1 * hash(k, 11)})`; ctx.lineWidth = 0.8 + hash(k, 13);
+    ctx.strokeStyle = `rgba(215,212,204,${(0.05 + 0.1 * hash(k, 11)) * (1 + 1.5 * sk)})`; ctx.lineWidth = 0.8 + hash(k, 13);
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + ca * len, y + sa * len * 0.5); ctx.stroke();
   }
   ctx.restore();
@@ -2797,6 +2852,16 @@ function renderScene() {
     ctx.beginPath(); ctx.arc(s.ox, s.oy, 44, 0, 7); ctx.stroke();
     const dx = s.x - s.ox, dy = s.y - s.oy, m = Math.hypot(dx, dy), c = Math.min(1, 44 / (m || 1));
     ctx.fillStyle = 'rgba(239,239,234,0.25)'; ctx.beginPath(); ctx.arc(s.ox + dx * c, s.oy + dy * c, 14, 0, 7); ctx.fill();
+    if (s.side === 'move' && S.holdFrom != null && !S.autoRun) {   // the ring fills as the auto run gets closer
+      const f = Math.min(1, (S.t - S.holdFrom) / AUTO_HOLD);
+      if (f > 0.15) { ctx.strokeStyle = `rgba(239,239,234,${0.35 + 0.4 * f})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.ox, s.oy, 44, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke(); }
+    }
+  }
+  if (S.autoRun) {                                // above your head: you're running on your own
+    const [px, py] = toScreen(S.p.x, S.p.y), fresh = S.t - (S.autoAt || 0) < 2.5;
+    ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = `rgba(239,239,234,${fresh ? 0.85 : 0.45 + 0.1 * Math.sin(S.t * 3)})`;
+    ctx.fillText(fresh ? 'AUTO RUN · touch left to stop' : 'AUTO RUN', px, py - 74 * Z);
   }
 }
 
@@ -3087,7 +3152,7 @@ const lastHeart = () => lv('lastlight') && S.rg.hp === 1;
 const sweepK = () => S.rg && lv('sweep') ? Math.min(1, (S.rg.sweepT || 0) / 0.2) : 0;
 const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / 0.9) : 0;
 function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.28 * lv('sweep') * sweepK()) * (1 - 0.15 * spotK()) * (lastHeart() ? 1.5 : 1)) * (1 + 0.05 * sr('wide')); }
-function rgRange() { return Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK())) * (1 + 0.06 * sr('reach')); }
+function rgRange() { return Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK())) * (1 + 0.06 * sr('reach')) * (1 - 0.5 * stormK()); }   // a dust storm halves the beam
 function rgBurn() {
   const rg = S.rg || {}, grow = 1 + 0.05 * Math.min(14, Math.max(0, (rg.wave || 1) - 1));   // the torch grows with the night
   return 1.05 * (1 + 0.08 * sr('searing')) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
@@ -4933,7 +4998,7 @@ function drawPackProp(o, c, sx, sy) { stamp(c, sprite('pack', 0), sx, sy, Z, 1, 
 function drawOrbBeacon(o) {                    // an orb waiting out in the dark: a beam you can see from a long way off, then the crystal itself
   const [ox, oy0] = toScreen(o.x, o.y), d = dist2(o, S.p), oy = oy0 - (26 + 4 * Math.sin(S.t * 2)) * Z;
   if (d < 3600) {
-    const k = Math.min(1, (3600 - d) / 1200);
+    const k = Math.min(1, (3600 - d) / 1200) * (1 - stormK() * Math.min(1, (d - 200) / 300));   // a dust storm hides its light unless you're right on it
     const g = ctx.createLinearGradient(0, oy - 520, 0, oy);
     g.addColorStop(0, `rgba(${ORB_COL},0)`); g.addColorStop(1, `rgba(${ORB_COL},${0.16 * k})`);
     ctx.fillStyle = g; ctx.fillRect(ox - 7 * Z, oy - 520, 14 * Z, 520);
@@ -4941,7 +5006,8 @@ function drawOrbBeacon(o) {                    // an orb waiting out in the dark
     hg.addColorStop(0, `rgba(${ORB_COL},${0.22 * k})`); hg.addColorStop(1, `rgba(${ORB_COL},0)`);
     ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(ox, oy, 220 * Z, 0, 7); ctx.fill();
   }
-  if (ox > -60 && ox < W + 60 && oy > -60 && oy < H + 60) drawOrb(ox, oy, Z, 1);
+  const vis = 1 - stormK() * Math.max(0, Math.min(1, (d - 200) / 300));
+  if (vis > 0.02 && ox > -60 && ox < W + 60 && oy > -60 && oy < H + 60) { ctx.save(); ctx.globalAlpha = vis; drawOrb(ox, oy, Z, 1); ctx.restore(); }
 }
 function drawOrb(x, y, s, a) {               // a levitating green crystal and its glow
   const g = ctx.createRadialGradient(x, y, 0, x, y, 46 * s);
@@ -5047,6 +5113,7 @@ function portalStep(dt) {                      // returns true when the rest of 
   if (rg.beyond) {                             // the Dunes: oil burns, centipedes hunt, a teal orb waits out in the sand
     rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
     exOilStep(dt, dist2(p, BEYOND_GATE) < 130);  // the portal's light tops the torch up
+    if (rg.phase === 'fight') stormStep(dt); stormSound(stormK());
     if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // quitting out here loses what you carry
     if (dist2(p, BEYOND_GATE) > 40) rg.leftGate = true;
     if (XS.dorbField && XS.dorb && !rg.carryDorb && dist2(XS.dorb, p) < 30) exTakeDorb();
@@ -5056,8 +5123,9 @@ function portalStep(dt) {                      // returns true when the rest of 
       // harder than the deep woods: no limit per kind, only on how many hunt at once, and that grows the further out you are
       const dg = dist2(p, BEYOND_GATE), cap = Math.min(24, 14 + dg / 250) + (rg.carryDorb ? 5 : 0);
       if ((rg.duneT = (rg.duneT ?? 3) - dt) <= 0) {
-        rg.duneT = 0.65 * (rg.carryDorb ? 0.6 : 1) * (0.6 + Math.random() * 0.8);
-        if (rg.enemies.filter(e => !e.guard).length < cap) { let r = Math.random() * DUNE_MIX.reduce((a, m) => a + m.w, 0); for (const m of DUNE_MIX) if ((r -= m.w) < 0) { spawnFoe(m.type); break; } }
+        const storming = stormK() > 0.5, mix = storming ? DUNE_MIX.map(m => m.type === 'centi' ? { type: m.type, w: m.w * 2.5 } : m) : DUNE_MIX;   // in a storm, the centipedes come up
+        rg.duneT = 0.65 * (rg.carryDorb ? 0.6 : 1) * (storming ? 0.75 : 1) * (0.6 + Math.random() * 0.8);
+        if (rg.enemies.filter(e => !e.guard).length < cap) { let r = Math.random() * mix.reduce((a, m) => a + m.w, 0); for (const m of mix) if ((r -= m.w) < 0) { spawnFoe(m.type); break; } }
       }
       if (!rg.centiSeen && rg.enemies.some(e => e.type === 'centi' && e.ai === 'rise' && dist2(e, p) < 260)) { rg.centiSeen = true; rg.ringMsg = { text: 'something under the sand', sub: 'when the ground glows, move', t: 0 }; }
     }
@@ -5149,7 +5217,7 @@ function warpArrive(dir) {
   const rg = S.rg, p = S.p;
   for (const e of rg.enemies) e.dead = e.gone = true;
   rg.enemies = []; rg.fires = []; rg.wisps = []; rg.blasts = []; rg.echoes = [];
-  rg.guardDone = false; rg.homeA = 0;
+  rg.guardDone = false; rg.homeA = 0; rg.storm = null;
   if (dir === 'out') {
     rg.beyond = true; rg.next = false; p.x = BEYOND_GATE.x; p.y = BEYOND_GATE.y + 34;
     S.msg = (XS.dorbs || 0) < 3 && !rg.carryDorb ? { text: 'the dunes', sub: XS.dorbs ? `${XS.dorbs} of 3 teal orbs home · another waits out in the sand` : 'A teal light waits out in the sand', t: 0 } : { text: 'the dunes', sub: 'Find water. Find shade. Keep moving', t: 0 };
@@ -5763,6 +5831,10 @@ document.getElementById('testDunes').addEventListener('click', () => {
   exTestCopy(3, 0); exNewDorb();
   const rg = S.rg; rg.beyond = true; rg.next = false; rg.inCamp = false; S.p.x = BEYOND_GATE.x; S.p.y = BEYOND_GATE.y + 34; S.cam.x = S.p.x; S.cam.y = S.p.y;
   S.msg = { text: 'playtest', sub: 'Find the teal orb and bring it home', t: 0 };
+});
+document.getElementById('testStorm').addEventListener('click', () => {
+  document.getElementById('testDunes').click();
+  S.rg.storm = { st: 'calm', t: 2, k: 0 }; S.msg = { text: 'playtest', sub: 'A dust storm is on its way', t: 0 };
 });
 document.getElementById('testPortal2').addEventListener('click', () => {
   exTestCopy(3, 2);
