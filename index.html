@@ -971,6 +971,23 @@ function updateRounds(dt) {
   if (S.q && S.q.lit && !S.spotted && S.spotHold >= SPOT_HOLD) { S.spotted = true; S.spotHold = 0; S.rounds++; S.msg = { text: 'Spotted', t: 0, short: true }; playTick(); }
   if (S.look <= 0) startDash();                // light's gone: off you go, ready or not
 }
+// what each figure wears, so every type reads as another survivor out here, told apart by kit as well as size and eyes
+const KIT = {
+  quarry:   { head: 'beanie', pack: 1 },
+  shade:    { head: 'hood', coat: 1 },
+  stalker:  { head: 'goggles' },
+  brute:    { head: 'helmet', vest: 1 },
+  tall:     { head: 'hood', coat: 2 },
+  bomber:   { head: 'helmet', vest: 1, pack: 1 },
+  laser:    { head: 'visor', vest: 1 },
+  kamikaze: { head: 'goggles', charges: 1 },
+  splitter: { head: 'hood', vest: 1 },
+  splitling:{},
+};
+const shadeC = (col, k) => {                     // the same colour, darker by k ('rgb(...)' or '#rrggbb')
+  const ch = col[0] === '#' ? [1, 3, 5].map(i => parseInt(col.slice(i, i + 2), 16)) : col.slice(col.indexOf('(') + 1, -1).split(',').map(Number);
+  return `rgb(${ch.slice(0, 3).map(v => Math.round(v * k)).join(',')})`;
+};
 function drawQuarry(q, c = ctx, red = false, opt = null) {
   // a pale running figure, same build as the player; frozen mid-stride whenever you stop
   let alpha = 1;
@@ -1019,21 +1036,85 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
     if (OUT) { c.strokeStyle = EDGE; c.lineWidth = 1.8 * Zs; c.lineJoin = 'round'; c.stroke(); } else c.fill(); };
   const FAR = pal ? pal.far : red ? '#8e1a1a' : '#9e9e98', NEAR = pal ? pal.near : red ? '#c42a2a' : '#cfcfc8', BODY = pal ? pal.body : red ? '#d23030' : '#dadad3';
   c.save(); c.globalAlpha *= alpha;
+  const kit = (opt && opt.kit) || (opt ? KIT.shade : KIT.quarry);
+  const GEAR = shadeC(BODY, 0.66), DARK = shadeC(BODY, 0.42), PALE = shadeC(BODY, 0.84);
+  const det = (pts, w, col) => { if (!OUT) line(pts, w, col); };
+  const mid = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+  const fillSlab = (pts, col, rim = true) => { if (OUT && !rim) return; c.fillStyle = col; slab(pts); };
+  const legKit = (lg, near) => {                 // boots and knee pads
+    const [hip, knee, foot] = lg, ankle = [foot[0] - 0.2, foot[1], foot[2] + 3.2];
+    line([ankle, [foot[0] - 0.1, foot[1], foot[2] + 0.8]], near ? 4.6 : 4.4, DARK);
+    line([[foot[0] - 1.2, foot[1], foot[2] + 0.8], [foot[0] + 2.8, foot[1], foot[2] + 0.6]], 3.1, DARK);
+    det([mid(hip, knee, 0.92), mid(knee, foot, 0.1)], 2.4, GEAR);
+    det([mid(hip, knee, 0.35), mid(hip, knee, 0.6)], 2, near ? PALE : GEAR);           // thigh pocket
+  };
+  const armKit = (arm, near) => { const [sh, el, ha] = arm; det([mid(el, ha, 0.8), mid(el, ha, 0.9)], 3.6, GEAR);
+    if (!OUT) { const [x, y] = P(...ha); c.fillStyle = DARK; c.beginPath(); c.arc(x, y, 1.7 * Zs, 0, 7); c.fill(); } };
   const paint = () => {
   const farLeg = rightNear ? L : Rg, nearLeg = rightNear ? Rg : L, farArm = rightNear ? LA : RA, nearArm = rightNear ? RA : LA;
-  line(farLeg, 4, FAR); line(farArm, 3, FAR);
-  if (!facingUs) line(nearLeg, 4.2, NEAR);
-  c.fillStyle = BODY;
   const lt = lean * 0.5;
+  const packKit = () => { if (!kit.pack) return;    // a rucksack, a bedroll strapped under it
+    const f0 = lt - 2.6, f1 = lt - 6.2, h0 = hipH + 3, h1 = shH - 0.5;
+    fillSlab([[f0, -4.2, h0], [f0, 4.2, h0], [f0, 4.4, h1], [f0, -4.4, h1]], GEAR);
+    fillSlab([[f1, -3.9, h0 + 0.5], [f1, 3.9, h0 + 0.5], [f1, 4.1, h1 - 0.5], [f1, -4.1, h1 - 0.5]], PALE);
+    fillSlab([[f0, -4.3, h0], [f1, -3.9, h0 + 0.5], [f1, -4.1, h1 - 0.5], [f0, -4.4, h1]], GEAR);
+    fillSlab([[f0, 4.3, h0], [f1, 3.9, h0 + 0.5], [f1, 4.1, h1 - 0.5], [f0, 4.4, h1]], GEAR);
+    line([[f1 + 1.5, -4.9, h0 - 0.6], [f1 + 1.5, 4.9, h0 - 0.6]], 3.2, PALE); };   // bedroll strapped under it
+  const coatKit = () => { if (!kit.coat) return;    // a long coat, its hem torn ragged
+    const low = kit.coat > 1 ? 4 : 8, hem = [];
+    for (let k = 0; k <= 6; k++) { const r = -5 + k * (10 / 6); hem.push([lt * 0.3 - 1 + Math.sin(now * 3 + k) * 0.4, r * 1.08, low + (k % 2 ? 1.6 : 0) + Math.sin(ph + k) * 0.6]); }
+    fillSlab([[0, -4.6, hipH], [0, 4.6, hipH], ...hem.reverse()], GEAR); };
+  line(farLeg, 4, FAR); legKit(farLeg, false); line(farArm, 3, FAR); armKit(farArm, false);
+  if (facingUs || Fy > -0.05) packKit();
+  if (!facingUs) { line(nearLeg, 4.2, NEAR); legKit(nearLeg, true); }
+  coatKit();
+  c.fillStyle = BODY;
   slab([[twist * -0.5, -4.2, hipH - 2], [twist * 0.5, 4.2, hipH - 2], [lt + twist * 0.6, 6, shH], [lt, 4, shH + 1.6], [lt, -4, shH + 1.6], [lt - twist * 0.6, -6, shH]]);
   slab([[-2.8, 0, hipH - 2], [2.8, 0, hipH - 2], [lt + 3.1, 0, shH - 1], [lt + 2.2, 0, shH + 1.4], [lt - 2.6, 0, shH + 1.4], [lt - 3.3, 0, shH - 1]]);
+  if (!OUT) {
+    const fr = lt * 0.7 + 3.1;
+    if (kit.vest) { fillSlab([[fr - 0.3, -4, hipH + 1.5], [fr - 0.3, 4, hipH + 1.5], [fr + 0.2, 3.8, shH], [fr + 0.2, -3.8, shH]], GEAR);   // armour plate
+      det([[fr + 0.3, -3, shH - 3], [fr + 0.3, 3, shH - 3]], 0.8, DARK); det([[fr + 0.3, -3, hipH + 4], [fr + 0.3, 3, hipH + 4]], 0.8, DARK); }
+    if (kit.charges) for (const r of [-2.7, -0.9, 0.9, 2.7]) {                  // a vest of strapped charges, wired together
+      fillSlab([[fr + 0.1, r - 0.75, hipH + 3], [fr + 0.1, r + 0.75, hipH + 3], [fr + 0.25, r + 0.75, hipH + 9], [fr + 0.25, r - 0.75, hipH + 9]], PALE);
+      det([[fr + 0.35, r, hipH + 9], [fr + 0.35, r + 0.9, hipH + 10.5]], 0.5, DARK); }
+    for (const sd of [-1, 1]) det([[lt - 2.4, sd * 3.6, shH + 1.4], [fr, sd * 3.2, shH - 0.6], [fr - 0.2, sd * 3.4, hipH + 2]], 1.1, DARK);   // straps
+    det([[-3.1, -4.4, hipH - 1.2], [3.1, -4.4, hipH - 1.2], [3.3, 4.4, hipH - 1.2], [-3.1, 4.4, hipH - 1.2]], 1.4, DARK);   // belt
+    det([[lt + 2.1, -3.5, shH + 1.3], [lt + 3.1, 0, shH + 0.6], [lt + 2.1, 3.5, shH + 1.3]], 1.7, GEAR);                   // collar
+  }
+  if (!(facingUs || Fy > -0.05)) packKit();
   line([[lt, 0, shH + 1], [lt + 0.6, 0, headH - 2.5]], 2.4, BODY);
   const [hx, hy] = P(lt + 1 + thr * 0.8, thr * 0.6, headH);
+  if (kit.head === 'hood') {                        // a hood: a darker cowl behind and round the head
+    const [kx, ky] = P(lt - 0.6 + thr * 0.8, thr * 0.6, headH + 0.4);
+    c.beginPath(); c.ellipse(kx, ky, 5 * Zs, 5.4 * Zs, 0, 0, 7);
+    if (OUT) { c.strokeStyle = EDGE; c.lineWidth = 1.8 * Zs; c.stroke(); } else { c.fillStyle = GEAR; c.fill(); }
+  }
   c.beginPath(); c.ellipse(hx, hy, 3.9 * Zs, 4.3 * Zs, 0, 0, 7);
   if (OUT) { c.strokeStyle = EDGE; c.lineWidth = 1.8 * Zs; c.stroke(); } else { c.fillStyle = pal ? pal.head : red ? '#e03a3a' : '#e4e4de'; c.fill(); }
   if (facingUs && !OUT) { const [fx, fy] = P(lt + 3.4, 0, headH - 0.3); c.fillStyle = pal ? pal.face : red ? '#6e1010' : '#8f8f89'; c.beginPath(); c.ellipse(fx, fy, (1.2 + 1.6 * Math.max(0, Fy)) * Zs, 1.8 * Zs, 0, 0, 7); c.fill(); }
-  if (facingUs) line(nearLeg, 4.2, NEAR);
-  line(nearArm, 3.2, NEAR);
+  if (kit.head === 'hood' && !OUT && Fy < -0.2) {  // from behind, the hood covers the back of the head
+    c.fillStyle = GEAR; c.beginPath(); c.ellipse(hx - Fx * 0.8 * Zs, hy + 0.4 * Zs, 4.2 * Zs, 4.6 * Zs, 0, 0, 7); c.fill(); }
+  if (kit.head === 'hood' && !OUT) {                // the cowl's rim, framing the face
+    c.strokeStyle = DARK; c.lineWidth = 1.1 * Zs; c.beginPath(); c.ellipse(hx, hy - 0.3 * Zs, 4.1 * Zs, 4.6 * Zs, 0, Math.PI * 1.05, Math.PI * 1.95); c.stroke(); }
+  if (kit.head === 'helmet') {                      // a battered helmet with a lip
+    c.beginPath(); c.ellipse(hx, hy - 1.1 * Zs, 4.7 * Zs, 3.9 * Zs, 0, Math.PI, 0); c.closePath();
+    if (OUT) { c.strokeStyle = EDGE; c.lineWidth = 1.8 * Zs; c.stroke(); } else { c.fillStyle = GEAR; c.fill();
+      c.strokeStyle = DARK; c.lineWidth = 1 * Zs; c.beginPath(); c.moveTo(hx - 5 * Zs, hy - 1 * Zs); c.lineTo(hx + 5 * Zs, hy - 1 * Zs); c.stroke();
+      c.fillStyle = PALE; c.beginPath(); c.ellipse(hx - 1.2 * Zs, hy - 3.3 * Zs, 1.8 * Zs, 0.9 * Zs, 0, 0, 7); c.fill(); }
+  }
+  if (kit.head === 'beanie' && !OUT) {              // a knitted cap
+    c.fillStyle = GEAR; c.beginPath(); c.ellipse(hx, hy - 1.6 * Zs, 4.1 * Zs, 3.2 * Zs, 0, Math.PI, 0); c.closePath(); c.fill();
+    c.fillStyle = DARK; c.fillRect(hx - 4.1 * Zs, hy - 1.9 * Zs, 8.2 * Zs, 1 * Zs); }
+  if ((kit.head === 'goggles' || kit.head === 'visor') && !OUT) {   // a strap round the head; lenses or a slit visor on the face
+    c.strokeStyle = DARK; c.lineWidth = 1.1 * Zs; c.beginPath(); c.ellipse(hx, hy - 0.6 * Zs, 4 * Zs, 1.6 * Zs, 0, 0, Math.PI * 2); c.stroke();
+    if (facingUs || Math.abs(Fx) > 0.6) { const [gx, gy] = P(lt + 3.6, 0, headH + 0.6);
+      c.fillStyle = DARK;
+      if (kit.head === 'visor') c.fillRect(gx - 2.4 * Zs, gy - 0.7 * Zs, 4.8 * Zs, 1.5 * Zs);
+      else for (const o of [-1.2, 1.2]) { c.beginPath(); c.arc(gx + o * Zs, gy, 1 * Zs, 0, 7); c.fill(); } }
+  }
+  if (facingUs) { line(nearLeg, 4.2, NEAR); legKit(nearLeg, true); }
+  line(nearArm, 3.2, NEAR); armKit(nearArm, true);
   };
   OUT = true; paint(); OUT = false; paint();
   c.restore();
@@ -1788,44 +1869,109 @@ function drawPlayer() {
 
   let OUT = false;   // outline pass: everything drawn a little fatter in a faint light tone, then the body on top
   const RIM = 'rgba(239,239,234,0.2)';
-  const line = (pts, w, col) => {
-    ctx.strokeStyle = OUT ? RIM : col; ctx.lineWidth = (w + (OUT ? 1.6 : 0)) * Z; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const G = (v, near) => { v += near ? 7 : 0; return `rgb(${v},${v},${v - 2})`; };   // the near side of the body sits a shade lighter
+  const line = (pts, w, col, cap = 'round') => {
+    ctx.strokeStyle = OUT ? RIM : col; ctx.lineWidth = (w + (OUT ? 1.6 : 0)) * Z; ctx.lineCap = cap; ctx.lineJoin = 'round';
     ctx.beginPath(); pts.forEach((q, i) => { const [x, y] = P(...q); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
   };
-  const foot = (lg, col) => { const [x, y] = P(lg.foot[0] + 1, lg.foot[1], lg.foot[2] + 0.5), [x2, y2] = P(lg.foot[0] + 3.2, lg.foot[1], lg.foot[2] + 0.4); line([[lg.foot[0] - 0.6, lg.foot[1], lg.foot[2] + 0.6], [lg.foot[0] + 2.6, lg.foot[1], lg.foot[2] + 0.4]], 2.6, col); };
-  const drawLeg = (lg, near) => { const col = near ? '#252523' : '#121211'; line([lg.hip, lg.knee, lg.foot], near ? 4.2 : 4, col); foot(lg, col); };
-  const drawFreeArm = near => line([lSh, lEl, lHa], near ? 3.2 : 3, near ? '#262624' : '#131312');
+  const slab = (pts, col, rim = true) => {
+    if (OUT && !rim) return;
+    ctx.beginPath(); pts.forEach((q, i) => { const [x, y] = P(...q); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath();
+    if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.lineJoin = 'round'; ctx.stroke(); } else { ctx.fillStyle = col; ctx.fill(); }
+  };
+  const detail = (pts, w, col) => { if (!OUT) line(pts, w, col); };      // small things that don't get an outline
+  const mid = (a, b, f = 0.5) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+
+  // legs: cargo trousers with a knee pad, tall laced boots with a heavy sole
+  const drawLeg = (lg, near) => {
+    const ankle = [lg.foot[0] - 0.2, lg.foot[1], lg.foot[2] + 3.4];
+    line([lg.hip, lg.knee], near ? 5 : 4.8, G(34, near));                                  // thigh
+    line([lg.knee, ankle], near ? 4.3 : 4.1, G(31, near));                                 // shin
+    detail([mid(lg.hip, lg.knee, 0.35), mid(lg.hip, lg.knee, 0.62)], 2.2, G(26, near));    // the thigh pocket
+    detail([mid(lg.hip, lg.knee, 0.92), mid(lg.knee, ankle, 0.12)], 2.6, G(46, near));     // knee pad
+    line([ankle, [lg.foot[0] - 0.1, lg.foot[1], lg.foot[2] + 1]], 4.4, G(18, near));      // boot shaft
+    line([[lg.foot[0] - 1.2, lg.foot[1], lg.foot[2] + 0.9], [lg.foot[0] + 2.8, lg.foot[1], lg.foot[2] + 0.7]], 3.2, G(17, near));   // boot
+    detail([[lg.foot[0] - 1.6, lg.foot[1], lg.foot[2] - 0.2], [lg.foot[0] + 3.4, lg.foot[1], lg.foot[2] - 0.3]], 0.9, G(52, near));   // sole
+    detail([[lg.foot[0] + 0.4, lg.foot[1], lg.foot[2] + 2.6], [lg.foot[0] + 0.9, lg.foot[1], lg.foot[2] + 1.6]], 0.5, G(60, near));   // laces
+  };
+  // arms: field-jacket sleeves, gloved hands
+  const drawFreeArm = near => {
+    line([lSh, lEl], near ? 3.9 : 3.7, G(36, near)); line([lEl, lHa], near ? 3.5 : 3.3, G(33, near));
+    detail([mid(lEl, lHa, 0.78), mid(lEl, lHa, 0.86)], 3.8, G(44, near));                // cuff
+    if (!OUT) { const [x, y] = P(...lHa); ctx.fillStyle = G(16, near); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }   // glove
+  };
   const drawTorchArm = near => {
-    line([rSh, rEl, rHa], near ? 3.2 : 3, near ? '#262624' : '#131312');
-    line([[rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL], 3.4, '#3a3a38');                 // torch body
+    line([rSh, rEl], near ? 3.9 : 3.7, G(36, near)); line([rEl, rHa], near ? 3.5 : 3.3, G(33, near));
+    detail([mid(rEl, rHa, 0.78), mid(rEl, rHa, 0.86)], 3.8, G(44, near));
+    line([[rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL], 3.4, '#2f2f2d');                 // a dented service torch
+    detail([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.3), mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.55)], 3.6, '#454542');   // grip
+    line([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.85), tipL], 4.2, '#3a3a37', 'butt');   // head of the torch
+    if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
     const [tx, ty] = P(...tipL);
     if (!OUT) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
     S.tip = [tx, ty];
   };
+  const lt = lean * 0.5;
+  // rucksack on the back, a rolled bedroll strapped across the top
+  const drawPack = () => {
+    const f0 = lt - 2.6, f1 = lt - 7, h0 = hipH + 1.5, h1 = shH + 1.5;
+    slab([[f0, -4.3, h0], [f0, 4.3, h0], [f0 - 0.2, 4.5, h1], [f0 - 0.2, -4.5, h1]], G(30, false));
+    slab([[f1, -4, h0 + 0.5], [f1, 4, h0 + 0.5], [f1 + 0.3, 4.2, h1 - 0.5], [f1 + 0.3, -4.2, h1 - 0.5]], G(40, false));
+    slab([[f0, -4.4, h0], [f1, -4, h0 + 0.5], [f1 + 0.3, -4.2, h1 - 0.5], [f0 - 0.2, -4.5, h1]], G(26, false));
+    slab([[f0, 4.4, h0], [f1, 4, h0 + 0.5], [f1 + 0.3, 4.2, h1 - 0.5], [f0 - 0.2, 4.5, h1]], G(34, false));
+    slab([[f1 + 0.3, -3, h0 + 2], [f1 + 0.3, 3, h0 + 2], [f1 - 0.6, 3, h0 + 6], [f1 - 0.6, -3, h0 + 6]], G(48, false), false);   // outer pocket
+    detail([[f1 - 0.6, -2.4, h0 + 6.2], [f1 - 0.6, 2.4, h0 + 6.2]], 0.8, G(22, false));                                        // its flap
+    line([[f1 + 2, -5.6, h1 + 1.4], [f1 + 2, 5.6, h1 + 1.4]], 3.4, G(52, false), 'butt');                                         // bedroll
+    detail([[f1 + 2, -2.5, h1 + 1.4], [f1 + 2, -2.5, h1 + 1.5]], 3.8, G(28, false)); detail([[f1 + 2, 2.5, h1 + 1.4], [f1 + 2, 2.5, h1 + 1.5]], 3.8, G(28, false));
+  };
 
   const farLeg = rightNear ? L : Rg, nearLeg = rightNear ? Rg : L;
+  const packFirst = Fy > -0.05;                       // the pack is on the far side of the body unless you face away from us
   const paint = () => {
-  // back to front: far leg, far arm, torso, head, near leg, near arm
+  // back to front: far leg, far arm, pack (if behind), torso, head, near leg, near arm
   drawLeg(farLeg, false);
   if (rightNear) drawFreeArm(false); else drawTorchArm(false);
+  if (packFirst) drawPack();
   if (!facingUs) drawLeg(nearLeg, true);    // seen from behind, the near leg sits under the coat
 
-  // torso: two overlapping slabs (side-to-side and front-to-back) give it some volume
-  ctx.fillStyle = '#1c1c1b'; ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.lineJoin = 'round';
-  const slab = pts => { ctx.beginPath(); pts.forEach((q, i) => { const [x, y] = P(...q); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); OUT ? ctx.stroke() : ctx.fill(); };
-  const lt = lean * 0.5;
-  slab([[twist * -0.5, -4.2, hipH - 2], [twist * 0.5, 4.2, hipH - 2], [lt + twist * 0.6, 6, shH], [lt, 4, shH + 1.6], [lt, -4, shH + 1.6], [lt - twist * 0.6, -6, shH]]);
-  slab([[-2.8, 0, hipH - 2], [2.8, 0, hipH - 2], [lt + 3.1, 0, shH - 1], [lt + 2.2, 0, shH + 1.4], [lt - 2.6, 0, shH + 1.4], [lt - 3.3, 0, shH - 1]]);
+  // torso: a field jacket (two crossed slabs for volume), a chest rig over it, a belt with pouches
+  slab([[twist * -0.5, -4.6, hipH - 2.5], [twist * 0.5, 4.6, hipH - 2.5], [lt + twist * 0.6, 6.4, shH], [lt, 4.4, shH + 1.8], [lt, -4.4, shH + 1.8], [lt - twist * 0.6, -6.4, shH]], G(30, false));
+  slab([[-3.1, 0, hipH - 2.5], [3.1, 0, hipH - 2.5], [lt + 3.4, 0, shH - 1], [lt + 2.4, 0, shH + 1.6], [lt - 2.8, 0, shH + 1.6], [lt - 3.6, 0, shH - 1]], G(33, false));
+  if (!OUT) {
+    const fr = lt * 0.7 + 3.15;                        // the front of the chest
+    slab([[fr - 0.3, -3.8, hipH + 2.5], [fr - 0.3, 3.8, hipH + 2.5], [fr + 0.15, 3.6, shH - 0.5], [fr + 0.15, -3.6, shH - 0.5]], G(21, false));   // chest rig
+    for (const r of [-2.5, 0, 2.5]) slab([[fr + 0.1, r - 1.05, hipH + 3], [fr + 0.1, r + 1.05, hipH + 3], [fr + 0.25, r + 1.05, hipH + 7.6], [fr + 0.25, r - 1.05, hipH + 7.6]], G(38, false));   // mag pouches
+    for (const r of [-2.5, 0, 2.5]) line([[fr + 0.3, r - 1, hipH + 7.6], [fr + 0.3, r + 1, hipH + 7.6]], 0.7, G(50, false));                       // pouch flaps
+    for (const sd of [-1, 1]) line([[lt - 2.4, sd * 3.6, shH + 1.4], [fr, sd * 3.2, shH - 0.6], [fr - 0.2, sd * 3.4, hipH + 3]], 1.2, G(17, false));   // shoulder straps
+    line([[-3.2, -4.5, hipH - 1.2], [3.2, -4.5, hipH - 1.2], [3.4, 4.5, hipH - 1.2], [-3.2, 4.5, hipH - 1.2]], 1.5, G(46, false));                   // belt
+    slab([[0.5, 4.6, hipH - 1.6], [-2.5, 4.9, hipH - 1.6], [-2.5, 5.1, hipH - 5.2], [0.5, 4.8, hipH - 5.2]], G(26, false));                          // hip pouch
+    line([[lt + 2.2, -3.6, shH + 1.3], [lt + 3.2, 0, shH + 0.6], [lt + 2.2, 3.6, shH + 1.3]], 1.8, G(44, false));                                   // collar
+  }
+  if (!packFirst) drawPack();
 
-  // head, neck and a hint of face on the side toward us
-  line([[lt, 0, shH + 1], [lt + 0.4, 0, headH - 2.5]], 2.4, '#1c1c1b');
+  // head: a scarf at the neck, a stubbled face on the side toward us, a battered boonie hat
+  line([[lt, 0, shH + 1], [lt + 0.4, 0, headH - 2.5]], 2.6, G(30, false));
+  line([[lt - 1.6, -2.4, shH + 1.6], [lt + 2.6, 0, shH + 1.3], [lt - 1.6, 2.4, shH + 1.6]], 2.8, G(56, false));        // scarf
   const [hx, hy] = P(lt + 0.6, 0, headH);
-  ctx.beginPath(); ctx.ellipse(hx, hy, 3.9 * Z, 4.3 * Z, 0, 0, 7);
-  if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = '#1e1e1d'; ctx.fill(); }
+  ctx.beginPath(); ctx.ellipse(hx, hy, 3.8 * Z, 4.2 * Z, 0, 0, 7);
+  if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = G(24, false); ctx.fill(); }
   if (!OUT && (facingUs || Math.abs(Fx) > 0.6)) {
-    const [fx2, fy2] = P(lt + 3.2, 0, headH - 0.4);
-    ctx.fillStyle = '#4a4a47';
-    ctx.beginPath(); ctx.ellipse(fx2, fy2, (1.2 + 1.8 * Math.max(0, Fy)) * Z, 2 * Z, 0, 0, 7); ctx.fill();
+    const [fx2, fy2] = P(lt + 3.1, 0, headH - 0.4), fw = (1.2 + 1.8 * Math.max(0, Fy)) * Z;
+    ctx.fillStyle = '#56544f'; ctx.beginPath(); ctx.ellipse(fx2, fy2, fw, 2.1 * Z, 0, 0, 7); ctx.fill();           // face
+    ctx.fillStyle = 'rgba(25,25,23,0.75)'; ctx.beginPath(); ctx.ellipse(fx2, fy2 + 1.1 * Z, fw * 0.95, 1.1 * Z, 0, 0, Math.PI); ctx.fill();   // stubble and beard
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(fx2 - fw * 0.6, fy2 - 1.6 * Z, fw * 1.2, 0.9 * Z);                    // the shadow of the brim over the eyes
+  }
+  { // boonie hat: a soft brim (a flat ring, so it shows as an ellipse) and a crown with a band
+    const [bx2, by2] = P(lt + 0.7, 0, headH + 1.6), droop = Math.sin(S.t * 0.9) * 0.2;
+    ctx.beginPath(); ctx.ellipse(bx2, by2, 6.4 * Z, (3.2 + droop) * Z, 0, 0, 7);
+    if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = G(36, false); ctx.fill(); }
+    if (!OUT) {
+      ctx.strokeStyle = G(22, false); ctx.lineWidth = 0.5 * Z; ctx.beginPath(); ctx.ellipse(bx2, by2, 5.2 * Z, 2.6 * Z, 0, 0, Math.PI); ctx.stroke();   // stitching
+      const [cx, cy] = P(lt + 0.6, 0, headH + 3.2);
+      ctx.fillStyle = G(32, false); ctx.beginPath(); ctx.ellipse(cx, cy, 3.9 * Z, 2.9 * Z, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = G(44, false); ctx.beginPath(); ctx.ellipse(cx - 0.6 * Z, cy - 0.9 * Z, 2.6 * Z, 1.5 * Z, 0, 0, 7); ctx.fill();   // light catching the top
+      ctx.strokeStyle = G(24, false); ctx.lineWidth = 0.8 * Z; ctx.beginPath(); ctx.ellipse(cx, cy + 0.6 * Z, 3.8 * Z, 1.9 * Z, 0, 0.15, Math.PI - 0.15); ctx.stroke();                        // hat band
+    }
   }
 
   if (facingUs) drawLeg(nearLeg, true);
@@ -3095,7 +3241,7 @@ function drawShade(e) {
   e.dirFace = foeDir(e);
   const leanAdd = -6 * (e.kick || 0) + (e.type === 'laser' && e.ai === 'fire' ? -2.5 : 0) + (fuse ? -3 : 0);
   drawQuarry({ x: e.x, y: e.y, dir: e.dirFace, phase: e.phase, state: 'run', t: 0 }, ctx, false,
-    { scale: foeScale(e) * (fuse ? 1 + 0.08 * Math.sin(S.t * 40) : 1), jx, pal, pain, reach: e.reach || 0, leanAdd });
+    { scale: foeScale(e) * (fuse ? 1 + 0.08 * Math.sin(S.t * 40) : 1), jx, pal, pain, reach: e.reach || 0, leanAdd, kit: KIT[e.type] });
   const h = f.h * Z, w = f.w * Z, fc = e.face || 1;
   ctx.fillStyle = ctx.strokeStyle = pal.near; ctx.lineCap = 'round';
   if (e.type === 'laser' && e.ai !== 'move') {                    // arm raised, pointing down its line of fire
@@ -3220,7 +3366,7 @@ function drawSurviveFx(bx, by, br) {
     const k = g.t / 0.8, sc = FOES[g.type].h / 38;
     ctx.save(); ctx.globalAlpha = k < 0.45 ? 1 : Math.max(0, 1 - (k - 0.45) / 0.55);
     drawQuarry({ x: g.x, y: g.y, dir: g.dir, phase: g.phase, state: 'run', t: 0 }, ctx, false,
-      { scale: sc * (1 - 0.15 * k), jx: (Math.random() - 0.5) * 4 * Z * (1 - k), pal: foePalette(1), pain: 1 - k * 0.6, kneel: Math.min(1, k * 2.2) });
+      { scale: sc * (1 - 0.15 * k), jx: (Math.random() - 0.5) * 4 * Z * (1 - k), pal: foePalette(1), pain: 1 - k * 0.6, kneel: Math.min(1, k * 2.2), kit: KIT[g.type] });
     if (g.t < 0.12) {                        // flash as the light finishes it
       const [x, y] = toScreen(g.x, g.y), r = 26 * Z * sc, gg = ctx.createRadialGradient(x, y - 18 * Z * sc, 0, x, y - 18 * Z * sc, r);
       gg.addColorStop(0, `rgba(255,240,210,${0.9 * (1 - g.t / 0.12)})`); gg.addColorStop(1, 'rgba(255,160,60,0)');
