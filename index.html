@@ -2531,6 +2531,20 @@ function drawPlayer() {
 }
 
 // the torch beam gets a slight warm cast too, strongest near the lens and fading out along the beam
+function drawBeamThrow() {                        // a real torch: a hot core down the middle, softer spill out to the sides
+  const b = beamGeo; if (!b || b.a < 0.02 || !ctx.createConicGradient) return;
+  const g = ctx.createConicGradient(S.aim - Math.PI, b.bx, b.by), w = (HALF + 0.12) / (2 * Math.PI);
+  g.addColorStop(0.5 - w, 'rgb(150,150,150)'); g.addColorStop(0.5 - w * 0.45, 'rgb(225,225,225)'); g.addColorStop(0.5, 'rgb(255,255,255)');
+  g.addColorStop(0.5 + w * 0.45, 'rgb(225,225,225)'); g.addColorStop(0.5 + w, 'rgb(150,150,150)');
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = Math.min(1, b.a); ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(b.bx, b.by);
+  for (let t = -HALF - 0.12; t <= HALF + 0.121; t += HALF / 8) ctx.lineTo(b.bx + Math.cos(S.aim + t) * b.br * 1.15, b.by + Math.sin(S.aim + t) * b.br * 1.15);
+  ctx.closePath(); ctx.fill();
+  const h = ctx.createRadialGradient(b.bx, b.by, 0, b.bx, b.by, b.br * 0.55);   // and the ground just ahead of you takes the most light
+  h.addColorStop(0, 'rgba(255,240,215,0.16)'); h.addColorStop(1, 'rgba(255,240,215,0)');
+  ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = h; ctx.fill();
+  ctx.restore();
+}
 function drawTorchWarmth() {
   const b = beamGeo; if (!b || b.a < 0.02) return;
   const g = ctx.createRadialGradient(b.bx, b.by, 0, b.bx, b.by, b.br);
@@ -2808,6 +2822,80 @@ function drawFilm() {
 
 const litMemo = new Map();
 let frameDt = 1 / 60;
+// ---- air: dust in the beam, low mist on the ground, sparks off the fires ----
+const AIR = { motes: [], mist: [], sparks: [] };
+function airStep() {
+  const p = S.p, dt = frameDt, R = Math.min(440, viewR());
+  const near = (o, r) => Math.hypot(o.x - p.x, o.y - p.y) < r;
+  while (AIR.motes.length < 280) AIR.motes.push({ x: 0, y: 0, z: 0, ph: Math.random() * 9, s: 0.5 + Math.random(), fresh: true });
+  for (const m of AIR.motes) {                      // dust hangs in the air and drifts; out of reach, it turns up somewhere new
+    if (m.fresh || !near(m, R)) { const a = Math.random() * 7, d = Math.sqrt(Math.random()) * R; m.x = p.x + Math.cos(a) * d; m.y = p.y + Math.sin(a) * d; m.z = 6 + Math.random() * 46; m.fresh = false; }
+    m.ph += dt; m.x += (Math.sin(m.ph * 0.4 + m.s * 5) * 4 + 3) * dt; m.y += Math.cos(m.ph * 0.33 + m.s * 3) * 4 * dt; m.z += Math.sin(m.ph * 0.7) * 2.5 * dt;
+  }
+  while (AIR.mist.length < 16) AIR.mist.push({ x: 0, y: 0, r: 0, ph: Math.random() * 9, fresh: true });
+  for (const m of AIR.mist) {                       // low banks of mist creep along the ground
+    if (m.fresh || !near(m, R + 150)) { const a = Math.random() * 7, d = (m.fresh ? Math.sqrt(Math.random()) : 0.85 + 0.15 * Math.random()) * (R + 120); m.x = p.x + Math.cos(a) * d; m.y = p.y + Math.sin(a) * d; m.r = 55 + Math.random() * 70; m.fresh = false; }
+    m.ph += dt; m.x += (inBeyond() ? 26 : 7) * dt; m.y += Math.sin(m.ph * 0.2) * 3 * dt;   // in the Dunes it's blown sand, and quicker
+  }
+  for (const k of AIR.sparks) { k.t += dt; k.z += k.vz * dt; k.vz *= 1 - 0.6 * dt; k.x += (k.vx + Math.sin(k.t * 5 + k.ph) * 6) * dt; k.y += k.vy * dt; }
+  AIR.sparks = AIR.sparks.filter(k => k.t < k.life);
+}
+function drawMistLow() {                          // drawn under the dark, so only lit ground shows its mist
+  if (!S.p) return;
+  const sand = inBeyond();
+  ctx.save();
+  for (const m of AIR.mist) {
+    const [x, y] = toScreen(m.x, m.y), rx = m.r * Z, a = 0.13 + 0.05 * Math.sin(m.ph * 0.5);
+    if (x < -rx || x > W + rx || y < -rx || y > H + rx) continue;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rx), c = sand ? '228,214,188' : '215,212,205';
+    g.addColorStop(0, `rgba(${c},${a})`); g.addColorStop(0.6, `rgba(${c},${a * 0.5})`); g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g; ctx.setTransform(DPR, 0, 0, DPR * 0.42, 0, y * DPR * 0.58);   // squashed flat onto the ground
+    ctx.beginPath(); ctx.arc(x, y, rx, 0, 7); ctx.fill();
+  }
+  ctx.restore(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+function drawBeamDust() {                         // specks of dust catch the torchlight; outside the beam you never see them
+  const b = beamGeo; if (!b || b.a < 0.05 || !S.p) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const m of AIR.motes) {
+    const [x, y0] = toScreen(m.x, m.y), y = y0 - m.z * Z, d = Math.hypot(x - b.bx, y - b.by);
+    if (d > b.br * 0.95 || d < 12 * Z) continue;
+    const off = Math.abs(angDiff(Math.atan2(y - b.by, x - b.bx), S.aim)); if (off > HALF) continue;
+    const edge = Math.min(1, (HALF - off) / (HALF * 0.35)), fall = Math.pow(1 - d / (b.br * 0.95), 0.6);
+    const tw = 0.5 + 0.5 * Math.sin(m.ph * (1.5 + m.s) + m.s * 9), a = Math.min(1, b.a) * edge * fall * tw;
+    if (a < 0.03) continue;
+    const rr = (0.8 + 0.8 * m.s) * Z;
+    ctx.fillStyle = `rgba(255,236,205,${a * 0.35})`; ctx.beginPath(); ctx.arc(x, y, rr * 2.4, 0, 7); ctx.fill();   // a little halo
+    ctx.fillStyle = `rgba(255,246,228,${a})`; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+function sparkFires(lights) {                     // every fire throws a few sparks up into the night
+  for (const L of lights) if (L.kind === 'fire' && Math.random() < frameDt * 14 && AIR.sparks.length < 90)
+    AIR.sparks.push({ x: L.x + (Math.random() - 0.5) * 8, y: L.y + (Math.random() - 0.5) * 8, z: 10, vz: 40 + Math.random() * 50, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10, t: 0, life: 1 + Math.random() * 1.4, ph: Math.random() * 9 });
+}
+function drawSparks() {
+  if (!AIR.sparks.length) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const k of AIR.sparks) {
+    const [x, y0] = toScreen(k.x, k.y), y = y0 - k.z * Z, f = 1 - k.t / k.life, a = f * (0.6 + 0.4 * Math.sin(k.t * 30 + k.ph));
+    ctx.fillStyle = `rgba(255,${150 + 70 * f | 0},70,${a})`; ctx.beginPath(); ctx.arc(x, y, (0.8 + 1.1 * f) * Z, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawLensGlow() {                         // the torch lens itself glows, and spills a little light round your feet
+  const b = beamGeo; if (!b || !S.tip || b.a < 0.05) return;
+  const [tx, ty] = S.tip, a = Math.min(1, b.a) * (0.9 + 0.1 * Math.sin(S.t * 13)), R = 13 * Z;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  let g = ctx.createRadialGradient(tx, ty, 0, tx, ty, R);
+  g.addColorStop(0, `rgba(255,235,200,${0.55 * a})`); g.addColorStop(0.35, `rgba(255,190,120,${0.18 * a})`); g.addColorStop(1, 'rgba(255,170,90,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tx, ty, R, 0, 7); ctx.fill();
+  const [px, py] = toScreen(S.p.x, S.p.y), fx = px + Math.cos(S.aim) * 10 * Z, fy = py + Math.sin(S.aim) * 5 * Z, FR = 30 * Z;
+  ctx.setTransform(DPR, 0, 0, DPR * 0.5, 0, fy * DPR * 0.5);
+  g = ctx.createRadialGradient(fx, fy, 0, fx, fy, FR); g.addColorStop(0, `rgba(255,200,140,${0.09 * a})`); g.addColorStop(1, 'rgba(255,200,140,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fx, fy, FR, 0, 7); ctx.fill();
+  ctx.restore(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
 
 // ---- game feel: camera shake (trauma that decays) and hit-stop (a few frozen frames on big hits) ----
 function addShake(a) { S.trauma = Math.min(1, (S.trauma || 0) + a); }
@@ -2834,6 +2922,7 @@ function renderScene() {
   for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
+  airStep(); sparkFires(lights); drawMistLow();
 
   // darkness
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2943,7 +3032,7 @@ function renderScene() {
   ctx.drawImage(dark, 0, 0);
   ctx.globalAlpha = 1;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  drawLightGlow(lights);
+  drawLightGlow(lights); drawSparks();
   drawEyeshine(bx, by, br, casters, lx, ly);
   if (S.q && S.q.lit) { ctx.save(); ctx.globalAlpha = Math.max(0, S.q.fall) * S.torchLvl; drawQuarry(S.q); ctx.restore(); }
   if (S.p.ghosts && S.p.ghosts.length) {   // after-images trailing the roll
@@ -2951,7 +3040,9 @@ function renderScene() {
     for (const g of p.ghosts) { p.x = g.x; p.y = g.y; ctx.save(); ctx.globalAlpha = Math.max(0, g.a); drawPlayer(); ctx.restore(); }
     p.x = x0; p.y = y0;
   }
+  drawBeamThrow(); drawLensGlow();
   drawPlayer(); // drawn over the dark so the whole figure stays readable
+  drawBeamDust();
   drawTorchWarmth();
   drawWarmth();
   if (isRg()) drawDodgeFx();
