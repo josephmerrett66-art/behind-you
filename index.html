@@ -2909,7 +2909,7 @@ function drawFilm() {
 const litMemo = new Map();
 let frameDt = 1 / 60;
 // ---- air: dust in the beam, low mist on the ground, sparks off the fires ----
-const AIR = { motes: [], mist: [], sparks: [] };
+const AIR = { motes: [], mist: [], sparks: [], moths: [] };
 function airStep() {
   const p = S.p, dt = frameDt, R = Math.min(440, viewR());
   const near = (o, r) => Math.hypot(o.x - p.x, o.y - p.y) < r;
@@ -2923,8 +2923,63 @@ function airStep() {
     if (m.fresh || !near(m, R + 150)) { const a = Math.random() * 7, d = (m.fresh ? Math.sqrt(Math.random()) : 0.85 + 0.15 * Math.random()) * (R + 120); m.x = p.x + Math.cos(a) * d; m.y = p.y + Math.sin(a) * d; m.r = 55 + Math.random() * 70; m.fresh = false; }
     m.ph += dt; m.x += (inBeyond() ? 26 : 7) * dt; m.y += Math.sin(m.ph * 0.2) * 3 * dt;   // in the Dunes it's blown sand, and quicker
   }
+  mothStep(dt, R);
   for (const k of AIR.sparks) { k.t += dt; k.z += k.vz * dt; k.vz *= 1 - 0.6 * dt; k.x += (k.vx + Math.sin(k.t * 5 + k.ph) * 6) * dt; k.y += k.vy * dt; }
   AIR.sparks = AIR.sparks.filter(k => k.t < k.life);
+}
+// ---- moths: little pale moths flitting about the woods; they find your torch and dance in the beam ----
+function mothStep(dt, R) {
+  const p = S.p, want = inNext() ? 0 : inBeyond() ? 5 : 14;   // fewer out in the dunes
+  while (AIR.moths.length < want) AIR.moths.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, ph: Math.random() * 9, fl: Math.random() * 9, s: 0.8 + Math.random() * 0.5, fresh: true, tint: Math.random() });
+  if (AIR.moths.length > want) AIR.moths.length = want;
+  const lit = S.torchLvl > 0.3 && !S.rg?.inCamp;
+  let ax = 0, ay = 0;
+  if (lit) { const [wx, wy] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)), l = Math.hypot(wx, wy) || 1; ax = wx / l; ay = wy / l; }
+  for (const m of AIR.moths) {
+    const d = Math.hypot(m.x - p.x, m.y - p.y);
+    if (m.fresh || d > R + 80) { const a = Math.random() * 7, r = (0.25 + 0.6 * Math.sqrt(Math.random())) * R; m.x = p.x + Math.cos(a) * r; m.y = p.y + Math.sin(a) * r; m.z = 10 + Math.random() * 40; m.vx = m.vy = m.vz = 0; m.fresh = false; m.lured = 0; }
+    m.ph += dt; m.fl += dt * (24 + 8 * m.s);   // wings beat fast
+    // a jittery, wandering flight: they never fly straight
+    m.vx += (Math.sin(m.ph * 2.3 + m.tint * 20) * 90 + (Math.random() - 0.5) * 240) * dt;
+    m.vy += (Math.cos(m.ph * 1.9 + m.tint * 13) * 90 + (Math.random() - 0.5) * 240) * dt;
+    m.vz += ((28 - m.z) * 1.2 + (Math.random() - 0.5) * 160) * dt;
+    if (d > R * 0.6) { m.vx += (p.x - m.x) / d * 40 * dt; m.vy += (p.y - m.y) / d * 40 * dt; }   // they keep to the woods round you
+    // the torch draws them in: any moth near the beam turns toward a point a little ahead of the lens and circles it
+    if (lit) {
+      const dx = m.x - p.x, dy = m.y - p.y, f = dx * ax + dy * ay;
+      const inBeam = f > 0 && f < 380 && Math.abs(-dx * ay + dy * ax) < f * 0.55 + 30;
+      m.lured = Math.max(0, Math.min(1, (m.lured || 0) + (inBeam ? dt * 0.8 : -dt * 0.3)));
+      if (m.lured > 0) {
+        const tf = 80 + 110 * m.tint, tx = p.x + ax * tf + Math.sin(m.ph * 3 + m.tint * 9) * 34, ty = p.y + ay * tf + Math.cos(m.ph * 2.6 + m.tint * 7) * 34;
+        m.vx += (tx - m.x) * 3.2 * m.lured * dt; m.vy += (ty - m.y) * 3.2 * m.lured * dt; m.vz += (32 - m.z) * 2 * m.lured * dt;
+      }
+    } else m.lured = Math.max(0, (m.lured || 0) - dt * 0.3);
+    const damp = Math.exp(-2.2 * dt); m.vx *= damp; m.vy *= damp; m.vz *= damp;
+    const sp = Math.hypot(m.vx, m.vy), max = 70 + 50 * (m.lured || 0); if (sp > max) { m.vx *= max / sp; m.vy *= max / sp; }
+    m.x += m.vx * dt; m.y += m.vy * dt; m.z = Math.max(4, Math.min(70, m.z + m.vz * dt));
+  }
+}
+function drawMoths() {                            // drawn under the dark: you only see them where light falls
+  if (!AIR.moths.length) return;
+  ctx.save();
+  for (const m of AIR.moths) {
+    const [x, y0] = toScreen(m.x, m.y), y = y0 - m.z * Z;
+    if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+    const s = m.s * Z * 2, flap = Math.sin(m.fl), w = 2.6 * s, h = (0.35 + 0.65 * Math.abs(flap)) * 1.9 * s;
+    const head = Math.atan2(m.vy * 0.5 + m.vx * 0.5, m.vx - m.vy);   // which way it's going, on screen
+    ctx.setTransform(DPR, 0, 0, DPR, x * DPR, y * DPR);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(0, m.z * Z, 1.8 * s, 0.7 * s, 0, 0, 7); ctx.fill();   // a faint shadow on the ground below
+    ctx.rotate(head);
+    const c = 215 + m.tint * 38 | 0;
+    ctx.fillStyle = `rgb(${c},${c - 6},${c - 22})`;
+    ctx.strokeStyle = 'rgba(40,36,30,0.7)'; ctx.lineWidth = 0.6 * Z;
+    for (const sd of [-1, 1]) {                   // forewing and hindwing on each side, folding up and down as it flaps
+      ctx.beginPath(); ctx.ellipse(0.4 * s, sd * h * 0.55, w * 0.55, h * 0.6, sd * 0.5, 0, 7); ctx.stroke(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-0.7 * s, sd * h * 0.4, w * 0.38, h * 0.42, -sd * 0.4, 0, 7); ctx.stroke(); ctx.fill();
+    }
+    ctx.fillStyle = 'rgb(70,64,56)'; ctx.beginPath(); ctx.ellipse(0, 0, 1.5 * s, 0.5 * s, 0, 0, 7); ctx.fill();   // the body
+  }
+  ctx.restore(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 function drawMistLow() {                          // drawn under the dark, so only lit ground shows its mist
   if (!S.p) return;
@@ -3008,7 +3063,7 @@ function renderScene() {
   for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
-  airStep(); sparkFires(lights); drawMistLow();
+  airStep(); sparkFires(lights); drawMistLow(); drawMoths();
 
   // darkness
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
