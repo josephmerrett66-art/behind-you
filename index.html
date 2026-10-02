@@ -6162,7 +6162,7 @@ function exNewLair() {                          // somewhere in the near woods, 
   propCache.clear();
 }
 const lairAt = () => S.mode === 'expedition' && XS && XS.lair && S.rg && !S.rg.beyond && !S.rg.next ? XS.lair : null;
-const lairAwake = () => { const L = lairAt(); return L && (L.beat === null || L.beat === undefined || (XS.trip || 0) - L.beat >= 3); };   // a beaten lair stays empty for 3 trips
+const lairAwake = () => { const L = lairAt(); return L && (L.beat === null || L.beat === undefined); };   // one boss at a time, like the orbs: once beaten, he's gone for good
 const miniLive = () => { const m = S.rg && S.rg.mini; return m && m.st !== 'gone' && m.st !== 'dead' ? m : null; };
 function lairStones() {
   const L = lairAt(); if (!L) return [];
@@ -7035,7 +7035,7 @@ function drawExFx() {
     if (XS.orbField && XS.orb && !rg.carryOrb) { const [x, y] = toScreen(XS.orb.x, XS.orb.y); exPointer(px, py, x, y, `rgb(${ORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
     if (!rg.inCamp) { const gp = Math.hypot(S.p.x, S.p.y) > CAMP_R + 30 ? exNearestGate(S.p.x, S.p.y) : { x: 0, y: 0 }, [x, y] = toScreen(gp.x, gp.y); exPointer(px, py, x, y, '#efefea', 'house', on(x, y) ? 0.25 : rg.carryOrb ? 0.95 : 0.7); }
     for (const L of rg.loose) { const [x, y] = toScreen(L.x, L.y); exPointer(px, py, x, y, L.orb ? `rgb(${ORB_COL})` : 'rgba(239,239,234,0.9)', 'pack', on(x, y) ? 0.25 : 0.7); }
-    if (lairAwake() && !miniLive() && dist2(S.p, XS.lair) < 1500) { const [x, y] = toScreen(XS.lair.x, XS.lair.y); if (!on(x, y)) exPointer(px, py, x, y, 'rgb(255,160,80)', 'flame', 0.7); }   // a warm glow somewhere off in the trees
+    if (lairAwake() && !miniLive()) { const [x, y] = toScreen(XS.lair.x, XS.lair.y); exPointer(px, py, x, y, 'rgb(255,160,80)', 'flame', on(x, y) ? 0.3 : 0.85); }   // the flame always points to the boss you're due to face next
   }
   // the pack, as a row of small slots over your head
   if (!rg.inCamp) {
