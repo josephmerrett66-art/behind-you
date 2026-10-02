@@ -1726,6 +1726,32 @@ function paintFern(g, R) {
     }
   }
 }
+const FLOWER_COLS = {                            // wildflowers: rich colour, pushed hard so it survives the torch's warm tint
+  flowerY: [[255, 220, 0], [255, 240, 70]],     // buttercups
+  flowerB: [[110, 120, 255], [170, 175, 255]],    // bluebells
+  flowerR: [[235, 40, 45], [255, 110, 90]],       // poppies
+  flowerW: [[248, 246, 236], [255, 255, 250]],    // daisies, with a yellow eye
+  flowerV: [[190, 70, 230], [225, 140, 255]],     // violets
+};
+const paintFlowers = col => (g, R) => {          // a little clump of wildflowers: thin grey stems, a few leaves, bright heads
+  const [c0, c1] = FLOWER_COLS[col], n = 14 + (R() * 8 | 0), heads = [];
+  for (let k = 0; k < n; k++) {
+    const a0 = R() * Math.PI * 2, d0 = Math.sqrt(R()), x = Math.cos(a0) * d0 * 16, y = Math.sin(a0) * d0 * 5, h = 4 + R() * 7, lean = (R() - 0.5) * 3;
+    g.strokeStyle = grey(70 + R() * 25); g.lineWidth = 0.5;
+    g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + lean * 0.3, y - h * 0.6, x + lean, y - h); g.stroke();
+    if (R() < 0.5) { g.fillStyle = grey(78 + R() * 20); g.beginPath(); g.ellipse(x + 1, y - h * 0.3, 1.4, 0.5, -0.5, 0, 7); g.fill(); }
+    heads.push([x + lean, y - h, 1.5 + R() * 0.9]);
+  }
+  heads.sort((a, b) => a[1] - b[1]);
+  for (const [x, y, r] of heads) {
+    const m = R(), c = c0.map((v, i) => v + (c1[i] - v) * m | 0);
+    g.fillStyle = `rgb(${c.map(v => v * 0.55 | 0)})`; g.beginPath(); g.arc(x + 0.25, y + 0.3, r * 1.15, 0, 7); g.fill();   // the shaded underside
+    g.fillStyle = `rgb(${c})`;
+    for (let p = 0; p < 5; p++) { const a = p / 5 * Math.PI * 2 + m; g.beginPath(); g.ellipse(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.4, r * 0.6, r * 0.42, a, 0, 7); g.fill(); }
+    g.fillStyle = col === 'flowerW' || col === 'flowerB' ? 'rgb(255,205,40)' : `rgb(${c.map(v => v * 0.45 | 0)})`;   // the eye
+    g.beginPath(); g.arc(x, y, r * 0.32, 0, 7); g.fill();
+  }
+};
 function paintGrass(g, R) {
   const n = 16 + (R() * 10 | 0);
   for (let k = 0; k < n; k++) {
@@ -1918,7 +1944,7 @@ function paintWoodpile(g, R) {                   // split logs stacked three hig
 const SPRITE_KINDS = {                           // kind: [variants, w, h, ax, ay, painter]
   pine: [6, 70, 118, 35, 112, paintPine], oak: [5, 84, 96, 42, 90, paintOak], cherry: [5, 100, 104, 50, 92, paintCherry], dead: [4, 76, 72, 38, 66, paintSnag],
   bush: [4, 28, 20, 14, 17, paintBush], fern: [4, 34, 16, 17, 13, paintFern], grass: [5, 16, 13, 8, 12, paintGrass],
-  stump: [3, 22, 13, 11, 10, paintStump], pebbles: [4, 16, 8, 8, 5, paintPebbles],
+  stump: [3, 22, 13, 11, 10, paintStump], flowerY: [3, 40, 22, 20, 15, paintFlowers('flowerY')], flowerB: [3, 40, 22, 20, 15, paintFlowers('flowerB')], flowerR: [3, 40, 22, 20, 15, paintFlowers('flowerR')], flowerW: [3, 40, 22, 20, 15, paintFlowers('flowerW')], flowerV: [3, 40, 22, 20, 15, paintFlowers('flowerV')], pebbles: [4, 16, 8, 8, 5, paintPebbles],
   rock: [5, 36, 26, 18, 21, paintRock], post: [3, 16, 38, 8, 35, paintPost], lamp: [1, 22, 58, 6, 55, paintLamp],
   firepit: [1, 40, 22, 20, 12, paintFirePit], crateS: [1, 20, 22, 10, 18, paintCrate(false)], crateB: [1, 24, 26, 12, 22, paintCrate(true)],
   barrel: [1, 16, 22, 8, 19, paintBarrel], woodpile: [1, 26, 20, 13, 17, paintWoodpile], pack: [1, 24, 22, 12, 18, paintPack],
@@ -2272,7 +2298,14 @@ function decorAt(i, j) {
   if (decorCache.size > 60000) decorCache.clear();
   let d = null;
   const h = hash(i * 1.31 + 17, j * 0.77 - 9);
-  if (h < 0.27 && !(Math.abs(i) < 2 && Math.abs(j) < 2) && !propAt(i, j)) {
+  const fl = flowerPatch(i, j);                  // a patch of wildflowers: one colour, a handful of clumps close together
+  if (fl && !propAt(i, j)) {
+    const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
+    if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || Math.hypot(x - TELE2.x, y - TELE2.y) < 70))) {
+      const v = hash(i * 3.3, j * 5.1);
+      d = { kind: 'decor', dk: fl, x, y, s: 1.1 + hash(j * 1.7, i) * 0.4, v: (v * 97 | 0) % 3, seed: v };
+    }
+  } else if (h < 0.27 && !(Math.abs(i) < 2 && Math.abs(j) < 2) && !propAt(i, j)) {
     const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
     if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || Math.hypot(x - TELE2.x, y - TELE2.y) < 70))) {
       const r = h / 0.27, v = hash(i * 3.3, j * 5.1);
@@ -2282,6 +2315,15 @@ function decorAt(i, j) {
   }
   decorCache.set(key, d);
   return d;
+}
+function flowerPatch(i, j) {                     // which colour of flower grows on this tile, if any
+  const ci = Math.floor(i / 6), cj = Math.floor(j / 6);
+  for (let a = ci - 1; a <= ci + 1; a++) for (let b = cj - 1; b <= cj + 1; b++) {   // patches near a cell edge can spill into the next cell
+    if (hash(a * 7.13 + 2.1, b * 3.37 - 5.3) > 0.2) continue;
+    const px = a * 6 + 3 + (hash(a + 0.5, b * 1.9) - 0.5) * 4, py = b * 6 + 3 + (hash(a * 2.3, b + 0.7) - 0.5) * 4, r = 1.4 + hash(a * 1.7, b * 4.1) * 1.1;
+    if (Math.hypot(i + 0.5 - px, j + 0.5 - py) < r && hash(i * 0.91 + 3, j * 1.37 - 1) < 0.85) return ['flowerY', 'flowerB', 'flowerR', 'flowerW', 'flowerV'][hash(a * 5.5, b * 6.6) * 5 | 0];
+  }
+  return null;
 }
 function decorNear(x, y, R) {
   const out = [];
