@@ -178,6 +178,16 @@ button.mode.big { padding: 0.9rem; border-color: rgba(239,239,234,0.6); }
 #start5.begin .nm { font: 400 clamp(1.25rem, 5.6vw, 1.7rem)/1.1 var(--display); text-transform: lowercase; }
 #start5.begin .best { font: 0.72rem var(--mono); letter-spacing: 0.04em; opacity: 0.75; }
 #start5.begin:hover, #start5.begin:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
+.savechip { all: unset; box-sizing: border-box; cursor: pointer; justify-self: start; display: inline-flex; align-items: center; gap: 0.45rem; margin-top: -0.5rem; padding: 0.3rem 0.1rem; font: 600 0.7rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
+.savechip svg { width: 1rem; height: 1rem; } .savechip:hover, .savechip:focus-visible { color: var(--bone); outline: none; }
+.savelist { display: grid; gap: 0.6rem; }
+.saverow { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem 0.8rem; align-items: center; padding: 0.85rem 0.9rem; border: 1px solid rgba(138,138,138,0.4); background: rgba(22,22,21,0.95); }
+.saverow.on { border-color: var(--bone); }
+.saverow .nm { font: 400 1.25rem/1.1 var(--display); color: var(--bone); }
+.saverow .nm em { font: 600 0.62rem var(--mono); font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: var(--void); background: var(--bone); padding: 0.1rem 0.35rem; margin-left: 0.5rem; vertical-align: middle; }
+.saverow .sm { grid-column: 1; font: 0.75rem var(--mono); color: var(--ash); }
+.saverow .acts { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 0.4rem; }
+.saverow .acts button { padding: 0.55rem 0.8rem; font-size: 0.7rem; }
 .menurow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; margin-top: 0.2rem; }
 button.nav { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; padding: 0.5rem 0.2rem; font: 600 0.6rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); text-align: center; }
 button.nav .ic { width: 2.3rem; height: 2.3rem; border-radius: 50%; } button.nav .ic svg { width: 1.15rem; height: 1.15rem; }
@@ -233,6 +243,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
   <div class="card" id="mainMenu">
     <button id="resume" hidden>Resume</button>
     <button id="start5" class="begin"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-8 17h16z"/><path d="M12 3v17M9 20l3-6 3 6"/></svg></span><span class="mt"><span class="nm">begin expedition</span><span class="best" id="bestExped"></span></span></button>
+    <button id="savesOpen" class="savechip" data-panel="pSaves"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></svg><span id="saveLbl">Saves</span></button>
     <nav class="menurow" aria-label="More">
       <button class="nav" data-panel="pExtras"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7"/><rect x="13.5" y="3.5" width="7" height="7"/><rect x="3.5" y="13.5" width="7" height="7"/><path d="M17 13.5v7M13.5 17h7"/></svg></span>Extras</button>
       <button id="statsOpen" class="nav wisp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.6 0-6-2.6-6-5.8C6 11 12 3 12 3s6 8 6 12.2c0 3.2-2.4 5.8-6 5.8z"/><circle cx="12" cy="15.5" r="2"/></svg></span><span id="statsLbl">Stats</span></button>
@@ -241,6 +252,13 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <button class="nav" data-panel="pHelp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17" r=".5"/></svg></span>How to play</button>
     </nav>
   </div>
+  <section class="card panel" id="pSaves" hidden>
+    <button class="backbtn" data-back><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>Back</button>
+    <h2>Saves</h2>
+    <p class="small">Each save has its own expedition, embers, upgrades and wisp stats.</p>
+    <div id="saveList" class="savelist"></div>
+    <button id="saveNew" class="alt">+ New save</button>
+  </section>
   <section class="card panel" id="pExtras" hidden>
     <button class="backbtn" data-back><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>Back</button>
     <h2>Extras</h2>
@@ -321,6 +339,14 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 </div>
 
 <script>
+// ---- save slots: each save keeps its own expedition and its own wisp stats. Save 1 uses the original keys, so old progress is Save 1 ----
+const SAVES_KEY = 'behind-you-saves', SAVE_MAX = 5;
+const SV = (() => { try { const s = JSON.parse(localStorage.getItem(SAVES_KEY)); if (s && Array.isArray(s.list) && s.list.length) return s; } catch (e) {} return { active: 1, list: [{ id: 1, at: Date.now() }] }; })();
+if (!SV.list.some(x => x.id === SV.active)) SV.active = SV.list[0].id;
+const svSave = () => { try { localStorage.setItem(SAVES_KEY, JSON.stringify(SV)); } catch (e) {} };
+const exKeyOf = id => id === 1 ? 'behind-you-expedition' : 'behind-you-expedition-' + id;
+const stKeyOf = id => id === 1 ? 'behind-you-stats' : 'behind-you-stats-' + id;
+const svName = id => 'Save ' + id;
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 const dark = document.createElement('canvas');
@@ -3125,9 +3151,52 @@ function menuBests() {
   put('bestSurvive', bests.survive ? `Best · wave ${bests.survive}` : '');
   put('bestChase', bests.chase ? `Best ${bests.chase}` : '');
   put('bestBlink', bests.blink ? `Best ${bests.blink}` : '');
-  let ex = null; try { ex = JSON.parse(localStorage.getItem('behind-you-expedition') || 'null'); } catch (e) {}
+  let ex = null; try { ex = JSON.parse(localStorage.getItem(exKey()) || 'null'); } catch (e) {}
+  put('saveLbl', SV.list.length > 1 ? `Playing ${svName(SV.active)} · change` : 'Saves');
   put('bestExped', ex && ex.v === 1 && (ex.orbs || ex.embers) ? `${ex.orbs || 0} of 3 orbs · ${ex.embers || 0} embers` : 'Head into the dark. Get the loot home.');
 }
+function saveInfo(id) {                      // a one-line summary of what a save holds
+  let x = null, st = null; try { x = JSON.parse(localStorage.getItem(exKeyOf(id)) || 'null'); st = JSON.parse(localStorage.getItem(stKeyOf(id)) || 'null'); } catch (e) {}
+  const at = (SV.list.find(v => v.id === id) || {}).at, d = at ? new Date(at) : null;
+  const when = d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+  if (!x || x.v !== 1) return 'Empty · not started yet';
+  return `${x.orbs || 0} of 3 orbs · ${x.embers || 0} embers · ${(st && st.w) || 0} wisps${when ? ' · ' + when : ''}`;
+}
+function useSave(id) {                        // make this the save everything reads and writes
+  SV.active = id; svSave(); ST = stRead(); XS = null; statsLabel(); menuBests();
+}
+function renderSaves() {
+  const box = document.getElementById('saveList'), busy = S.mode === 'expedition';
+  box.replaceChildren(...SV.list.map(v => {
+    const on = v.id === SV.active, row = document.createElement('div'); row.className = 'saverow' + (on ? ' on' : '');
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = svName(v.id);
+    if (on) { const t = document.createElement('em'); t.textContent = 'current'; nm.append(t); }
+    const sm = document.createElement('span'); sm.className = 'sm'; sm.textContent = saveInfo(v.id);
+    const acts = document.createElement('span'); acts.className = 'acts';
+    const play = document.createElement('button'); play.textContent = on && busy ? 'Restart' : 'Play';
+    play.addEventListener('click', () => { useSave(v.id); begin('expedition'); });
+    const del = document.createElement('button'); del.className = 'alt'; del.textContent = 'Delete';
+    if (on && busy) { del.disabled = true; del.title = 'This save is in use. Quit to the title to delete it.'; }
+    del.addEventListener('click', () => {
+      if (!confirm(`Delete ${svName(v.id)}? Its expedition, embers, upgrades and wisp stats are gone for good.`)) return;
+      try { localStorage.removeItem(exKeyOf(v.id)); localStorage.removeItem(stKeyOf(v.id)); } catch (e) {}
+      SV.list = SV.list.filter(o => o.id !== v.id);
+      if (!SV.list.length) SV.list.push({ id: 1, at: Date.now() });   // there's always one save, even if it's empty
+      if (on) useSave(SV.list[0].id); else svSave();
+      renderSaves();
+    });
+    acts.append(play, del); row.append(nm, sm, acts); return row;
+  }));
+  const nw = document.getElementById('saveNew'); nw.disabled = SV.list.length >= SAVE_MAX; nw.textContent = SV.list.length >= SAVE_MAX ? `${SAVE_MAX} saves is the most` : '+ New save · start from scratch';
+  menuBests();
+}
+document.getElementById('saveNew').addEventListener('click', () => {
+  if (SV.list.length >= SAVE_MAX) return;
+  let id = 1; while (SV.list.some(v => v.id === id)) id++;
+  try { localStorage.removeItem(exKeyOf(id)); localStorage.removeItem(stKeyOf(id)); } catch (e) {}   // a fresh start, nothing left over
+  SV.list.push({ id, at: Date.now() }); useSave(id); begin('expedition');
+});
+document.getElementById('savesOpen').addEventListener('click', renderSaves);
 addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hidden && document.getElementById('mainMenu').hidden) { showPanel(null); return; } if (e.key === 'Escape' && S.mode && picker.hidden && campEl.hidden && statsEl.hidden) (overlay.hidden ? openMenu() : resumeBtn.click()); });
 resumeBtn.addEventListener('click', () => { overlay.hidden = true; menuBtn.hidden = false; S.running = true; last = performance.now(); });
 
@@ -4646,12 +4715,12 @@ const gearMax = g => g.id === 'lanterns' ? Math.min(g.max, 3 - XS.outposts.lengt
 const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
 
 // ---- saving: everything banked lives on this device ----
-const EX_KEY = 'behind-you-expedition';
+const exKey = () => exKeyOf(SV.active);
 let XS = null;
 function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, torch: {}, arm: {}, shop2: true, shop3: true, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
 function exRead() {
   try {
-    const s = JSON.parse(localStorage.getItem(EX_KEY) || 'null');
+    const s = JSON.parse(localStorage.getItem(exKey()) || 'null');
     if (s && s.v === 1) {
       const x = Object.assign(exFresh(), s);
       if (x.own && x.own.rear) { x.embers += PRICE.legendary; delete x.own.rear; }   // Eyes in the Back of Your Head was removed: refund it
@@ -4678,7 +4747,7 @@ function exRead() {
   return exFresh();
 }
 let EX_TEST = false;                         // a playtest run: nothing it does is saved
-function exSave() { if (EX_TEST) return; try { localStorage.setItem(EX_KEY, JSON.stringify(XS, (k, v) => k === 'light' || k === 'stones' ? undefined : v)); } catch (e) {} }
+function exSave() { if (EX_TEST) return; const me = SV.list.find(x => x.id === SV.active); if (me) { me.at = Date.now(); svSave(); } try { localStorage.setItem(exKey(), JSON.stringify(XS, (k, v) => k === 'light' || k === 'stones' ? undefined : v)); } catch (e) {} }
 const packMax = () => 6 + 2 * XS.bag, slotMax = () => 3 + XS.slot;
 const packUsed = items => items.reduce((a, k) => a + ITEMS[k].slots, 0);
 const eqUsed = () => XS.eq.reduce((a, id) => a + slotCost(id), 0);
@@ -5005,7 +5074,7 @@ function exItems() {   // camp, chests and dropped packs, drawn in with the tree
 }
 
 // ---- personal stats: kills drop violet wisps, wisps buy small boosts that last for good (Nightfall and Expedition) ----
-const ST_KEY = 'behind-you-stats', WISP_COL = '185,130,255';
+const stKey = () => stKeyOf(SV.active), WISP_COL = '185,130,255';
 const WISP = { shade: 1, stalker: 1, kamikaze: 1, laser: 1, bomber: 2, splitter: 2, brute: 3, tall: 10, splitling: 0 };
 const STATS = [
   { id: 'swift', g: 'Body', name: 'Swift', max: 5, sh: 'Walk and run faster', desc: 'You move 4% faster per rank.' },
@@ -5023,12 +5092,12 @@ const STAT_GROUPS = [
   { id: 'Body', line: 'Speed, hearts, healing and dodging', icon: 'hardy' },
   { id: 'Spirit', line: 'Gathering wisps', icon: 'wisp' },
 ];
-function stRead() { try { const s = JSON.parse(localStorage.getItem(ST_KEY)); if (s && typeof s.w === 'number' && s.r) return s; } catch (e) {} return { w: 0, r: {} }; }
-function stSave() { try { localStorage.setItem(ST_KEY, JSON.stringify(ST)); } catch (e) {} }
+function stRead() { try { const s = JSON.parse(localStorage.getItem(stKey())); if (s && typeof s.w === 'number' && s.r) return s; } catch (e) {} return { w: 0, r: {} }; }
+function stSave() { try { localStorage.setItem(stKey(), JSON.stringify(ST)); } catch (e) {} }
 let ST = stRead();
 { let back = 0;                                   // torch stats moved to the camp shop (embers): give back the wisps spent on them
   for (const id of ['searing', 'reach', 'wide']) { for (let i = 0; i < (ST.r[id] || 0); i++) back += STAT_COST[i]; delete ST.r[id]; }
-  if (back) { ST.w += back; try { localStorage.setItem(ST_KEY, JSON.stringify(ST)); } catch (e) {} } }
+  if (back) { ST.w += back; try { localStorage.setItem(stKey(), JSON.stringify(ST)); } catch (e) {} } }
 function sr(id) { return ST.r[id] || 0; }
 const statCost = (s, have) => (s.cost || STAT_COST)[have];
 const baseHearts = () => 3 + sr('hardy');
@@ -6694,7 +6763,7 @@ campBtn.addEventListener('click', openCamp);
 document.getElementById('campGo').addEventListener('click', closeCamp);
 document.getElementById('campWipe').addEventListener('click', () => {
   if (!confirm('Start a new expedition? Your embers, upgrades and orbs will all be lost.')) return;
-  try { localStorage.removeItem(EX_KEY); } catch (e) {}
+  try { localStorage.removeItem(exKey()); } catch (e) {}
   campEl.hidden = true; begin('expedition');
 });
 addEventListener('keydown', e => {
