@@ -6263,10 +6263,10 @@ function drawBossBar() {                         // his name and a long thin hea
 // Every move has a wind-up and a red mark on the ground; after it he's open, and the light burns him hard.
 const LR = 200, MRC = 760, M_AREA = 1.15e6;      // the ring of stones you walk into; the cleared field round it; how much ground the camera shows
 const MINIS = [
-  { id: 'woodcutter', name: 'THE WOODCUTTER', title: 'the woodcutter', sub: 'He keeps the stones in the near woods', d: [1250, 1400], units: ['woodcutter'], wisps: 40, loot: ['r', 'c', 'c'] },
-  { id: 'lamplighter', name: 'THE LAMPLIGHTER', title: 'the lamplighter', sub: 'He hates any light but his own', d: [2700, 3300], units: ['lamplighter'], wisps: 80, loot: ['r', 'r', 'c', 'c'] },
-  { id: 'twins', name: 'THE TWINS', title: 'the twins', sub: 'Two hunters, one mind', d: [5200, 5900], units: ['spear', 'archer'], wisps: 140, loot: ['r', 'r', 'r', 'r', 'c'] },
-  { id: 'huntsman', name: 'THE HUNTSMAN', title: 'the huntsman', sub: 'The deep woods are his', d: [7350, 7700], units: ['huntsman'], wisps: 220, loot: ['r', 'r', 'r', 'r', 'r', 'r', 'r'] },
+  { id: 'woodcutter', name: 'THE WOODCUTTER', title: 'the woodcutter', sub: 'He keeps the stones in the near woods', d: [2600, 3000], units: ['woodcutter'], wisps: 40, loot: ['r', 'c', 'c'] },
+  { id: 'lamplighter', name: 'THE LAMPLIGHTER', title: 'the lamplighter', sub: 'He hates any light but his own', d: [4400, 5000], units: ['lamplighter'], wisps: 80, loot: ['r', 'r', 'c', 'c'] },
+  { id: 'twins', name: 'THE TWINS', title: 'the twins', sub: 'Two hunters, one mind', d: [5800, 6400], units: ['spear', 'archer'], wisps: 140, loot: ['r', 'r', 'r', 'r', 'c'] },
+  { id: 'huntsman', name: 'THE HUNTSMAN', title: 'the huntsman', sub: 'The deep woods are his', d: [6900, 7400], units: ['huntsman'], wisps: 220, loot: ['r', 'r', 'r', 'r', 'r', 'r', 'r'] },
 ];
 const MK = {                                     // each fighter: health, size against you, gear, what he carries, walking speed, how close he likes to stand
   woodcutter:  { hp: 30, s: 2.9, kit: { head: 'beanie', coat: 1, vest: 0 }, prop: 'axe', sp: 50, keep: 50 },
@@ -6299,6 +6299,10 @@ function exMakeLairs() {                         // one clearing for each keeper
   if (XS.lair && !XS.lairs) { XS.lairs = [{ id: 'woodcutter', x: XS.lair.x, y: XS.lair.y, beat: XS.lair.beat !== null && XS.lair.beat !== undefined }]; }   // the lair from before
   delete XS.lair;
   XS.lairs = XS.lairs || [];
+  if ((XS.lairV || 0) < 2) {                     // the lairs moved further out: any not yet beaten finds a new spot at the new distance
+    XS.lairs = XS.lairs.filter(l => { const B = MINIS.find(b => b.id === l.id); return l.beat || !B || Math.hypot(l.x, l.y) >= B.d[0]; });
+    XS.lairV = 2;
+  }
   for (const B of MINIS) {
     if (XS.lairs.some(l => l.id === B.id)) continue;
     let x = 0, y = 0;
