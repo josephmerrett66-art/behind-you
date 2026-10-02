@@ -4680,15 +4680,15 @@ const DORB_COL = '70,225,200';
 const exRing = d => d < RINGS[0] ? 0 : d < RINGS[1] ? 1 : d < RINGS[2] ? 2 : 3;
 const exInCamp = () => Math.hypot(S.p.x, S.p.y) < CAMP_R;
 // Spawning follows distance from camp: how many may be out at once, and seconds between spawns, per ring.
-const EX_CAP = [9, 8, 13, 18], EX_GAP = [1.2, 1.5, 1.0, 0.7];   // the near woods: lots of weaker shades, so it never feels empty
+const EX_CAP = [9, 14, 19, 25], EX_GAP = [1.2, 0.9, 0.65, 0.45];   // the near woods: lots of weaker shades, so it never feels empty
 const EX_SPAWNS = [
   { type: 'shade',    weight: [60, 40, 28, 22] },
-  { type: 'kamikaze', weight: [6, 12, 12, 12], max: [1, 2, 3, 4] },
+  { type: 'kamikaze', weight: [6, 12, 12, 12], max: [1, 3, 4, 5] },
   { type: 'stalker',  weight: [0, 16, 16, 16] },
-  { type: 'splitter', weight: [0, 9, 10, 10], max: [0, 1, 2, 3] },
+  { type: 'splitter', weight: [0, 9, 10, 10], max: [0, 2, 3, 4] },
   { type: 'brute',    weight: [0, 0, 10, 12] },
-  { type: 'bomber',   weight: [0, 0, 12, 13], max: [0, 0, 2, 3] },
-  { type: 'laser',    weight: [0, 0, 12, 13], max: [0, 0, 2, 3] },
+  { type: 'bomber',   weight: [0, 0, 12, 13], max: [0, 0, 3, 4] },
+  { type: 'laser',    weight: [0, 0, 12, 13], max: [0, 0, 3, 4] },
 ];
 // the shop: every Nightfall card except the ones that only change card picks
 const SHOP = UPGRADES.filter(u => u.tag !== 'Fate' && !EX_CUT.includes(u.id));
@@ -6088,7 +6088,7 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (dist2(p, BEYOND_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser' || e.type === 'spear' || e.type === 'archer') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the ranged ones off, like an outpost
     if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // hunters roam the open sand; the ground round the portal is safe
       // harder than the deep woods: no limit per kind, only on how many hunt at once, and that grows the further out you are
-      const dg = dist2(p, BEYOND_GATE), cap = (Math.min(24, 14 + dg / 250) + (rg.carryDorb ? 5 : 0)) * (pact('horde') ? 2 : 1);
+      const dg = dist2(p, BEYOND_GATE), cap = (Math.min(30, 18 + dg / 250) + (rg.carryDorb ? 5 : 0)) * (pact('horde') ? 2 : 1);
       if ((rg.duneT = (rg.duneT ?? 3) - dt) <= 0) {
         const storming = stormK() > 0.5, mix = storming ? DUNE_MIX.map(m => m.type === 'spear' ? { type: m.type, w: m.w * 2.5 } : m.type === 'archer' ? { type: m.type, w: m.w * 0.5 } : m) : DUNE_MIX;   // in a storm the archers can't see far, so the spear throwers close in
         rg.duneT = 0.65 * (pact('horde') ? 0.5 : 1) * (rg.carryDorb ? 0.6 : 1) * (storming ? 0.75 : 1) * (0.6 + Math.random() * 0.8);
