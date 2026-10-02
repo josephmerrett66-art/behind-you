@@ -3307,7 +3307,8 @@ const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / (isEx()
 const exSpot = () => isEx() && spotK() >= 1;   // Expedition's Spotlight: fully charged, the beam narrows to a long, hot spotlight
 function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.28 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 0.6 : 1) : 1 - 0.15 * spotK()) * (lastHeart() ? 1.5 : 1)) * (1 + 0.06 * tu('width')); }
 function rgRange() { return (isEx() ? 0.62 * (exSpot() ? (lv('spot') > 2 ? 2 : 1.5) : 1) : Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK()))) * (1 + 0.08 * tu('reach')) * (1 - 0.5 * stormK()); }   // a dust storm halves the beam
-function rgBurn() {
+function rgBurn() { return rgBurn0() * (pact('horde') ? 2 : 1); }   // Horde: twice the burn
+function rgBurn0() {
   const rg = S.rg || {}, grow = 1 + 0.05 * Math.min(14, Math.max(0, (rg.wave || 1) - 1));   // the torch grows with the night
   return 1.05 * (1 + 0.1 * tu('heat')) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 2 : 1) : 1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
 }
@@ -3442,7 +3443,7 @@ function hurt(e) {
     shove(e, 90); sfx(2.6, 0.5, 'bandpass', 2600, 0.35); sfx(0.6, 0.6, 'lowpass', 700, 0.25);
     return;
   }
-  const dmgH = isEx() && e && e.type === 'shade' ? 0.5 : 1;   // Expedition's basic shades take half a heart
+  const dmgH = (isEx() && e && e.type === 'shade' ? 0.5 : 1) * (pact('half') ? 0.5 : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
   rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
   rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };   // a heart cracked in half, or the one that just went
   if (lv('coat')) { lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white'); if (isEx() && lv('coat') > 2) for (const o of rg.enemies) if (dist2(o, S.p) < 150 + 20 * lv('coat')) o.frozen = 2.5; }   // Thick Coat 3: the flash freezes
@@ -3977,7 +3978,7 @@ function updateSurvive(dt) {
     const farOff = !e.lit && d > Math.max(700, (e.spawnD || 500) + 300) && !seenAt(e.x, e.y);   // well out of reach and out of sight
     if (S.mode === 'expedition' && farOff && d > 900 && !e.guard) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
     if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; if (e.type === 'spear') spearInit(e); if (e.type === 'archer') archerInit(e); continue; }   // left far behind: bring it back around you
-    let sp = f.sp * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
+    let sp = f.sp * (pact('hunted') ? 1.3 : 1) * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
     if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
@@ -4712,6 +4713,21 @@ const ARMOUR = [
   { id: 'steel', name: 'Steel Hearts', desc: 'Grey steel hearts sit on top of your own, like armour. Hits break steel first. They don\'t heal out in the dark, but camp makes them whole again.', base: 25, max: 4, lvl: n => `${n} steel heart${n > 1 ? 's' : ''}` },
   { id: 'shield', name: 'Shield', desc: 'Blocks one hit completely, then recharges while you\'re out. At level 3, breaking it sets off a flash that freezes everything near you.', base: 30, max: 3, lvl: n => `recharges in ${[60, 40, 25][n - 1]} s` },
 ];
+// Pacts: risk for reward. Bought once with embers, switched on or off at the fire; any number can be on at once.
+const PACTS = [
+  { id: 'horde', name: 'Horde', price: 40, sh: 'Twice the enemies, twice the burn', desc: 'Twice as many enemies come for you, but your beam burns twice as hard.' },
+  { id: 'half', name: 'Half Life', price: 40, sh: 'Start on half hearts, take half damage', desc: 'You set out with only half your hearts, but every hit does half the damage.' },
+  { id: 'wick', name: 'Short Wick', price: 40, sh: 'Half the oil, double the embers', desc: 'Your oil tank holds half as much, but everything you bank is worth double embers.' },
+  { id: 'hunted', name: 'Hunted', price: 40, sh: 'Faster enemies, double wisps', desc: 'Enemies move 30% faster, but they drop twice as many wisps.' },
+];
+const pact = id => isEx() && XS && XS.pacts && XS.pacts.on[id] ? 1 : 0;
+const tripHp = m => pact('half') ? Math.max(0.5, Math.ceil(m) / 2) : m;   // Half Life: you set out on half your hearts
+function buyPact(t) {
+  if (XS.pacts.own[t.id] || XS.embers < t.price) return;
+  XS.embers -= t.price; XS.pacts.own[t.id] = 1; XS.pacts.on[t.id] = true;
+  sfx(1.4, 0.5, 'bandpass', 1500, 0.3); exApply();
+}
+function togglePact(t) { if (!XS.pacts.own[t.id]) return; XS.pacts.on[t.id] = !XS.pacts.on[t.id]; exApply(); }
 const armPrice = t => Math.round(t.base * Math.pow(1.8, XS.arm[t.id] || 0));
 function buyArm(t) {
   const have = XS.arm[t.id] || 0, cost = armPrice(t);
@@ -4735,7 +4751,7 @@ const slotCost = id => UP[id].r === 'legendary' ? 2 : 1;
 // ---- saving: everything banked lives on this device ----
 const exKey = () => exKeyOf(SV.active);
 let XS = null;
-function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, torch: {}, arm: {}, shop2: true, shop3: true, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
+function exFresh() { return { v: 1, embers: 0, own: {}, eq: [], bag: 0, slot: 0, orbs: 0, orb: null, orbField: false, orbA: null, drop: null, out: null, recall: 0, lanterns: 0, outposts: [], tank: 0, frame: 0, torch: {}, arm: {}, pacts: { own: {}, on: {} }, shop2: true, shop3: true, dorbs: 0, dorb: null, dorbField: false, dorbA: null }; }
 function exRead() {
   try {
     const s = JSON.parse(localStorage.getItem(exKey()) || 'null');
@@ -4759,6 +4775,7 @@ function exRead() {
         if (x.torch && x.torch.quick) { for (let i = 0; i < x.torch.quick; i++) x.embers += Math.round(18 * Math.pow(1.8, i)); delete x.torch.quick; }
         x.shop3 = true; x.arm = x.arm || {};
       }
+      if (!x.pacts || !x.pacts.own) x.pacts = { own: {}, on: {} };
       return x;
     }
   } catch (e) {}
@@ -4773,7 +4790,7 @@ const eqUsed = () => XS.eq.reduce((a, id) => a + slotCost(id), 0);
 // and heavy loot (relics, the orb) slows you, so carrying the prize home is the tense part.
 const OIL_BASE = 60, OIL_IDLE = 0.6, OIL_LIT = 1, OIL_REFILL = 25;
 const WEIGHT = { s: 0.5, c: 1, r: 3 }, ORB_WEIGHT = 4;
-const oilMax = () => OIL_BASE * (1 + 0.4 * (XS ? XS.tank || 0 : 0));
+const oilMax = () => OIL_BASE * (1 + 0.4 * (XS ? XS.tank || 0 : 0)) * (pact('wick') ? 0.5 : 1);   // Short Wick: half the tank
 function exLoad() {                           // how much you're carrying, in weight
   const rg = S.rg; return rg.pack.reduce((a, k) => a + (WEIGHT[k] || 0), 0) + (rg.carryOrb ? ORB_WEIGHT : 0) + (rg.carryDorb ? ORB_WEIGHT : 0);
 }
@@ -5120,7 +5137,7 @@ function sr(id) { return ST.r[id] || 0; }
 const statCost = (s, have) => (s.cost || STAT_COST)[have];
 const baseHearts = () => 3 + sr('hardy');
 function dropWisps(e) {                      // a soul lifts out of the ash
-  const rg = S.rg; let n = WISP[e.type] || 0; if (!n) return;
+  const rg = S.rg; let n = (WISP[e.type] || 0) * (pact('hunted') ? 2 : 1); if (!n) return;
   for (let i = 0; i < sr('fortune'); i++) if (Math.random() < 0.1) n++;
   const L = rg.wisps || (rg.wisps = []);
   if (L.length > 60) { L.sort((a, b) => a.life - b.life); L.shift(); }
@@ -5259,7 +5276,7 @@ function exNewRun() {
   const rg = newRun();
   rg.wave = 1; rg.up = {};
   for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
-  rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = lv('wind'); rg.steel = steelMax();
+  rg.maxHp = baseHearts() + (rg.up.coat || 0); rg.hp = tripHp(rg.maxHp); rg.shield = lv('wind'); rg.steel = steelMax();
   rg.pack = []; rg.carryOrb = false; rg.carryDorb = false; rg.looted = new Set(); rg.left = new Map(); rg.loose = []; rg.notes = [];
   rg.inCamp = true; rg.oil = oilMax(); rg.oilWarn = 0; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
   return rg;
@@ -5374,7 +5391,7 @@ function exDeposit() {
 function exHome() {                          // stepped inside the fence: bank the pack, heal up
   const rg = S.rg;
   if (rg.pack.length) {
-    const v = rg.pack.reduce((a, k) => a + ITEMS[k].val, 0);
+    const v = rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // Short Wick: banked loot is worth double
     XS.embers += v; rg.pack = []; rg.fullFx = 0;
     exNote(`+${v} embers banked`, true);
     sfx(0.9, 0.6, 'bandpass', 700, 0.6); sfx(1.8, 0.35, 'bandpass', 2400, 0.4);
@@ -5383,7 +5400,7 @@ function exHome() {                          // stepped inside the fence: bank t
   if (rg.wispCarry) {
     ST.w += rg.wispCarry; stSave(); exNote(`+${rg.wispCarry} wisps`, true); rg.wispCarry = 0; wispChime(0.75);
   }
-  if (rg.hp < rg.maxHp || (rg.steel || 0) < steelMax()) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = rg.maxHp; }
+  if (rg.hp < tripHp(rg.maxHp) || (rg.steel || 0) < steelMax()) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = Math.max(rg.hp, tripHp(rg.maxHp)); }
   rg.steel = steelMax(); rg.shield = lv('wind'); rg.looted.clear(); rg.left.clear(); rg.cleared = false;   // home again: the woods fill back up
   rg.oil = oilMax(); rg.oilWarn = 0;
   XS.out = null; exSave();
@@ -5429,9 +5446,9 @@ function exStep(dt) {
   } else if (!bossLive() && !rg.cleared) {   // nothing else comes into the mist while the Woodwarden fights, nor on the walk home after he falls
     rg.spawnT -= dt;
     const bait = rg.carryOrb || rg.carryDorb ? 5 : 0;         // a carried orb draws them in from all round
-    const cap = EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3);   // and so does a heavy pack
+    const cap = (EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1);   // Horde: twice as many   // and so does a heavy pack
     if (rg.spawnT <= 0) {
-      rg.spawnT = EX_GAP[ring] * (rg.carryOrb || rg.carryDorb ? 0.55 : 1) * (0.6 + Math.random() * 0.8);
+      rg.spawnT = EX_GAP[ring] * (rg.carryOrb || rg.carryDorb ? 0.55 : 1) * (pact('horde') ? 0.5 : 1) * (0.6 + Math.random() * 0.8);
       if (rg.enemies.length < cap) exSpawn(exPickFoe(ring));
     }
   }
@@ -6071,10 +6088,10 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (dist2(p, BEYOND_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser' || e.type === 'spear' || e.type === 'archer') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the ranged ones off, like an outpost
     if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // hunters roam the open sand; the ground round the portal is safe
       // harder than the deep woods: no limit per kind, only on how many hunt at once, and that grows the further out you are
-      const dg = dist2(p, BEYOND_GATE), cap = Math.min(24, 14 + dg / 250) + (rg.carryDorb ? 5 : 0);
+      const dg = dist2(p, BEYOND_GATE), cap = (Math.min(24, 14 + dg / 250) + (rg.carryDorb ? 5 : 0)) * (pact('horde') ? 2 : 1);
       if ((rg.duneT = (rg.duneT ?? 3) - dt) <= 0) {
         const storming = stormK() > 0.5, mix = storming ? DUNE_MIX.map(m => m.type === 'spear' ? { type: m.type, w: m.w * 2.5 } : m.type === 'archer' ? { type: m.type, w: m.w * 0.5 } : m) : DUNE_MIX;   // in a storm the archers can't see far, so the spear throwers close in
-        rg.duneT = 0.65 * (rg.carryDorb ? 0.6 : 1) * (storming ? 0.75 : 1) * (0.6 + Math.random() * 0.8);
+        rg.duneT = 0.65 * (pact('horde') ? 0.5 : 1) * (rg.carryDorb ? 0.6 : 1) * (storming ? 0.75 : 1) * (0.6 + Math.random() * 0.8);
         if (rg.enemies.filter(e => !e.guard).length < cap) { let r = Math.random() * mix.reduce((a, m) => a + m.w, 0); for (const m of mix) if ((r -= m.w) < 0) { spawnFoe(m.type); break; } }
       }
     }
@@ -6575,7 +6592,7 @@ function drawExHud(top) {
   }
   ctx.fillStyle = 'rgba(239,239,234,0.4)';
   const bits = [`PACK ${packUsed(rg.pack)}/${packMax()}`, `${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`, `OIL ${Math.round(100 * rg.oil / oilMax())}%`];
-  if (lv('wind')) bits.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's'); if (XS.recall) bits.push('FLARE'); if (XS.lanterns) bits.push('LANTERN');
+  for (const t of PACTS) if (pact(t.id)) bits.push(t.name.toUpperCase()); if (lv('wind')) bits.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's'); if (XS.recall) bits.push('FLARE'); if (XS.lanterns) bits.push('LANTERN');
   let ln = '', y = 54 + top; const room = W - 16 - 110;   // wrap before it reaches the Menu button
   for (const b of bits) { const t = ln ? ln + ' · ' + b : b; if (ln && ctx.measureText(t).width > room) { ctx.fillText(ln, 16, y); y += 17; ln = b; } else ln = t; }
   ctx.fillText(ln, 16, y);
@@ -6598,7 +6615,7 @@ function closeCamp() {
 function exApply() {                         // loadout changed: rebuild the run's upgrades from what's equipped
   const rg = S.rg;
   rg.up = {}; for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
-  rg.maxHp = rg.hp = baseHearts() + (rg.up.coat || 0); rg.shield = lv('wind'); rg.steel = steelMax();
+  rg.maxHp = baseHearts() + (rg.up.coat || 0); rg.hp = tripHp(rg.maxHp); rg.shield = lv('wind'); rg.steel = steelMax();
   if (rg.inCamp) rg.oil = oilMax();
   exSave(); renderCamp();
 }
@@ -6681,6 +6698,11 @@ const ICONS = {
   laser: '<path d="M3 12l17-6M3 12l17 6"/><path d="M3 12h19" stroke-width="2.4"/>',
   regen: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7.5 2.3C19.5 15.4 12 20 12 20z"/><path d="M8 13.5h2l1-2 2 4 1-2h2"/>',
   power: '<path d="M13 2L5 13h6l-1 9 8-12h-6z"/>',
+  pact: '<path d="M6 3h12v18l-6-4-6 4z"/><path d="M9 8h6M9 11.5h6"/>',
+  horde: '<circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
+  half: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7.5 2.3C19.5 15.4 12 20 12 20z"/><path d="M12 7.5V20s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.5z" fill="currentColor"/>',
+  wick: '<path d="M9 21h6v-9H9z"/><path d="M12 12V9"/><path d="M12 9c-1.4-1.2-.3-3.2 0-5 1 1.5 1.5 3.6 0 5z"/>',
+  hunted: '<path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 4l3 3M20 4l-3 3"/>',
   lanterns: '<path d="M6.5 21V4h8"/><rect x="11.5" y="7.5" width="6" height="8.5"/><path d="M14.5 4v3.5"/><path d="M14.5 10v3" stroke-width="2.4"/>',
 };
 const SHORT = {
@@ -6694,6 +6716,7 @@ const SHORT = {
   scar: 'Burned enemies stay slower', wildfire: 'Bigger bursts, free flares', embers: 'Kills leave burning ground',
   heat: 'Burns hotter', reach: 'A longer beam', width: 'A wider beam', quick: 'Comes on faster', clean: 'Uses less oil',
   smoulder: 'Burn lingers, fire where they fall', glare: 'Burn spears and arrows mid-air', mirror: 'Bend lasers back at them',
+  horde: 'Twice the enemies, twice the burn', half: 'Half hearts, half damage', wick: 'Half the oil, double embers', hunted: 'Faster enemies, double wisps',
   steel: 'Armour hearts on top of yours', shield: 'Blocks a hit, then recharges', laser: 'A burning laser down the beam', regen: 'Hearts heal over time',
   tank: 'More oil, go further', frame: 'Heavy loot slows you less', bag: 'Two more pack slots', slot: 'Hold one more power-up', recall: 'One use: home now', lanterns: 'Plant a safe light',
 };
@@ -6702,6 +6725,7 @@ const CATS = [
   { id: 'Armour', line: 'Steel hearts and a shield', icon: 'shield' },
   { id: 'Power', nm: 'Power-ups', line: 'Special powers that fill your slots', icon: 'power' },
   { id: 'Gear', line: 'Oil tank, pack and supplies', icon: 'bag' },
+  { id: 'Pacts', line: 'Take a risk for a bigger reward', icon: 'pact' },
 ];
 const POWER_GROUPS = [['Torch', 'Beam'], ['Body', 'Body'], ['Allies', 'Allies'], ['Senses', 'Senses']];
 let campCat = null, campOpen = null;
@@ -6714,6 +6738,13 @@ function campItems(cat) {                    // everything in a category, in one
   });
   if (cat === 'Flame') return levelled(TORCH_UP, XS.torch, torchPrice, buyTorch, 'always on');
   if (cat === 'Armour') return levelled(ARMOUR, XS.arm, armPrice, buyArm, 'always on');
+  if (cat === 'Pacts') return PACTS.map(t => {
+    const have = !!XS.pacts.own[t.id], on = !!XS.pacts.on[t.id];
+    return { id: t.id, name: t.name, desc: t.desc, cls: (have ? 'own' : '') + (on ? ' on' : ''), lvl: have ? (on ? 'On for your next trips' : 'Owned · switched off') : 'Buy once, then switch it on or off here',
+      tag: on ? 'ON' : have ? 'OFF' : String(t.price), have: 0, max: 0,
+      buy: [have ? 'Owned' : `Buy · ${t.price}`, !have && XS.embers >= t.price, () => buyPact(t)],
+      eq: have ? [on ? 'Switch off' : 'Switch on', true, () => togglePact(t)] : null };
+  });
   const gearItem = g => {
     const have = XS[g.id], cost = gearPrice(g), maxed = have >= gearMax(g);
     const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : g.id === 'tank' ? Math.round(oilMax()) + ' oil' : g.id === 'frame' ? Math.round(20 * (XS.frame || 0)) + '% lighter loads' : slotMax() + ' power-up slots'} · level ${have} of ${g.max}`
@@ -6770,6 +6801,7 @@ function renderCamp() {
       let count;
       if (c.id === 'Gear') count = `${packMax()} pack · ${Math.round(oilMax())} oil`;
       else if (c.id === 'Flame') count = `${TORCH_UP.reduce((a, t) => a + (XS.torch[t.id] || 0), 0)} of ${TORCH_UP.reduce((a, t) => a + t.max, 0)} levels`;
+      else if (c.id === 'Pacts') count = `${PACTS.filter(t => XS.pacts.on[t.id]).length} on · ${PACTS.filter(t => XS.pacts.own[t.id]).length} of ${PACTS.length} owned`;
       else if (c.id === 'Armour') count = `${XS.arm.steel || 0} steel · shield ${XS.arm.shield ? 'level ' + XS.arm.shield : 'none'}`;
       else { const all = SHOP.filter(u => POWER_GROUPS.some(g => g[0] === u.tag)); count = `${all.filter(u => XS.own[u.id]).length} of ${all.length} owned · ${slotMax()} slots`; }
       const t = el('span', 'ct'); t.append(el('span', 'nm', c.nm || c.id), el('span', 'sh', c.line), el('span', 'cnt', count));
