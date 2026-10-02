@@ -3298,7 +3298,7 @@ const lv = id => isEx() && EX_LV[id] ? EX_LV[id]() : rawLv(id);
 const tu = id => isEx() && XS && XS.torch ? XS.torch[id] || 0 : 0;   // Expedition's torch upgrades, bought with embers
 const steelMax = () => isEx() && XS && XS.arm ? XS.arm.steel || 0 : 0;   // Armour: steel hearts on top of your own
 const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const lastHeart = () => lv('lastlight') && S.rg.hp === 1;
+const lastHeart = () => lv('lastlight') && S.rg.hp <= 1;
 // Sweep: flares while you swing fast. Spotlight: tightens the longer you hold still.
 const sweepK = () => S.rg && lv('sweep') && !isEx() ? Math.min(1, (S.rg.sweepT || 0) / 0.2) : 0;   // Expedition's Sweep leaves a burning arc instead (see exSweepArc)
 const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / (isEx() ? (lv('spot') > 1 ? 0.5 : 1) : 0.9)) : 0;
@@ -3440,8 +3440,9 @@ function hurt(e) {
     shove(e, 90); sfx(2.6, 0.5, 'bandpass', 2600, 0.35); sfx(0.6, 0.6, 'lowpass', 700, 0.25);
     return;
   }
-  rg.hp--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = 1;
-  rg.pop = { t: 0, lost: rg.hp };          // index of the heart that just went
+  const dmgH = isEx() && e && e.type === 'shade' ? 0.5 : 1;   // Expedition's basic shades take half a heart
+  rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
+  rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };   // a heart cracked in half, or the one that just went
   if (lv('coat')) { lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white'); if (isEx() && lv('coat') > 2) for (const o of rg.enemies) if (dist2(o, S.p) < 150 + 20 * lv('coat')) o.frozen = 2.5; }   // Thick Coat 3: the flash freezes
   addShake(0.75); hitStop(0.11);
   { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }   // knocked back
@@ -3492,7 +3493,7 @@ function killFoe(e) {
   }
   if (lv('wildfire') && Math.random() < 0.25) fireFlare();
   if (S.mode === 'expedition' && e.type === 'tall') rg.loose.push({ kind: 'pack', x: e.x, y: e.y, items: ['r', 'r'], orb: false });   // it drops what it carried
-  if (lv('feast')) { const n = [20, 20, 14, 10][Math.min(3, lv('feast'))]; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp++; rg.pop = { t: 0, gained: rg.hp - 1 }; } }
+  if (lv('feast')) { const n = [20, 20, 14, 10][Math.min(3, lv('feast'))]; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; } }
   dropWisps(e);
 }
 // ---- the bomber: keeps its distance, plants a mortar and lobs shells at where you stand ----
@@ -3911,7 +3912,7 @@ function updateSurvive(dt) {
   }
   if (sr('regen') && rg.phase === 'fight' && rg.hp > 0) {   // Regen (a wisp stat): a while without a hit heals a heart
     rg.regenT = (rg.regenT || 0) + dt;
-    if (rg.hp < rg.maxHp && rg.regenT >= [30, 30, 20, 12][Math.min(3, sr('regen'))]) { rg.regenT = 0; rg.hp++; rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
+    if (rg.hp < rg.maxHp && rg.regenT >= [30, 30, 20, 12][Math.min(3, sr('regen'))]) { rg.regenT = 0; rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
   }
   // the Red Laser: a thin line down the middle of the beam that burns hard
   rg.laserOn = isEx() && tu('laser') > 0 && S.torchLvl > 0.6;
@@ -4534,14 +4535,14 @@ function drawHeartPop() {
   const t = P.t, n = rg.maxHp + steelMax(), sz = 15, gap = 20, [px, py] = toScreen(S.p.x, S.p.y);
   const cx = px, cy = py - 62 * Z - 6;
   const fade = t < HEART_POP - 0.45 ? 1 : Math.max(0, (HEART_POP - t) / 0.45);
-  const last = rg.hp === 1;
+  const last = rg.hp <= 1;
   ctx.save(); ctx.lineJoin = 'round';
   for (let i = 0; i < n; i++) {
     const pop = Math.min(1, (t - i * 0.05) / 0.14);                     // each heart springs up in turn
     if (pop <= 0) continue;
     const bounce = pop < 1 ? 0.5 + 0.7 * pop : 1 + 0.12 * Math.max(0, 1 - (t - 0.14 - i * 0.05) / 0.2);
     const st = i >= rg.maxHp, si = i - rg.maxHp;           // steel hearts sit after your own
-    let x = cx + (i - (n - 1) / 2) * gap, y = cy, s = sz * bounce, a = fade, full = st ? si < (rg.steel || 0) : i < rg.hp, col = st ? '#9ca3a9' : last ? '#e03434' : '#efefea';
+    let x = cx + (i - (n - 1) / 2) * gap, y = cy, s = sz * bounce, a = fade, full = st ? si < (rg.steel || 0) : i + 1 <= rg.hp, half = !st && rg.hp > i && rg.hp < i + 1, col = st ? '#9ca3a9' : last ? '#e03434' : '#efefea';
     if (P.refill !== undefined && i >= P.refill) full = t > 0.25 + (i - P.refill) * 0.18;   // refilling one by one
     if (!st && P.gained === i) full = t > 0.25;
     if (st ? P.steelLost === si : P.lost === i) {                    // the heart you lost: flashes red, cracks, then drops away
@@ -4556,6 +4557,13 @@ function drawHeartPop() {
       }
     }
     ctx.globalAlpha = a;
+    if (half) {                            // half a heart: the left side filled, the right side empty
+      if (P.halved === i && t < 0.35) { col = '#ff4a4a'; x += (Math.random() - 0.5) * 3; }
+      heartPath(ctx, x, y, s); ctx.fillStyle = 'rgba(10,10,10,0.55)'; ctx.fill(); ctx.strokeStyle = 'rgba(239,239,234,0.55)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.save(); ctx.beginPath(); ctx.rect(x - s * 2, y - s * 2, s * 2, s * 4); ctx.clip();
+      heartPath(ctx, x, y, s); ctx.fillStyle = col; ctx.fill(); ctx.restore();
+      continue;
+    }
     heartPath(ctx, x, y, s);
     if (full) {
       ctx.fillStyle = col; ctx.fill();
@@ -4661,7 +4669,7 @@ const DORB_COL = '70,225,200';
 const exRing = d => d < RINGS[0] ? 0 : d < RINGS[1] ? 1 : d < RINGS[2] ? 2 : 3;
 const exInCamp = () => Math.hypot(S.p.x, S.p.y) < CAMP_R;
 // Spawning follows distance from camp: how many may be out at once, and seconds between spawns, per ring.
-const EX_CAP = [4, 8, 13, 18], EX_GAP = [2.6, 1.5, 1.0, 0.7];
+const EX_CAP = [9, 8, 13, 18], EX_GAP = [1.2, 1.5, 1.0, 0.7];   // the near woods: lots of weaker shades, so it never feels empty
 const EX_SPAWNS = [
   { type: 'shade',    weight: [60, 40, 28, 22] },
   { type: 'kamikaze', weight: [6, 12, 12, 12], max: [1, 2, 3, 4] },
@@ -5286,7 +5294,11 @@ function exWake() {
 function exSpawn(type) {
   for (let n = 0; n < 8; n++) {
     const at = spawnSpot();
-    if (!exSafeAt(at.x, at.y, 280)) { spawnFoe(type, at); return; }
+    if (!exSafeAt(at.x, at.y, 280)) {
+      spawnFoe(type, at);
+      if (!S.rg.beyond && exRing(Math.hypot(S.p.x, S.p.y)) === 0) { const e = S.rg.enemies[S.rg.enemies.length - 1]; if (e) { e.maxHp *= 0.65; e.hp = Math.min(e.hp, e.maxHp); } }   // near-woods foes go down quicker
+      return;
+    }
   }
 }
 function exPickFoe(r) {
@@ -5531,7 +5543,7 @@ function bossHurt(n, knock, from) {
   if (rg.inv > 0 || rg.phase !== 'fight') return false;
   const hp0 = rg.hp; hurt(from || { x: b.x, y: b.y });
   if (rg.hp >= hp0) return false;               // rolled through it, or a Second Wind took it
-  if (n > 1 && rg.hp > 0) { rg.hp--; rg.pop = { t: 0, lost: rg.hp }; if (rg.hp <= 0) nightOver(); }
+  if (n > 1 && rg.hp > 0) { rg.hp = Math.max(0, Math.ceil(rg.hp) - 1); rg.pop = { t: 0, lost: rg.hp }; if (rg.hp <= 0) nightOver(); }
   if (knock) { const f = from || b, dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy) || 1; p.x += dx / d * knock; p.y += dy / d * knock; }
   return true;
 }
@@ -6545,8 +6557,11 @@ function drawExHud(top) {
     const x = 16 + i * 15, y = 37 + top, st = i >= rg.maxHp;
     heartPath(ctx, x + 5, y + 5, 11);
     if (st) { if (i - rg.maxHp < (rg.steel || 0)) { ctx.fillStyle = '#9ca3a9'; ctx.fill(); } else { ctx.strokeStyle = 'rgba(156,163,169,0.4)'; ctx.lineWidth = 1; ctx.stroke(); } }
-    else if (i < rg.hp) { ctx.fillStyle = rg.hp === 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); }
-    else { ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
+    else if (i + 1 <= rg.hp) { ctx.fillStyle = rg.hp <= 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); }
+    else {
+      ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+      if (rg.hp > i) { ctx.save(); ctx.beginPath(); ctx.rect(x - 4, y - 6, 9, 22); ctx.clip(); heartPath(ctx, x + 5, y + 5, 11); ctx.fillStyle = rg.hp <= 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); ctx.restore(); }   // half a heart
+    }
   }
   ctx.fillStyle = 'rgba(239,239,234,0.4)';
   const bits = [`PACK ${packUsed(rg.pack)}/${packMax()}`, `${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`, `OIL ${Math.round(100 * rg.oil / oilMax())}%`];
