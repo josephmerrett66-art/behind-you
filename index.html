@@ -1538,6 +1538,10 @@ let SPR = 0;                                     // sprite pixels per world unit
 let SPRITES = {};
 function sprRand(seed) { let a = seed * 2654435761 >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const grey = v => { v = Math.max(0, Math.min(255, v | 0)); return `rgb(${v},${v},${v - 2})`; };
+const tint = (r, g, b) => v => `rgb(${Math.max(0, Math.min(255, v * r | 0))},${Math.max(0, Math.min(255, v * g | 0))},${Math.max(0, Math.min(255, v * b | 0))})`;
+let LEAF_K = 0.8;                                  // how much green the leaves carry (1 = the normal amount); a gentle tint, never a pop like the flowers
+const pineG = v => tint(1 - 0.16 * LEAF_K, 1 + 0.05 * LEAF_K, 1 - 0.1 * LEAF_K)(v);   // pine needles: a dark blue-green
+const oakG = v => tint(1 - 0.1 * LEAF_K, 1 + 0.06 * LEAF_K, 1 - 0.24 * LEAF_K)(v);    // oak and bush leaves: a soft olive
 function makeSprite(key, w, h, ax, ay, paint) { // w, h, ax, ay in world units; (ax, ay) is where it meets the ground
   const cv = document.createElement('canvas'); cv.width = Math.ceil(w * SPR); cv.height = Math.ceil(h * SPR);
   const g = cv.getContext('2d'); g.scale(SPR, SPR); g.translate(ax, ay); g.lineCap = 'round'; g.lineJoin = 'round';
@@ -1566,13 +1570,13 @@ function paintPine(g, R, Ld) {
     for (let L = 0; L < layers; L++) {
       const t = L / (layers - 1), y = -21 - t * (H - 27), wl = wMax * Math.pow(1 - t, 0.85) + 2;
       const erx = wl * 0.72, ery = wl * 0.28;   // seen from above, each tier of boughs is a ring: its front edge curves down toward you
-      if (pass === 0) { g.fillStyle = grey(22 + R() * 5); g.beginPath(); g.ellipse(0, y + 1, erx, ery, 0, 0, Math.PI); g.fill(); }
+      if (pass === 0) { g.fillStyle = pineG(22 + R() * 5); g.beginPath(); g.ellipse(0, y + 1, erx, ery, 0, 0, Math.PI); g.fill(); }
       for (const sd of [-1, 1]) {
         const w = wl * (0.7 + R() * 0.55);
         if (pass === 1 && t > 0.1 && t < 0.8 && R() < 0.12) continue;   // a missing bough here and there lets the trunk show
         const droop = 4 + R() * 4 + (1 - t) * 3, tipX = sd * w, tipY = y + droop;
         if (pass === 0) {
-          g.fillStyle = grey(24 + R() * 6);
+          g.fillStyle = pineG(24 + R() * 6);
           g.beginPath(); g.moveTo(0, y - 6); g.quadraticCurveTo(tipX * 0.6, y - 2, tipX, tipY); g.lineTo(tipX * 0.7, tipY + 3); g.lineTo(0, y + 5); g.closePath(); g.fill();
           continue;
         }
@@ -1583,11 +1587,11 @@ function paintPine(g, R, Ld) {
           const f = k / n, bx = tipX * f, by = y + (tipY - y) * f * f - 1.5 * Math.sin(f * Math.PI);
           const lit = sd === Ld ? 0.35 + 0.65 * f : 0.1 * f, top = R() < 0.55;
           const len = 2.5 + R() * 3.5 * (1 - f * 0.4), ang = Math.PI / 2 + sd * (0.3 + R() * 0.7) * (top ? -1 : 1);
-          g.strokeStyle = grey(26 + R() * 12 + lit * (top ? 50 : 18)); g.lineWidth = 0.55 + R() * 0.4;
+          g.strokeStyle = pineG(26 + R() * 12 + lit * (top ? 50 : 18)); g.lineWidth = 0.55 + R() * 0.4;
           g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + Math.cos(ang) * len * 0.6 * sd, by + (top ? -0.8 : 1) * Math.sin(ang) * len * 0.7); g.stroke();
         }
         if (R() < 0.8 && sd === Ld) {                // a frosted, light-catching rim along the top of the boughs facing the light
-          g.strokeStyle = 'rgba(120,120,114,0.55)'; g.lineWidth = 0.6;
+          g.strokeStyle = 'rgba(112,124,110,0.55)'; g.lineWidth = 0.6;
           g.beginPath(); g.moveTo(tipX * 0.25, y - 1); g.quadraticCurveTo(tipX * 0.6, y - 2, tipX * 0.95, tipY - 0.6); g.stroke();
         }
       }
@@ -1595,7 +1599,7 @@ function paintPine(g, R, Ld) {
         for (let k = 0; k < 5 + wl * 0.35; k++) {      // sprays along the front of the ring
           const ox = (R() * 2 - 1) * erx * 0.95, fy = y + 1 + ery * Math.sqrt(Math.max(0, 1 - (ox / erx) ** 2)) * (0.6 + R() * 0.3);
           const len = 2 + R() * 3, a = Math.PI / 2 + (R() - 0.5) * 1.6, lit = Math.max(0, 0.35 + 0.65 * Ld * ox / erx);
-          g.strokeStyle = grey(30 + R() * 10 + lit * 40); g.lineWidth = 0.6 + R() * 0.3;
+          g.strokeStyle = pineG(30 + R() * 10 + lit * 40); g.lineWidth = 0.6 + R() * 0.3;
           g.beginPath(); g.moveTo(ox * 0.6, fy); g.lineTo(ox + Math.cos(a) * len, fy + Math.sin(a) * len); g.stroke();
         }
       }
@@ -1628,12 +1632,12 @@ function paintOak(g, R, Ld) {
   for (let n = 0; n < 13; n++) { const a = R() * Math.PI * 2, d = Math.sqrt(R()); clumps.push({ x: Math.cos(a) * rx * d * 0.8, y: cy + Math.sin(a) * ry * d * 0.8, r: 8 + R() * 6 }); }
   clumps.sort((a, b) => a.y - b.y);
   const leafy = (c, back) => {
-    g.fillStyle = grey(back ? 22 : 26); g.beginPath(); g.ellipse(c.x, c.y, c.r, c.r * 0.85, 0, 0, 7); g.fill();
+    g.fillStyle = oakG(back ? 22 : 26); g.beginPath(); g.ellipse(c.x, c.y, c.r, c.r * 0.85, 0, 0, 7); g.fill();
     const n = c.r * c.r * 0.9 | 0;
     for (let k = 0; k < n; k++) {
       const a = R() * Math.PI * 2, d = Math.sqrt(R()) * c.r, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d * 0.85;
       const light = Math.max(0, (Ld * (x - c.x) * 0.6 - (y - c.y)) / c.r) * 0.5 + Math.max(0, Ld * x / rx) * 0.5 + Math.max(0, (cy - y) / ry) * 0.25;
-      g.fillStyle = grey(22 + R() * 10 + light * (back ? 22 : 56));
+      g.fillStyle = oakG(22 + R() * 10 + light * (back ? 22 : 56));
       g.beginPath(); g.ellipse(x, y, 0.9 + R() * 1.1, 0.6 + R() * 0.7, R() * 3, 0, 7); g.fill();
     }
   };
@@ -1703,10 +1707,10 @@ function paintBush(g, R, Ld) {
   for (let n = 0; n < 6; n++) blobs.push({ x: (R() - 0.5) * 18, y: -5 - R() * 7, r: 4 + R() * 3.5 });
   blobs.sort((a, b) => a.y - b.y);
   for (const c of blobs) {
-    g.fillStyle = grey(30); g.beginPath(); g.ellipse(c.x, c.y, c.r, c.r * 0.8, 0, 0, 7); g.fill();
+    g.fillStyle = oakG(30); g.beginPath(); g.ellipse(c.x, c.y, c.r, c.r * 0.8, 0, 0, 7); g.fill();
     for (let k = 0; k < c.r * c.r * 1.4; k++) {
       const a = R() * Math.PI * 2, d = Math.sqrt(R()) * c.r, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d * 0.8;
-      g.fillStyle = grey(30 + R() * 12 + Math.max(0, (x - c.x) - (y - c.y)) / c.r * 34);
+      g.fillStyle = oakG(30 + R() * 12 + Math.max(0, (x - c.x) - (y - c.y)) / c.r * 34);
       g.beginPath(); g.ellipse(x, y, 0.7 + R() * 0.8, 0.5 + R() * 0.5, R() * 3, 0, 7); g.fill();
     }
   }
