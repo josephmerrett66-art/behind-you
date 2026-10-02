@@ -570,7 +570,7 @@ function makeProp(i, j) {
   const h = hash(i, j);
   const x = i * T + 8 + hash(j, i) * (T - 16), y = j * T + 8 + hash(i + 7, j - 3) * (T - 16);
   const tv = hash(i * 1.7 + 3, j * 2.9 - 1);
-  if (h > 0.92) return { kind: 'tree', type: tv < 0.6 ? 'pine' : tv < 0.85 ? 'oak' : 'dead', seed: hash(i + 0.3, j + 0.7), x, y, r: 10, s: 0.8 + hash(i * 3, j) * 0.6, key: i + ',' + j, birds: hash(i * 5.1, j * 2.3) < 0.3 };
+  if (h > 0.92) return { kind: 'tree', type: tv < 0.57 ? 'pine' : tv < 0.81 ? 'oak' : tv < 0.94 ? 'dead' : 'cherry', seed: hash(i + 0.3, j + 0.7), x, y, r: 10, s: 0.8 + hash(i * 3, j) * 0.6, key: i + ',' + j, birds: hash(i * 5.1, j * 2.3) < 0.3 };
   if (h > 0.895) return { kind: 'rock', x, y, r: 9, s: 0.7 + hash(i, j * 5) * 0.7 };
   if (h > 0.885) return { kind: 'post', x, y, r: 4, s: 1 };
   return null;
@@ -1640,6 +1640,44 @@ function paintOak(g, R, Ld) {
   for (const c of clumps.slice(7)) leafy(c, false);
   shadeRound(g, Ld, rx * 0.9, 90, 0, cy, true);
 }
+function paintCherry(g, R, Ld) {                 // a cherry tree in blossom: a dark, crooked trunk under a broad cloud of pink
+  const cy = -58 - R() * 6, rx = 34 + R() * 6, ry = 19 + R() * 4, lean = (R() - 0.5) * 8;
+  for (let k = 0; k < 70; k++) {                 // petals already fallen, scattered pale on the ground round its foot
+    const a = R() * Math.PI * 2, d = 4 + Math.sqrt(R()) * 26, x = Math.cos(a) * d, y = Math.sin(a) * d * 0.4;
+    g.fillStyle = `rgba(${235 + R() * 20 | 0},${150 + R() * 40 | 0},${180 + R() * 30 | 0},${0.55 + R() * 0.4})`;
+    g.beginPath(); g.ellipse(x, y, 0.8 + R() * 0.6, 0.5 + R() * 0.3, R() * 3, 0, 7); g.fill();
+  }
+  paintTrunk(g, R, 0, -26, 5.5, 3, 24, Ld);
+  const limbs = [];                               // crooked limbs spreading wide and low, the way cherries grow
+  for (let n = 0; n < 5; n++) { const a = -Math.PI / 2 + (n - 2) * 0.55 + (R() - 0.5) * 0.25; limbs.push([lean + Math.cos(a) * (18 + R() * 12), -30 + Math.sin(a) * (14 + R() * 8)]); }
+  g.strokeStyle = grey(22); g.lineCap = 'round';
+  for (const [lx, ly] of limbs) {
+    const mx = lx * 0.45 + (R() - 0.5) * 6, my = (ly - 24) / 2 + (R() - 0.5) * 6;
+    g.lineWidth = 3; g.beginPath(); g.moveTo(0, -22); g.lineTo(mx, my); g.lineTo(lx, ly); g.stroke();   // elbows, not smooth curves
+    g.lineWidth = 1.1; g.beginPath(); g.moveTo(lx, ly); g.lineTo(lx + (R() - 0.5) * 14, ly - 5 - R() * 7); g.stroke();
+  }
+  const clumps = [];
+  for (let n = 0; n < 16; n++) { const a = R() * Math.PI * 2, d = Math.sqrt(R()); clumps.push({ x: lean + Math.cos(a) * rx * d * 0.85, y: cy + Math.sin(a) * ry * d * 0.85, r: 7 + R() * 6 }); }
+  clumps.sort((a, b) => a.y - b.y);
+  const bloom = (c, back) => {                    // each clump: a dark rose mass, then hundreds of little flowers catching the light
+    g.fillStyle = back ? 'rgb(70,30,46)' : 'rgb(96,44,64)'; g.beginPath(); g.ellipse(c.x, c.y, c.r, c.r * 0.8, 0, 0, 7); g.fill();
+    const n = c.r * c.r * 1.1 | 0;
+    for (let k = 0; k < n; k++) {
+      const a = R() * Math.PI * 2, d = Math.sqrt(R()) * c.r, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d * 0.8;
+      const light = Math.min(1, Math.max(0, (Ld * (x - c.x) * 0.6 - (y - c.y)) / c.r) * 0.5 + Math.max(0, Ld * (x - lean) / rx) * 0.45 + Math.max(0, (cy - y) / ry) * 0.3) * (back ? 0.55 : 1);
+      const rr = 115 + light * 140, gg = 38 + light * 120, bb = 78 + light * 122;   // rich pink, strong enough to stay pink under the warm torch
+      g.fillStyle = `rgb(${rr + R() * 10 | 0},${gg + R() * 14 | 0},${bb + R() * 12 | 0})`;
+      g.beginPath(); g.arc(x, y, 0.75 + R() * 0.75, 0, 7); g.fill();
+      if (light > 0.75 && R() < 0.12) { g.fillStyle = 'rgb(255,236,242)'; g.beginPath(); g.arc(x, y, 0.55, 0, 7); g.fill(); }   // the odd almost-white flower
+    }
+  };
+  for (const c of clumps.slice(0, 7)) bloom(c, true);
+  for (const c of clumps.slice(7)) bloom(c, false);
+  for (let k = 0; k < 14; k++) {                  // a few petals hanging in the air below the crown
+    g.fillStyle = `rgba(250,${175 + R() * 40 | 0},205,0.8)`; g.beginPath(); g.ellipse(lean + (R() - 0.5) * rx * 1.6, cy + ry * (0.4 + R() * 1.2), 0.9, 0.5, R() * 3, 0, 7); g.fill();
+  }
+  shadeRound(g, Ld, rx * 0.9, 90, lean, cy, true);
+}
 function paintSnag(g, R, Ld) {
   paintTrunk(g, R, 0, -40, 3.4, 1.8, 44, Ld);
   g.strokeStyle = grey(52); g.lineWidth = 2; g.beginPath(); g.moveTo(-1.8, -40); g.lineTo(-0.5, -45); g.lineTo(0.6, -41); g.lineTo(1.8, -43); g.stroke();   // snapped top
@@ -1872,7 +1910,7 @@ function paintWoodpile(g, R) {                   // split logs stacked three hig
   }
 }
 const SPRITE_KINDS = {                           // kind: [variants, w, h, ax, ay, painter]
-  pine: [6, 70, 118, 35, 112, paintPine], oak: [5, 84, 96, 42, 90, paintOak], dead: [4, 76, 72, 38, 66, paintSnag],
+  pine: [6, 70, 118, 35, 112, paintPine], oak: [5, 84, 96, 42, 90, paintOak], cherry: [5, 100, 104, 50, 92, paintCherry], dead: [4, 76, 72, 38, 66, paintSnag],
   bush: [4, 28, 20, 14, 17, paintBush], fern: [4, 34, 16, 17, 13, paintFern], grass: [5, 16, 13, 8, 12, paintGrass],
   stump: [3, 22, 13, 11, 10, paintStump], pebbles: [4, 16, 8, 8, 5, paintPebbles],
   rock: [5, 36, 26, 18, 21, paintRock], post: [3, 16, 38, 8, 35, paintPost], lamp: [1, 22, 58, 6, 55, paintLamp],
@@ -2208,12 +2246,12 @@ function stamp(c, spr, sx, sy, s, flip, sway, mask) {  // draw a sprite with its
 }
 function drawTree(o, c, mask, sx, sy, s) {
   const sway = Math.sin(S.t * 0.7 + o.seed * 20) * 1.6 * s + Math.sin(S.t * 1.9 + o.seed * 7) * 0.5 * s;
-  const kind = o.type === 'pine' ? 'pine' : o.type === 'oak' ? 'oak' : 'dead', v = (o.seed * 997 | 0) % SPRITE_KINDS[kind][0];
+  const kind = o.type === 'pine' || o.type === 'oak' || o.type === 'cherry' ? o.type : 'dead', v = (o.seed * 997 | 0) % SPRITE_KINDS[kind][0];
   const m = (o.seed * 7919 % 1) < 0.5 ? 1 : -1;   // each tree keeps its own facing; only its lighting turns with you
   // the side facing the player catches the torch; as you pass a tree the light slides across it instead of the tree flipping over
   const wR = Math.max(0, Math.min(1, 0.5 - (sx - toScreen(S.p.x, S.p.y)[0]) / (90 * Z)));   // 1 = lit from the right of the screen
   const sw = sway * (kind === 'dead' ? 0.4 : 1);
-  if (!mask) shadow(sx, sy, (kind === 'pine' ? 15 : kind === 'oak' ? 20 : 10) * s);
+  if (!mask) shadow(sx, sy, (kind === 'pine' ? 15 : kind === 'oak' || kind === 'cherry' ? 20 : 10) * s);
   if (mask || wR <= 0.02 || wR >= 0.98) { stamp(c, sprite(kind, v, wR >= 0.5 ? m : -m), sx, sy, s, m, sw, mask); return; }
   stamp(c, sprite(kind, v, -m), sx, sy, s, m, sw, false);
   const ga = c.globalAlpha; c.globalAlpha = ga * wR;
@@ -2269,7 +2307,7 @@ function drawDecor(o) {   // sets the transform directly (no save/restore): ther
 // ---- torch shadows ----
 // how wide an object is at ground level for blocking light, and how far its shadow reaches
 function caster(o) {
-  if (o.kind === 'tree') return { r: (o.type === 'oak' ? 12 : o.type === 'dead' ? 4 : 9) * o.s, len: 1600 };
+  if (o.kind === 'tree') return { r: (o.type === 'oak' || o.type === 'cherry' ? 12 : o.type === 'dead' ? 4 : 9) * o.s, len: 1600 };
   if (o.kind === 'rock') return { r: 11 * o.s, len: 90 * o.s };
   if (o.kind === 'dprop') return { r: (o.dk === 'palm' ? 4 : 5) * o.s, len: o.dk === 'palm' ? 1600 : 120 * o.s };
   if (o.kind === 'post' || o.kind === 'lamp') return { r: 3.5, len: 1600 };
