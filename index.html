@@ -1365,24 +1365,28 @@ function dodge() {
   if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, 3500, 500, 0.28, 0.4, sfxGain); }
   dodgeBtn.dataset.cool = '1';
 }
-// ---- attacks: swing the torch like a blade, Hades-style. Three quick slashes, the third a big burst of light; after a roll, a lunging thrust ----
-// Every hit stops the world for a blink, kicks the camera, throws sparks and knocks the target back. The beam still burns as before.
+// ---- attacks: swing the torch like a blade, Hades-style. Two leaping slashes, then a jump into the air and a slam that sends out a shockwave;
+// attack out of a roll for a lunging thrust. Every swing kicks the camera and throws dust and sparks; every hit freezes the world for a blink.
 const ATK = [
-  { reach: 64, arc: 2.0, lunge: 26, dur: 0.2, dmg: 0.5, boss: 0.9, knock: 16, shake: 0.08, stop: 0.035 },
-  { reach: 64, arc: 2.0, lunge: 26, dur: 0.2, dmg: 0.5, boss: 0.9, knock: 16, shake: 0.08, stop: 0.035 },
-  { reach: 86, arc: 2.9, lunge: 40, dur: 0.34, dmg: 1.2, boss: 2.2, knock: 46, shake: 0.28, stop: 0.08, fin: true },   // the finisher: wide, heavy, bright
-  { reach: 96, arc: 0.9, lunge: 110, dur: 0.24, dmg: 1, boss: 1.6, knock: 34, shake: 0.2, stop: 0.06, dash: true },   // the dash strike, straight out of a roll
+  { reach: 66, arc: 2.0, lunge: 40, hop: 7, dur: 0.22, hitAt: 0.06, dmg: 0.5, boss: 0.9, knock: 22, shake: 0.14, stop: 0.05, kick: 7 },
+  { reach: 66, arc: 2.0, lunge: 40, hop: 7, dur: 0.22, hitAt: 0.06, dmg: 0.5, boss: 0.9, knock: 22, shake: 0.14, stop: 0.05, kick: 7 },
+  { reach: 100, arc: 7, lunge: 95, hop: 34, dur: 0.5, hitAt: 0.3, dmg: 1.4, boss: 2.4, knock: 60, shake: 0.55, stop: 0.11, kick: 14, slam: true },   // the finisher: leap and slam
+  { reach: 100, arc: 0.9, lunge: 135, hop: 5, dur: 0.26, hitAt: 0.05, dmg: 1, boss: 1.6, knock: 40, shake: 0.28, stop: 0.07, kick: 12, dash: true },   // the dash strike, straight out of a roll
 ];
-const ATK_CHAIN = 0.38;                          // how long after a swing the next one still chains
+const ATK_CHAIN = 0.4;                           // how long after a swing the next one still chains
 function attack() {
-  if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall || S.rg.inCamp) return;
+  if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight') return;
   const p = S.p, A = p.atk;
-  if (A && A.t < A.dur * 0.45) { A.queued = true; return; }   // too early: buffer it, the next swing comes out the moment this one can chain
-  if (A && A.t < A.dur) { A.queued = true; return; }
+  if (A && A.t < A.dur) { A.queued = true; return; }   // mid-swing: buffer it, the next one comes out the moment this one ends
   startSwing();
 }
+function camKick(a, k) { S.kick = S.kick || { x: 0, y: 0 }; S.kick.x += Math.cos(a) * k; S.kick.y += Math.sin(a) * k; }
+function dustKick(x, y, a, n, sp) {              // dirt and ash thrown up off the ground
+  const rg = S.rg;
+  for (let i = 0; i < n; i++) { const b = a + Math.PI + (Math.random() - 0.5) * 1.6, v = sp * (0.4 + Math.random() * 0.8); rg.ash.push({ x, y, z: 1, vx: Math.cos(b) * v, vy: Math.sin(b) * v, vz: 25 + Math.random() * 45, life: 0.35 + Math.random() * 0.35 }); }
+}
 function startSwing() {
-  const p = S.p, prev = p.atkLast;
+  const p = S.p, prev = p.atkLast, rg = S.rg;
   let i = 0;
   if ((p.roll || 0) > 0 || (p.rollEnd || 0) > 0) i = 3;   // out of a roll: the dash strike
   else if (prev && S.t - prev.end < ATK_CHAIN && prev.i < 2) i = prev.i + 1;
@@ -1390,70 +1394,103 @@ function startSwing() {
   if (i === 3) p.roll = 0;                        // the roll turns into the thrust
   const side = i === 1 ? -1 : 1;
   p.atk = { i, t: 0, dur: D.dur, a, side, hit: new Set(), done: false, queued: false };
-  S.rg.slashes = S.rg.slashes || [];
-  S.rg.slashes.push({ i, a, side, t: 0, life: D.fin ? 0.4 : 0.28, r: D.reach, arc: D.arc });
-  if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, D.fin ? 1800 : 3000, D.fin ? 300 : 700, D.fin ? 0.22 : 0.13, D.fin ? 0.4 : 0.28, sfxGain); }
+  rg.slashes = rg.slashes || [];
+  if (!D.slam) rg.slashes.push({ i, a, side, t: 0, life: 0.28, r: D.reach, arc: D.arc });
+  addShake(D.slam ? 0.12 : 0.07); camKick(a, D.kick * 0.5);
+  dustKick(p.x, p.y, a, D.slam ? 14 : 6, D.slam ? 110 : 70);
+  if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, D.slam ? 1400 : 3000, D.slam ? 250 : 700, D.slam ? 0.3 : 0.14, D.slam ? 0.45 : 0.32, sfxGain); if (D.slam) boomAt(t, 90, 60, 0.15, 0.3, sfxGain); }
 }
-function atkHit(D, a) {                          // everything in the arc in front of you takes the blow, once per swing
+function atkHit(D, a) {                          // everything in reach takes the blow, once per swing
   const rg = S.rg, p = S.p, A = p.atk; let hits = 0;
-  const inArc = (o, rad) => {
+  const inReach = (o, rad) => {
     const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
     if (d > D.reach + rad) return false;
+    if (D.slam) return true;                      // the slam hits all the way round
     return d < rad + 14 || Math.abs(angDiff(Math.atan2(dy, dx), a)) < D.arc / 2 + Math.atan2(rad, Math.max(1, d));
   };
-  const spark = (o, h, n) => {                   // a spray of hot sparks off the point of impact
+  const spark = (o, h, n) => {                   // a spray of hot sparks off the point of impact, and a little flash ring
     const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1;
-    for (let k = 0; k < n; k++) rg.embers.push({ x: o.x - dx / d * 6, y: o.y - dy / d * 6, z: h * (0.4 + Math.random() * 0.4), vz: 40 + Math.random() * 80, vx: dx / d * (60 + Math.random() * 120) + (Math.random() - 0.5) * 90, vy: dy / d * (60 + Math.random() * 120) + (Math.random() - 0.5) * 90, life: 0.25 + Math.random() * 0.3, ember: true });
+    for (let k = 0; k < n; k++) rg.embers.push({ x: o.x - dx / d * 6, y: o.y - dy / d * 6, z: h * (0.3 + Math.random() * 0.5), vz: 50 + Math.random() * 110, vx: dx / d * (90 + Math.random() * 170) + (Math.random() - 0.5) * 120, vy: dy / d * (90 + Math.random() * 170) + (Math.random() - 0.5) * 120, life: 0.3 + Math.random() * 0.35, ember: true });
+    rg.blasts.push({ x: o.x - dx / d * 8, y: o.y - dy / d * 8, t: 0, life: 0.18, r: 34, col: 'white' });
   };
   const push = (o, k) => { const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1; o.x += dx / d * k; o.y += dy / d * k; };
   for (const o of rg.enemies) {
-    if (o.dead || A.hit.has(o) || !inArc(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
+    if (o.dead || A.hit.has(o) || !inReach(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
     A.hit.add(o); hits++;
-    o.hp -= D.dmg * (1 + 0.1 * tu('heat')); o.jit = 1; o.hitT = 0.12;
+    o.hp -= D.dmg * (1 + 0.1 * tu('heat')); o.jit = 1;
     if (o.type !== 'tall') push(o, D.knock);
-    spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.fin ? 10 : 5);
+    spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.slam ? 14 : 9);
   }
   const b = S.mode === 'expedition' && bossLive();
-  if (b && !A.hit.has(b) && ['walk', 'tell', 'act', 'recover', 'roar'].includes(b.st) && inArc(b, 12 * BS)) {
+  if (b && !A.hit.has(b) && ['walk', 'tell', 'act', 'recover', 'roar'].includes(b.st) && inReach(b, 12 * BS)) {
     A.hit.add(b); hits++;
-    b.hp -= D.boss * (b.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); b.flinch = Math.max(b.flinch, 0.6); spark(b, 38 * BS, D.fin ? 14 : 7);
+    b.hp -= D.boss * (b.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); b.flinch = Math.max(b.flinch, 0.7); spark(b, 38 * BS, D.slam ? 18 : 10);
   }
   const m = S.mode === 'expedition' && miniLive();
   if (m) for (const u of m.units) {
-    if (A.hit.has(u) || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inArc(u, 9 * MK[u.kind].s)) continue;
+    if (A.hit.has(u) || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inReach(u, 9 * MK[u.kind].s)) continue;
     A.hit.add(u); hits++;
-    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); u.flinch = Math.max(u.flinch, 0.6); spark(u, 38 * MK[u.kind].s, D.fin ? 12 : 6);
+    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
     if (u.st !== 'act') { push(u, D.knock * 0.35); arenaClamp(u, 30); }   // a blow can't knock him out of a swing, only nudge him
   }
-  if (hits) {
-    hitStop(D.stop); addShake(D.shake);
-    if (actx) { const t = actx.currentTime; boomAt(t, D.fin ? 110 : 160, 50, D.fin ? 0.22 : 0.12, D.fin ? 0.6 : 0.4, sfxGain); noiseAt(t, 5200, 1400, 0.06, 0.3, sfxGain); }
-  }
-  if (D.fin) rg.blasts.push({ x: p.x + Math.cos(a) * D.reach * 0.55, y: p.y + Math.sin(a) * D.reach * 0.55, t: 0, life: 0.3, r: D.reach * 0.9, col: 'white' });
+  if (D.slam) {                                  // the landing: a shockwave of light rolling out across the ground, a ring of dust, the ground bucks
+    rg.slashes.push({ i: 2, a, side: 1, t: 0, life: 0.42, r: D.reach, ring: true });
+    rg.echoes.push({ r: 0, x: p.x, y: p.y, max: D.reach * 1.3, burst: true });
+    rg.blasts.push({ x: p.x, y: p.y, t: 0, life: 0.35, r: D.reach * 1.1, col: 'white' });
+    for (let k = 0; k < 28; k++) { const b2 = k / 28 * Math.PI * 2, v = 120 + Math.random() * 90; rg.ash.push({ x: p.x + Math.cos(b2) * 10, y: p.y + Math.sin(b2) * 10, z: 1, vx: Math.cos(b2) * v, vy: Math.sin(b2) * v, vz: 20 + Math.random() * 50, life: 0.45 + Math.random() * 0.3 }); }
+    for (let k = 0; k < 18; k++) { const b2 = Math.random() * Math.PI * 2, v = 60 + Math.random() * 120; rg.embers.push({ x: p.x, y: p.y, z: 4, vx: Math.cos(b2) * v, vy: Math.sin(b2) * v, vz: 90 + Math.random() * 120, life: 0.4 + Math.random() * 0.4, ember: true }); }
+    addShake(D.shake); hitStop(hits ? D.stop : 0.05); camKick(a + Math.PI / 2, 4);
+    if (actx) { const t = actx.currentTime; boomAt(t, 70, 28, 0.5, 0.9, sfxGain); noiseAt(t, 900, 120, 0.35, 0.45, sfxGain); }
+  } else if (hits) { addShake(D.shake); hitStop(D.stop); camKick(a, D.kick); }
+  if (hits && actx) { const t = actx.currentTime; boomAt(t, 160, 50, 0.13, 0.5, sfxGain); noiseAt(t, 5200, 1400, 0.07, 0.35, sfxGain); }
 }
-function atkStep(dt) {                           // called from update, before you move: the lunge carries you into the swing
+function atkStep(dt) {                           // called from update, before you move: the leap carries you into the swing
   const p = S.p;
   if (p.rollEnd > 0) p.rollEnd -= dt;
-  const A = p.atk; if (!A) return;
+  if (S.kick) { const f = Math.exp(-12 * dt); S.kick.x *= f; S.kick.y *= f; }
+  const A = p.atk; if (!A) { p.hopZ = 0; return; }
   const D = ATK[A.i];
   A.t += dt;
-  const lungeT = D.dur * 0.45;
-  if (A.t < lungeT) { const v = D.lunge / lungeT * 2 * (1 - A.t / lungeT); p.vx = Math.cos(A.a) * v; p.vy = Math.sin(A.a) * v; }
-  else if (!A.slowed) { A.slowed = true; p.vx *= 0.25; p.vy *= 0.25; }
-  if (!A.done && A.t >= 0.04) { A.done = true; atkHit(D, A.a); }
+  const air = D.slam ? D.hitAt : D.dur * 0.6, moveT = D.slam ? D.hitAt : D.dur * 0.45;
+  p.hopZ = A.t < air ? D.hop * Math.sin(Math.PI * A.t / air) : 0;   // up and over, landing as the blow lands
+  const rooted = S.rg.recall;                    // a burning recall flare holds you in place: swing, but don't leap
+  if (A.t < moveT && !rooted) { const v = D.slam ? D.lunge / moveT : D.lunge / moveT * 2 * (1 - A.t / moveT); p.vx = Math.cos(A.a) * v; p.vy = Math.sin(A.a) * v; }
+  else if (!A.slowed) { A.slowed = true; p.vx *= 0.2; p.vy *= 0.2; }
+  if (!A.done && A.t >= D.hitAt) { A.done = true; atkHit(D, A.a); }
+  if (D.slam && A.t < D.hitAt && Math.random() < dt * 40) S.rg.embers.push({ x: p.x, y: p.y, z: p.hopZ + 20, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, vz: -20, life: 0.25, ember: true });   // sparks streaming off the torch as you come down
   if (A.t >= D.dur) {
-    p.atkLast = { i: A.i, end: S.t }; p.atk = null;
+    p.atkLast = { i: A.i, end: S.t }; p.atk = null; p.hopZ = 0;
     if (A.queued) startSwing();
   }
 }
-function slashStep(dt) { const rg = S.rg; if (!rg || !rg.slashes) return; for (const s of rg.slashes) s.t += dt; rg.slashes = rg.slashes.filter(s => s.t < s.life); }
+function slashStep(dt) {
+  const rg = S.rg; if (!rg || !rg.slashes) return;
+  for (const s of rg.slashes) {
+    s.t += dt;
+    if (!s.ring && s.t < 0.1 && Math.random() < 0.8) {   // sparks peel off the leading edge of the blade
+      const p = S.p, sweep = Math.min(1, s.t / 0.09), an = s.a - s.side * s.arc / 2 + s.side * s.arc * sweep;
+      rg.embers.push({ x: p.x + Math.cos(an) * s.r * 0.9, y: p.y + Math.sin(an) * s.r * 0.9, z: 18, vx: Math.cos(an) * 60 + (Math.random() - 0.5) * 50, vy: Math.sin(an) * 60 + (Math.random() - 0.5) * 50, vz: 20 + Math.random() * 50, life: 0.2 + Math.random() * 0.25, ember: true });
+    }
+  }
+  rg.slashes = rg.slashes.filter(s => s.t < s.life);
+}
 function drawSlashes() {                         // a crescent of torchlight sweeping round in front of you, fading as it goes
   const rg = S.rg; if (!rg || !rg.slashes || !rg.slashes.length) return;
   const p = S.p;
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
   for (const s of rg.slashes) {
-    const k = s.t / s.life, sweep = Math.min(1, s.t / (s.i === 3 ? 0.05 : 0.09)), fade = 1 - k * k;
-    const lift = 18 * Z, n = 18, pts = [], R0 = s.i === 3 ? 0.2 : 0.5;
+    const k = s.t / s.life, fade = 1 - k * k;
+    if (s.ring) {                                // the slam's shockwave: a flat ring of light racing out across the ground
+      const [cx, cy] = toScreen(p.x, p.y), R = s.r * K() * (0.25 + 1.05 * Math.sqrt(k));
+      ctx.setTransform(DPR, 0, 0, DPR * 0.5, 0, cy * DPR * 0.5);
+      for (const [w, col] of [[16, `rgba(255,150,60,${0.35 * fade})`], [7, `rgba(255,215,150,${0.8 * fade})`], [2.5, `rgba(255,252,240,${fade})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w * Z * (1 - 0.5 * k); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke(); }
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R); g.addColorStop(0, `rgba(255,200,130,${0.3 * fade})`); g.addColorStop(1, 'rgba(255,200,130,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      continue;
+    }
+    const sweep = Math.min(1, s.t / (s.i === 3 ? 0.05 : 0.09));
+    const lift = (18 + (p.hopZ || 0)) * Z, n = 18, pts = [], R0 = s.i === 3 ? 0.2 : 0.5;
     const a0 = s.a - s.side * s.arc / 2, a1 = a0 + s.side * s.arc * sweep;
     if (s.i === 3) {                              // a thrust: a narrow spear of light straight out
       for (let j = 0; j <= n; j++) { const f = j / n, w = Math.sin(f * Math.PI) * 0.22; const [x, y] = toScreen(p.x + Math.cos(s.a + w) * s.r * f, p.y + Math.sin(s.a + w) * s.r * f); pts.push([x, y - lift]); }
@@ -1464,12 +1501,10 @@ function drawSlashes() {                         // a crescent of torchlight swe
     }
     const [cx, cy] = toScreen(p.x, p.y), g = ctx.createRadialGradient(cx, cy - lift, s.r * K() * 0.2, cx, cy - lift, s.r * K() * 1.1);
     g.addColorStop(0, `rgba(255,150,60,${0.35 * fade})`); g.addColorStop(0.6, `rgba(255,200,120,${0.85 * fade})`); g.addColorStop(1, `rgba(255,248,225,${fade})`);
-    ctx.fillStyle = g; ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
-    ctx.fill();                                   // twice: 'lighter' builds it up hot
+    ctx.fillStyle = g; ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); ctx.fill();
     const edge = () => { ctx.beginPath(); for (let j = 0; j <= n; j++) { const [x, y] = pts[j]; j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); };
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = `rgba(255,160,70,${0.45 * fade})`; ctx.lineWidth = (s.i === 2 ? 9 : 6) * Z; edge();   // a warm glow round the edge
-    ctx.strokeStyle = `rgba(255,250,235,${fade})`; ctx.lineWidth = (s.i === 2 ? 3 : 2.2) * Z; edge();       // the white-hot leading edge
+    ctx.strokeStyle = `rgba(255,160,70,${0.45 * fade})`; ctx.lineWidth = 9 * Z; edge();   // a warm glow round the edge
+    ctx.strokeStyle = `rgba(255,250,235,${fade})`; ctx.lineWidth = 2.6 * Z; edge();     // the white-hot leading edge
   }
   ctx.restore();
 }
@@ -2580,7 +2615,7 @@ function drawBirds(alpha) {
 }
 
 function drawPlayer() {
-  const p = S.p, [bx, by] = toScreen(p.x, p.y);
+  const p = S.p, [bx, by0] = toScreen(p.x, p.y), by = by0 - (p.hopZ || 0) * Z;   // up off the ground mid-leap
   const a = S.aim, v = screenSpeed(p), moving = v > 8;
   const sf = Math.min(1.5, v / WALK);                          // 0 standing, 1 walking, ~1.5 running
   const run = Math.max(0, sf - 1) * 2;                          // 0..1 how much of a run it is
@@ -3166,6 +3201,7 @@ function render() {
     S.cam.x += shx; S.cam.y += shy;
   }
   S.trauma = Math.max(0, tr - frameDt * 1.6);
+  if (S.kick) { shx += S.kick.x; shy += S.kick.y; S.cam.x += S.kick.x; S.cam.y += S.kick.y; }   // an attack nudges the camera the way you swing
   try { renderScene(); } finally { S.cam.x -= shx; S.cam.y -= shy; }
 }
 function renderScene() {
@@ -5862,7 +5898,7 @@ function exStep(dt) {
   if (rg.ringMsg && !(S.msg && S.msg.t < 2.2)) { rg.ringMsg.t += dt; if (rg.ringMsg.t > 2.8) rg.ringMsg = null; }   // waits for any big banner to clear
   rg.fullFx = Math.max(0, (rg.fullFx || 0) - dt * 1.5);
   if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
-  campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = inCamp;
+  campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns;
   rg.lamps = exPathLamps();
   if (inCamp) {
