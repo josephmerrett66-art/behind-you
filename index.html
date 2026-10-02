@@ -35,6 +35,8 @@ button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14
 #torch { position: fixed; right: 16px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; }
 #dodge { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #dodge[data-cool="1"] { opacity: 0.4; }
+#attack { position: fixed; right: 96px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
+#attack:active { background: rgba(255,190,130,0.35); }
 #autorun { position: fixed; right: 24px; bottom: calc(214px + env(safe-area-inset-bottom, 0px)); width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
 #autorun[aria-pressed="true"] { color: var(--void); background: var(--bone); border-color: var(--bone); }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
@@ -82,7 +84,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .fov output { color: var(--ash); text-align: right; font-variant-numeric: tabular-nums; }
 .audio { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
 .audio h2 { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); font-weight: 600; }
-body.mouse #torch, body.mouse #dodge, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
+body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
 #campBtn { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
 .exuse { position: fixed; right: 26px; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #recallBtn { bottom: calc(210px + env(safe-area-inset-bottom, 0px)); }
@@ -227,6 +229,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <canvas id="game"></canvas>
 <button id="torch" hidden aria-pressed="true">Torch</button>
 <button id="dodge" hidden>Dodge</button>
+<button id="attack" hidden>Attack</button>
 <button id="autorun" hidden aria-pressed="false">Auto<br>run</button>
 <button id="campBtn" hidden>Shop</button>
 <button id="recallBtn" class="exuse" hidden>Flare</button>
@@ -351,8 +354,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-5 7h3l-4 6h12l-4-6h3z"/><path d="M12 16v5"/></svg></span>Free roam<span class="sh">No goals</span></summary><p>Walk the woods with rabbits, birds and fireflies.</p></details>
     </div>
     <div class="controls">
-      <span>Phone</span><span>Right thumb aims. Left thumb walks. Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
-      <span>Desktop</span><span>Mouse aims<br>W or Space walks<br>Right-click or Q dodges<br>F switches the torch<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
+      <span>Phone</span><span>Right thumb aims. Left thumb walks. Tap Attack to swing the torch (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
+      <span>Desktop</span><span>Mouse aims<br>W or Space walks<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
     </div>
   </section>
 </div>
@@ -445,12 +448,12 @@ function worldMatrix(c, scale) {
 
 // ---- input ----
 const keys = {};
-addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; if (e.key.toLowerCase() === 'r' && !e.repeat && S && S.running) toggleAutoRun(); keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
+addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; if (e.key.toLowerCase() === 'r' && !e.repeat && S && S.running) toggleAutoRun(); keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); if (e.key.toLowerCase() === 'j' && !e.repeat) attack(); });
 // a mouse in hand hides the thumb buttons; the first touch brings them back
 if (matchMedia('(pointer: fine)').matches && !matchMedia('(pointer: coarse)').matches) document.body.classList.add('mouse');
 addEventListener('pointermove', e => { if (e.pointerType === 'mouse') document.body.classList.add('mouse'); }, { passive: true });
 addEventListener('touchstart', () => document.body.classList.remove('mouse'), { passive: true });
-cv.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); dodge(); } });
+cv.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); dodge(); } if (e.button === 0 && S && isRg()) attack(); });
 cv.addEventListener('contextmenu', e => { if (S && isRg()) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 cv.addEventListener('mousemove', e => {
@@ -1354,12 +1357,121 @@ function dodge() {
   let a;
   if (mv > 15) a = Math.atan2(p.vy, p.vx);
   else { const [wx, wy] = screenDirToWorld(-Math.cos(S.aim), -Math.sin(S.aim)); a = Math.atan2(wy, wx); }   // backstep
+  p.atk = null;                                   // a roll cancels a swing, like Hades' dash
   p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollBack = mv <= 15; p.ghosts = [];
   if (spare) p.spare = 0; else { p.rollCool = ROLL_COOL * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble')); p.spare = isEx() && lv('feet') > 1 ? 1 : 0; }
   if (lv('nova') && S.rg.nova >= 12) { S.rg.nova = 0; lightBurst(p.x, p.y, 230, 0.85, 'white'); hitStop(0.06); }
   for (let i = 0; i < 6; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: -Math.cos(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vy: -Math.sin(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vz: 20 + Math.random() * 30, life: 0.4 + Math.random() * 0.3 });
   if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, 3500, 500, 0.28, 0.4, sfxGain); }
   dodgeBtn.dataset.cool = '1';
+}
+// ---- attacks: swing the torch like a blade, Hades-style. Three quick slashes, the third a big burst of light; after a roll, a lunging thrust ----
+// Every hit stops the world for a blink, kicks the camera, throws sparks and knocks the target back. The beam still burns as before.
+const ATK = [
+  { reach: 64, arc: 2.0, lunge: 26, dur: 0.2, dmg: 0.5, boss: 0.9, knock: 16, shake: 0.08, stop: 0.035 },
+  { reach: 64, arc: 2.0, lunge: 26, dur: 0.2, dmg: 0.5, boss: 0.9, knock: 16, shake: 0.08, stop: 0.035 },
+  { reach: 86, arc: 2.9, lunge: 40, dur: 0.34, dmg: 1.2, boss: 2.2, knock: 46, shake: 0.28, stop: 0.08, fin: true },   // the finisher: wide, heavy, bright
+  { reach: 96, arc: 0.9, lunge: 110, dur: 0.24, dmg: 1, boss: 1.6, knock: 34, shake: 0.2, stop: 0.06, dash: true },   // the dash strike, straight out of a roll
+];
+const ATK_CHAIN = 0.38;                          // how long after a swing the next one still chains
+function attack() {
+  if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall || S.rg.inCamp) return;
+  const p = S.p, A = p.atk;
+  if (A && A.t < A.dur * 0.45) { A.queued = true; return; }   // too early: buffer it, the next swing comes out the moment this one can chain
+  if (A && A.t < A.dur) { A.queued = true; return; }
+  startSwing();
+}
+function startSwing() {
+  const p = S.p, prev = p.atkLast;
+  let i = 0;
+  if ((p.roll || 0) > 0 || (p.rollEnd || 0) > 0) i = 3;   // out of a roll: the dash strike
+  else if (prev && S.t - prev.end < ATK_CHAIN && prev.i < 2) i = prev.i + 1;
+  const D = ATK[i], a = S.aimW !== undefined ? S.aimW : 0;
+  if (i === 3) p.roll = 0;                        // the roll turns into the thrust
+  const side = i === 1 ? -1 : 1;
+  p.atk = { i, t: 0, dur: D.dur, a, side, hit: new Set(), done: false, queued: false };
+  S.rg.slashes = S.rg.slashes || [];
+  S.rg.slashes.push({ i, a, side, t: 0, life: D.fin ? 0.4 : 0.28, r: D.reach, arc: D.arc });
+  if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, D.fin ? 1800 : 3000, D.fin ? 300 : 700, D.fin ? 0.22 : 0.13, D.fin ? 0.4 : 0.28, sfxGain); }
+}
+function atkHit(D, a) {                          // everything in the arc in front of you takes the blow, once per swing
+  const rg = S.rg, p = S.p, A = p.atk; let hits = 0;
+  const inArc = (o, rad) => {
+    const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
+    if (d > D.reach + rad) return false;
+    return d < rad + 14 || Math.abs(angDiff(Math.atan2(dy, dx), a)) < D.arc / 2 + Math.atan2(rad, Math.max(1, d));
+  };
+  const spark = (o, h, n) => {                   // a spray of hot sparks off the point of impact
+    const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1;
+    for (let k = 0; k < n; k++) rg.embers.push({ x: o.x - dx / d * 6, y: o.y - dy / d * 6, z: h * (0.4 + Math.random() * 0.4), vz: 40 + Math.random() * 80, vx: dx / d * (60 + Math.random() * 120) + (Math.random() - 0.5) * 90, vy: dy / d * (60 + Math.random() * 120) + (Math.random() - 0.5) * 90, life: 0.25 + Math.random() * 0.3, ember: true });
+  };
+  const push = (o, k) => { const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1; o.x += dx / d * k; o.y += dy / d * k; };
+  for (const o of rg.enemies) {
+    if (o.dead || A.hit.has(o) || !inArc(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
+    A.hit.add(o); hits++;
+    o.hp -= D.dmg * (1 + 0.1 * tu('heat')); o.jit = 1; o.hitT = 0.12;
+    if (o.type !== 'tall') push(o, D.knock);
+    spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.fin ? 10 : 5);
+  }
+  const b = S.mode === 'expedition' && bossLive();
+  if (b && !A.hit.has(b) && ['walk', 'tell', 'act', 'recover', 'roar'].includes(b.st) && inArc(b, 12 * BS)) {
+    A.hit.add(b); hits++;
+    b.hp -= D.boss * (b.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); b.flinch = Math.max(b.flinch, 0.6); spark(b, 38 * BS, D.fin ? 14 : 7);
+  }
+  const m = S.mode === 'expedition' && miniLive();
+  if (m) for (const u of m.units) {
+    if (A.hit.has(u) || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inArc(u, 9 * MK[u.kind].s)) continue;
+    A.hit.add(u); hits++;
+    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); u.flinch = Math.max(u.flinch, 0.6); spark(u, 38 * MK[u.kind].s, D.fin ? 12 : 6);
+    if (u.st !== 'act') { push(u, D.knock * 0.35); arenaClamp(u, 30); }   // a blow can't knock him out of a swing, only nudge him
+  }
+  if (hits) {
+    hitStop(D.stop); addShake(D.shake);
+    if (actx) { const t = actx.currentTime; boomAt(t, D.fin ? 110 : 160, 50, D.fin ? 0.22 : 0.12, D.fin ? 0.6 : 0.4, sfxGain); noiseAt(t, 5200, 1400, 0.06, 0.3, sfxGain); }
+  }
+  if (D.fin) rg.blasts.push({ x: p.x + Math.cos(a) * D.reach * 0.55, y: p.y + Math.sin(a) * D.reach * 0.55, t: 0, life: 0.3, r: D.reach * 0.9, col: 'white' });
+}
+function atkStep(dt) {                           // called from update, before you move: the lunge carries you into the swing
+  const p = S.p;
+  if (p.rollEnd > 0) p.rollEnd -= dt;
+  const A = p.atk; if (!A) return;
+  const D = ATK[A.i];
+  A.t += dt;
+  const lungeT = D.dur * 0.45;
+  if (A.t < lungeT) { const v = D.lunge / lungeT * 2 * (1 - A.t / lungeT); p.vx = Math.cos(A.a) * v; p.vy = Math.sin(A.a) * v; }
+  else if (!A.slowed) { A.slowed = true; p.vx *= 0.25; p.vy *= 0.25; }
+  if (!A.done && A.t >= 0.04) { A.done = true; atkHit(D, A.a); }
+  if (A.t >= D.dur) {
+    p.atkLast = { i: A.i, end: S.t }; p.atk = null;
+    if (A.queued) startSwing();
+  }
+}
+function slashStep(dt) { const rg = S.rg; if (!rg || !rg.slashes) return; for (const s of rg.slashes) s.t += dt; rg.slashes = rg.slashes.filter(s => s.t < s.life); }
+function drawSlashes() {                         // a crescent of torchlight sweeping round in front of you, fading as it goes
+  const rg = S.rg; if (!rg || !rg.slashes || !rg.slashes.length) return;
+  const p = S.p;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const s of rg.slashes) {
+    const k = s.t / s.life, sweep = Math.min(1, s.t / (s.i === 3 ? 0.05 : 0.09)), fade = 1 - k * k;
+    const lift = 18 * Z, n = 18, pts = [], R0 = s.i === 3 ? 0.2 : 0.5;
+    const a0 = s.a - s.side * s.arc / 2, a1 = a0 + s.side * s.arc * sweep;
+    if (s.i === 3) {                              // a thrust: a narrow spear of light straight out
+      for (let j = 0; j <= n; j++) { const f = j / n, w = Math.sin(f * Math.PI) * 0.22; const [x, y] = toScreen(p.x + Math.cos(s.a + w) * s.r * f, p.y + Math.sin(s.a + w) * s.r * f); pts.push([x, y - lift]); }
+      for (let j = n; j >= 0; j--) { const f = j / n, w = Math.sin(f * Math.PI) * 0.22; const [x, y] = toScreen(p.x + Math.cos(s.a - w) * s.r * f, p.y + Math.sin(s.a - w) * s.r * f); pts.push([x, y - lift]); }
+    } else {
+      for (let j = 0; j <= n; j++) { const f = j / n, an = a0 + (a1 - a0) * f, rr = s.r * (0.86 + 0.14 * Math.sin(f * Math.PI)); const [x, y] = toScreen(p.x + Math.cos(an) * rr, p.y + Math.sin(an) * rr); pts.push([x, y - lift]); }
+      for (let j = n; j >= 0; j--) { const f = j / n, an = a0 + (a1 - a0) * f, th = 0.5 + 0.5 * f; const rr = s.r * (1 - (1 - R0) * th); const [x, y] = toScreen(p.x + Math.cos(an) * rr, p.y + Math.sin(an) * rr); pts.push([x, y - lift]); }
+    }
+    const [cx, cy] = toScreen(p.x, p.y), g = ctx.createRadialGradient(cx, cy - lift, s.r * K() * 0.2, cx, cy - lift, s.r * K() * 1.1);
+    g.addColorStop(0, `rgba(255,150,60,${0.35 * fade})`); g.addColorStop(0.6, `rgba(255,200,120,${0.85 * fade})`); g.addColorStop(1, `rgba(255,248,225,${fade})`);
+    ctx.fillStyle = g; ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
+    ctx.fill();                                   // twice: 'lighter' builds it up hot
+    const edge = () => { ctx.beginPath(); for (let j = 0; j <= n; j++) { const [x, y] = pts[j]; j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); };
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(255,160,70,${0.45 * fade})`; ctx.lineWidth = (s.i === 2 ? 9 : 6) * Z; edge();   // a warm glow round the edge
+    ctx.strokeStyle = `rgba(255,250,235,${fade})`; ctx.lineWidth = (s.i === 2 ? 3 : 2.2) * Z; edge();       // the white-hot leading edge
+  }
+  ctx.restore();
 }
 function update(dt) {
   S.t += dt;
@@ -1378,9 +1490,10 @@ function update(dt) {
       const ex = isEx(), life = ex ? 3 + 0.5 * lv('feet') : 1.2 + 0.5 * lv('feet');   // Expedition: a long streak of burning light; at 3 it freezes
       p.trailT = 0.05; S.rg.fires.push({ x: p.x, y: p.y, r: ex ? 24 : 20, life, max: life, seed: Math.random() * 9, freeze: ex && lv('feet') > 2 });
     }
-    if (p.roll <= 0) { p.vx *= 0.3; p.vy *= 0.3; }
+    if (p.roll <= 0) { p.vx *= 0.3; p.vy *= 0.3; p.rollEnd = 0.16; }   // a moment after a roll still counts for the dash strike
   }
   if (p.ghosts) { for (const g of p.ghosts) g.a -= dt * 2.2; p.ghosts = p.ghosts.filter(g => g.a > 0); }
+  if (isRg() && S.rg) { atkStep(dt); slashStep(dt); }
   const ox = p.x, oy = p.y;
   p.x += p.vx * dt; p.y += p.vy * dt;
   { const sk = stormK(); if (sk > 0.01 && S.rg.phase === 'fight') { const [wx, wy] = windVec(), m = sk * (Math.hypot(p.vx, p.vy) > 5 ? 15 : 8); p.x += wx * m * dt; p.y += wy * m * dt; } }   // the storm leans on you
@@ -3177,7 +3290,7 @@ function renderScene() {
   ctx.drawImage(dark, 0, 0);
   ctx.globalAlpha = 1;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  drawLightGlow(lights); drawSparks();
+  drawLightGlow(lights); drawSparks(); drawSlashes();
   drawEyeshine(bx, by, br, casters, lx, ly);
   if (S.q && S.q.lit) { ctx.save(); ctx.globalAlpha = Math.max(0, S.q.fall) * S.torchLvl; drawQuarry(S.q); ctx.restore(); }
   if (S.p.ghosts && S.p.ghosts.length) {   // after-images trailing the roll
@@ -3341,7 +3454,8 @@ for (const [k, id] of [['music', 'volMusic'], ['amb', 'volAmb'], ['sfx', 'volSfx
   inp.addEventListener('input', () => { VOL[k] = parseFloat(inp.value); show(); applyVolumes(); try { localStorage.setItem('behind-you-volume', JSON.stringify(VOL)); } catch (e) {} });
   show();
 }
-const dodgeBtn = document.getElementById('dodge');
+const dodgeBtn = document.getElementById('dodge'), attackBtn = document.getElementById('attack');
+attackBtn.addEventListener('pointerdown', e => { e.preventDefault(); attack(); });
 dodgeBtn.addEventListener('pointerdown', e => { e.preventDefault(); dodge(); });
 let soundOn = true;
 function setSound(on) {
@@ -5748,7 +5862,7 @@ function exStep(dt) {
   if (rg.ringMsg && !(S.msg && S.msg.t < 2.2)) { rg.ringMsg.t += dt; if (rg.ringMsg.t > 2.8) rg.ringMsg = null; }   // waits for any big banner to clear
   rg.fullFx = Math.max(0, (rg.fullFx || 0) - dt * 1.5);
   if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
-  campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp;
+  campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = inCamp;
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns;
   rg.lamps = exPathLamps();
   if (inCamp) {
@@ -6880,13 +6994,13 @@ function portalStep(dt) {                      // returns true when the rest of 
     return true;
   }
   if (rg.next) {                               // past the second portal: nothing here yet, only the way back
-    rg.oil = oilMax(); rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
+    rg.oil = oilMax(); rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false; attackBtn.hidden = false;
     if (dist2(p, NEXT_GATE) > 40) rg.leftGate = true;
     if (rg.leftGate && dist2(p, NEXT_GATE) < 16) warpStart('home2');
     return true;
   }
   if (rg.beyond) {                             // the Dunes: oil burns, spear throwers and archers hunt, a teal orb waits out in the sand
-    rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false;
+    rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false; attackBtn.hidden = false;
     exOilStep(dt, dist2(p, BEYOND_GATE) < 130);  // the portal's light tops the torch up
     if (rg.phase === 'fight') stormStep(dt); stormSound(stormK());
     if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // quitting out here loses what you carry
@@ -7710,7 +7824,7 @@ function begin(mode) {
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
   document.getElementById('deathCard').hidden = true;
-  initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
