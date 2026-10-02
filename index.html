@@ -6,6 +6,7 @@
 <style>html{color-scheme:dark}body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 </head>
 <body>
+<div id="boot" style="position:fixed;inset:0;z-index:99;background:#000;display:grid;place-items:center;color:#8a857c;font:500 13px ui-monospace,monospace;letter-spacing:.3em;text-transform:uppercase"><span>Lighting the torch<span id="bootDots">…</span></span></div>
 <title>Behind You</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
@@ -81,6 +82,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .fov output { color: var(--ash); text-align: right; font-variant-numeric: tabular-nums; }
 .audio { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
 .audio h2 { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); font-weight: 600; }
+body.mouse #torch, body.mouse #dodge, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
 #campBtn { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
 .exuse { position: fixed; right: 26px; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #recallBtn { bottom: calc(210px + env(safe-area-inset-bottom, 0px)); }
@@ -90,6 +92,16 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 #camp h3 span, #stats h3 span { color: var(--ash); font-weight: 400; }
 #camp .pick, #stats .pick { max-width: 40rem; }
 #stats { z-index: 40; background: #050505; }
+#deathCard { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(40,6,6,0.55), rgba(5,5,5,0.92) 70%); animation: dcIn 0.6s ease-out; }
+#deathCard[hidden] { display: none; }
+@keyframes dcIn { from { opacity: 0; } to { opacity: 1; } }
+#deathCard .dc { width: min(26rem, 100%); display: grid; gap: 0.9rem; text-align: left; }
+#deathCard h2 { margin: 0; font: 400 clamp(1.6rem, 7vw, 2.3rem)/1.1 var(--display); text-transform: lowercase; color: var(--bone); }
+#deathCard dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.45rem 1rem; font: 0.88rem var(--mono); border-top: 1px solid rgba(138,138,138,0.35); padding-top: 0.9rem; }
+#deathCard dt { color: var(--ash); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.7rem; padding-top: 0.15rem; }
+#deathCard dd { margin: 0; color: var(--bone); }
+#deathCard dd.lost { color: #e05a4a; }
+#deathCard button { justify-self: start; margin-top: 0.3rem; }
 #stats .ic { color: rgb(215,185,255); }
 #stats .pr.cost::after { color: rgb(185,130,255); }
 #stats .pips i.f { background: rgb(185,130,255); }
@@ -199,6 +211,10 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 .backbtn .ic { width: 1.8rem; height: 1.8rem; border: 0; background: none; } .backbtn:hover, .backbtn:focus-visible { color: var(--bone); outline: none; }
 .panel .board { border-top: 0; padding-top: 0; }
 .howto { display: grid; gap: 0.4rem; }
+.devtools { display: grid; gap: 0.5rem; margin-top: 1.2rem; }
+.devtools summary { cursor: pointer; font: 600 0.62rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(138,138,138,0.6); list-style: none; }
+.devtools summary::-webkit-details-marker { display: none; }
+.devtools[open] summary { color: var(--ash); margin-bottom: 0.4rem; }
 .howto details { border: 1px solid rgba(138,138,138,0.35); background: rgba(14,14,13,0.92); }
 .howto details[open] { border-color: var(--bone); }
 .howto summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.7rem; font: 400 1.05rem var(--display); }
@@ -223,6 +239,14 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <h2>Choose one</h2>
     <div id="cards"></div>
     <div class="pickfoot"><button id="reroll" class="alt">Reroll</button><p id="owned" class="small"></p></div>
+  </div>
+</div>
+<div id="deathCard" hidden>
+  <div class="dc">
+    <p class="eyebrow">Expedition</p>
+    <h2>The dark took you</h2>
+    <dl id="dcList"></dl>
+    <button id="dcGo">Back to the fire</button>
   </div>
 </div>
 <div id="camp" hidden>
@@ -282,7 +306,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Ambience</span><input id="volAmb" type="range" min="0" max="100" step="5"><output id="volAmbOut"></output></label>
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
     </div>
-      <div class="audio"><h2>Playtest</h2>
+      <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
       <button id="testDunes" class="alt">Test the desert orbs</button>
@@ -293,7 +317,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <p class="small">Starts in the Dunes with a dust storm two seconds away.</p>
       <button id="testBoss" class="alt">Test the boss fight</button>
       <p class="small">Starts in Expedition by the Woodwarden's stones, with two orbs home. Nothing from the test is saved.</p>
-    </div>
+    </details>
   </section>
   <section class="card panel" id="pScores" hidden>
     <button class="backbtn" data-back><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>Back</button>
@@ -314,16 +338,16 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <button class="backbtn" data-back><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>Back</button>
     <h2>How to play</h2>
     <div class="howto">
-      <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/><circle cx="16.5" cy="6" r=".6"/><circle cx="19.5" cy="9.5" r=".5"/></svg></span>Nightfall<span class="sh">Waves, upgrades</span></summary><p>Shades only move in the dark and freeze in your light. Hold the beam on them and they burn. Burn every shade to reach dawn, then pick an upgrade. Each wave brings more, and new kinds.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-8 17h16z"/><path d="M12 3v17M9 20l3-6 3 6"/></svg></span>Expedition<span class="sh">Loot, camp, orbs</span></summary><p>Live in a walled camp and head out for loot. Carry it home to bank it and buy upgrades that last. Your torch burns oil and loot weighs you down. The further out, the worse it gets. Three green orbs wait in the deep; bring them home to the shrine. Die out there and you lose what you carried.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.6 0-6-2.6-6-5.8C6 11 12 3 12 3s6 8 6 12.2c0 3.2-2.4 5.8-6 5.8z"/><circle cx="12" cy="15.5" r="2"/></svg></span>Stats<span class="sh">Wisps, for good</span></summary><p>Everything you burn in Nightfall and Expedition leaves a violet wisp. Grab it before it fades and spend wisps on stats that last. In Expedition, wisps only count once you carry them home.</p></details>
+      <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/><circle cx="16.5" cy="6" r=".6"/><circle cx="19.5" cy="9.5" r=".5"/></svg></span>Nightfall<span class="sh">Waves, upgrades</span></summary><p>Shades only move in the dark and freeze in your light. Hold the beam on them and they burn. Burn every shade to reach dawn, then pick an upgrade. Each wave brings more, and new kinds.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16c-1.6 0-2.6-1.4-2.4-3.2C4.9 10.6 6 9 7.3 9.3c1.3.3 1.5 2.3 1.2 4-.2 1.6-.6 2.7-1.5 2.7zM16 10c-1.6 0-2.6-1.4-2.4-3.2.3-2.2 1.4-3.8 2.7-3.5 1.3.3 1.5 2.3 1.2 4-.2 1.6-.6 2.7-1.5 2.7z"/><path d="M5.5 18.5h3M14.5 12.5h3"/></svg></span>Chase<span class="sh">Search, then run</span></summary><p>Stop to search with a fading torch, then run blind for eight seconds while they flee. Two red trails show where they went. Miss them once and they're gone.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span>Blink<span class="sh">No running</span></summary><p>Two seconds of dark, then the torch comes on somewhere new with them hidden nearby. Find them before the light fades.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-5 7h3l-4 6h12l-4-6h3z"/><path d="M12 16v5"/></svg></span>Free roam<span class="sh">No goals</span></summary><p>Walk the woods with rabbits, birds and fireflies.</p></details>
     </div>
     <div class="controls">
       <span>Phone</span><span>Right thumb aims. Left thumb walks. Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
-      <span>Desktop</span><span>Mouse aims. W or Space walks. Right-click or Q dodges. Shift runs in Free roam. At camp: E shop, R recall flare, T outpost lantern.</span>
+      <span>Desktop</span><span>Mouse aims<br>W or Space walks<br>Right-click or Q dodges<br>F switches the torch<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
     </div>
   </section>
 </div>
@@ -417,6 +441,10 @@ function worldMatrix(c, scale) {
 // ---- input ----
 const keys = {};
 addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; if (e.key.toLowerCase() === 'r' && !e.repeat && S && S.running) toggleAutoRun(); keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); });
+// a mouse in hand hides the thumb buttons; the first touch brings them back
+if (matchMedia('(pointer: fine)').matches && !matchMedia('(pointer: coarse)').matches) document.body.classList.add('mouse');
+addEventListener('pointermove', e => { if (e.pointerType === 'mouse') document.body.classList.add('mouse'); }, { passive: true });
+addEventListener('touchstart', () => document.body.classList.remove('mouse'), { passive: true });
 cv.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); dodge(); } });
 cv.addEventListener('contextmenu', e => { if (S && isRg()) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -845,6 +873,30 @@ function boomAt(t, f0, f1, len, gain, out) {     // a falling sine: the body of 
   o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + len);
   g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
   o.connect(g); g.connect(out); o.start(t); o.stop(t + len + 0.02);
+}
+function toneAt(t, f, len, gain, type, out) {     // a struck tone: rings and dies away
+  const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + len + 0.02);
+}
+function playClang() {                       // a steel heart breaking: metal struck hard
+  if (!actx || !sfxGain) return; const t = actx.currentTime;
+  for (const [f, g] of [[523, 0.16], [787, 0.11], [1244, 0.07], [1890, 0.04]]) toneAt(t, f * (0.98 + Math.random() * 0.04), 0.55, g, 'triangle', sfxGain);
+  noiseAt(t, 5000, 900, 0.12, 0.25, sfxGain); boomAt(t, 180, 70, 0.15, 0.3, sfxGain);
+}
+function playShieldChime() {                 // the shield taking a hit: a glassy ring
+  if (!actx || !sfxGain) return; const t = actx.currentTime;
+  for (const [f, g, d] of [[1568, 0.09, 0], [2350, 0.07, 0.03], [3136, 0.05, 0.06]]) toneAt(t + d, f, 0.9, g, 'sine', sfxGain);
+  noiseAt(t, 8000, 3000, 0.08, 0.12, sfxGain);
+}
+function playChestOpen(best) {               // a lid thrown back: wood knock, then a little glitter
+  if (!actx || !sfxGain) return; const t = actx.currentTime;
+  boomAt(t, 150, 70, 0.16, 0.45, sfxGain); noiseAt(t, 1400, 300, 0.12, 0.3, sfxGain);
+  for (let i = 0; i < 2 + best; i++) toneAt(t + 0.08 + i * 0.06, [1760, 2093, 2637, 3136, 3520][i], 0.35, 0.05, 'sine', sfxGain);
+}
+function playRingSting() {                   // a low swell when you cross into a deeper ring
+  if (!actx || !sfxGain) return; const t = actx.currentTime;
+  boomAt(t, 72, 36, 1.8, 0.32, sfxGain); noiseAt(t, 260, 60, 1.4, 0.14, sfxGain); toneAt(t + 0.05, 55, 2.2, 0.08, 'sawtooth', sfxGain);
 }
 function noiseAt(t, f0, f1, len, gain, out) {    // a filtered burst of noise that darkens as it fades
   const src = actx.createBufferSource(); src.buffer = noiseBuf;
@@ -3154,7 +3206,7 @@ function menuBests() {
   put('bestChase', bests.chase ? `Best ${bests.chase}` : '');
   put('bestBlink', bests.blink ? `Best ${bests.blink}` : '');
   let ex = null; try { ex = JSON.parse(localStorage.getItem(exKey()) || 'null'); } catch (e) {}
-  put('saveLbl', SV.list.length > 1 ? `Playing ${svName(SV.active)} · change` : 'Saves');
+  put('saveLbl', `${svName(SV.active)} · saves`);
   put('bestExped', ex && ex.v === 1 && (ex.orbs || ex.embers) ? `${ex.orbs || 0} of 3 orbs · ${ex.embers || 0} embers` : 'Head into the dark. Get the loot home.');
 }
 function saveInfo(id) {                      // a one-line summary of what a save holds
@@ -3431,7 +3483,7 @@ function hurt(e) {
   if (rg.shield > 0) {                     // Second Wind: this one bounces off
     rg.shield--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.pop = { t: 0, blocked: true }; rg.windT = 0;
     if (isEx() && lv('wind') > 2) { lightBurst(S.p.x, S.p.y, 150, 0.4, 'white'); for (const o of rg.enemies) if (dist2(o, S.p) < 150) o.frozen = 2; }   // Second Wind 3: breaking it flashes
-    addShake(0.35); hitStop(0.05); shove(e, 90); sfx(1.4, 0.6, 'bandpass', 1500, 0.3);
+    addShake(0.35); hitStop(0.05); shove(e, 90); playShieldChime();
     return;
   }
   rg.regenT = 0;
@@ -3440,7 +3492,7 @@ function hurt(e) {
     rg.pop = { t: 0, steelLost: rg.steel };
     addShake(0.55); hitStop(0.08);
     { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }
-    shove(e, 90); sfx(2.6, 0.5, 'bandpass', 2600, 0.35); sfx(0.6, 0.6, 'lowpass', 700, 0.25);
+    shove(e, 90); playClang();
     return;
   }
   const dmgH = (isEx() && e && e.type === 'shade' ? 0.5 : 1) * (pact('half') ? 0.5 : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
@@ -3861,7 +3913,7 @@ function updateSurvive(dt) {
   if (rg.pop) { rg.pop.t += dt; if (rg.pop.t > HEART_POP) rg.pop = null; }
   if (rg.dodged) { rg.dodged.t += dt; if (rg.dodged.t > 0.7) rg.dodged = null; }
   rg.hurtFx = Math.max(0, rg.hurtFx - dt * 1.8); rg.strobeFx = Math.max(0, rg.strobeFx - dt);
-  if (rg.phase === 'dead') { rg.deadT += dt; if (S.mode === 'expedition') { if (rg.deadT > 3.5) exWake(); return; } if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
+  if (rg.phase === 'dead') { rg.deadT += dt; if (S.mode === 'expedition') { if (rg.deadT > 1.6 && deathCard.hidden && !rg.cardShown) showDeathCard(); return; } if (rg.deadT > 4.5) { S.rg = newRun(); S.msg = null; S.rounds = 0; startWave(); } return; }
   if (rg.phase === 'dawn') { rg.dawnT -= dt; if (rg.dawnT <= 0) openPicker(); return; }
   if (rg.phase !== 'fight') return;
   rg.inv -= dt; rg.adren -= dt;
@@ -5153,8 +5205,9 @@ function wispStep(dt) {
     if (w.fly || d < mag) {                  // close enough: it streams into you
       w.fly = true; w.v = Math.min(560, w.v + 1000 * dt); w.life = Math.max(w.life, 0.6);
       const st = Math.min(d, w.v * dt); w.x += dx / d * st; w.y += dy / d * st;
+      (w.tr = w.tr || []).push([w.x, w.y]); if (w.tr.length > 10) w.tr.shift();   // a violet trail behind it
     }
-    if (Math.hypot(p.x - w.x, p.y - w.y) < 16) { w.got = true; gainWisps(w.n); }
+    if (Math.hypot(p.x - w.x, p.y - w.y) < 16) { w.got = true; gainWisps(w.n); (rg.wispFx = rg.wispFx || []).push({ t: 0 }); }
   }
   rg.wisps = L.filter(w => !w.got && w.life > 0);
 }
@@ -5187,11 +5240,31 @@ function drawWisps() {
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, yy, 22 * s * pulse, 0, 7); ctx.fill();
     ctx.fillStyle = `rgba(245,232,255,${fade})`;
     ctx.beginPath(); ctx.ellipse(x, yy, 3.4 * s, 4.8 * s, 0, 0, 7); ctx.fill();
+    if (w.tr && w.tr.length > 1) {            // the trail: fading violet strokes back along its path
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      for (let i = 1; i < w.tr.length; i++) {
+        const k = i / w.tr.length, [ax, ay] = toScreen(w.tr[i - 1][0], w.tr[i - 1][1]), [bx, by] = toScreen(w.tr[i][0], w.tr[i][1]);
+        ctx.strokeStyle = `rgba(${WISP_COL},${0.55 * k * fade})`; ctx.lineWidth = (1 + 4 * k) * s;
+        ctx.beginPath(); ctx.moveTo(ax, ay - z * Z); ctx.lineTo(bx, by - z * Z); ctx.stroke();
+      }
+      ctx.restore();
+    }
     if (w.fly) { ctx.strokeStyle = `rgba(${WISP_COL},${0.5 * fade})`; ctx.lineWidth = 2 * s; const [px, py] = toScreen(S.p.x, S.p.y), a = Math.atan2(yy - (py - 30 * Z), x - px); ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + Math.cos(a) * 12 * s, yy + Math.sin(a) * 12 * s); ctx.stroke(); }
   }
 }
 function drawWispPop() {                     // the count above your head after a pickup
-  const rg = S.rg, P = rg && rg.wispPop; if (!P) return;
+  const rg = S.rg; if (!rg) return;
+  if (rg.wispFx && rg.wispFx.length) {         // a soft violet flare where a wisp lands in you
+    const [px, py] = toScreen(S.p.x, S.p.y), cy = py - 30 * Z;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const f of rg.wispFx) {
+      f.t += 1 / 60; const k = Math.min(1, f.t / 0.4), R = (10 + 30 * k) * Z;
+      const g = ctx.createRadialGradient(px, cy, 0, px, cy, R); g.addColorStop(0, `rgba(${WISP_COL},${0.5 * (1 - k)})`); g.addColorStop(1, `rgba(${WISP_COL},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, cy, R, 0, 7); ctx.fill();
+    }
+    ctx.restore(); rg.wispFx = rg.wispFx.filter(f => f.t < 0.4);
+  }
+  const P = rg.wispPop; if (!P) return;
   const [px, py] = toScreen(S.p.x, S.p.y), a = P.t < 1.2 ? 1 : (1.6 - P.t) / 0.4, pop = 1 + 0.25 * Math.max(0, 1 - P.t / 0.15);
   const total = S.mode === 'expedition' ? rg.wispCarry || 0 : ST.w;
   ctx.save(); ctx.textAlign = 'center'; ctx.globalAlpha = a;
@@ -5305,10 +5378,26 @@ function exDeath() {
   const rg = S.rg;
   rg.phase = 'dead'; rg.deadT = 0;
   const had = rg.pack.length || rg.carryOrb || rg.carryDorb || rg.wispCarry;
+  rg.lost = { embers: rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1), wisps: rg.wispCarry || 0, orb: rg.carryOrb ? 'a green orb' : rg.carryDorb ? 'a teal orb' : '',
+    where: rg.beyond ? 'the Dunes' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))], far: Math.round(Math.hypot(S.p.x, S.p.y) / 10) * 10, burned: rg.kills || 0 };
   exDropPack({ x: S.p.x, y: S.p.y, items: rg.pack, orb: rg.carryOrb, dorb: rg.carryDorb });
   XS.out = null; exSave();
   S.msg = { text: 'The dark took you', sub: had ? 'Everything you carried is gone' : 'You wake by the fire', t: 0 };
 }
+const deathCard = document.getElementById('deathCard');
+function showDeathCard() {                    // what the dark took, and how far you got, before you wake by the fire
+  const rg = S.rg, L = rg.lost || {}; rg.cardShown = true; S.msg = null;
+  const rows = [];
+  const lostBits = [L.embers ? `${L.embers} embers of loot` : '', L.wisps ? `${L.wisps} wisp${L.wisps > 1 ? 's' : ''}` : '', L.orb].filter(Boolean);
+  rows.push(['Lost', lostBits.length ? lostBits.join(' · ') : 'Nothing. Your pack was empty.', lostBits.length ? 'lost' : '']);
+  rows.push(['Fell in', `${L.where || 'the woods'} · ${L.far || 0} m from camp`]);
+  rows.push(['Burned', `${L.burned || 0} this trip`]);
+  rows.push(['Kept', `${XS.embers} embers banked · ${XS.orbs} of 3 orbs home`]);
+  document.getElementById('dcList').replaceChildren(...rows.flatMap(([k, v, c]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; if (c) dd.className = c; return [dt, dd]; }));
+  deathCard.hidden = false; menuBtn.hidden = true;
+  document.getElementById('dcGo').focus({ preventScroll: true });
+}
+document.getElementById('dcGo').addEventListener('click', () => { deathCard.hidden = true; menuBtn.hidden = false; if (S.mode === 'expedition' && S.rg && S.rg.phase === 'dead') exWake(); });
 function exWake() {
   S.rg = exNewRun(); exPlaceHome(); S.msg = null;
   S.rg.pop = { t: 0, refill: 0 };
@@ -5358,6 +5447,8 @@ function exOpen(c) {
   const rg = S.rg, left = rg.left.get(c.key) || c.items.slice(), took = exTake(left);
   if (!took.length) return exFull();
   if (left.length) rg.left.set(c.key, left); else { rg.left.delete(c.key); rg.looted.add(c.key); }
+  const best = took.includes('r') ? 3 : took.includes('c') ? 2 : 1;
+  (rg.chestFx = rg.chestFx || []).push({ x: c.x, y: c.y, t: 0, best }); playChestOpen(best); addShake(0.08 + 0.04 * best);
   exGot(c.x, c.y, took);
 }
 function exTakeLoose(L) {
@@ -5393,8 +5484,8 @@ function exHome() {                          // stepped inside the fence: bank t
   if (rg.pack.length) {
     const v = rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // Short Wick: banked loot is worth double
     XS.embers += v; rg.pack = []; rg.fullFx = 0;
-    exNote(`+${v} embers banked`, true);
-    sfx(0.9, 0.6, 'bandpass', 700, 0.6); sfx(1.8, 0.35, 'bandpass', 2400, 0.4);
+    rg.bankFx = { v, t: 0 };                   // a big warm count-up over your head
+    { const k = Math.min(1, v / 80); sfx(0.9, 0.6, 'bandpass', 700, 0.6); sfx(1.8, 0.35, 'bandpass', 2400 + 1600 * k, 0.4); if (actx) setTimeout(() => sfx(1.4, 0.4, 'bandpass', 3200 + 2000 * k, 0.3), 160); }
     for (let i = 0; i < 30; i++) rg.embers.push({ x: (Math.random() - 0.5) * 16, y: (Math.random() - 0.5) * 16, z: 6, vz: 50 + Math.random() * 80, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.8 + Math.random() * 0.8, ember: true });
   }
   if (rg.wispCarry) {
@@ -5428,7 +5519,7 @@ function exStep(dt) {
     if (portalOpen() >= 1 && !rg.warp && dist2(p, TELE) < 16) warpStart('out');
     return;                                  // nothing new comes while you're home
   }
-  if (ring > rg.ringMax) { rg.ringMax = ring; rg.ringMsg = { text: RING_NAMES[ring], t: 0 }; }
+  if (ring > rg.ringMax) { rg.ringMax = ring; rg.ringMsg = { text: RING_NAMES[ring], t: 0 }; if (ring > 0) playRingSting(); }
   if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // where your pack ends up if you quit out here
   for (const o of XS.outposts) o.n = Math.min(LAMP_MAX, (o.n || 0) + dt / 20);   // outposts lay a new lamp every 20 s you're out
   if (rg.recall && (rg.recall.t += dt) >= RECALL_T) {                             // the flare carries you home
@@ -6103,7 +6194,7 @@ function portalStep(dt) {                      // returns true when the rest of 
 function exOilStep(dt, refill) {
   const rg = S.rg;
   if (refill) { rg.oil = Math.min(oilMax(), rg.oil + OIL_REFILL * dt); return; }
-  rg.oil = Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT * (1 - 0.15 * tu('clean')) * (tu('laser') ? 1.25 : 1) : OIL_IDLE));   // Clean Burn: the beam sips less
+  rg.oil = Math.min(oilMax(), Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT * (1 - 0.15 * tu('clean')) * (tu('laser') ? 1.25 : 1) : OIL_IDLE)));   // Clean Burn: the beam sips less
   const f = rg.oil / oilMax();
   if (f < 0.3 && rg.oilWarn < 1) { rg.oilWarn = 1; exNote('oil low, head back', true); }
   if (f < 0.1 && rg.oilWarn < 2) { rg.oilWarn = 2; exNote('the torch is guttering', true); }
@@ -6492,6 +6583,16 @@ function drawExFx() {
     ctx.strokeStyle = `rgba(250,250,240,${a})`; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(x - r, yy); ctx.lineTo(x + r, yy); ctx.moveTo(x, yy - r); ctx.lineTo(x, yy + r); ctx.stroke();
   }
+  for (const f of rg.chestFx || []) {        // a chest thrown open: a gold flash and a ring of light
+    f.t += 1 / 60; const k = f.t / 0.6; if (k >= 1) continue;
+    const [x, y] = toScreen(f.x, f.y), cy = y - 10 * Z, R = (18 + 50 * k) * Z * (1 + 0.15 * f.best);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, cy, 0, x, cy, R); g.addColorStop(0, `rgba(255,210,110,${0.7 * (1 - k)})`); g.addColorStop(1, 'rgba(255,170,60,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, cy, R, R * 0.8, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(255,220,150,${0.8 * (1 - k)})`; ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.ellipse(x, y, R * 1.1, R * 0.55, 0, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+  if (rg.chestFx) rg.chestFx = rg.chestFx.filter(f => f.t < 0.6);
   drawShrineFx(); if (XS.orbs >= 3) asTeal(drawShrineFx);   // the green shrine in camp, and the teal one past the wall
   drawWarpVeil();
   // the orb out in the deep: a beacon you can see from a long way off, then the crystal itself
@@ -6555,7 +6656,7 @@ function drawExFx() {
   } else if (S.running) {
     ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = `rgba(239,239,234,${0.55 + 0.15 * Math.sin(S.t * 2.5)})`;
-    ctx.fillText(matchMedia('(pointer: coarse)').matches ? 'TAP CAMP TO SHOP' : 'E · CAMP', px, py - 50 * Z - 4);
+    ctx.fillText(matchMedia('(pointer: coarse)').matches ? 'TAP SHOP TO SPEND' : 'E · SHOP', px, py - 50 * Z - 4);
   }
   // notes rising over your head: loot taken, embers banked, pack full
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -6574,28 +6675,50 @@ function drawExFx() {
   }
   ctx.textAlign = 'left';
 }
+function drawBankFx() {
+  const rg = S.rg, B = rg && rg.bankFx; if (!B) return;
+  B.t += 1 / 60; if (B.t > 2.2) { rg.bankFx = null; return; }
+  const [px, py] = toScreen(S.p.x, S.p.y), k = Math.min(1, B.t / 0.8), n = Math.round(B.v * (1 - Math.pow(1 - k, 3)));
+  const a = B.t < 1.6 ? 1 : 1 - (B.t - 1.6) / 0.6, y = py - 80 * Z - 18 * Math.min(1, B.t / 0.4), pop = 1 + 0.25 * Math.max(0, 1 - B.t / 0.25);
+  ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `400 ${Math.round(26 * pop)}px "Major Mono Display", monospace`;
+  ctx.shadowColor = 'rgba(255,150,50,0.9)'; ctx.shadowBlur = 18; ctx.fillStyle = '#ffd08a';
+  ctx.fillText(`+${n}`, px, y);
+  ctx.shadowBlur = 0; ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(255,214,160,0.85)';
+  ctx.fillText('EMBERS BANKED', px, y + 22);
+  ctx.restore();
+}
 function drawExHud(top) {
-  drawRedLaser(); drawBossBar();
+  drawRedLaser(); drawBankFx(); drawBossBar();
   const rg = S.rg; if (!rg || !XS) return;
-  ctx.font = '600 13px "IBM Plex Mono", monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(239,239,234,0.75)';
+  // the corner keeps only what you bank and where you are; hearts, pack and oil sit over your head where you're looking
+  const big = W > 900, fs = big ? 15 : 13, lh = fs + 5, hs = big ? 13 : 11, hg = big ? 18 : 15;
+  ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  ctx.font = `600 ${fs}px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(239,239,234,0.88)';
   ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.next ? 'SOMEWHERE ELSE' : rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
+  const hy = 20 + lh + top;
   for (let i = 0; i < rg.maxHp + steelMax(); i++) {
-    const x = 16 + i * 15, y = 37 + top, st = i >= rg.maxHp;
-    heartPath(ctx, x + 5, y + 5, 11);
+    const x = 16 + i * hg, y = hy, st = i >= rg.maxHp, cx = x + hs / 2, cy = y + hs / 2;
+    heartPath(ctx, cx, cy, hs);
     if (st) { if (i - rg.maxHp < (rg.steel || 0)) { ctx.fillStyle = '#9ca3a9'; ctx.fill(); } else { ctx.strokeStyle = 'rgba(156,163,169,0.4)'; ctx.lineWidth = 1; ctx.stroke(); } }
-    else if (i + 1 <= rg.hp) { ctx.fillStyle = rg.hp <= 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); }
+    else if (i + 1 <= rg.hp) { ctx.fillStyle = rg.hp <= 1 ? '#d23030' : 'rgba(239,239,234,0.92)'; ctx.fill(); }
     else {
       ctx.strokeStyle = 'rgba(239,239,234,0.35)'; ctx.lineWidth = 1; ctx.stroke();
-      if (rg.hp > i) { ctx.save(); ctx.beginPath(); ctx.rect(x - 4, y - 6, 9, 22); ctx.clip(); heartPath(ctx, x + 5, y + 5, 11); ctx.fillStyle = rg.hp <= 1 ? '#d23030' : 'rgba(239,239,234,0.9)'; ctx.fill(); ctx.restore(); }   // half a heart
+      if (rg.hp > i) { ctx.save(); ctx.beginPath(); ctx.rect(cx - hs, cy - hs, hs, hs * 2); ctx.clip(); heartPath(ctx, cx, cy, hs); ctx.fillStyle = rg.hp <= 1 ? '#d23030' : 'rgba(239,239,234,0.92)'; ctx.fill(); ctx.restore(); }   // half a heart
     }
   }
-  ctx.fillStyle = 'rgba(239,239,234,0.4)';
-  const bits = [`PACK ${packUsed(rg.pack)}/${packMax()}`, `${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`, `OIL ${Math.round(100 * rg.oil / oilMax())}%`];
-  for (const t of PACTS) if (pact(t.id)) bits.push(t.name.toUpperCase()); if (lv('wind')) bits.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's'); if (XS.recall) bits.push('FLARE'); if (XS.lanterns) bits.push('LANTERN');
-  let ln = '', y = 54 + top; const room = W - 16 - 110;   // wrap before it reaches the Menu button
-  for (const b of bits) { const t = ln ? ln + ' · ' + b : b; if (ln && ctx.measureText(t).width > room) { ctx.fillText(ln, 16, y); y += 17; ln = b; } else ln = t; }
-  ctx.fillText(ln, 16, y);
+  const room = W - 16 - 110;   // wrap before it reaches the Menu button
+  const row = (bits, y, col, size) => {
+    ctx.font = `600 ${size}px "IBM Plex Mono", monospace`; ctx.fillStyle = col;
+    let ln = ''; for (const b of bits) { const t = ln ? ln + ' · ' + b : b; if (ln && ctx.measureText(t).width > room) { ctx.fillText(ln, 16, y); y += size + 5; ln = b; } else ln = t; }
+    if (ln) { ctx.fillText(ln, 16, y); y += size + 5; } return y;
+  };
+  let y = row([`${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`], hy + hs + 8, 'rgba(239,239,234,0.68)', fs - 1);
+  const st = [];
+  if (lv('wind')) st.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's');
+  if (XS.recall) st.push('FLARE'); if (XS.lanterns) st.push('LANTERN');
+  for (const t of PACTS) if (pact(t.id)) st.push(t.name.toUpperCase());
+  if (st.length) row(st, y, 'rgba(239,239,234,0.42)', fs - 3);
 }
 
 // ---- the camp: shop and loadout at the fire ----
@@ -6742,7 +6865,7 @@ function campItems(cat) {                    // everything in a category, in one
     const have = !!XS.pacts.own[t.id], on = !!XS.pacts.on[t.id];
     return { id: t.id, name: t.name, desc: t.desc, cls: (have ? 'own' : '') + (on ? ' on' : ''), lvl: have ? (on ? 'On for your next trips' : 'Owned · switched off') : 'Buy once, then switch it on or off here',
       tag: on ? 'ON' : have ? 'OFF' : String(t.price), have: 0, max: 0,
-      buy: [have ? 'Owned' : `Buy · ${t.price}`, !have && XS.embers >= t.price, () => buyPact(t)],
+      buy: have ? null : [`Buy · ${t.price}`, XS.embers >= t.price, () => buyPact(t)],
       eq: have ? [on ? 'Switch off' : 'Switch on', true, () => togglePact(t)] : null };
   });
   const gearItem = g => {
@@ -6827,8 +6950,8 @@ function renderCamp() {
     wrap.append(row);
     if (open) {
       const more = el('div', 'more'), acts = el('div', 'acts');
-      const b = el('button', 'mini', it.buy[0]); b.type = 'button'; b.disabled = !it.buy[1]; b.addEventListener('click', it.buy[2]); acts.append(b);
-      if (it.eq) { const q = el('button', 'mini alt', it.eq[0]); q.type = 'button'; q.disabled = !it.eq[1]; q.addEventListener('click', it.eq[2]); acts.append(q); }
+      if (it.buy) { const b = el('button', 'mini', it.buy[0]); b.type = 'button'; b.disabled = !it.buy[1]; b.addEventListener('click', it.buy[2]); acts.append(b); }
+      if (it.eq) { const q = el('button', it.buy ? 'mini alt' : 'mini', it.eq[0]); q.type = 'button'; q.disabled = !it.eq[1]; q.addEventListener('click', it.eq[2]); acts.append(q); }
       more.append(el('p', 'ds', it.desc), el('p', 'lv', it.lvl), acts);
       wrap.append(more);
     }
@@ -6847,7 +6970,7 @@ addEventListener('keydown', e => {
   if (!S || S.mode !== 'expedition' || e.repeat) return;
   const k = e.key.toLowerCase();
   if (k === 'e') { if (!campEl.hidden) closeCamp(); else openCamp(); }
-  if (k === 'r') exRecall();
+  if (k === 'g') exRecall();   // R is auto run, so the flare lives on G
   if (k === 't') exPlant();
   if (e.key === 'Escape' && !campEl.hidden) closeCamp();
 });
@@ -6867,6 +6990,7 @@ function begin(mode) {
   else if (mode === 'blink') { S.blinkPhase = 'dark'; S.darkT = BLINK_DARK; S.torchOn = true; spawnQuarry(); S.q.hiddenUntilLit = true; }
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
+  document.getElementById('deathCard').hidden = true;
   initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
@@ -6960,6 +7084,7 @@ function frame(now) {
 }
 reset(); S.running = false; showPanel(null);
 requestAnimationFrame(frame);
+{ const b = document.getElementById('boot'); b.style.transition = 'opacity .6s'; requestAnimationFrame(() => { b.style.opacity = 0; setTimeout(() => b.remove(), 650); }); }   // the game is ready: lift the loading screen
 </script>
 
 </body>
