@@ -2827,7 +2827,7 @@ const AIR = { motes: [], mist: [], sparks: [] };
 function airStep() {
   const p = S.p, dt = frameDt, R = Math.min(440, viewR());
   const near = (o, r) => Math.hypot(o.x - p.x, o.y - p.y) < r;
-  while (AIR.motes.length < 280) AIR.motes.push({ x: 0, y: 0, z: 0, ph: Math.random() * 9, s: 0.5 + Math.random(), fresh: true });
+  while (AIR.motes.length < 0) AIR.motes.push({ x: 0, y: 0, z: 0, ph: Math.random() * 9, s: 0.5 + Math.random(), fresh: true });
   for (const m of AIR.motes) {                      // dust hangs in the air and drifts; out of reach, it turns up somewhere new
     if (m.fresh || !near(m, R)) { const a = Math.random() * 7, d = Math.sqrt(Math.random()) * R; m.x = p.x + Math.cos(a) * d; m.y = p.y + Math.sin(a) * d; m.z = 6 + Math.random() * 46; m.fresh = false; }
     m.ph += dt; m.x += (Math.sin(m.ph * 0.4 + m.s * 5) * 4 + 3) * dt; m.y += Math.cos(m.ph * 0.33 + m.s * 3) * 4 * dt; m.z += Math.sin(m.ph * 0.7) * 2.5 * dt;
@@ -3042,7 +3042,6 @@ function renderScene() {
   }
   drawBeamThrow(); drawLensGlow();
   drawPlayer(); // drawn over the dark so the whole figure stays readable
-  drawBeamDust();
   drawTorchWarmth();
   drawWarmth();
   if (isRg()) drawDodgeFx();
