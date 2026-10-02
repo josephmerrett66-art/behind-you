@@ -3040,7 +3040,7 @@ function renderScene() {
     for (const g of p.ghosts) { p.x = g.x; p.y = g.y; ctx.save(); ctx.globalAlpha = Math.max(0, g.a); drawPlayer(); ctx.restore(); }
     p.x = x0; p.y = y0;
   }
-  drawBeamThrow(); drawLensGlow();
+  drawLensGlow();
   drawPlayer(); // drawn over the dark so the whole figure stays readable
   drawTorchWarmth();
   drawWarmth();
