@@ -7566,11 +7566,9 @@ function drawExFx() {
   if (rg.carryOrb) drawOrb(px + 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4) * 2 * Z, Z * 0.75, 1);
   if (rg.carryDorb) asTeal(() => drawOrb(px - 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4 + 1) * 2 * Z, Z * 0.75, 1));
   // pointers round you: green to the orb, white to home, pale to a dropped pack
-  const tealHunt = XS.orbs >= 3 && (XS.dorbs || 0) < 3 && !rg.carryDorb && !rg.carryOrb;   // the forest is done: the teal arrow leads to the green portal and the Dunes past it
-  if (!rg.inCamp || rg.loose.length || (XS.orbField && XS.orb) || rg.carryDorb || tealHunt) {
+  if (!rg.inCamp || rg.loose.length || (XS.orbField && XS.orb) || rg.carryDorb) {   // v100: no teal arrow in the woods, only out in the Dunes (Joe)
     const on = (x, y) => x > 40 && x < W - 40 && y > 40 && y < H - 40;
     if (rg.carryDorb) { const [x, y] = toScreen(TELE2.x, TELE2.y); exPointer(px, py, x, y, `rgb(${DORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
-    if (tealHunt && !rg.inCamp) drawTealArrow(TELE);
     if (XS.orbField && XS.orb && !rg.carryOrb) { const [x, y] = toScreen(XS.orb.x, XS.orb.y); exPointer(px, py, x, y, `rgb(${ORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
     if (!rg.inCamp) { const gp = Math.hypot(S.p.x, S.p.y) > CAMP_R + 30 ? exNearestGate(S.p.x, S.p.y) : { x: 0, y: 0 }, [x, y] = toScreen(gp.x, gp.y); exPointer(px, py, x, y, '#efefea', 'house', on(x, y) ? 0.25 : rg.carryOrb ? 0.95 : 0.7); }
     for (const L of rg.loose) { const [x, y] = toScreen(L.x, L.y); exPointer(px, py, x, y, L.orb ? `rgb(${ORB_COL})` : 'rgba(239,239,234,0.9)', 'pack', on(x, y) ? 0.25 : 0.7); }
