@@ -38,6 +38,7 @@ button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14
 #attack { position: fixed; right: 16px; bottom: calc(290px + env(safe-area-inset-bottom, 0px)); width: 76px; height: 76px; padding: 0; border-radius: 50%; font-size: 0.58rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
 #attack:active { background: rgba(255,190,130,0.35); }
 #autorun { position: fixed; right: 28px; bottom: calc(572px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
+body.ex #autorun { bottom: calc(488px + env(safe-area-inset-bottom, 0px)); }   /* no torch button in Expedition: auto run takes its place */
 #autorun[aria-pressed="true"] { color: var(--void); background: var(--bone); border-color: var(--bone); }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 .modes { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -89,6 +90,7 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
 #recallBtn { right: 112px; bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
 #lampBtn { right: 112px; bottom: calc(372px + env(safe-area-inset-bottom, 0px)); }
 @media (max-height: 520px) {   /* a phone on its side: one row across, above the aiming corner */
+  body.ex #autorun { right: 202px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
   #attack { right: 16px; bottom: calc(220px + env(safe-area-inset-bottom, 0px)); } #dodge, #campBtn { right: 112px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #torch { right: 196px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #autorun { right: 282px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
   #recallBtn { right: 356px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 424px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); }
 }
@@ -358,7 +360,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     </div>
     <div class="controls">
       <span>Phone</span><span>Right thumb aims. Left thumb runs. Tap Attack to swing the torch (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
-      <span>Desktop</span><span>Mouse aims<br>W or Space runs<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
+      <span>Desktop</span><span>Mouse aims<br>W or Space runs<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch (not in Expedition)<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
     </div>
   </section>
 </div>
@@ -3473,6 +3475,7 @@ setInterval(musTick, 200);
 const soundBtn = document.getElementById('sound');
 const torchBtn = document.getElementById('torch');
 function toggleTorch() {
+  if (S && S.mode === 'expedition') return;     // v94: in Expedition the torch is always on (Joe)
   S.torchOn = !S.torchOn; S.torchOnT = 0;
   const rg = S.rg;
   if (isRg() && rg && lv('blackout')) {
@@ -3712,7 +3715,7 @@ const EX_KIT = {
   glare: { lv: ['Spears and arrows burn up', 'Bomber shells too', 'A wider catch, past the beam\'s edge'] },
   mirror: { lv: ['The laser burns its owner', 'It bounces on to a second enemy'] },
 };
-const EX_CUT = ['kindling', 'afterglow', 'adrenaline', 'salt', 'echo', 'scar', 'embers', 'coat', 'wind'];   // coat and wind live on as Armour   // folded into other items, or dropped
+const EX_CUT = ['kindling', 'afterglow', 'adrenaline', 'salt', 'echo', 'scar', 'embers', 'coat', 'wind', 'blackout'];   // v94: Blackout needs the torch switch, gone from Expedition   // coat and wind live on as Armour   // folded into other items, or dropped
 const kitMax = u => (EX_KIT[u.id] && EX_KIT[u.id].max) || u.max;
 const kitDesc = u => (EX_KIT[u.id] && EX_KIT[u.id].desc) || u.desc;
 const UP = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
@@ -5219,6 +5222,10 @@ function exRead() {
       if (!x.noLaser) {                              // v87: Red Laser removed, refund the embers spent on it
         if (x.torch && x.torch.laser) { for (let i = 0; i < x.torch.laser; i++) x.embers += Math.round(150 * Math.pow(1.8, i)); delete x.torch.laser; }
         x.noLaser = true;
+      }
+      if (!x.noBlackout) {                           // v94: the torch can't be switched in Expedition any more, so Blackout is refunded
+        if (x.own.blackout) { const u = UP.blackout; for (let i = 0; i < x.own.blackout; i++) x.embers += upPrice(u, i); delete x.own.blackout; }
+        x.eq = x.eq.filter(id => x.own[id]); x.noBlackout = true;
       }
       if (!x.pacts || !x.pacts.own) x.pacts = { own: {}, on: {} };
       return x;
@@ -7908,7 +7915,7 @@ function begin(mode) {
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
   document.getElementById('deathCard').hidden = true;
-  initAudio(); torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = true; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
