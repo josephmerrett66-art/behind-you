@@ -32,12 +32,12 @@ p { margin: 0; line-height: 1.55; color: var(--ash); font-size: 0.95rem; }
 .controls { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; font-size: 0.85rem; color: var(--ash); }
 .controls span:nth-child(odd) { color: var(--bone); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; padding-top: 0.1rem; }
 button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--void); background: var(--bone); border: 0; padding: 0.85rem 1.4rem; cursor: pointer; }
-#torch { position: fixed; right: 16px; bottom: calc(36px + env(safe-area-inset-bottom, 0px)); width: 70px; height: 70px; padding: 0; border-radius: 50%; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; }
-#dodge { position: fixed; right: 20px; bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
+#torch { position: fixed; right: 22px; bottom: calc(482px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; }
+#dodge { position: fixed; right: 22px; bottom: calc(392px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #dodge[data-cool="1"] { opacity: 0.4; }
-#attack { position: fixed; right: 118px; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: 74px; height: 74px; padding: 0; border-radius: 50%; font-size: 0.58rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
+#attack { position: fixed; right: 16px; bottom: calc(290px + env(safe-area-inset-bottom, 0px)); width: 76px; height: 76px; padding: 0; border-radius: 50%; font-size: 0.58rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
 #attack:active { background: rgba(255,190,130,0.35); }
-#autorun { position: fixed; right: 128px; bottom: calc(156px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
+#autorun { position: fixed; right: 28px; bottom: calc(572px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
 #autorun[aria-pressed="true"] { color: var(--void); background: var(--bone); border-color: var(--bone); }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 .modes { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -84,11 +84,14 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .audio { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
 .audio h2 { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); font-weight: 600; }
 body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
-#campBtn { position: fixed; right: 20px; bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
+#campBtn { position: fixed; right: 22px; bottom: calc(392px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
 .exuse { position: fixed; right: 27px; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
-#recallBtn { bottom: calc(244px + env(safe-area-inset-bottom, 0px)); }
-#lampBtn { bottom: calc(316px + env(safe-area-inset-bottom, 0px)); }
-@media (max-height: 520px) { #recallBtn { right: 130px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 196px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); } }   /* a phone on its side: the flare and lantern sit in a row instead of a tall stack */
+#recallBtn { right: 112px; bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
+#lampBtn { right: 112px; bottom: calc(372px + env(safe-area-inset-bottom, 0px)); }
+@media (max-height: 520px) {   /* a phone on its side: one row across, above the aiming corner */
+  #attack { right: 16px; bottom: calc(220px + env(safe-area-inset-bottom, 0px)); } #dodge, #campBtn { right: 112px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #torch { right: 196px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #autorun { right: 282px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
+  #recallBtn { right: 356px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 424px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); }
+}
 #camp, #stats { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding-inline: 16px; padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); background: rgba(5,5,5,0.95); }
 #camp h3, #stats h3 { margin: 0.4rem 0 0; font: 600 0.72rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); display: flex; justify-content: space-between; gap: 1rem; }
 #camp h3 span, #stats h3 span { color: var(--ash); font-weight: 400; }
