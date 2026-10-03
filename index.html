@@ -32,12 +32,12 @@ p { margin: 0; line-height: 1.55; color: var(--ash); font-size: 0.95rem; }
 .controls { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; font-size: 0.85rem; color: var(--ash); }
 .controls span:nth-child(odd) { color: var(--bone); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; padding-top: 0.1rem; }
 button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--void); background: var(--bone); border: 0; padding: 0.85rem 1.4rem; cursor: pointer; }
-#torch { position: fixed; right: 16px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; }
-#dodge { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
+#torch { position: fixed; right: 16px; bottom: calc(36px + env(safe-area-inset-bottom, 0px)); width: 70px; height: 70px; padding: 0; border-radius: 50%; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; }
+#dodge { position: fixed; right: 20px; bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #dodge[data-cool="1"] { opacity: 0.4; }
-#attack { position: fixed; right: 96px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
+#attack { position: fixed; right: 118px; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: 74px; height: 74px; padding: 0; border-radius: 50%; font-size: 0.58rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
 #attack:active { background: rgba(255,190,130,0.35); }
-#autorun { position: fixed; right: 24px; bottom: calc(214px + env(safe-area-inset-bottom, 0px)); width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
+#autorun { position: fixed; right: 128px; bottom: calc(156px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
 #autorun[aria-pressed="true"] { color: var(--void); background: var(--bone); border-color: var(--bone); }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 .modes { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -84,10 +84,11 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .audio { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
 .audio h2 { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); font-weight: 600; }
 body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
-#campBtn { position: fixed; right: 20px; bottom: calc(142px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
-.exuse { position: fixed; right: 26px; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
-#recallBtn { bottom: calc(210px + env(safe-area-inset-bottom, 0px)); }
-#lampBtn { bottom: calc(266px + env(safe-area-inset-bottom, 0px)); }
+#campBtn { position: fixed; right: 20px; bottom: calc(146px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
+.exuse { position: fixed; right: 27px; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
+#recallBtn { bottom: calc(244px + env(safe-area-inset-bottom, 0px)); }
+#lampBtn { bottom: calc(316px + env(safe-area-inset-bottom, 0px)); }
+@media (max-height: 520px) { #recallBtn { right: 130px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 196px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); } }   /* a phone on its side: the flare and lantern sit in a row instead of a tall stack */
 #camp, #stats { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding-inline: 16px; padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); background: rgba(5,5,5,0.95); }
 #camp h3, #stats h3 { margin: 0.4rem 0 0; font: 600 0.72rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); display: flex; justify-content: space-between; gap: 1rem; }
 #camp h3 span, #stats h3 span { color: var(--ash); font-weight: 400; }
@@ -353,8 +354,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-5 7h3l-4 6h12l-4-6h3z"/><path d="M12 16v5"/></svg></span>Free roam<span class="sh">No goals</span></summary><p>Walk the woods with rabbits, birds and fireflies.</p></details>
     </div>
     <div class="controls">
-      <span>Phone</span><span>Right thumb aims. Left thumb walks. Tap Attack to swing the torch (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
-      <span>Desktop</span><span>Mouse aims<br>W or Space walks<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
+      <span>Phone</span><span>Right thumb aims. Left thumb runs. Tap Attack to swing the torch (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
+      <span>Desktop</span><span>Mouse aims<br>W or Space runs<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
     </div>
   </section>
 </div>
@@ -484,10 +485,10 @@ autoBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropaga
 function moveInput() {
   // one control: go forward, toward wherever the torch points
   let go = keys['w'] || keys['arrowup'] || keys[' '];
-  let speed = keys['shift'] ? RUN : WALK;
+  let speed = RUN;                               // no walking: going is always a sprint (Joe)
   for (const id in sticks) {
     const s = sticks[id], m = Math.hypot(s.x - s.ox, s.y - s.oy);
-    if (s.side === 'move' && !s.stop) { go = true; speed = m > 60 ? RUN : WALK; }   // hold to walk, drag your thumb out to run
+    if (s.side === 'move' && !s.stop) { go = true; speed = RUN; }   // a thumb on the left side: sprint
     if (s.side === 'aim' && m > 12) S.aim = Math.atan2(s.y - s.oy, s.x - s.ox);
   }
   // auto run: on only while the button is on; it runs you toward the torch until you turn it off
