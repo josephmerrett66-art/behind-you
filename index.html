@@ -7202,7 +7202,7 @@ function drawTealArrow(t) {                       // the big teal arrow: the way
   rg.tealA = (rg.tealA || 0) + (on - (rg.tealA || 0)) * Math.min(1, frameDt * 4);
   if (rg.warp) return;
   const [px, py0] = toScreen(S.p.x, S.p.y), py = py0 - 18 * Z, a = Math.atan2(ty - py, tx - px);
-  const R = 52 * Z, x = px + Math.cos(a) * R, y = py + Math.sin(a) * R * 0.8, s = 11 * Z * (1 + 0.08 * Math.sin(S.t * 4 + 1.5)), al = rg.tealA * (0.7 + 0.3 * Math.sin(S.t * 4 + 1.5));
+  const R = 62 * Z, x = px + Math.cos(a) * R, y = py + Math.sin(a) * R * 0.8, s = 15 * Z * (1 + 0.1 * Math.sin(S.t * 4 + 1.5)), al = rg.tealA * (0.8 + 0.2 * Math.sin(S.t * 4 + 1.5));
   ctx.save(); ctx.translate(x, y); ctx.rotate(a);
   ctx.globalCompositeOperation = 'lighter';
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2.2); g.addColorStop(0, `rgba(${DORB_COL},${0.35 * al})`); g.addColorStop(1, `rgba(${DORB_COL},0)`);
@@ -7213,8 +7213,23 @@ function drawTealArrow(t) {                       // the big teal arrow: the way
   ctx.restore();
   if (d > 600) {
     ctx.save(); ctx.font = `${Math.round(9 * Z)}px ui-monospace, monospace`; ctx.textAlign = 'center';
-    ctx.fillStyle = `rgba(${DORB_COL},${0.85 * rg.tealA})`; ctx.fillText(Math.round(d / 10) + ' m', x, y + 18 * Z); ctx.restore();
+    ctx.fillStyle = `rgba(${DORB_COL},${0.85 * rg.tealA})`; ctx.fillText(Math.round(d / 10) + ' m', x, y + 22 * Z); ctx.restore();
   }
+  // and when it's off screen, a second marker rides the edge of the screen right where it lies, so you can't miss which way to go
+  const m = 40, top = 96, bot = H - 60;
+  if (tx > m && tx < W - m && ty > top && ty < bot) return;
+  const dx = tx - W / 2, dy = ty - (top + bot) / 2, k = Math.min((W / 2 - m) / Math.abs(dx || 1e-6), ((bot - top) / 2) / Math.abs(dy || 1e-6));
+  const ex = W / 2 + dx * k, ey = (top + bot) / 2 + dy * k, ea = Math.atan2(dy, dx), es = 13 * (1 + 0.12 * Math.sin(S.t * 5));
+  ctx.save(); ctx.translate(ex, ey);
+  ctx.globalCompositeOperation = 'lighter';
+  const g2 = ctx.createRadialGradient(0, 0, 0, 0, 0, es * 2.6); g2.addColorStop(0, `rgba(${DORB_COL},${0.4 * rg.tealA})`); g2.addColorStop(1, `rgba(${DORB_COL},0)`);
+  ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(0, 0, es * 2.6, 0, 7); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.rotate(ea); ctx.fillStyle = `rgba(${DORB_COL},${0.95 * rg.tealA})`; ctx.strokeStyle = `rgba(220,255,248,${0.9 * rg.tealA})`; ctx.lineWidth = 1.4; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(es, 0); ctx.lineTo(-es * 0.7, -es * 0.75); ctx.lineTo(-es * 0.3, 0); ctx.lineTo(-es * 0.7, es * 0.75); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.rotate(-ea); ctx.font = '600 10px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = `rgba(${DORB_COL},${0.9 * rg.tealA})`; ctx.fillText(Math.round(d / 10) + ' m', -Math.cos(ea) * 30, -Math.sin(ea) * 24);
+  ctx.restore();
 }
 function drawPortal(tx, ty, ZT, o, sockets) {
   if (o <= 0) return;
