@@ -2123,20 +2123,21 @@ function sandFoot(g, R, w) {                     // sand drifted up against the 
   gr.addColorStop(0, 'rgba(160,157,148,0.95)'); gr.addColorStop(0.6, 'rgba(160,157,148,0.6)'); gr.addColorStop(1, 'rgba(160,157,148,0)');
   g.save(); g.scale(1, h / w); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, w, Math.PI, 0); g.fill(); g.restore();
 }
+const palmG = tint(0.62, 1.22, 0.55), palmT = tint(1.12, 0.98, 0.78);   // v99 (Joe): rich green fronds and a warm brown trunk
 function paintPalm(g, R, Ld) {                   // a date palm: a ringed trunk leaning and curving, a crown of long feathered fronds
   const H = 70 + R() * 30, lean = (R() - 0.5) * 34, cx = lean * 0.35;
   const tx = lean, ty = -H, steps = 16, wb = 3.6, wt = 2.2;
   const at = u => [cx * 2 * u * (1 - u) + tx * u * u, ty * u];   // the trunk's curve
   for (let k = 0; k < steps; k++) {                // the trunk, ring by ring
     const u0 = k / steps, u1 = (k + 1) / steps, [x0, y0] = at(u0), [x1, y1] = at(u1), w = wb + (wt - wb) * u0;
-    g.fillStyle = grey(70 + (k % 2) * 8); g.beginPath(); g.moveTo(x0 - w, y0); g.lineTo(x1 - w * 0.95, y1); g.lineTo(x1 + w * 0.95, y1); g.lineTo(x0 + w, y0); g.closePath(); g.fill();
-    g.fillStyle = grey(104 + (k % 2) * 8); g.beginPath(); g.moveTo(x0 + Ld * w * 0.15, y0); g.lineTo(x1 + Ld * w * 0.15, y1); g.lineTo(x1 + Ld * w * 0.95, y1); g.lineTo(x0 + Ld * w, y0); g.closePath(); g.fill();
-    g.strokeStyle = grey(44); g.lineWidth = 0.45; g.beginPath(); g.moveTo(x1 - w * 0.95, y1); g.quadraticCurveTo(x1, y1 + 1.2, x1 + w * 0.95, y1); g.stroke();
+    g.fillStyle = palmT(70 + (k % 2) * 8); g.beginPath(); g.moveTo(x0 - w, y0); g.lineTo(x1 - w * 0.95, y1); g.lineTo(x1 + w * 0.95, y1); g.lineTo(x0 + w, y0); g.closePath(); g.fill();
+    g.fillStyle = palmT(104 + (k % 2) * 8); g.beginPath(); g.moveTo(x0 + Ld * w * 0.15, y0); g.lineTo(x1 + Ld * w * 0.15, y1); g.lineTo(x1 + Ld * w * 0.95, y1); g.lineTo(x0 + Ld * w, y0); g.closePath(); g.fill();
+    g.strokeStyle = palmT(44); g.lineWidth = 0.45; g.beginPath(); g.moveTo(x1 - w * 0.95, y1); g.quadraticCurveTo(x1, y1 + 1.2, x1 + w * 0.95, y1); g.stroke();
   }
   const fr = 10 + (R() * 3 | 0), fronds = [];
   for (let k = 0; k < fr; k++) fronds.push([k / fr * Math.PI * 2 + R() * 0.3, 30 + R() * 14, 0.7 + R() * 0.6]);
   fronds.sort((a, b) => Math.sin(a[0]) - Math.sin(b[0]));   // the ones reaching away from you first
-  g.fillStyle = grey(40); for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(tx + (k - 2) * 2, ty + 3 + (k % 2) * 1.5, 1.8, 0, 7); g.fill(); }   // dates hanging under the crown
+  g.fillStyle = tint(1.5, 0.95, 0.45)(52); for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(tx + (k - 2) * 2, ty + 3 + (k % 2) * 1.5, 1.8, 0, 7); g.fill(); }   // dates hanging under the crown
   for (const [a, L, droop] of fronds) {
     const dx = Math.cos(a), back = Math.sin(a), pts = [], N = 14;
     for (let m = 0; m <= N; m++) { const u = m / N; pts.push([tx + dx * L * u * (1 - 0.15 * back), ty - back * 7 * u - 11 * u * (1 - back * 0.4) + 30 * droop * u * u]); }   // up and out, then arching over and down
@@ -2145,10 +2146,10 @@ function paintPalm(g, R, Ld) {                   // a date palm: a ringed trunk 
       const [x, y] = pts[m], [nx, ny] = pts[m + 1], ang = Math.atan2(ny - y, nx - x), l = 11 * (1 - m / (N + 3));
       for (const sd of [-1, 1]) {
         const la = ang + sd * 0.9, hx = x + Math.cos(la) * l, hy = y + Math.sin(la) * l + l * 0.55;   // they hang with their own weight
-        g.fillStyle = grey(tone + (sd * Ld > 0 ? 10 : -8) + R() * 10); g.beginPath(); g.moveTo(x - 0.8, y); g.quadraticCurveTo((x + hx) / 2, (y + hy) / 2 - 1.5, hx, hy); g.lineTo(x + 0.8, y + 0.6); g.closePath(); g.fill();
+        g.fillStyle = palmG(tone + (sd * Ld > 0 ? 10 : -8) + R() * 10); g.beginPath(); g.moveTo(x - 0.8, y); g.quadraticCurveTo((x + hx) / 2, (y + hy) / 2 - 1.5, hx, hy); g.lineTo(x + 0.8, y + 0.6); g.closePath(); g.fill();
       }
     }
-    g.strokeStyle = grey(tone + 14); g.lineWidth = 1.1;
+    g.strokeStyle = palmG(tone + 14); g.lineWidth = 1.1;
     g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
   }
   sandFoot(g, R, 9);
@@ -2163,7 +2164,7 @@ function paintReeds(g, R, Ld) {                  // tall reeds and rushes at the
   const n = 10 + (R() * 8 | 0);
   for (let k = 0; k < n; k++) {
     const x0 = (R() - 0.5) * 14, l = 14 + R() * 16, bend = (R() - 0.5) * 6, tone = 70 + (x0 * Ld > 0 ? 34 : 6) + R() * 14;
-    g.strokeStyle = grey(tone); g.lineWidth = 0.7; g.beginPath(); g.moveTo(x0, 0); g.quadraticCurveTo(x0 + bend * 0.3, -l * 0.6, x0 + bend, -l); g.stroke();
+    g.strokeStyle = tint(0.85, 1.08, 0.72)(tone); g.lineWidth = 0.7; g.beginPath(); g.moveTo(x0, 0); g.quadraticCurveTo(x0 + bend * 0.3, -l * 0.6, x0 + bend, -l); g.stroke();
     if (R() < 0.35) { g.fillStyle = grey(58); g.beginPath(); g.ellipse(x0 + bend * 0.85, -l * 0.86, 0.9, 3, bend * 0.03, 0, 7); g.fill(); }
   }
 }
@@ -2304,24 +2305,24 @@ function lagoonPath(c, o, k) {
 function drawLagoons() {
   const t = S.t;
   for (const o of oasesNear(S.cam.x, S.cam.y, viewR() + 150)) {
-    ctx.fillStyle = 'rgba(70,68,62,0.35)'; lagoonPath(ctx, o, 1.32); ctx.fill();   // damp sand round the water
-    ctx.fillStyle = 'rgba(58,56,51,0.5)'; lagoonPath(ctx, o, 1.12); ctx.fill();
+    ctx.fillStyle = 'rgba(78,68,52,0.35)'; lagoonPath(ctx, o, 1.32); ctx.fill();   // damp sand round the water
+    ctx.fillStyle = 'rgba(62,56,44,0.5)'; lagoonPath(ctx, o, 1.12); ctx.fill();
     const gr = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r * 1.1);
-    gr.addColorStop(0, '#202426'); gr.addColorStop(0.65, '#33393b'); gr.addColorStop(1, '#5d625f');
+    gr.addColorStop(0, '#0b2c45'); gr.addColorStop(0.65, '#16507a'); gr.addColorStop(1, '#3f8aa6');   // v99: deep blue water
     ctx.fillStyle = gr; lagoonPath(ctx, o, 1); ctx.fill();
     ctx.save(); lagoonPath(ctx, o, 1); ctx.clip();
     ctx.lineWidth = 1;
     for (let n = 0; n < 4; n++) {                 // slow rings spreading from the middle
       const u = (t * 0.12 + n / 4 + o.seed) % 1;
-      ctx.strokeStyle = `rgba(190,192,190,${0.16 * (1 - u)})`; lagoonPath(ctx, o, 0.15 + u * 0.85); ctx.stroke();
+      ctx.strokeStyle = `rgba(160,215,240,${0.2 * (1 - u)})`; lagoonPath(ctx, o, 0.15 + u * 0.85); ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(220,224,222,0.3)'; ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(200,235,250,0.32)'; ctx.lineWidth = 1.6;
     for (let n = 0; n < 9; n++) {                 // the moon's light, broken up by the ripples
       const y = o.y - o.r * 0.5 + n * o.r * 0.13, x = o.x - o.r * 0.25 + Math.sin(t * 0.9 + n * 1.7 + o.seed) * 5, l = o.r * (0.12 + 0.1 * Math.sin(t * 1.3 + n));
       ctx.beginPath(); ctx.moveTo(x - l, y + l * 0.5); ctx.lineTo(x + l, y - l * 0.5); ctx.stroke();
     }
     ctx.restore();
-    ctx.strokeStyle = `rgba(220,220,214,${0.32 + 0.12 * Math.sin(t * 1.1 + o.seed)})`; ctx.lineWidth = 1.2; lagoonPath(ctx, o, 1 + 0.02 * Math.sin(t * 0.8)); ctx.stroke();   // a thin lip of foam lapping the shore
+    ctx.strokeStyle = `rgba(215,240,250,${0.34 + 0.12 * Math.sin(t * 1.1 + o.seed)})`; ctx.lineWidth = 1.2; lagoonPath(ctx, o, 1 + 0.02 * Math.sin(t * 0.8)); ctx.stroke();   // a thin lip of foam lapping the shore
   }
 }
 function drawLagoonGlints() {                    // the water catches the moon even in the dark, so you can spot an oasis from far off
@@ -2331,7 +2332,7 @@ function drawLagoonGlints() {                    // the water catches the moon e
       const a = hash(n, o.seed) * 6.28, r = Math.sqrt(hash(o.seed, n)) * o.r * 0.85, tw = Math.max(0, Math.sin(S.t * (1.2 + hash(n, 3)) + n * 2.3));
       if (tw < 0.3) continue;
       const [sx, sy] = toScreen(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r), l = (0.8 + 1.6 * tw) * Z;
-      ctx.strokeStyle = `rgba(225,228,226,${0.4 * tw})`; ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(170,225,250,${0.45 * tw})`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(sx - l, sy); ctx.lineTo(sx + l, sy); ctx.stroke();
     }
   }
@@ -2343,20 +2344,20 @@ function sandPattern() {
   if (sandPat) return sandPat;
   const P = 384, cv = document.createElement('canvas'); cv.width = cv.height = P;
   const g = cv.getContext('2d'), R = sprRand(9191);
-  g.fillStyle = '#a8a59c'; g.fillRect(0, 0, P, P);
+  g.fillStyle = '#b3a587'; g.fillRect(0, 0, P, P);   // v99: a slight sandy colour
   const wrap = f => { for (const ox of [-P, 0, P]) for (const oy of [-P, 0, P]) { g.save(); g.translate(ox, oy); f(); g.restore(); } };
   for (let n = 0; n < 26; n++) {                    // hollows and pale drifts
     const x = R() * P, y = R() * P, r = 30 + R() * 70, dark = R() < 0.5;
-    wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, dark ? 'rgba(80,78,72,0.14)' : 'rgba(215,212,204,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
+    wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, dark ? 'rgba(88,76,56,0.14)' : 'rgba(225,212,184,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
   }
   for (let k = 0; k < 34; k++) {                    // wind ripples: a shaded trough and a lit crest, running right across and wrapping
     const y0 = k / 34 * P + R() * 4, ph = R() * 6.3, a1 = 3 + R() * 3, amp2 = 1 + R() * 2;
     const path = dy => { g.beginPath(); for (let x = 0; x <= P; x += 4) { const y = y0 + dy + Math.sin(x / P * Math.PI * 4 + ph) * a1 + Math.sin(x / P * Math.PI * 10 + ph * 2) * amp2; x ? g.lineTo(x, y) : g.moveTo(x, y); } };
     for (const oy of [-P, 0, P]) { g.save(); g.translate(0, oy);
-      g.strokeStyle = 'rgba(96,94,88,0.32)'; g.lineWidth = 1.1; path(0); g.stroke();
-      g.strokeStyle = 'rgba(214,211,203,0.4)'; g.lineWidth = 0.9; path(-1.4); g.stroke(); g.restore(); }
+      g.strokeStyle = 'rgba(104,90,66,0.32)'; g.lineWidth = 1.1; path(0); g.stroke();
+      g.strokeStyle = 'rgba(226,212,182,0.4)'; g.lineWidth = 0.9; path(-1.4); g.stroke(); g.restore(); }
   }
-  for (let n = 0; n < 1800; n++) { const x = R() * P, y = R() * P, v = R() < 0.5 ? 120 : 200; g.fillStyle = `rgba(${v},${v},${v - 6},0.35)`; g.fillRect(x, y, 0.6, 0.6); }
+  for (let n = 0; n < 1800; n++) { const x = R() * P, y = R() * P, v = R() < 0.5 ? 120 : 200; g.fillStyle = `rgba(${v},${v - 10},${v - 34},0.35)`; g.fillRect(x, y, 0.6, 0.6); }
   for (let n = 0; n < 40; n++) { const x = R() * P, y = R() * P; g.fillStyle = 'rgba(70,68,64,0.45)'; g.beginPath(); g.ellipse(x, y, 0.8 + R(), 0.5 + R() * 0.5, R() * 3, 0, 7); g.fill(); }   // grit
   return sandPat = ctx.createPattern(cv, 'repeat');
 }
