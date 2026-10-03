@@ -4355,7 +4355,7 @@ function updateSurvive(dt) {
     if (rg.hp < rg.maxHp && rg.regenT >= [30, 30, 20, 12][Math.min(3, sr('regen'))]) { rg.regenT = 0; rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
   }
   // the Red Laser: a thin line down the middle of the beam that burns hard
-  rg.laserOn = isEx() && tu('laser') > 0 && S.torchLvl > 0.6;
+  rg.laserOn = false;                            // v87: Red Laser removed (Joe: too strong)
   // strobe
   if (lv('strobe')) {
     rg.strobeT -= dt;
@@ -5144,7 +5144,6 @@ const TORCH_UP = [
   { id: 'reach', name: 'Reach', desc: 'Your beam is 8% longer per level.', base: 15, max: 4, lvl: n => `${8 * n}% longer` },
   { id: 'width', name: 'Width', desc: 'Your beam is 6% wider per level.', base: 15, max: 4, lvl: n => `${6 * n}% wider` },
   { id: 'clean', name: 'Oil Saver', desc: 'Your beam uses less oil while it is on. The Oil Tank makes the tank bigger; this makes each drop last longer.', base: 18, max: 3, lvl: n => `${15 * n}% less oil` },
-  { id: 'laser', name: 'Red Laser', desc: 'A thin red laser runs down the middle of your beam. Anything it touches burns hard, like a laser gun, even the bosses. It drinks a little more oil. Unlocks once your first orb is home.', base: 150, max: 2, lock: () => XS.orbs < 1 && !XS.dorbs, lvl: n => n > 1 ? 'thicker, hotter laser' : 'laser on' },
 ];
 const ARMOUR = [
   { id: 'steel', name: 'Steel Hearts', desc: 'Grey steel hearts sit on top of your own, like armour. Hits break steel first. They don\'t heal out in the dark, but camp makes them whole again.', base: 25, max: 4, lvl: n => `${n} steel heart${n > 1 ? 's' : ''}` },
@@ -5211,6 +5210,10 @@ function exRead() {
         x.eq = x.eq.filter(id => x.own[id]);
         if (x.torch && x.torch.quick) { for (let i = 0; i < x.torch.quick; i++) x.embers += Math.round(18 * Math.pow(1.8, i)); delete x.torch.quick; }
         x.shop3 = true; x.arm = x.arm || {};
+      }
+      if (!x.noLaser) {                              // v87: Red Laser removed, refund the embers spent on it
+        if (x.torch && x.torch.laser) { for (let i = 0; i < x.torch.laser; i++) x.embers += Math.round(150 * Math.pow(1.8, i)); delete x.torch.laser; }
+        x.noLaser = true;
       }
       if (!x.pacts || !x.pacts.own) x.pacts = { own: {}, on: {} };
       return x;
