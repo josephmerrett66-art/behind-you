@@ -3813,7 +3813,7 @@ function spawnSpot() {
   return at;
 }
 function spawnFoe(type, at = spawnSpot()) {
-  const rg = S.rg, f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1));
+  const rg = S.rg, f = FOES[type], hp = f.hp * (1 + 0.09 * (rg.wave - 1)) * (inDunes() ? DUNE_HP : 1);   // the Dunes are a step up: much tougher hunters
   rg.enemies.push({ kind: 'shade', type, x: at.x, y: at.y, hp, maxHp: hp, spawnD: at.d || 500,
     beam: 0, lit: false, after: 0, scarred: false, blink: Math.random() * 4, jit: 0, reveal: 0, fly: 0, flare: 0, phase: Math.random() * 6, face: 1 });
   const e = rg.enemies[rg.enemies.length - 1];
@@ -3880,16 +3880,17 @@ function hurt(e) {
     return;
   }
   rg.regenT = 0;
-  if (rg.steel > 0) {                      // Armour: a steel heart takes it
-    rg.steel--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = 0.6;
+  const dune = inDunes();                  // out in the Dunes every hit is two hearts, and they come quicker after each other
+  if (rg.steel > 0) {                      // Armour: a steel heart takes it (two in the Dunes)
+    rg.steel = Math.max(0, rg.steel - (dune ? DUNE_HIT : 1)); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = 0.6;
     rg.pop = { t: 0, steelLost: rg.steel };
     addShake(0.55); hitStop(0.08);
     { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }
     shove(e, 90); playClang();
     return;
   }
-  const dmgH = (isEx() && e && e.type === 'shade' ? 0.5 : 1) * (pact('half') ? 0.5 : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
-  rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = 1.2 + 0.15 * sr('steady'); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
+  const dmgH = (isEx() && e && e.type === 'shade' ? 0.5 : 1) * (pact('half') ? 0.5 : 1) * (dune ? DUNE_HIT : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
+  rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
   rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };   // a heart cracked in half, or the one that just went
   if (lv('coat')) { lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white'); if (isEx() && lv('coat') > 2) for (const o of rg.enemies) if (dist2(o, S.p) < 150 + 20 * lv('coat')) o.frozen = 2.5; }   // Thick Coat 3: the flash freezes
   addShake(0.75); hitStop(0.11);
@@ -4423,7 +4424,7 @@ function updateSurvive(dt) {
     const farOff = !e.lit && d > Math.max(700, (e.spawnD || 500) + 300) && !seenAt(e.x, e.y);   // well out of reach and out of sight
     if (S.mode === 'expedition' && farOff && d > 900 && !e.guard) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
     if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; if (e.type === 'spear') spearInit(e); if (e.type === 'archer') archerInit(e); continue; }   // left far behind: bring it back around you
-    let sp = f.sp * (pact('hunted') ? 1.3 : 1) * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
+    let sp = f.sp * (inDunes() ? DUNE_SP : 1) * (pact('hunted') ? 1.3 : 1) * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
     if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
@@ -7086,7 +7087,8 @@ function exOilStep(dt, refill) {
 // ---- the teal orbs of the Dunes: three of them, each by an oasis further out, each guarded by a great centipede.
 // Carry them back through the green portal to the second shrine past the camp wall; three open the next way.
 const DORB_D = [1200, 2000, 2800];
-const DUNE_WISP = 2;                              // wisps per kill in the Dunes, times the usual
+const DUNE_WISP = 2;
+const DUNE_HP = 4, DUNE_HIT = 2, DUNE_SP = 1.25, DUNE_INV = 0.6;   // v95 (Joe): the Dunes are a big step up from the woods: 4x health, every hit two hearts, 25% faster, less breathing room between hits                              // wisps per kill in the Dunes, times the usual
 const DUNE_MIX = [{ type: 'spear', w: 30 }, { type: 'archer', w: 26 }, { type: 'bomber', w: 22 }, { type: 'laser', w: 22 }];   // who hunts the Dunes, and how often each comes
 function exNewDorb() {
   if ((XS.dorbs || 0) >= 3) { XS.dorb = null; XS.dorbField = false; return; }
@@ -7132,7 +7134,7 @@ function spawnGuard() {                          // a big spear thrower keeps th
   const o = XS.dorb, a = Math.random() * Math.PI * 2;
   spawnFoe('spear', { x: o.x + Math.cos(a) * 90, y: o.y + Math.sin(a) * 90, d: 700 });
   const e = S.rg.enemies[S.rg.enemies.length - 1];
-  e.guard = true; e.k = 1.6; e.hp = e.maxHp = 8 * (1 + 0.09 * (S.rg.wave - 1)); e.want = 150;
+  e.guard = true; e.k = 1.6; e.hp = e.maxHp = 8 * 2.5 * (1 + 0.09 * (S.rg.wave - 1)); e.want = 150;
   S.rg.spearSeen = true;
   if (!S.rg.guardSeen) { S.rg.guardSeen = true; S.rg.ringMsg = { text: 'the orb is kept', sub: 'something big throws three at once', t: 0 }; }
 }
