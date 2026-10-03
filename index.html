@@ -3447,6 +3447,11 @@ function renderScene() {
   }
   drawTargetFlash();
   drawHud();
+  if (S.mode === 'expedition' && inNext()) {      // past the blue portal the world is a negative: every colour flipped, HUD too so its pale text reads dark on the white
+    const k = Math.min(1, (S.t - (S.rg.nextAt || 0)) / 1.2);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'difference'; ctx.globalAlpha = k;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
+  }
   drawFilm();
 
   // touch sticks
@@ -7265,7 +7270,7 @@ function warpArrive(dir) {
     rg.beyond = true; rg.next = false; p.x = BEYOND_GATE.x; p.y = BEYOND_GATE.y + 34;
     S.msg = (XS.dorbs || 0) < 3 && !rg.carryDorb ? { text: 'the dunes', sub: XS.dorbs ? `${XS.dorbs} of 3 teal orbs home · another waits out in the sand` : 'A teal light waits out in the sand', t: 0 } : { text: 'the dunes', sub: 'Find water. Find shade. Keep moving', t: 0 };
   } else if (dir === 'next') {
-    rg.beyond = true; rg.next = true; p.x = NEXT_GATE.x; p.y = NEXT_GATE.y + 34;
+    rg.beyond = true; rg.next = true; rg.nextAt = S.t; p.x = NEXT_GATE.x; p.y = NEXT_GATE.y + 34;
     S.msg = { text: 'somewhere else', sub: 'Nothing here yet', t: 0 };
   } else if (dir === 'home2') {
     rg.beyond = false; rg.next = false; p.x = TELE2.x + 26; p.y = TELE2.y - 26;   // back out of the second shrine
