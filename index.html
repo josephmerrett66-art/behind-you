@@ -591,7 +591,11 @@ function makeProp(i, j) {
 }
 function propsNear(x, y, R) {
   const out = [];
-  if (inNext()) return out;
+  if (inNext()) {
+    for (let i = Math.floor((x - R) / T); i <= Math.ceil((x + R) / T); i++)
+      for (let j = Math.floor((y - R) / T); j <= Math.ceil((y + R) / T); j++) { const p = snowPropAt(i, j); if (p) out.push(p); }
+    return out;
+  }
   if (inBeyond()) {
     for (let i = Math.floor((x - R) / T); i <= Math.ceil((x + R) / T); i++)
       for (let j = Math.floor((y - R) / T); j <= Math.ceil((y + R) / T); j++) { const p = desertPropAt(i, j); if (p) out.push(p); }
@@ -1695,10 +1699,10 @@ const tint = (r, g, b) => v => `rgb(${Math.max(0, Math.min(255, v * r | 0))},${M
 let LEAF_K = 2.2;                                  // how much green the leaves carry (1 = the normal amount); a gentle tint, never a pop like the flowers
 const pineG = v => tint(1 - 0.16 * LEAF_K, 1 + 0.05 * LEAF_K, 1 - 0.1 * LEAF_K)(v);   // pine needles: a dark blue-green
 const oakG = v => tint(1 - 0.1 * LEAF_K, 1 + 0.06 * LEAF_K, 1 - 0.24 * LEAF_K)(v);    // oak and bush leaves: a soft olive
-function makeSprite(key, w, h, ax, ay, paint) { // w, h, ax, ay in world units; (ax, ay) is where it meets the ground
+function makeSprite(key, w, h, ax, ay, paint, post) { // w, h, ax, ay in world units; (ax, ay) is where it meets the ground
   const cv = document.createElement('canvas'); cv.width = Math.ceil(w * SPR); cv.height = Math.ceil(h * SPR);
   const g = cv.getContext('2d'); g.scale(SPR, SPR); g.translate(ax, ay); g.lineCap = 'round'; g.lineJoin = 'round';
-  paint(g);
+  paint(g); if (post) post(cv);
   const mk = document.createElement('canvas'); mk.width = cv.width; mk.height = cv.height;   // a solid silhouette of it, for cutting light
   const m = mk.getContext('2d'); m.drawImage(cv, 0, 0); m.globalCompositeOperation = 'source-in'; m.fillStyle = '#000'; m.fillRect(0, 0, mk.width, mk.height);
   return SPRITES[key] = { cv, mk, ax, ay, h };
@@ -2112,8 +2116,8 @@ function sprite(kind, v, Ld = 1) {
   const want = Math.max(0.75, Math.min(3, Math.round(Z * DPR * 1.3 * 4) / 4));
   if (want !== SPR) { SPR = want; SPRITES = {}; }   // zoom or quality changed: repaint at the new size
   const key = kind + v + (Ld > 0 ? 'r' : 'l'); if (SPRITES[key]) return SPRITES[key];
-  const [, w, h, ax, ay, paint] = SPRITE_KINDS[kind];
-  return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld));
+  const [, w, h, ax, ay, paint, snow] = SPRITE_KINDS[kind];
+  return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld), snow ? cv => snowify(cv, ax, Ld, snow) : null);
 }
 // ================= THE DUNES: the first world through the portal =================
 // Rolling sand under the moon, mostly empty: the odd rock, dry scrub, a dead tree. Now and then an oasis: a small lagoon
@@ -2249,6 +2253,235 @@ function drawDesertProp(o, c, mask, sx, sy, s) {
   const sway = o.dk === 'palm' ? (Math.sin(S.t * 0.6 + o.sway) * 2.6 + Math.sin(S.t * 1.7 + o.sway * 3) * 0.7) * s : 0;   // palms rock in the night wind
   if (o.dk === 'palm' && !mask) shadow(sx, sy, 9 * s);
   litStamp(c, o.dk, o.v, sx, sy, s, mask, sway);
+}
+
+// ================= THE FROST: the world past the blue portal =================
+// A normal snowy pine forest painted in the forest's own hand, then the whole world is shown as a negative (see renderScene).
+// Every snowy sprite is the forest sprite with snow laid on it afterwards: wherever a surface faces up, snow settles on it.
+function snowify(cv, ax, Ld, amt = 1) {                   // snow on every upward-facing edge of a painted sprite, thicker in drifts
+  const W = cv.width, H = cv.height, g = cv.getContext('2d'), im = g.getImageData(0, 0, W, H), d = im.data, ox = ax * SPR, th = Math.max(2, SPR * 3.2 * amt);
+  for (let x = 0; x < W; x++) {
+    const thick = th * (0.7 + 0.45 * Math.sin(x / SPR * 0.9) + 0.3 * Math.sin(x / SPR * 2.3 + 1)), lit = (x - ox) * Ld > 0;
+    let air = 99, depth = 99;
+    for (let y = 0; y < H; y++) {
+      const i = (y * W + x) * 4;
+      if (d[i + 3] < 50) { air++; depth = 99; continue; }
+      if (air >= 1) depth = 0;
+      air = 0;
+      if (depth < thick) {
+        const v = (lit ? 236 : 196) - depth / thick * 26, k = Math.min(1, thick - depth);
+        d[i] += (v - 8 - d[i]) * k; d[i + 1] += (v - 3 - d[i + 1]) * k; d[i + 2] += (Math.min(255, v + 10) - d[i + 2]) * k;
+      }
+      depth++;
+    }
+  }
+  g.putImageData(im, 0, 0);
+}
+function snowFoot(g, R, w) {                     // snow banked up round the foot of something
+  const h = Math.min(6, w * 0.22), gr = g.createRadialGradient(0, 0, 0, 0, 0, w);
+  gr.addColorStop(0, 'rgba(214,220,230,0.95)'); gr.addColorStop(0.65, 'rgba(206,212,224,0.75)'); gr.addColorStop(1, 'rgba(200,206,218,0)');
+  g.save(); g.scale(1, h / w); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, w, Math.PI, 0); g.fill(); g.restore();
+}
+const snowy = (paint, foot) => (g, R, Ld) => { paint(g, R, Ld); if (foot) snowFoot(g, R, foot); };
+function paintDrift(g, R, Ld) {                  // a wind-carved drift: a low mound with a sharp lee edge
+  const w = 14 + R() * 12, h = 4 + R() * 4;
+  const gr = g.createLinearGradient(-Ld * w, 0, Ld * w, 0); gr.addColorStop(0, '#9aa3b2'); gr.addColorStop(0.55, '#ced5df'); gr.addColorStop(1, '#eef2f7');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(-w, 0); g.bezierCurveTo(-w * 0.6, -h * 0.4, -w * 0.3, -h, w * 0.1, -h); g.quadraticCurveTo(w * 0.55, -h * 0.9, w, 0); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(250,252,255,0.8)'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(-w * 0.45, -h * 0.75); g.quadraticCurveTo(0, -h * 1.05, w * 0.45, -h * 0.8); g.stroke();
+  g.fillStyle = 'rgba(70,82,104,0.18)'; g.beginPath(); g.ellipse(Ld > 0 ? -w * 0.4 : w * 0.4, -h * 0.25, w * 0.35, h * 0.25, 0, 0, 7); g.fill();
+}
+function paintDeadGrass(g, R) {                  // dry stalks poking up through the snow
+  for (let k = 0; k < 11; k++) { const x = (R() - 0.5) * 9, h = 4 + R() * 8, lean = (R() - 0.5) * 4;
+    g.strokeStyle = tint(1.08, 1, 0.82)(92 + R() * 40); g.lineWidth = 0.5; g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + lean * 0.3, -h * 0.6, x + lean, -h); g.stroke(); }
+  snowFoot(g, R, 7);
+}
+function paintSnowStone(g, R, Ld) {              // a stone nearly buried, only its snowy cap showing
+  const w = 5 + R() * 4; g.fillStyle = grey(64); g.beginPath(); g.ellipse(0, -1, w, w * 0.45, 0, Math.PI, 0); g.fill();
+  g.fillStyle = '#dfe5ee'; g.beginPath(); g.ellipse(Ld * w * 0.1, -w * 0.32, w * 0.8, w * 0.22, 0, Math.PI, 0); g.fill();
+  snowFoot(g, R, w * 1.1);
+}
+function paintIcicles(g, R, Ld) {                // a frozen fallen log with snow on top and icicles hanging off it
+  paintLog(g, R, Ld);
+  for (let k = 0; k < 9; k++) { const f = R() * 1.6 - 0.8, x = 18 * f, y = -9 * f + 1.5, l = 1.5 + R() * 3.5;
+    g.fillStyle = 'rgba(200,226,240,0.85)'; g.beginPath(); g.moveTo(x - 0.5, y); g.lineTo(x + 0.5, y); g.lineTo(x, y + l); g.closePath(); g.fill(); }
+}
+const SNOW_KINDS = {                             // kind: [variants, w, h, ax, ay, painter, snow on top]
+  sPine: [6, 70, 118, 35, 112, snowy(paintPine, 16), 1.7], sDead: [4, 76, 72, 38, 66, snowy(paintSnag, 8), 1], sRock: [5, 36, 26, 18, 21, snowy(paintRock, 14), 1],
+  sBush: [4, 28, 20, 14, 17, snowy(paintBush, 11), 1], sStump: [3, 22, 13, 11, 10, snowy(paintStump, 8), 1], sLog: [3, 56, 34, 28, 19, paintIcicles, 1],
+  drift: [5, 40, 14, 20, 11, paintDrift], dGrass: [4, 18, 14, 9, 12, paintDeadGrass], sStone: [4, 22, 10, 11, 7, paintSnowStone],
+};
+Object.assign(SPRITE_KINDS, SNOW_KINDS);
+// ---- frozen ponds: one in about every third 1600-unit cell ----
+const POND_CELL = 1600, pondCache = new Map();
+function pondIn(ci, cj) {
+  const key = ci + ',' + cj; if (pondCache.has(key)) return pondCache.get(key);
+  let o = null;
+  const gi = Math.floor(NEXT_GATE.x / POND_CELL), gj = Math.floor(NEXT_GATE.y / POND_CELL);
+  if (ci === gi && cj === gj) o = { x: NEXT_GATE.x - 420, y: NEXT_GATE.y + 330, r: 110 };   // one close to where you arrive
+  else if (hash(ci * 2.3 - 9, cj * 1.7 + 5) > 0.62) o = { x: (ci + 0.2 + 0.6 * hash(cj + 1, ci - 3)) * POND_CELL, y: (cj + 0.2 + 0.6 * hash(ci - 5, cj + 2)) * POND_CELL, r: 70 + hash(ci + 4, cj * 3) * 90 };
+  if (o) o.seed = hash(ci * 5.1, cj * 9.3) * 6.28;
+  pondCache.set(key, o); return o;
+}
+function pondsNear(x, y, R) {
+  const out = [];
+  for (let ci = Math.floor((x - R) / POND_CELL); ci <= Math.floor((x + R) / POND_CELL); ci++)
+    for (let cj = Math.floor((y - R) / POND_CELL); cj <= Math.floor((y + R) / POND_CELL); cj++) { const o = pondIn(ci, cj); if (o) out.push(o); }
+  return out;
+}
+function pondAt(x, y) {                          // how far this point is from the nearest pond's shore (negative = on the ice)
+  for (const o of pondsNear(x, y, 300)) { const d = Math.hypot(x - o.x, y - o.y), sh = lagoonR(o, Math.atan2(y - o.y, x - o.x)); if (d < sh + 200) return d - sh; }
+  return 1e9;
+}
+function vnoise(x, y) {                          // smooth value noise, 0..1
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+const groveK = (x, y) => Math.max(0, Math.min(1, (vnoise(x / 520 + 11, y / 520 - 7) * 0.75 + vnoise(x / 170, y / 170) * 0.25 - 0.32) * 2.2));   // where the pines grow thick
+const snowCache = new Map();
+function snowPropAt(i, j) {
+  const key = i * 2097152 + j;
+  if (snowCache.has(key)) return snowCache.get(key);
+  if (snowCache.size > 100000) snowCache.clear();
+  let p = null;
+  const x = i * T + 8 + hash(j - 17, i + 23) * (T - 16), y = j * T + 8 + hash(i + 31, j - 6) * (T - 16);
+  if (Math.hypot(x - NEXT_GATE.x, y - NEXT_GATE.y) > 140 && pondAt(x, y) > 10) {
+    const h = hash(i * 1.17 - 61, j * 0.83 + 19), v = hash(i * 0.7 + 3, j * 2.9 - 8), s = 0.8 + hash(i * 2.2, j * 3.1) * 0.6, gk = groveK(x, y);
+    if (h > 0.985 - 0.2 * gk) p = { kind: 'sprop', sk: 'sPine', x, y, s: s * (0.9 + gk * 0.25), r: 9, v: (v * 97 | 0) % 6, sway: v * 9 };   // pines, thick in the groves
+    else if (h < 0.006 + 0.004 * (1 - gk)) p = { kind: 'sprop', sk: 'sDead', x, y, s: 0.8 + v * 0.4, r: 4, v: (v * 97 | 0) % 4, sway: v * 9 };
+    else if (h < 0.016) p = { kind: 'sprop', sk: 'sRock', x, y, s: 0.7 + v * 0.7, r: 9, v: (v * 97 | 0) % 5 };
+  }
+  snowCache.set(key, p);
+  return p;
+}
+function snowDecorAt(i, j) {
+  if (snowPropAt(i, j)) return null;
+  const h = hash(i * 0.61 + 13, j * 1.93 - 2), x = i * T + 6 + hash(j + 5, i) * (T - 12), y = j * T + 6 + hash(i, j + 8) * (T - 12), v = hash(i * 2.9, j * 0.37);
+  if (pondAt(x, y) < 8) return null;
+  const gk = groveK(x, y);
+  let dk = null;
+  if (h < 0.07) dk = 'drift';
+  else if (h < 0.1 + 0.08 * gk) dk = 'sBush';
+  else if (h < 0.14) dk = 'dGrass';
+  else if (h < 0.16) dk = 'sStone';
+  else if (h < 0.168 + 0.01 * gk) dk = 'sStump';
+  else if (h < 0.172 + 0.008 * gk) dk = 'sLog';
+  if (!dk) return null;
+  return { kind: 'decor', dk, x, y, s: 0.8 + hash(j * 1.1, i * 0.9) * 0.5, v: (v * 97 | 0) % SNOW_KINDS[dk][0], seed: v };
+}
+function snowDecorInView() {                     // only what the torch can reach
+  const reach = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * (isRg() ? rgRange() : 1) / K() + 60, out = [], R = viewR();
+  for (let i = Math.floor((S.cam.x - R) / T); i <= Math.ceil((S.cam.x + R) / T); i++)
+    for (let j = Math.floor((S.cam.y - R) / T); j <= Math.ceil((S.cam.y + R) / T); j++) {
+      const o = snowDecorAt(i, j); if (!o || Math.hypot(o.x - S.p.x, o.y - S.p.y) > reach) continue;
+      const [sx, sy] = toScreen(o.x, o.y); if (sx < -60 || sx > W + 60 || sy < -10 || sy - 50 * Z > H) continue;
+      o.sx = sx; o.sy = sy; out.push(o);
+    }
+  return out;
+}
+function drawSnowProp(o, c, mask, sx, sy, s) {
+  const sway = o.sk === 'sPine' || o.sk === 'sDead' ? (Math.sin(S.t * 0.7 + o.sway) * 1.4 + Math.sin(S.t * 1.9 + o.sway * 3) * 0.4) * s : 0;
+  litStamp(c, o.sk, o.v, sx, sy, s, mask, sway);
+}
+// the snow itself: wind-carved ridges, blue hollows and a glitter of frost, painted into one tile like the forest floor
+let snowPat = null, snowT = null;
+function snowPattern() {
+  if (snowPat) return snowPat;
+  const P = 384, cv = document.createElement('canvas'); cv.width = cv.height = P;
+  const g = cv.getContext('2d'), R = sprRand(4242);
+  g.fillStyle = '#c7ced9'; g.fillRect(0, 0, P, P);
+  const wrap = f => { for (const ox of [-P, 0, P]) for (const oy of [-P, 0, P]) { g.save(); g.translate(ox, oy); f(); g.restore(); } };
+  for (let n = 0; n < 30; n++) {                    // soft blue hollows and bright wind-packed rises
+    const x = R() * P, y = R() * P, r = 30 + R() * 80, dark = R() < 0.5;
+    wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, dark ? 'rgba(96,112,140,0.16)' : 'rgba(246,249,255,0.2)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
+  }
+  for (let k = 0; k < 16; k++) {                    // sastrugi: long low wind ridges, a blue shadow under a bright lip
+    const y0 = k / 16 * P + R() * 10, ph = R() * 6.3, a1 = 5 + R() * 6;
+    const path = dy => { g.beginPath(); for (let x = 0; x <= P; x += 6) { const y = y0 + dy + Math.sin(x / P * Math.PI * 2 + ph) * a1 + Math.sin(x / P * Math.PI * 6 + ph * 3) * 2; x ? g.lineTo(x, y) : g.moveTo(x, y); } };
+    for (const oy of [-P, 0, P]) { g.save(); g.translate(0, oy);
+      g.strokeStyle = 'rgba(110,126,156,0.22)'; g.lineWidth = 2.2; path(1.2); g.stroke();
+      g.strokeStyle = 'rgba(250,252,255,0.45)'; g.lineWidth = 0.9; path(-0.6); g.stroke(); g.restore(); }
+  }
+  for (let n = 0; n < 1400; n++) { const x = R() * P, y = R() * P; g.fillStyle = R() < 0.5 ? 'rgba(255,255,255,0.55)' : 'rgba(150,162,184,0.3)'; g.fillRect(x, y, 0.7, 0.7); }   // frost grains
+  for (let n = 0; n < 30; n++) { const x = R() * P, y = R() * P; g.strokeStyle = 'rgba(72,70,66,0.45)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R() - 0.5) * 6, y + (R() - 0.5) * 3); g.stroke(); }   // the odd fallen twig
+  return snowPat = ctx.createPattern(cv, 'repeat');
+}
+function snowTile() {
+  const k = K(), P = 384, w = Math.round(2 * k * P * DPR), h = Math.round(k * P * DPR);
+  if (snowT && snowT.w === w && snowT.h === h) return snowT;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d'), sx = w / (2 * P), sy = h / P;
+  g.setTransform(sx, sy / 2, -sx, sy / 2, 0, 0); g.fillStyle = snowPattern(); g.fillRect(-2 * P, -P, 4 * P, 4 * P);
+  return snowT = { w, h, pat: ctx.createPattern(cv, 'repeat') };
+}
+function drawPonds() {                           // frozen ponds: dark clear ice with cracks and blown snow, a snow bank round the edge
+  for (const o of pondsNear(S.cam.x, S.cam.y, viewR() + 150)) {
+    ctx.fillStyle = 'rgba(236,241,248,0.7)'; lagoonPath(ctx, o, 1.12); ctx.fill();   // the bank
+    const gr = ctx.createRadialGradient(o.x - o.r * 0.2, o.y - o.r * 0.2, 0, o.x, o.y, o.r * 1.1);
+    gr.addColorStop(0, '#2a3f55'); gr.addColorStop(0.6, '#4a6a86'); gr.addColorStop(1, '#8fb0c6');
+    ctx.fillStyle = gr; lagoonPath(ctx, o, 1); ctx.fill();
+    ctx.save(); lagoonPath(ctx, o, 1); ctx.clip();
+    const Rr = sprRand(o.seed * 1000 | 0);
+    ctx.strokeStyle = 'rgba(205,228,242,0.5)'; ctx.lineWidth = 0.7;
+    for (let n = 0; n < 7; n++) {                 // cracks running out across the ice
+      let x = o.x + (Rr() - 0.5) * o.r * 0.6, y = o.y + (Rr() - 0.5) * o.r * 0.6, a = Rr() * 6.28;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      for (let k = 0; k < 6; k++) { a += (Rr() - 0.5) * 1.2; x += Math.cos(a) * o.r * 0.14; y += Math.sin(a) * o.r * 0.14; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    for (let n = 0; n < 9; n++) {                 // snow blown across the ice in streaks
+      const x = o.x + (Rr() - 0.5) * o.r * 1.4, y = o.y + (Rr() - 0.5) * o.r * 1.4, l = o.r * (0.15 + Rr() * 0.3);
+      const g2 = ctx.createRadialGradient(x, y, 0, x, y, l); g2.addColorStop(0, 'rgba(225,233,243,0.55)'); g2.addColorStop(1, 'rgba(225,233,243,0)');
+      ctx.fillStyle = g2; ctx.beginPath(); ctx.ellipse(x, y, l, l * 0.35, -0.46, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(240,246,252,0.85)'; ctx.lineWidth = 1.6; lagoonPath(ctx, o, 1.01); ctx.stroke();
+  }
+}
+function drawNextGround() {                      // past the blue portal: deep snow, frozen ponds, footprints pressed in
+  const st = snowTile(), k = K();
+  const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
+  st.pat.setTransform(new DOMMatrix().translate(Math.round(ox), Math.round(oy)));
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = st.pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
+  ctx.save(); worldMatrix(ctx, DPR);
+  drawPonds();
+  for (const f of S.p.prints) { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a); const a = 1 - f.age / 10;
+    ctx.fillStyle = `rgba(92,108,136,${0.55 * a})`; ctx.beginPath(); ctx.ellipse(0, 0, 4.6, 2.3, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgba(246,249,255,${0.5 * a})`; ctx.beginPath(); ctx.ellipse(0.6, -0.9, 4.2, 1.2, 0, Math.PI, 0); ctx.fill(); ctx.restore(); }   // pressed deep, a lip of snow pushed up
+  ctx.restore();
+}
+// falling snow: flakes drifting down round you, drawn under the dark so you see them where the light falls
+function snowStep(dt) {
+  const p = S.p, R = Math.min(440, viewR()), want = inNext() ? 260 : 0;
+  if (!AIR.snow) AIR.snow = [];
+  while (AIR.snow.length < want) AIR.snow.push({ x: 0, y: 0, z: 0, ph: Math.random() * 9, s: 0.5 + Math.random(), fresh: true });
+  if (AIR.snow.length > want) AIR.snow.length = want;
+  const [wx, wy] = windVec();
+  for (const f of AIR.snow) {
+    if (f.fresh || f.z <= 0 || Math.hypot(f.x - p.x, f.y - p.y) > R) { const a = Math.random() * 7, d = Math.sqrt(Math.random()) * R; f.x = p.x + Math.cos(a) * d; f.y = p.y + Math.sin(a) * d; f.z = f.fresh ? Math.random() * 120 : 110 + Math.random() * 20; f.fresh = false; }
+    f.ph += dt; f.z -= (16 + 10 * f.s) * dt;
+    f.x += (wx * 14 + Math.sin(f.ph * 1.3 + f.s * 7) * 9) * dt; f.y += (wy * 14 + Math.cos(f.ph * 1.1 + f.s * 5) * 9) * dt;
+  }
+}
+function drawSnowfall() {
+  if (!AIR.snow || !AIR.snow.length) return;
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = 'rgba(250,252,255,0.85)';
+  for (const f of AIR.snow) {
+    const [x, y0] = toScreen(f.x, f.y), y = y0 - f.z * Z, r = (0.5 + 0.6 * f.s) * Z;
+    if (x < -5 || x > W + 5 || y < -5 || y > H + 5) continue;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  ctx.restore();
+}
+// your breath clouds in the cold
+function drawBreath() {
+  if (!inNext() || !S.p) return;
+  const p = S.p, t = S.t, run = Math.hypot(p.vx, p.vy) > WALK, per = run ? 1.1 : 2.2, u = (t % per) / per;
+  if (u > 0.5) return;
+  const k = u / 0.5, [px, py] = toScreen(p.x, p.y), [fx, fy] = [Math.cos(S.aim), Math.sin(S.aim)];
+  const x = px + fx * (6 + 16 * k) * Z, y = py - (31 - 4 * k) * Z + fy * 5 * k * Z, rr = (2.5 + 8 * k) * Z;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, rr); g.addColorStop(0, `rgba(235,240,248,${0.4 * (1 - k)})`); g.addColorStop(1, 'rgba(235,240,248,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill();
 }
 // the dunes: one big height field (1536 units square, repeating), shaded once by the moon and laid over the sand.
 // Each ridge rises gently on the windward side and drops steeply on the slip face, with a pale crest along the top.
@@ -2490,7 +2723,7 @@ function decorNear(x, y, R) {
   return out;
 }
 function decorInView(lights) {   // ground cover only shows where some light reaches it, so skip the rest
-  if (inNext()) return [];
+  if (inNext()) return snowDecorInView();
   if (inBeyond()) return desertDecorInView();
   const reach = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
   const out = [], near = lights.filter(L => Math.hypot(L.x - S.p.x, L.y - S.p.y) < viewR() + 200);
@@ -2504,7 +2737,7 @@ function decorInView(lights) {   // ground cover only shows where some light rea
 }
 function drawDecor(o) {   // sets the transform directly (no save/restore): there are a lot of these each frame
   const s = o.s * Z, spr = sprite(o.dk, o.v), k = s / SPR, f = o.seed > 0.5 ? k : -k;
-  const sh = o.dk === 'grass' || o.dk === 'fern' || o.dk === 'reeds' || o.dk === 'tuft' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
+  const sh = o.dk === 'grass' || o.dk === 'fern' || o.dk === 'reeds' || o.dk === 'tuft' || o.dk === 'dGrass' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
   if (o.dk === 'bush' || o.dk === 'stump') shadow(o.sx, o.sy, 9 * s);
   const [l, hy] = lean(o.sx, o.sy);   // combined lean and wind sway, applied as one transform
   withXf(ctx, f, sh * k - l * k, hy * k, o.sx, o.sy, () => ctx.drawImage(spr.cv, -spr.ax * SPR, -spr.ay * SPR));
@@ -2515,6 +2748,7 @@ function drawDecor(o) {   // sets the transform directly (no save/restore): ther
 function caster(o) {
   if (o.kind === 'tree') return { r: (o.type === 'oak' || o.type === 'cherry' ? 12 : o.type === 'dead' ? 4 : 9) * o.s, len: 1600 };
   if (o.kind === 'rock') return { r: 11 * o.s, len: 90 * o.s };
+  if (o.kind === 'sprop') return o.sk === 'sRock' ? { r: 11 * o.s, len: 90 * o.s } : { r: (o.sk === 'sPine' ? 9 : 4) * o.s, len: 1600 };
   if (o.kind === 'dprop') return { r: (o.dk === 'palm' ? 4 : 5) * o.s, len: o.dk === 'palm' ? 1600 : 120 * o.s };
   if (o.kind === 'post' || o.kind === 'lamp') return { r: 3.5, len: 1600 };
   if (o.kind === 'fence') return { r: 2.5, len: 45 };
@@ -2558,6 +2792,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   if (o.kind === 'tree') {
     drawTree(o, c, mask, sx, sy, s);
   } else if (o.kind === 'dprop') { drawDesertProp(o, c, mask, sx, sy, s);
+  } else if (o.kind === 'sprop') { drawSnowProp(o, c, mask, sx, sy, s);
   } else if (o.kind === 'rock') {
     if (!mask) shadow(sx, sy, 13 * s);
     litStamp(c, 'rock', (hash(o.x * 0.37, o.y * 0.91) * 50 | 0) % SPRITE_KINDS.rock[0], sx, sy, s * 0.95, mask);
@@ -3227,7 +3462,7 @@ function drawMoths() {                            // drawn under the dark: you o
 }
 function drawMistLow() {                          // drawn under the dark, so only lit ground shows its mist
   if (!S.p) return;
-  const sand = inBeyond();
+  const sand = inDunes();
   ctx.save();
   for (const m of AIR.mist) {
     const [x, y] = toScreen(m.x, m.y), rx = m.r * Z, a = 0.13 + 0.05 * Math.sin(m.ph * 0.5);
@@ -3308,7 +3543,7 @@ function renderScene() {
   for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
-  airStep(); sparkFires(lights); drawMistLow(); drawMoths();
+  airStep(); snowStep(frameDt); sparkFires(lights); drawMistLow(); drawMoths(); drawSnowfall();
 
   // darkness
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -3428,6 +3663,7 @@ function renderScene() {
   }
   drawLensGlow();
   drawPlayer(); // drawn over the dark so the whole figure stays readable
+  drawBreath();
   drawTorchWarmth();
   drawWarmth();
   if (isRg()) drawDodgeFx();
@@ -3448,7 +3684,7 @@ function renderScene() {
   drawTargetFlash();
   drawHud();
   if (S.mode === 'expedition' && inNext()) {      // past the blue portal the world is a negative: every colour flipped, HUD too so its pale text reads dark on the white
-    const k = Math.min(1, (S.t - (S.rg.nextAt || 0)) / 1.2);
+    const k = Math.max(0, Math.min(1, (S.t - (S.rg.nextAt || 0)) / 1.2));
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'difference'; ctx.globalAlpha = k;
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
   }
@@ -7150,7 +7386,8 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (w.t >= 1.9) rg.warp = null;
     return true;
   }
-  if (rg.next) {                               // past the second portal: nothing here yet, only the way back
+  if (rg.next) {                               // past the second portal: the Frost, empty of hunters for now, and the way back
+    stormSound(0.28);                          // a thin cold wind
     rg.oil = oilMax(); rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false; attackBtn.hidden = false;
     if (dist2(p, NEXT_GATE) > 40) rg.leftGate = true;
     if (rg.leftGate && dist2(p, NEXT_GATE) < 16) warpStart('home2');
@@ -7250,12 +7487,6 @@ function asTeal(fn) {
   rg.portalFx = rg.portal2Fx; XS.orbs = XS.dorbs || 0; TELE.x = TELE2.x; TELE.y = TELE2.y;
   try { fn(); } finally { [ORB_COL, ORB_DARK, ORB_LITE, rg.portalFx, XS.orbs, TELE.x, TELE.y] = keep; }
 }
-function drawNextGround() {                      // past the second portal: bare dark ground, nothing made yet
-  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = '#4a4a48'; ctx.fillRect(0, 0, W, H); ctx.restore();
-  ctx.save(); worldMatrix(ctx, DPR);
-  for (const f of S.p.prints) { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a); ctx.fillStyle = `rgba(30,30,28,${0.5 * (1 - f.age / 10)})`; ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 2.2, 0, 0, 7); ctx.fill(); ctx.restore(); }
-  ctx.restore();
-}
 function warpStart(dir) {
   const rg = S.rg; rg.warp = { t: 0, dir, moved: false }; rg.leftGate = false;
   addShake(0.6); hitStop(0.08);
@@ -7271,7 +7502,7 @@ function warpArrive(dir) {
     S.msg = (XS.dorbs || 0) < 3 && !rg.carryDorb ? { text: 'the dunes', sub: XS.dorbs ? `${XS.dorbs} of 3 teal orbs home · another waits out in the sand` : 'A teal light waits out in the sand', t: 0 } : { text: 'the dunes', sub: 'Find water. Find shade. Keep moving', t: 0 };
   } else if (dir === 'next') {
     rg.beyond = true; rg.next = true; rg.nextAt = S.t; p.x = NEXT_GATE.x; p.y = NEXT_GATE.y + 34;
-    S.msg = { text: 'somewhere else', sub: 'Nothing here yet', t: 0 };
+    S.msg = { text: 'the frost', sub: 'Everything here is wrong. Keep moving', t: 0 };
   } else if (dir === 'home2') {
     rg.beyond = false; rg.next = false; p.x = TELE2.x + 26; p.y = TELE2.y - 26;   // back out of the second shrine
     S.msg = { text: 'home', sub: 'The camp is close', t: 0 };
@@ -7724,7 +7955,7 @@ function drawExHud(top) {
   const big = W > 900, fs = big ? 15 : 13, lh = fs + 5, hs = big ? 13 : 11, hg = big ? 18 : 15;
   ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.font = `600 ${fs}px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(239,239,234,0.88)';
-  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.next ? 'SOMEWHERE ELSE' : rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
+  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.next ? 'THE FROST' : rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
   const hy = 20 + lh + top;
   for (let i = 0; i < rg.maxHp + steelMax(); i++) {
     const x = 16 + i * hg, y = hy, st = i >= rg.maxHp, cx = x + hs / 2, cy = y + hs / 2;
