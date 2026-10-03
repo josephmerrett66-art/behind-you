@@ -2620,6 +2620,51 @@ function drawBirds(alpha) {
   }
 }
 
+// ---- attack body animation (v101): keyed poses for each blow, eased between, so the whole body throws the torch ----
+// Each key: u (fraction of the swing), ph (shoulder turn, + brings the torch shoulder forward), ln (lean into it), cr (crouch),
+// st (stance: front foot forward), tk (knees tucked up mid-air), and the torch hand: a (angle round the body, 0 straight ahead,
+// + out to the torch side), R (how far out), h (height from the shoulder), ta/tp (which way the torch points: round, and up/down),
+// la/lR/lh the free hand (null: it grips the torch too), e (how the move into this key eases: 'o' snap out, 'io' smooth).
+const POSES = [
+  [ { u: 0, ph: -0.35, ln: 0.5, cr: 0.5, st: 1, a: 1.5, R: 9, h: -3, ta: 1.9, tp: 0.25, la: -2.2, lR: 6, lh: -9 },
+    { u: 0.14, ph: -0.85, ln: 0, cr: 1.8, st: 2.5, a: 2.5, R: 10.5, h: 0, ta: 2.9, tp: 0.55, la: -1.2, lR: 8, lh: -7, e: 'io' },     // wind-up: torch hauled back behind the shoulder
+    { u: 0.4, ph: 0.85, ln: 4.6, cr: 3, st: 6.5, a: -1.35, R: 14.5, h: -4, ta: -1.75, tp: -0.12, la: -2.7, lR: 8.5, lh: -5, e: 'o' },   // the cut: whipped right across the front
+    { u: 0.72, ph: 0.9, ln: 3.8, cr: 2.6, st: 6, a: -1.6, R: 13, h: -5, ta: -2.05, tp: -0.22, la: -2.6, lR: 8, lh: -6, e: 'io' },     // follow-through
+    { u: 1, ph: 0.55, ln: 2.2, cr: 1.4, st: 3.5, a: -1.3, R: 10, h: -5, ta: -1.6, tp: -0.1, la: -2.3, lR: 6.5, lh: -8, e: 'io' } ],
+  [ { u: 0, ph: 0.55, ln: 2.2, cr: 1.4, st: 3.5, a: -1.3, R: 10, h: -5, ta: -1.6, tp: -0.1, la: -2.3, lR: 6.5, lh: -8 },
+    { u: 0.14, ph: 1.05, ln: 1.6, cr: 2.4, st: 3, a: -2.1, R: 9.5, h: -1, ta: -2.7, tp: 0.45, la: -2.8, lR: 7, lh: -7, e: 'io' },     // coiled across the chest
+    { u: 0.4, ph: -0.8, ln: 4.8, cr: 3.2, st: -6.5, a: 1.65, R: 15, h: -2.5, ta: 2, tp: 0.05, la: -0.4, lR: 9, lh: -4, e: 'o' },   // the backhand: flung out wide
+    { u: 0.72, ph: -0.85, ln: 4, cr: 2.8, st: -6, a: 1.9, R: 13.5, h: -3.5, ta: 2.2, tp: -0.05, la: -0.5, lR: 8.5, lh: -5, e: 'io' },
+    { u: 1, ph: -0.4, ln: 2, cr: 1.4, st: -3, a: 1.3, R: 10, h: -4.5, ta: 1.5, tp: 0, la: -1.2, lR: 6.5, lh: -8, e: 'io' } ],
+  [ { u: 0, ph: 0, ln: 1.5, cr: 2, st: 1, a: 0.6, R: 8, h: -6, ta: 0.4, tp: 0, la: -0.6, lR: 7, lh: -7 },
+    { u: 0.1, ph: 0.1, ln: 3.5, cr: 6.5, st: 2, a: 0.9, R: 7, h: -11, ta: 1.2, tp: -0.6, la: -1.2, lR: 7, lh: -11, e: 'io' },       // dropped low, about to spring
+    { u: 0.22, ph: 0, ln: -1.5, cr: -1.5, st: 1, tk: 4, a: 0.1, R: 2.5, h: 10, ta: 0, tp: 1.35, la: null, e: 'o' },                 // up and away, torch raised high in both hands
+    { u: 0.5, ph: 0, ln: -3, cr: -1, st: 1, tk: 7, a: 0, R: 0.5, h: 12, ta: 0, tp: 1.9, la: null, e: 'io' },                        // arched back at the top, torch tipped behind the head
+    { u: 0.6, ph: 0, ln: 7, cr: 7, st: 4, tk: 0, a: 0, R: 14, h: -12, ta: 0, tp: -1.05, la: null, e: 'o' },                         // SLAM: driven into the ground
+    { u: 0.8, ph: 0, ln: 6, cr: 6.5, st: 4, a: 0, R: 13, h: -12, ta: 0, tp: -0.95, la: null, e: 'io' },                             // held on the impact
+    { u: 1, ph: 0.1, ln: 2.5, cr: 2, st: 3, a: -0.2, R: 10, h: -6, ta: -0.1, tp: -0.2, la: -1.8, lR: 6, lh: -8, e: 'io' } ],
+  [ { u: 0, ph: 0.2, ln: 4, cr: 3, st: 3, a: 0.4, R: 6, h: -5, ta: 0.2, tp: 0, la: -2.4, lR: 6, lh: -6 },
+    { u: 0.2, ph: 0.7, ln: 7.5, cr: 3.5, st: 7, a: -0.05, R: 16, h: -2.5, ta: 0, tp: 0.02, la: 3.1, lR: 8, lh: -3, e: 'o' },        // the thrust: everything behind one straight arm
+    { u: 0.6, ph: 0.65, ln: 7, cr: 3.5, st: 7, a: -0.05, R: 15.5, h: -3, ta: 0, tp: 0, la: 3, lR: 7.5, lh: -4, e: 'io' },
+    { u: 1, ph: 0.3, ln: 3, cr: 1.8, st: 4, a: -0.15, R: 11, h: -5, ta: -0.1, tp: -0.05, la: -2.2, lR: 6.5, lh: -8, e: 'io' } ],
+];
+const EASE = { o: u => 1 - Math.pow(1 - u, 3), io: u => u * u * (3 - 2 * u) };
+function poseAt(i, u) {                            // the body's shape u of the way through blow i
+  const K = POSES[i]; let k = 1; while (k < K.length - 1 && K[k].u < u) k++;
+  const A = K[k - 1], B = K[k], f = EASE[B.e || 'io'](Math.max(0, Math.min(1, (u - A.u) / ((B.u - A.u) || 1))));
+  const o = {};
+  for (const key of ['ph', 'ln', 'cr', 'st', 'tk', 'a', 'R', 'h', 'ta', 'tp']) o[key] = (A[key] || 0) + ((B[key] || 0) - (A[key] || 0)) * f;
+  const la = v => v.la === null ? null : v;   // the free hand joins the torch (grip) or swings on its own
+  const lA = la(A), lB = la(B);
+  if (!lA || !lB) { o.grip = !lB ? (lA ? f : 1) : 1 - f; o.la = (lA || lB) ? (lA || lB).la : 0; o.lR = (lA || lB) ? (lA || lB).lR : 6; o.lh = (lA || lB) ? (lA || lB).lh : -8; }
+  else { o.grip = 0; for (const key of ['la', 'lR', 'lh']) o[key] = A[key] + (B[key] - A[key]) * f; }
+  return o;
+}
+function atkPose(p) {                              // the pose to draw, and how much of it (it lets go over 0.16 s once the blow is done)
+  if (p.atk) return Object.assign(poseAt(p.atk.i, Math.min(1, p.atk.t / p.atk.dur)), { w: Math.min(1, p.atk.t / 0.03 + (p.atk.i === (p.atkLast && p.atkLast.i + 1) ? 1 : 0)) });
+  const L = p.atkLast; if (!L || !S.rg || S.t - L.end > 0.16) return null;
+  return Object.assign(poseAt(L.i, 1), { w: 1 - (S.t - L.end) / 0.16 });
+}
 function drawPlayer() {
   const p = S.p, [bx, by0] = toScreen(p.x, p.y), by = by0 - (p.hopZ || 0) * Z;   // up off the ground mid-leap
   const a = S.aim, v = screenSpeed(p), moving = v > 8;
@@ -2636,29 +2681,53 @@ function drawPlayer() {
   // body motion
   const bob = moving ? Math.abs(Math.cos(ph)) * (1.2 + run * 1.3) : 0;
   const breathe = moving ? 0 : Math.sin(S.t * 1.8) * 0.35;
-  const lean = sf * 1.4 + run * 2;                              // leans into the walk, more when running
-  const hipH = 17 - (moving ? 0.8 : 0) + bob, shH = 30.5 + bob + breathe, headH = 36.5 + bob + breathe * 0.6;
-  const twist = moving ? Math.sin(ph) * 0.8 * sf : 0;           // hips and shoulders counter-rotate a touch
+  const AP = isRg() ? atkPose(p) : null, aw = AP ? AP.w : 0, mx = (a0, b0) => a0 + (b0 - a0) * aw;   // an attack takes the body over
+  const walkW = 1 - aw;
+  const lean = (sf * 1.4 + run * 2) * walkW + (AP ? AP.ln * 2 * aw : 0);   // leans into the walk, more when running; and into every blow
+  const crouch = AP ? AP.cr * aw : 0;
+  const hipH = 17 - (moving ? 0.8 : 0) * walkW + bob * walkW - crouch, shH = 30.5 + bob * walkW + breathe - crouch * 1.15, headH = 36.5 + bob * walkW + breathe * 0.6 - crouch * 1.2;
+  const phi = AP ? AP.ph * aw : 0;                               // the shoulders turn with the blow
+  const twist = (moving ? Math.sin(ph) * 0.8 * sf : 0) * walkW + 10.7 * Math.sin(phi);   // hips and shoulders counter-rotate a touch
 
   // legs: each foot swings forward and back; the back foot lifts as it passes under the body
   const stride = strideLen(v);
   function leg(side, off) {
     const s = Math.sin(ph + off), c = Math.cos(ph + off);
-    const footF = moving ? s * stride : side * 0.4, lift = moving ? Math.max(0, c) * (2.2 + run * 2.5) : 0;
-    const hip = [twist * side * 0.6, side * 2.6, hipH];
-    const foot = [footF, side * 2.2, lift];
-    const knee = [(hip[0] + foot[0]) / 2 + 1.2 + lift * 0.5 + sf * 0.4, side * 2.4, (hip[2] + foot[2]) / 2 + 0.6];
+    let footF = moving ? s * stride : side * 0.4, lift = moving ? Math.max(0, c) * (2.2 + run * 2.5) : 0, footR = side * 2.2;
+    if (AP) {                                   // a fighting stance: feet planted wide, one forward; tucked up under you in the air
+      const st = AP.st, front = st >= 0 ? side < 0 : side > 0, sF = front ? Math.abs(st) : -Math.abs(st) * 0.75;
+      footF = mx(footF, sF + AP.tk * 0.35); lift = mx(lift, AP.tk); footR = mx(footR, side * (2.2 + crouch * 0.35));
+    }
+    const hip = [twist * side * 0.6 * (AP ? 0.4 : 1), side * 2.6, hipH];
+    const foot = [footF, footR, lift];
+    const bend = crouch * 0.9 + (AP ? AP.tk * 0.6 * aw : 0);
+    const knee = [(hip[0] + foot[0]) / 2 + 1.2 + lift * 0.5 + sf * 0.4 * walkW + bend, side * (2.4 + crouch * 0.25), (hip[2] + foot[2]) / 2 + 0.6];
     return { hip, knee, foot };
   }
   const L = leg(-1, Math.PI), Rg = leg(1, 0);
 
   // arms: the free (left) arm swings against the right leg; the right arm holds the torch out front
   const swingA = moving ? Math.sin(ph) * (4 + run * 3) : Math.sin(S.t * 1.8) * 0.3;
-  const lSh = [-twist * 0.6 + lean * 0.5, -5.4, shH - 1], rSh = [twist * 0.6 + lean * 0.5, 5.4, shH - 1];
-  const lEl = [lSh[0] + swingA * 0.5, -5.2, shH - 7], lHa = [lSh[0] + swingA + (run ? 2 : 0), -4.8, shH - 13 + (run ? 3 : 0)];
-  const sway = moving ? Math.sin(ph * 2) * 0.5 : 0;
-  const rEl = [rSh[0] + 4, 5.2, shH - 6.5 + sway], rHa = [rSh[0] + 9.5, 3.6, shH - 7.5 + sway];
-  const tipL = [rHa[0] + 6, 3.4, rHa[2] - 1.2];
+  const cphi = Math.cos(phi);
+  const lSh = [-twist * 0.6 + lean * 0.5, -5.4 * cphi, shH - 1], rSh = [twist * 0.6 + lean * 0.5, 5.4 * cphi, shH - 1];
+  let lEl = [lSh[0] + swingA * 0.5 * walkW, -5.2, shH - 7], lHa = [lSh[0] + (swingA + (run ? 2 : 0)) * walkW, -4.8, shH - 13 + (run ? 3 : 0) * walkW];
+  const sway = moving ? Math.sin(ph * 2) * 0.5 * walkW : 0;
+  let rEl = [rSh[0] + 4, 5.2, shH - 6.5 + sway], rHa = [rSh[0] + 9.5, 3.6, shH - 7.5 + sway];
+  let tipL = [rHa[0] + 6, 3.4, rHa[2] - 1.2];
+  const tip0 = tipL;                               // where the lens sits at rest: the beam keeps coming from there
+  if (AP) {                                        // the torch hand swings round the body on its arc; the elbow follows, bent out
+    const add = (q, d) => [q[0] + d[0], q[1] + d[1], q[2] + d[2]], mix3 = (q0, q1, f) => [q0[0] + (q1[0] - q0[0]) * f, q0[1] + (q1[1] - q0[1]) * f, q0[2] + (q1[2] - q0[2]) * f];
+    const hand = add(rSh, [Math.cos(AP.a) * AP.R, Math.sin(AP.a) * AP.R - 1.8, AP.h]);
+    const out = [Math.cos(AP.a + 1.2) * 2.4, Math.sin(AP.a + 1.2) * 2.4, -2.2];   // the elbow bows out and down
+    const elbow = add(mix3(rSh, hand, 0.5), out);
+    const tp = AP.tp, td = [Math.cos(AP.ta) * Math.cos(tp) * 7, Math.sin(AP.ta) * Math.cos(tp) * 7, Math.sin(tp) * 7];
+    rHa = mix3(rHa, hand, aw); rEl = mix3(rEl, elbow, aw); tipL = mix3(tipL, add(hand, td), aw);
+    // the free hand: flung out for balance, or up on the torch beside the other one
+    const freeH = add(lSh, [Math.cos(AP.la) * AP.lR, Math.sin(AP.la) * AP.lR * 0.9, AP.lh]);
+    const gripH = mix3(rHa, tipL, 0.22), lH = mix3(freeH, [gripH[0], gripH[1] - 1.2, gripH[2]], AP.grip);
+    const lE = add(mix3(lSh, lH, 0.5), [-1.4 * (1 - AP.grip), -1.6, -2.2]);
+    lHa = mix3(lHa, lH, aw); lEl = mix3(lEl, lE, aw);
+  }
 
   let OUT = false;   // outline pass: everything drawn a little fatter in a faint light tone, then the body on top
   const RIM = 'rgba(239,239,234,0.2)';
@@ -2702,7 +2771,8 @@ function drawPlayer() {
     if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
     const [tx, ty] = P(...tipL);
     if (!OUT) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
-    S.tip = [tx, ty];
+    S.tip = AP ? P(...tip0) : [tx, ty];           // mid-blow the beam stays put; the torch itself goes where the swing takes it
+    S.tipNow = [tx, ty];
   };
   const lt = lean * 0.5;
   // rucksack on the back, a rolled bedroll strapped across the top
@@ -2772,6 +2842,22 @@ function drawPlayer() {
   };
   OUT = true; paint();
   OUT = false; paint();
+  // the torch leaves a hot streak through the air behind it as it swings (kept relative to you, so it travels with the lunge)
+  if (p.atk && S.tipNow && p.trailT !== S.t) { p.trailT = S.t; (p.tTrail = p.tTrail || []).push([S.tipNow[0] - bx, S.tipNow[1] - by0, S.t]); }
+  if (p.tTrail && p.tTrail.length) {
+    p.tTrail = p.tTrail.filter(q => S.t - q[2] < 0.16);
+    const T = p.tTrail;
+    if (T.length > 1) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      for (let i = 1; i < T.length; i++) {
+        const k = 1 - (S.t - T[i][2]) / 0.16;
+        ctx.strokeStyle = `rgba(255,190,120,${0.7 * k})`; ctx.lineWidth = (1.5 + 6 * k) * Z;
+        ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke();
+        ctx.strokeStyle = `rgba(255,250,240,${0.7 * k})`; ctx.lineWidth = (0.5 + 1.6 * k) * Z; ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
 }
 
 // the torch beam gets a slight warm cast too, strongest near the lens and fading out along the beam
