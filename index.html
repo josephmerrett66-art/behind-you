@@ -575,7 +575,7 @@ function propAt(i, j) {
 function makeProp(i, j) {
   if (Math.abs(i) < 2 && Math.abs(j) < 2) return null; // clear spawn
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2, j * T + T / 2) < CAMP_R + 60) return null;   // the camp clearing
-  if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2 - TELE2.x, j * T + T / 2 - TELE2.y) < 120) return null;   // and round the second shrine
+  if (S && S.mode === 'expedition' && inPlaza(i * T + T / 2, j * T + T / 2)) return null;   // and the ring of portals round it
   if (S && S.mode === 'expedition' && XS && XS.lairs && XS.lairs.some(L => Math.hypot(i * T + T / 2 - L.x, j * T + T / 2 - L.y) < MRC + 40)) return null;   // and the mini-bosses' clearings
   if (S && S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb && Math.hypot(i * T + T / 2 - XS.orb.x, j * T + T / 2 - XS.orb.y) < RC + 60) return null;   // and the boss's field
   const cx = i * T + T / 2, cy = j * T + T / 2;
@@ -1558,8 +1558,8 @@ function update(dt) {
   if (S.mode === 'expedition' && !inBeyond()) exWall(p, ox, oy);
 
   // bump into trees and rocks (and the camp's towers, tent and stores)
-  for (const o of propsNear(p.x, p.y, 60).concat(lightsNear(p.x, p.y, 60).filter(L => L.r), S.mode === 'expedition' && Math.hypot(p.x, p.y) < CAMP_R + 40 ? CAMP_SOLID : [], S.mode === 'expedition' && !inBeyond() && dist2(p, TELE2) < 120 && !(S.rg && S.rg.warp) ? [TELE2] : [])) {
-    if (o.nocol || (o === TELE2 && portal2Open() >= 1)) continue;   // an open portal you walk into
+  for (const o of propsNear(p.x, p.y, 60).concat(lightsNear(p.x, p.y, 60).filter(L => L.r), S.mode === 'expedition' && Math.hypot(p.x, p.y) < CAMP_R + 40 ? CAMP_SOLID : [], S.mode === 'expedition' && !inBeyond() && Math.hypot(p.x, p.y) < PRING + 80 && !(S.rg && S.rg.warp) ? [TELE, TELE2, ...PLINTHS] : [])) {
+    if (o.nocol || (o === TELE2 && portal2Open() >= 1) || (o === TELE && portalOpen() >= 1)) continue;   // an open portal you walk into
     const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = o.r * o.s + 7;
     if (d < min && d > 0) { p.x = o.x + dx / d * min; p.y = o.y + dy / d * min; }
   }
@@ -1690,6 +1690,7 @@ function drawGround() {
     const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
     ft.pat.setTransform(new DOMMatrix().translate(Math.round(ox), Math.round(oy)));
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = ft.pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); }
+  drawPortalRing();
   // footprints
   for (const f of S.p.prints) {
     ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a);
@@ -2706,13 +2707,13 @@ function decorAt(i, j) {
   const fl = flowerPatch(i, j);                  // a patch of wildflowers: one colour, a handful of clumps close together
   if (fl && !propAt(i, j)) {
     const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
-    if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || Math.hypot(x - TELE2.x, y - TELE2.y) < 70))) {
+    if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || nearPortal(x, y, 70)))) {
       const v = hash(i * 3.3, j * 5.1);
       d = { kind: 'decor', dk: fl, x, y, s: 1.1 + hash(j * 1.7, i) * 0.4, v: (v * 97 | 0) % 3, seed: v };
     }
   } else if (h < 0.27 && !(Math.abs(i) < 2 && Math.abs(j) < 2) && !propAt(i, j)) {
     const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
-    if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || Math.hypot(x - TELE2.x, y - TELE2.y) < 70))) {
+    if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || nearPortal(x, y, 70)))) {
       const r = h / 0.27, v = hash(i * 3.3, j * 5.1);
       const kind = r < 0.36 ? 'grass' : r < 0.52 ? 'fern' : r < 0.64 ? 'pebbles' : r < 0.76 ? 'bush' : r < 0.85 ? 'shrooms' : r < 0.93 ? 'stump' : 'log';
       d = { kind: 'decor', dk: kind, x, y, s: 1 + hash(j * 1.7, i) * 0.55, v: (v * 97 | 0) % SPRITE_KINDS[kind][0], seed: v };
@@ -2822,6 +2823,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
     c.fillStyle = col('#2f2f2d'); c.fillRect(sx - 2 * Z, sy - 19 * Z, 4 * Z, 19 * Z);
   } else if (o.kind === 'chest') { if (!mask) drawChest(o, c, sx, sy);
   } else if (o.kind === 'tele') { drawTele(o, c, sx, sy, col);
+  } else if (o.kind === 'plinth') { drawPlinth(o, c, sx, sy, col);
   } else if (o.kind === 'stone') { drawStone(o, c, sx, sy, col);
   } else if (o.kind === 'pack') { if (!mask) drawPackProp(o, c, sx, sy);
   } else if (o.kind === 'lamp') {
@@ -5476,8 +5478,14 @@ rerollBtn.addEventListener('click', () => { const rg = S.rg; if (!rg || rg.rerol
 
 const CAMP_R = 170, RINGS = [1800, 4200, 7200];
 const RING_NAMES = ['the near woods', 'the middle woods', 'the far woods', 'the deep'];
-const TELE = { kind: 'tele', x: 92, y: -92, s: 1 };
-const TELE2 = { kind: 'tele', x: -300, y: 300, s: 1, r: 30, second: true };   // the second shrine: out past the wall on the far side of camp, for the desert orbs
+// v107 (Joe): the portals stand in a ring of their own outside the camp wall, eight places between the four gates.
+// The green shrine and the teal one flank the east gate; the other six are bare plinths waiting for worlds still to come.
+const PRING = 340, PORTAL_A = [0, 1, 2, 3, 4, 5, 6, 7].map(k => -Math.PI / 8 + k * Math.PI / 4);
+const TELE = { kind: 'tele', x: Math.cos(PORTAL_A[0]) * PRING, y: Math.sin(PORTAL_A[0]) * PRING, s: 1, r: 30 };
+const TELE2 = { kind: 'tele', x: Math.cos(PORTAL_A[1]) * PRING, y: Math.sin(PORTAL_A[1]) * PRING, s: 1, r: 30, second: true };   // the second shrine, for the desert orbs
+const PLINTHS = PORTAL_A.slice(2).map((a, k) => ({ kind: 'plinth', x: Math.cos(a) * PRING, y: Math.sin(a) * PRING, s: 1, r: 24, seed: k * 1.7 + 0.3 }));
+const nearPortal = (x, y, d) => [TELE, TELE2, ...PLINTHS].some(o => Math.hypot(x - o.x, y - o.y) < d);
+const inPlaza = (x, y) => Math.hypot(x, y) < PRING + 110;   // the camp and the portal ring round it: no trees grow here
 const EX_FIRE = { kind: 'fire', x: 0, y: 0, r: 14, s: 1, seed: 3.7 };
 const OUT_R = 100, LAMP_GAP = 170, LAMP_MAX = 40, RECALL_T = 2;
 const ITEMS = { s: { name: 'scrap', slots: 1, val: 1 }, c: { name: 'cache', slots: 1, val: 5 }, r: { name: 'relic', slots: 2, val: 22 } };
@@ -5732,6 +5740,10 @@ const CAMP = [], CAMP_SOLID = [];
     const p = polar(a, CAMP_R + 30);
     CAMP.push({ camp: 'stakes', kind: 'stakes', x: p.x, y: p.y, a, s: 1, seed: hash(a * 7, 3) });
   }
+  for (const g of GATES) for (const sd of [-1, 1]) {   // braziers where each gate road crosses the portal ring
+    const p = polar(g + sd * 0.1, PRING);
+    CAMP.push({ camp: 'brazier', kind: 'brazier', x: p.x, y: p.y, s: 1, cast: { r: 3, len: 30 } });
+  }
   // the yard
   const put = (o, r) => { CAMP.push(Object.assign({ s: 1 }, o)); if (r) CAMP_SOLID.push({ x: o.x, y: o.y, r }); };
   for (const a of [0.35, 2.3, 4.2]) { const p = polar(a, 40); put({ camp: 'bench', kind: 'bench', x: p.x, y: p.y, a: a + Math.PI / 2 }); }
@@ -5884,6 +5896,13 @@ function drawCampPiece(o, c, sx, sy, col, mask) {
       for (let m = 0; m < 4; m++) { const x = sx - 4 * Z + m * 4 * Z; c.beginPath(); c.moveTo(x - 1.2 * Z, sy - 31 * Z); c.lineTo(x + 0.6 * Z, sy - 38 * Z); c.lineTo(x + 1.6 * Z, sy - 31 * Z); c.closePath(); c.fill(); }
       break;
     }
+    case 'brazier': {                           // an iron fire basket on three legs
+      c.strokeStyle = col('#2b2a28'); c.lineWidth = 1.4 * Z;
+      for (const dx of [-5, 0, 5]) { c.beginPath(); c.moveTo(sx + dx * Z, sy + (dx ? 0 : 2) * Z); c.lineTo(sx + dx * 0.3 * Z, sy - 15 * Z); c.stroke(); }
+      c.fillStyle = col('#3a3835'); c.beginPath(); c.moveTo(sx - 7 * Z, sy - 19 * Z); c.lineTo(sx + 7 * Z, sy - 19 * Z); c.lineTo(sx + 4.5 * Z, sy - 14 * Z); c.lineTo(sx - 4.5 * Z, sy - 14 * Z); c.closePath(); c.fill();
+      c.fillStyle = col('#201f1d'); c.beginPath(); c.ellipse(sx, sy - 19 * Z, 7 * Z, 2.2 * Z, 0, 0, 7); c.fill();
+      break;
+    }
     case 'flag': {                              // the camp's banner, stirring in the night air
       c.fillStyle = col('#3a3631'); c.fillRect(sx - 1.2 * Z, sy - 74 * Z, 2.4 * Z, 74 * Z);
       const t = S.t, fx = sx + 1.2 * Z, fy = sy - 72 * Z, L = 26 * Z, Hh = 14 * Z;
@@ -5909,17 +5928,18 @@ function drawCampFlames() {
   };
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (const o of CAMP) {
-    if (o.camp !== 'post' && o.camp !== 'tower') continue;
+    if (o.camp !== 'post' && o.camp !== 'tower' && o.camp !== 'brazier') continue;
     const [x, y] = toScreen(o.x, o.y);
     if (x < -60 || x > W + 60 || y < -40 || y > H + 120) continue;
     if (o.camp === 'post') flame(x, y - 42 * Z, Z, o.x * 0.1);
+    else if (o.camp === 'brazier') flame(x, y - 21 * Z, Z * 1.2, o.x * 0.13 + o.y);
     else flame(x, y - 62 * Z, Z * 1.2, o.y * 0.1);
   }
   ctx.restore();
 }
 function exItems() {   // camp, chests and dropped packs, drawn in with the trees
   const rg = S.rg; if (!rg || rg.beyond) return [];
-  return CAMP.concat([TELE, TELE2], exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones(), lairStones());
+  return CAMP.concat([TELE, TELE2], PLINTHS, exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones(), lairStones());
 }
 
 // ---- personal stats: kills drop violet wisps, wisps buy small boosts that last for good (Nightfall and Expedition) ----
@@ -6288,10 +6308,10 @@ function exStep(dt) {
   campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns;
   rg.lamps = exPathLamps();
+  if (rg.carryOrb && dist2(p, TELE) < 46) exDeposit();                       // the green shrine, out on the portal ring
+  if (portalOpen() >= 1 && !rg.warp && dist2(p, TELE) < 16) warpStart('out');
   if (inCamp) {
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }   // the ranged ones melt back into the dark
-    if (rg.carryOrb && dist2(p, TELE) < 46) exDeposit();
-    if (portalOpen() >= 1 && !rg.warp && dist2(p, TELE) < 16) warpStart('out');
     return;                                  // nothing new comes while you're home
   }
   if (ring > rg.ringMax) { rg.ringMax = ring; rg.ringMsg = { text: RING_NAMES[ring], t: 0 }; if (ring > 0) playRingSting(); }
@@ -7303,6 +7323,43 @@ function drawTele(o, c, sx, sy, col) {       // an ancient dais of black stone; 
     c.beginPath(); c.moveTo(x - 1.5 * ZT, y - 6 * ZT); c.lineTo(x - 1.5 * ZT + lean * 0.35, y - 18 * ZT); c.lineTo(x + lean * 0.5, y - 22 * ZT); c.lineTo(x - 1 * ZT + lean * 0.7, y - 33 * ZT); c.lineTo(x - 0.5 * ZT + lean * 0.85, y - 44 * ZT); c.stroke();
   }
 }
+function drawPlinth(o, c, sx, sy, col) {     // a place for a portal not found yet: a cold dais, three snapped shard stumps, worn runes
+  const ZT = Z * TELE_S * 0.9, R = sprRand(o.seed * 1000 | 0);
+  const el = (x, y, rx, ry, f) => { c.fillStyle = col(f); c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 7); c.fill(); };
+  el(sx, sy + 3 * ZT, 34 * ZT, 17 * ZT, '#1f1f23'); el(sx, sy, 33 * ZT, 16 * ZT, '#3b3b41');
+  c.strokeStyle = col('#2a2a2f'); c.lineWidth = 1 * ZT;
+  for (let n = 0; n < 14; n++) { const a = n / 14 * Math.PI * 2, x = sx + Math.cos(a) * 28 * ZT, y = sy + Math.sin(a) * 13.6 * ZT; c.beginPath(); c.moveTo(x - 1.6 * ZT, y); c.lineTo(x + 1.6 * ZT, y); c.stroke(); }
+  el(sx, sy - 2 * ZT, 18 * ZT, 9 * ZT, '#19191c'); el(sx, sy - 4 * ZT, 17 * ZT, 8.5 * ZT, '#303036');
+  el(sx, sy - 4 * ZT, 9 * ZT, 4.5 * ZT, '#121214');      // the sealed pit
+  for (const i of [1, 0, 2]) {                 // the shards, snapped off short
+    const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 25 * ZT, y = sy + Math.sin(a) * 12.5 * ZT, h = (12 + R() * 14) * ZT, lean = (sx - x) * 0.12;
+    c.fillStyle = col('#4c4c55'); c.beginPath(); c.moveTo(x - 6 * ZT, y); c.lineTo(x - 5 * ZT + lean, y - h); c.lineTo(x - 1 * ZT + lean, y - h - 3 * ZT); c.lineTo(x + 2 * ZT + lean, y - h + 1.5 * ZT); c.lineTo(x + 0.5 * ZT, y + 1 * ZT); c.closePath(); c.fill();
+    c.fillStyle = col('#26262b'); c.beginPath(); c.moveTo(x + 0.5 * ZT, y + 1 * ZT); c.lineTo(x + 2 * ZT + lean, y - h + 1.5 * ZT); c.lineTo(x + 5 * ZT + lean, y - h + 3 * ZT); c.lineTo(x + 6 * ZT, y); c.closePath(); c.fill();
+  }
+  for (let k = 0; k < 4; k++) el(sx + (R() - 0.5) * 60 * ZT, sy + 8 * ZT + R() * 8 * ZT, (2 + R() * 2) * ZT, (1 + R()) * ZT, '#3a3a40');   // rubble at its foot
+}
+// the ring itself: a worn flagstone road circling the camp; the gate roads cross it straight in
+function drawPortalRing() {
+  if (S.mode !== 'expedition' || inBeyond() || Math.hypot(S.cam.x, S.cam.y) > PRING + viewR() + 120) return;
+  const R0 = PRING - 34, R1 = PRING + 34, n = 96;
+  ctx.fillStyle = 'rgba(58,58,60,0.6)'; ctx.beginPath(); ctx.arc(0, 0, R1 + 3, 0, 7); ctx.arc(0, 0, R0 - 3, 0, 7, true); ctx.fill('evenodd');
+  for (let ring = 0; ring < 3; ring++) {         // three courses of slabs, offset like brickwork
+    const ra = R0 + ring * (R1 - R0) / 3, rb = ra + (R1 - R0) / 3, off = ring * 0.5;
+    for (let k = 0; k < n; k++) {
+      const a0 = (k + off) / n * Math.PI * 2 + 0.004, a1 = (k + off + 1) / n * Math.PI * 2 - 0.004, mid = (a0 + a1) / 2;
+      const mx = Math.cos(mid) * (ra + rb) / 2, my = Math.sin(mid) * (ra + rb) / 2;
+      if (Math.hypot(mx - S.cam.x, my - S.cam.y) > viewR() + 60) continue;
+      const h = hash(k * 1.7 + ring * 31, ring * 3.1), v = 78 + h * 34 | 0;
+      if (h < 0.08) continue;                    // a slab missing here and there
+      ctx.fillStyle = `rgba(${v},${v},${v + 3},0.9)`;
+      ctx.beginPath(); ctx.arc(0, 0, rb - 1.2, a0, a1); ctx.arc(0, 0, ra + 1.2, a1, a0, true); ctx.closePath(); ctx.fill();
+      if (h > 0.85) { ctx.strokeStyle = 'rgba(40,40,42,0.6)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(Math.cos(a0 + 0.01) * ra, Math.sin(a0 + 0.01) * ra); ctx.lineTo(mx, my); ctx.stroke(); }   // a crack
+    }
+  }
+  for (const g of GATES) {                       // the gate roads: packed earth from the gate out across the ring
+    ctx.fillStyle = 'rgba(64,62,58,0.5)'; ctx.save(); ctx.rotate(g); ctx.fillRect(CAMP_R + 10, -20, R1 - CAMP_R + 20, 40); ctx.restore();
+  }
+}
 function teleSockets(sx, sy) { const ZT = Z * TELE_S; return [0, 1, 2].map(i => { const a = -Math.PI / 2 + (i - 1) * 2.2, x = sx + Math.cos(a) * 26 * ZT, y = sy + Math.sin(a) * 13 * ZT; return [x + (sx - x) * 0.3, y - 70 * ZT]; }); }
 function drawPackProp(o, c, sx, sy) { stamp(c, sprite('pack', 0), sx, sy, Z, 1, 0, false); }
 function drawOrbBeacon(o) {                    // an orb waiting out in the dark: a beam you can see from a long way off, then the crystal itself
@@ -7342,6 +7399,7 @@ function exHoles(hole) {                     // light the orb puts out round its
   if (rg.carryDorb) hole(S.p.x, S.p.y, 70, 0.55, 0);
   if (XS.dorbs || XS.orbs >= 3) hole(TELE2.x, TELE2.y, 60 + 25 * (XS.dorbs || 0) + 70 * portal2Open(), 0.4 + 0.3 * portal2Open(), 0);
   for (const g of GATES) { const p = polar(g, CAMP_R + 8); if (Math.abs(p.x - S.cam.x) < 900 && Math.abs(p.y - S.cam.y) < 900) hole(p.x, p.y, 62 * (1 + 0.05 * Math.sin(S.t * 9 + g)), 0.55); }
+  for (const g of GATES) { const p = polar(g, PRING); if (Math.abs(p.x - S.cam.x) < 900 && Math.abs(p.y - S.cam.y) < 900) hole(p.x, p.y, 78 * (1 + 0.05 * Math.sin(S.t * 8 + g * 2)), 0.45); }   // the braziers light the crossing
   if (XS.orbField && XS.orb) hole(XS.orb.x, XS.orb.y, 95 * (1 + 0.05 * Math.sin(S.t * 2)), 0.8, 0);   // the orbs keep their green
   if (rg.carryOrb) hole(S.p.x, S.p.y, 70, 0.55, 0);
   for (const L of rg.loose) if (L.orb) hole(L.x, L.y, 70, 0.6, 0);
