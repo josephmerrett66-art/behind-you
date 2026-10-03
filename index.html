@@ -40,7 +40,6 @@ button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14
 #autorun { position: fixed; right: 24px; bottom: calc(214px + env(safe-area-inset-bottom, 0px)); width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
 #autorun[aria-pressed="true"] { color: var(--void); background: var(--bone); border-color: var(--bone); }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
-#sound { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding: 0.5rem 0.75rem; font-size: 0.7rem; letter-spacing: 0.12em; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 .modes { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 button.alt { background: transparent; color: var(--bone); border: 1px solid var(--bone); }
 p.small { font-size: 0.82rem; }
@@ -234,7 +233,6 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <button id="campBtn" hidden>Shop</button>
 <button id="recallBtn" class="exuse" hidden>Flare</button>
 <button id="lampBtn" class="exuse" hidden>Lantern</button>
-<button id="sound" hidden>Sound on</button>
 <button id="menu" hidden>Menu</button>
 <div id="picker" hidden>
   <div class="pick">
@@ -308,6 +306,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Music</span><input id="volMusic" type="range" min="0" max="100" step="5"><output id="volMusicOut"></output></label>
       <label class="fov"><span>Ambience</span><input id="volAmb" type="range" min="0" max="100" step="5"><output id="volAmbOut"></output></label>
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
+      <button id="sound" class="alt">Sound on</button>
     </div>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
@@ -3493,14 +3492,16 @@ for (const [k, id] of [['music', 'volMusic'], ['amb', 'volAmb'], ['sfx', 'volSfx
 const dodgeBtn = document.getElementById('dodge'), attackBtn = document.getElementById('attack');
 attackBtn.addEventListener('pointerdown', e => { e.preventDefault(); attack(); });
 dodgeBtn.addEventListener('pointerdown', e => { e.preventDefault(); dodge(); });
-let soundOn = true;
+let soundOn = true; try { soundOn = localStorage.getItem('behind-you-sound') !== 'off'; } catch (e) {}
 function setSound(on) {
   soundOn = on;
   if (sfxGain) sfxGain.gain.value = on ? volK('sfx') : 0;
   soundBtn.textContent = on ? 'Sound on' : 'Sound off';
+  try { localStorage.setItem('behind-you-sound', on ? 'on' : 'off'); } catch (e) {}
   if (on) musicPlay(); else musicPause();
 }
 soundBtn.addEventListener('click', () => setSound(!soundOn));
+soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
 // ---- personal bests and the shared leaderboard ----
 const bests = { chase: 0, blink: 0, survive: 0 };
 try { const saved = JSON.parse(localStorage.getItem('behind-you-bests') || '{}'); bests.chase = saved.chase || 0; bests.blink = saved.blink || 0; bests.survive = saved.survive || 0; } catch (e) {}
@@ -7863,7 +7864,7 @@ function begin(mode) {
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
   document.getElementById('deathCard').hidden = true;
-  initAudio(); soundBtn.hidden = false; torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); torchBtn.hidden = false; dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
