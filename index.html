@@ -5553,7 +5553,7 @@ function exItems() {   // camp, chests and dropped packs, drawn in with the tree
 
 // ---- personal stats: kills drop violet wisps, wisps buy small boosts that last for good (Nightfall and Expedition) ----
 const stKey = () => stKeyOf(SV.active), WISP_COL = '185,130,255';
-const WISP = { shade: 1, stalker: 1, kamikaze: 1, laser: 1, bomber: 2, splitter: 2, brute: 3, tall: 10, splitling: 0 };
+const WISP = { shade: 1, stalker: 1, kamikaze: 1, laser: 1, bomber: 2, splitter: 2, brute: 3, tall: 10, splitling: 0, spear: 1, archer: 1 };
 const STATS = [
   { id: 'swift', g: 'Body', name: 'Swift', max: 5, sh: 'Walk and run faster', desc: 'You move 4% faster per rank.' },
   { id: 'hardy', g: 'Body', name: 'Hardy', max: 2, cost: [120, 300], sh: 'One more heart', desc: 'One more heart per rank, every run and every trip.' },
@@ -5580,7 +5580,7 @@ function sr(id) { return ST.r[id] || 0; }
 const statCost = (s, have) => (s.cost || STAT_COST)[have];
 const baseHearts = () => 3 + sr('hardy');
 function dropWisps(e) {                      // a soul lifts out of the ash
-  const rg = S.rg; let n = (WISP[e.type] || 0) * (pact('hunted') ? 2 : 1); if (!n) return;
+  const rg = S.rg; let n = (WISP[e.type] || 0) * (pact('hunted') ? 2 : 1) * (inDunes() ? DUNE_WISP : 1); if (!n) return;   // the Dunes are the wisp harvest: every kill there gives more
   for (let i = 0; i < sr('fortune'); i++) if (Math.random() < 0.1) n++;
   const L = rg.wisps || (rg.wisps = []);
   if (L.length > 60) { L.sort((a, b) => a.life - b.life); L.shift(); }
@@ -7051,10 +7051,10 @@ function portalStep(dt) {                      // returns true when the rest of 
     if (dist2(p, BEYOND_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser' || e.type === 'spear' || e.type === 'archer') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the ranged ones off, like an outpost
     if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // hunters roam the open sand; the ground round the portal is safe
       // harder than the deep woods: no limit per kind, only on how many hunt at once, and that grows the further out you are
-      const dg = dist2(p, BEYOND_GATE), cap = (Math.min(52, 32 + dg / 150) + (rg.carryDorb ? 8 : 0)) * (pact('horde') ? 2 : 1);
+      const dg = dist2(p, BEYOND_GATE), cap = (Math.min(66, 44 + dg / 110) + (rg.carryDorb ? 10 : 0)) * (pact('horde') ? 1.5 : 1);   // v91: no bosses out here, just a crowd (Joe)
       if ((rg.duneT = (rg.duneT ?? 3) - dt) <= 0) {
         const storming = stormK() > 0.5, mix = storming ? DUNE_MIX.map(m => m.type === 'spear' ? { type: m.type, w: m.w * 2.5 } : m.type === 'archer' ? { type: m.type, w: m.w * 0.5 } : m) : DUNE_MIX;   // in a storm the archers can't see far, so the spear throwers close in
-        rg.duneT = 0.38 * (pact('horde') ? 0.5 : 1) * (rg.carryDorb ? 0.6 : 1) * (storming ? 0.75 : 1) * (0.6 + Math.random() * 0.8);
+        rg.duneT = 0.24 * (pact('horde') ? 0.5 : 1) * (rg.carryDorb ? 0.6 : 1) * (storming ? 0.75 : 1) * (0.6 + Math.random() * 0.8);
         if (rg.enemies.filter(e => !e.guard).length < cap) { let r = Math.random() * mix.reduce((a, m) => a + m.w, 0); for (const m of mix) if ((r -= m.w) < 0) { spawnFoe(m.type); break; } }
       }
     }
@@ -7076,6 +7076,7 @@ function exOilStep(dt, refill) {
 // ---- the teal orbs of the Dunes: three of them, each by an oasis further out, each guarded by a great centipede.
 // Carry them back through the green portal to the second shrine past the camp wall; three open the next way.
 const DORB_D = [1200, 2000, 2800];
+const DUNE_WISP = 2;                              // wisps per kill in the Dunes, times the usual
 const DUNE_MIX = [{ type: 'spear', w: 30 }, { type: 'archer', w: 26 }, { type: 'bomber', w: 22 }, { type: 'laser', w: 22 }];   // who hunts the Dunes, and how often each comes
 function exNewDorb() {
   if ((XS.dorbs || 0) >= 3) { XS.dorb = null; XS.dorbField = false; return; }
