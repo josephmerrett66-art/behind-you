@@ -3704,7 +3704,7 @@ const EX_KIT = {
   strobe: { max: 3, desc: 'Every few seconds your beam pulses white, tearing 40% off everything in it.', lv: ['A pulse every 6.5 seconds', 'Every 5.3 seconds', 'Every 4.1 seconds, and each pulse freezes what it hits'] },
   halo: { max: 3, desc: 'A ring of light around you freezes anything that gets close.', lv: ['A small ring', 'A bigger ring', 'Bigger again, and the ring burns'] },
   blackout: { max: 2, desc: 'Flick your torch off and on again to fire a blinding flash down the beam.', lv: ['Flash every 5 seconds', 'Every 3.5 seconds, and the flash stuns for 2 seconds'] },
-  coat: { max: 3, desc: 'One more heart per level. Losing a heart sets off a white flash that burns everything near you.', lv: ['One more heart', 'Two more hearts', 'Three more, and the flash freezes them'] },
+  coat: { max: 3, desc: 'One more heart with each upgrade. Losing a heart sets off a white flash that burns everything near you.', lv: ['One more heart', 'Two more hearts', 'Three more, and the flash freezes them'] },
   feet: { max: 3, desc: 'Your roll leaves a long streak of burning light behind you, and your dodge comes back sooner.', lv: ['A burning streak', 'A second roll before the cooldown', 'The streak freezes whatever crosses it'] },
   wind: { max: 3, desc: 'A shield that shrugs off one hit, and comes back while you are out in the dark.', lv: ['Back 90 seconds after it breaks', 'Back after 60 seconds', 'Back after 30, and it flashes when it breaks'] },
   close: { max: 2, desc: 'Rolling through a hit refills your dodge and makes your beam burn twice as hot for a few seconds.', lv: ['Double burn for 3 seconds', 'For 4.5 seconds, plus a burst of speed'] },
@@ -4363,7 +4363,7 @@ function updateSurvive(dt) {
   }
   if (sr('regen') && rg.phase === 'fight' && rg.hp > 0) {   // Regen (a wisp stat): a while without a hit heals a heart
     rg.regenT = (rg.regenT || 0) + dt;
-    if (rg.hp < rg.maxHp && rg.regenT >= [30, 30, 20, 12][Math.min(3, sr('regen'))]) { rg.regenT = 0; rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
+    if (rg.hp < rg.maxHp && rg.regenT >= [30, 30, 20, 12, 8][Math.min(4, sr('regen'))]) { rg.regenT = 0; rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
   }
   // the Red Laser: a thin line down the middle of the beam that burns hard
   rg.laserOn = false;                            // v87: Red Laser removed (Joe: too strong)
@@ -5151,14 +5151,14 @@ const GEAR = [
   { id: 'lanterns', use: true, name: 'Outpost Lantern', desc: 'Plant it past the near woods. Its light is safe ground, and over time it lays a trail of lamps toward the orb. Three in all.', base: 30, max: 1 },
 ];
 const TORCH_UP = [
-  { id: 'heat', name: 'Heat', desc: 'Your beam burns 10% hotter per level.', base: 15, max: 5, lvl: n => `${10 * n}% hotter` },
-  { id: 'reach', name: 'Reach', desc: 'Your beam is 8% longer per level.', base: 15, max: 4, lvl: n => `${8 * n}% longer` },
-  { id: 'width', name: 'Width', desc: 'Your beam is 6% wider per level.', base: 15, max: 4, lvl: n => `${6 * n}% wider` },
+  { id: 'heat', name: 'Heat', desc: 'Your beam burns 10% hotter with each upgrade.', base: 15, get max() { return 5 + bx(3); }, lvl: n => `${10 * n}% hotter` },
+  { id: 'reach', name: 'Reach', desc: 'Your beam is 8% longer with each upgrade.', base: 15, get max() { return 4 + bx(2); }, lvl: n => `${8 * n}% longer` },
+  { id: 'width', name: 'Width', desc: 'Your beam is 6% wider with each upgrade.', base: 15, get max() { return 4 + bx(2); }, lvl: n => `${6 * n}% wider` },
   { id: 'clean', name: 'Oil Saver', desc: 'Your beam uses less oil while it is on. The Oil Tank makes the tank bigger; this makes each drop last longer.', base: 18, max: 3, lvl: n => `${15 * n}% less oil` },
 ];
 const ARMOUR = [
   { id: 'steel', name: 'Steel Hearts', desc: 'Grey steel hearts sit on top of your own, like armour. Hits break steel first. They don\'t heal out in the dark, but camp makes them whole again.', base: 25, max: 4, lvl: n => `${n} steel heart${n > 1 ? 's' : ''}` },
-  { id: 'shield', name: 'Shield', desc: 'Blocks one hit completely, then recharges while you\'re out. At level 3, breaking it sets off a flash that freezes everything near you.', base: 30, max: 3, lvl: n => `recharges in ${[60, 40, 25][n - 1]} s` },
+  { id: 'shield', name: 'Shield', desc: 'Blocks one hit completely, then recharges while you\'re out. With the third upgrade, breaking it sets off a flash that freezes everything near you.', base: 30, max: 3, lvl: n => `recharges in ${[60, 40, 25][n - 1]} s` },
 ];
 // Pacts: risk for reward. Bought once with embers, switched on or off at the fire; any number can be on at once.
 const PACTS = [
@@ -5568,24 +5568,25 @@ function exItems() {   // camp, chests and dropped packs, drawn in with the tree
 const stKey = () => stKeyOf(SV.active), WISP_COL = '185,130,255';
 const WISP = { shade: 1, stalker: 1, kamikaze: 1, laser: 1, bomber: 2, splitter: 2, brute: 3, tall: 10, splitling: 0, spear: 1, archer: 1 };
 const STATS = [
-  { id: 'swift', g: 'Body', name: 'Swift', max: 5, sh: 'Walk and run faster', desc: 'You move 4% faster per rank.' },
-  { id: 'hardy', g: 'Body', name: 'Hardy', max: 2, cost: [120, 300], sh: 'One more heart', desc: 'One more heart per rank, every run and every trip.' },
-  { id: 'nimble', g: 'Body', name: 'Nimble', max: 4, sh: 'Dodge again sooner', desc: 'Your dodge recharges 8% faster per rank.' },
-  { id: 'regen', g: 'Body', name: 'Regen', max: 3, cost: [60, 140, 260], sh: 'Hearts heal over time', desc: 'Go a while without being hit and you heal a heart: every 30 s, then 20 s, then 12 s.' },
-  { id: 'steady', g: 'Body', name: 'Steady', max: 3, sh: 'Longer safety after hits', desc: 'After a hit you stay safe 0.15 seconds longer per rank.' },
-  { id: 'pull', g: 'Spirit', name: 'Pull', max: 3, sh: 'Wisps come to you', desc: 'Wisps fly to you from further away.' },
-  { id: 'linger', g: 'Spirit', name: 'Linger', max: 2, sh: 'Wisps fade slower', desc: 'Wisps last 4 seconds longer per rank before they fade.' },
-  { id: 'fortune', g: 'Spirit', name: 'Fortune', max: 3, sh: 'Kills drop more wisps', desc: 'Each kill has a 10% chance per rank to drop an extra wisp.' },
+  { id: 'swift', g: 'Body', name: 'Swift', get max() { return 5 + bx(3); }, sh: 'Walk and run faster', desc: 'You move 4% faster with each upgrade.' },
+  { id: 'hardy', g: 'Body', name: 'Hardy', get max() { return 2 + bx(1); }, cost: [120, 300, 600], sh: 'One more heart', desc: 'One more heart with each upgrade, every run and every trip.' },
+  { id: 'nimble', g: 'Body', name: 'Nimble', get max() { return 4 + bx(2); }, sh: 'Dodge again sooner', desc: 'Your dodge recharges 8% faster with each upgrade.' },
+  { id: 'regen', g: 'Body', name: 'Regen', get max() { return 3 + bx(1); }, cost: [60, 140, 260, 500], sh: 'Hearts heal over time', desc: 'Go a while without being hit and you heal a heart: every 30 s, then 20 s, then 12 s, then 8 s.' },
+  { id: 'steady', g: 'Body', name: 'Steady', get max() { return 3 + bx(2); }, sh: 'Longer safety after hits', desc: 'After a hit you stay safe 0.15 seconds longer with each upgrade.' },
+  { id: 'pull', g: 'Spirit', name: 'Pull', get max() { return 3 + bx(2); }, sh: 'Wisps come to you', desc: 'Wisps fly to you from further away.' },
+  { id: 'linger', g: 'Spirit', name: 'Linger', get max() { return 2 + bx(2); }, sh: 'Wisps fade slower', desc: 'Wisps last 4 seconds longer with each upgrade before they fade.' },
+  { id: 'fortune', g: 'Spirit', name: 'Fortune', get max() { return 3 + bx(2); }, sh: 'Kills drop more wisps', desc: 'Each upgrade gives every kill a 10% chance to drop an extra wisp.' },
   // v96 (Joe): somewhere to spend a mountain of wisps, opened by the portal; built to help you climb the Dunes
-  { id: 'might', g: 'Beyond', name: 'Might', max: 5, cost: [150, 300, 500, 800, 1200], sh: 'Attacks hit harder', desc: 'Your torch swings, lunges and slams do 12% more damage per rank, to bosses too.' },
-  { id: 'kindle', g: 'Beyond', name: 'Kindle', max: 5, cost: [150, 300, 500, 800, 1200], sh: 'The beam burns hotter', desc: 'On Expeditions your beam burns 10% hotter per rank.' },
-  { id: 'heartwood', g: 'Beyond', name: 'Heartwood', max: 3, cost: [300, 700, 1300], sh: 'More hearts', desc: 'One more heart per rank, on top of Hardy.' },
-  { id: 'sandward', g: 'Beyond', name: 'Sandward', max: 3, cost: [250, 600, 1100], sh: 'Dunes hits can graze', desc: 'Out in the Dunes a hit costs two hearts. Each rank gives a 25% chance it only grazes you for one.' },
+  { id: 'might', g: 'Beyond', name: 'Might', max: 5, cost: [150, 300, 500, 800, 1200], sh: 'Attacks hit harder', desc: 'Your torch swings, lunges and slams do 12% more damage with each upgrade, to bosses too.' },
+  { id: 'kindle', g: 'Beyond', name: 'Kindle', max: 5, cost: [150, 300, 500, 800, 1200], sh: 'The beam burns hotter', desc: 'On Expeditions your beam burns 10% hotter with each upgrade.' },
+  { id: 'heartwood', g: 'Beyond', name: 'Heartwood', max: 3, cost: [300, 700, 1300], sh: 'More hearts', desc: 'One more heart with each upgrade, on top of Hardy.' },
+  { id: 'sandward', g: 'Beyond', name: 'Sandward', max: 3, cost: [250, 600, 1100], sh: 'Dunes hits can graze', desc: 'Out in the Dunes a hit costs two hearts. Each upgrade adds a 25% chance it only grazes you for one.' },
   { id: 'drink', g: 'Beyond', name: 'Soul Drink', max: 3, cost: [200, 500, 900], sh: 'Kills heal you', desc: 'Every so many kills heal half a heart: every 30 kills, then 20, then 12.' },
 ];
+const bx = n => beyondOpen() ? n : 0;   // extra upgrades that open with the portal
 const beyondOpen = () => { try { const x = XS || exRead(); return !!x && x.orbs >= 3; } catch (e) { return false; } };   // the Beyond stats wait for the portal
 const STAT = Object.fromEntries(STATS.map(s => [s.id, s]));
-const STAT_COST = [15, 35, 70, 120, 190];
+const STAT_COST = [15, 35, 70, 120, 190, 300, 450, 650];   // the last three only once the portal opens
 const STAT_GROUPS = [
   { id: 'Body', line: 'Speed, hearts, healing and dodging', icon: 'hardy' },
   { id: 'Spirit', line: 'Gathering wisps', icon: 'wisp' },
@@ -5726,7 +5727,7 @@ function renderStats() {
     cats.append(...STAT_GROUPS.map(c => {
       const b = el('button', 'cat'); b.type = 'button';
       const all = STATS.filter(s => s.g === c.id), got = all.reduce((a, s) => a + sr(s.id), 0), tot = all.reduce((a, s) => a + s.max, 0), locked = c.lock && c.lock();
-      const t = el('span', 'ct'); t.append(el('span', 'nm', c.id), el('span', 'sh', locked ? c.lockLine : c.line), el('span', 'cnt', locked ? 'Locked' : `${got} of ${tot} ranks`));
+      const t = el('span', 'ct'); t.append(el('span', 'nm', c.id), el('span', 'sh', locked ? c.lockLine : c.line), el('span', 'cnt', locked ? 'Locked' : `${got} of ${tot} upgrades`));
       b.append(svgIcon(c.icon), t);
       if (locked) { b.disabled = true; b.style.opacity = '0.45'; return b; }
       b.addEventListener('click', () => { statCat = c.id; statOpen = null; renderStats(); body.querySelector('button').focus({ preventScroll: true }); });
@@ -5750,7 +5751,7 @@ function renderStats() {
     if (open) {
       const more = el('div', 'more'), acts = el('div', 'acts'), b = el('button', 'mini', maxed ? 'Maxed' : `Buy · ${cost}`);
       b.type = 'button'; b.disabled = maxed || ST.w < cost; b.addEventListener('click', () => buyStat(s.id)); acts.append(b);
-      more.append(el('p', 'ds', s.desc), el('p', 'lv', `Rank ${have} of ${s.max}`), acts);
+      more.append(el('p', 'ds', s.desc), el('p', 'lv', `Upgrade ${have} of ${s.max}`), acts);
       wrap.append(more);
     }
     return wrap;
@@ -7799,8 +7800,8 @@ const svgIcon = id => { const s = el('span', 'ic'); s.innerHTML = `<svg viewBox=
 function campItems(cat) {                    // everything in a category, in one shape for drawing
   const levelled = (list, own, price, buy, extra) => list.map(t => {
     const have = own[t.id] || 0, cost = price(t), maxed = have >= t.max, locked = !have && t.lock && t.lock();
-    return { id: t.id, name: t.name, desc: t.desc, cls: have ? 'own' : '', lvl: locked ? 'Locked · bring your first orb home' : `${have ? t.lvl(have) + ' · ' : ''}level ${have} of ${t.max} · ${extra}`, tag: maxed ? 'MAX' : locked ? 'LOCKED' : String(cost), have, max: t.max,
-      buy: [maxed ? 'Maxed' : locked ? 'Locked' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && !locked && XS.embers >= cost, () => buy(t)] };
+    return { id: t.id, name: t.name, desc: t.desc, cls: have ? 'own' : '', lvl: locked ? 'Locked · bring your first orb home' : `${have ? t.lvl(have) + ' · ' : ''}upgrade ${have} of ${t.max} · ${extra}`, tag: maxed ? 'MAX' : locked ? 'LOCKED' : String(cost), have, max: t.max,
+      buy: [maxed ? 'Maxed' : locked ? 'Locked' : have ? `Upgrade · ${cost}` : `Buy · ${cost}`, !maxed && !locked && XS.embers >= cost, () => buy(t)] };
   });
   if (cat === 'Flame') return levelled(TORCH_UP, XS.torch, torchPrice, buyTorch, 'always on');
   if (cat === 'Armour') return levelled(ARMOUR, XS.arm, armPrice, buyArm, 'always on');
@@ -7813,7 +7814,7 @@ function campItems(cat) {                    // everything in a category, in one
   });
   const gearItem = g => {
     const have = XS[g.id], cost = gearPrice(g), maxed = have >= gearMax(g);
-    const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : g.id === 'tank' ? Math.round(oilMax()) + ' oil' : g.id === 'frame' ? Math.round(20 * (XS.frame || 0)) + '% lighter loads' : slotMax() + ' power-up slots'} · level ${have} of ${g.max}`
+    const lvl = !g.use ? `${g.id === 'bag' ? packMax() + ' pack slots' : g.id === 'tank' ? Math.round(oilMax()) + ' oil' : g.id === 'frame' ? Math.round(20 * (XS.frame || 0)) + '% lighter loads' : slotMax() + ' power-up slots'} · upgrade ${have} of ${g.max}`
       : g.id === 'lanterns' ? `${XS.outposts.length} of 3 planted · ${have ? 'carrying one' : 'carry one at a time'}` : have ? 'Carrying one' : 'Carry one at a time';
     return { id: g.id, name: g.id === 'slot' ? 'Power-up Slot' : g.name, desc: g.id === 'slot' ? 'Hold one more power-up at a time.' : g.desc, lvl, cls: '', tag: maxed ? (g.use && have ? 'HAVE' : g.use ? 'NONE' : 'MAX') : String(cost),
       have: g.use ? 0 : have, max: g.use ? 0 : gearMax(g),
@@ -7825,9 +7826,9 @@ function campItems(cat) {                    // everything in a category, in one
     const ladder = EX_KIT[u.id] && EX_KIT[u.id].lv;   // what each level adds
     const lvTxt = ladder ? ladder.map((t, i) => `${i < have ? '✓' : i === have ? '›' : '·'} ${i + 1}: ${t}`).join('\n') : '';
     return { id: u.id, name: u.name, desc: kitDesc(u) + (lvTxt ? '\n' + lvTxt : ''), cls: u.r + (on ? ' on' : '') + (have ? ' own' : ''),
-      lvl: `${RARITY[u.r].label}${u.r === 'legendary' ? ' · takes 2 slots' : ''} · ${have ? `level ${have} of ${mx}` : mx === 1 ? 'one level' : `${mx} levels`}${on ? ' · equipped' : ''}`,
+      lvl: `${RARITY[u.r].label}${u.r === 'legendary' ? ' · takes 2 slots' : ''} · ${have ? `upgrade ${have} of ${mx}` : mx === 1 ? 'one upgrade' : `${mx} upgrades`}${on ? ' · equipped' : ''}`,
       tag: on ? 'ON' : maxed ? 'MAX' : String(cost), have, max: mx,
-      buy: [maxed ? 'Maxed' : have ? `Level up · ${cost}` : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyUp(u.id)],
+      buy: [maxed ? 'Maxed' : have ? `Upgrade · ${cost}` : `Buy · ${cost}`, !maxed && XS.embers >= cost, () => buyUp(u.id)],
       eq: have ? [on ? 'Unequip' : room ? 'Equip' : 'No room', on || room, () => toggleEq(u.id)] : null };
   };
   if (cat === 'Power') return [{ ...gearItem(GEAR.find(g => g.id === 'slot')), grp: 'Slots' },
@@ -7866,9 +7867,9 @@ function renderCamp() {
       const b = el('button', 'cat'); b.type = 'button';
       let count;
       if (c.id === 'Gear') count = `${packMax()} pack · ${Math.round(oilMax())} oil`;
-      else if (c.id === 'Flame') count = `${TORCH_UP.reduce((a, t) => a + (XS.torch[t.id] || 0), 0)} of ${TORCH_UP.reduce((a, t) => a + t.max, 0)} levels`;
+      else if (c.id === 'Flame') count = `${TORCH_UP.reduce((a, t) => a + (XS.torch[t.id] || 0), 0)} of ${TORCH_UP.reduce((a, t) => a + t.max, 0)} upgrades`;
       else if (c.id === 'Pacts') count = `${PACTS.filter(t => XS.pacts.on[t.id]).length} on · ${PACTS.filter(t => XS.pacts.own[t.id]).length} of ${PACTS.length} owned`;
-      else if (c.id === 'Armour') count = `${XS.arm.steel || 0} steel · shield ${XS.arm.shield ? 'level ' + XS.arm.shield : 'none'}`;
+      else if (c.id === 'Armour') count = `${XS.arm.steel || 0} steel · shield ${XS.arm.shield ? 'upgrade ' + XS.arm.shield : 'none'}`;
       else { const all = SHOP.filter(u => POWER_GROUPS.some(g => g[0] === u.tag)); count = `${all.filter(u => XS.own[u.id]).length} of ${all.length} owned · ${slotMax()} slots`; }
       const t = el('span', 'ct'); t.append(el('span', 'nm', c.nm || c.id), el('span', 'sh', c.line), el('span', 'cnt', count));
       b.append(svgIcon(c.icon), t);
