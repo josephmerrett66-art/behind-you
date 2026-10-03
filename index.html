@@ -1422,20 +1422,20 @@ function atkHit(D, a) {                          // everything in reach takes th
   for (const o of rg.enemies) {
     if (o.dead || A.hit.has(o) || !inReach(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
     A.hit.add(o); hits++;
-    o.hp -= D.dmg * (1 + 0.1 * tu('heat')); o.jit = 1;
+    o.hp -= D.dmg * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); o.jit = 1;
     if (o.type !== 'tall') push(o, D.knock);
     spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.slam ? 14 : 9);
   }
   const b = S.mode === 'expedition' && bossLive();
   if (b && !A.hit.has(b) && ['walk', 'tell', 'act', 'recover', 'roar'].includes(b.st) && inReach(b, 12 * BS)) {
     A.hit.add(b); hits++;
-    b.hp -= D.boss * (b.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); b.flinch = Math.max(b.flinch, 0.7); spark(b, 38 * BS, D.slam ? 18 : 10);
+    b.hp -= D.boss * (b.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); b.flinch = Math.max(b.flinch, 0.7); spark(b, 38 * BS, D.slam ? 18 : 10);
   }
   const m = S.mode === 'expedition' && miniLive();
   if (m) for (const u of m.units) {
     if (A.hit.has(u) || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inReach(u, 9 * MK[u.kind].s)) continue;
     A.hit.add(u); hits++;
-    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
+    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
     if (u.st !== 'act') { push(u, D.knock * 0.35); arenaClamp(u, 30); }   // a blow can't knock him out of a swing, only nudge him
   }
   if (D.slam) {                                  // the landing: a shockwave of light rolling out across the ground, a ring of dust, the ground bucks
@@ -3755,7 +3755,7 @@ function rgRange() { return (isEx() ? 0.62 * (exSpot() ? (lv('spot') > 2 ? 2 : 1
 function rgBurn() { return rgBurn0() * (pact('horde') ? 2 : 1); }   // Horde: twice the burn
 function rgBurn0() {
   const rg = S.rg || {}, grow = 1 + 0.05 * Math.min(14, Math.max(0, (rg.wave || 1) - 1));   // the torch grows with the night
-  return 1.05 * (1 + 0.1 * tu('heat')) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 2 : 1) : 1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
+  return 1.05 * (1 + 0.1 * tu('heat')) * (isEx() ? 1 + 0.1 * sr('kindle') : 1) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 2 : 1) : 1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
 }
 function rgSpeed() { return 1.4 * (1 + 0.04 * sr('swift')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
 function rgDarkAlpha() { return 1; }   // the Dunes are as dark as the woods outside your light
@@ -3880,7 +3880,8 @@ function hurt(e) {
     return;
   }
   rg.regenT = 0;
-  const dune = inDunes();                  // out in the Dunes every hit is two hearts, and they come quicker after each other
+  const dune = inDunes() && !(Math.random() < 0.25 * sr('sandward'));   // Sandward: sometimes it only grazes
+  // out in the Dunes every hit is two hearts, and they come quicker after each other
   if (rg.steel > 0) {                      // Armour: a steel heart takes it (two in the Dunes)
     rg.steel = Math.max(0, rg.steel - (dune ? DUNE_HIT : 1)); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = 0.6;
     rg.pop = { t: 0, steelLost: rg.steel };
@@ -3923,6 +3924,7 @@ function lightBurst(x, y, R, frac, col) {
   addShake(0.3); sfx(1.6, 0.6, 'highpass', 1800, 0.35);
 }
 function killFoe(e) {
+  if (isEx() && sr('drink') && S.rg.hp < S.rg.maxHp && (S.rg.drinkN = (S.rg.drinkN || 0) + 1) >= [0, 30, 20, 12][sr('drink')]) { S.rg.drinkN = 0; S.rg.hp = Math.min(S.rg.maxHp, S.rg.hp + 0.5); S.rg.pop = { t: 0, gained: Math.ceil(S.rg.hp) - 1 }; }   // Soul Drink
   const rg = S.rg;
   if (lv('embers')) rg.fires.push({ x: e.x, y: e.y, r: 28 + 8 * lv('embers'), life: 2 + 1.5 * lv('embers'), max: 2 + 1.5 * lv('embers'), seed: Math.random() * 9, freeze: isEx() && rawLv('smoulder') > 2 });
   if (lv('nova') && rg.nova < 12) { rg.nova++; if (rg.nova === 12) sfx(2.5, 0.4, 'bandpass', 2200, 0.3); }
@@ -5574,12 +5576,20 @@ const STATS = [
   { id: 'pull', g: 'Spirit', name: 'Pull', max: 3, sh: 'Wisps come to you', desc: 'Wisps fly to you from further away.' },
   { id: 'linger', g: 'Spirit', name: 'Linger', max: 2, sh: 'Wisps fade slower', desc: 'Wisps last 4 seconds longer per rank before they fade.' },
   { id: 'fortune', g: 'Spirit', name: 'Fortune', max: 3, sh: 'Kills drop more wisps', desc: 'Each kill has a 10% chance per rank to drop an extra wisp.' },
+  // v96 (Joe): somewhere to spend a mountain of wisps, opened by the portal; built to help you climb the Dunes
+  { id: 'might', g: 'Beyond', name: 'Might', max: 5, cost: [150, 300, 500, 800, 1200], sh: 'Attacks hit harder', desc: 'Your torch swings, lunges and slams do 12% more damage per rank, to bosses too.' },
+  { id: 'kindle', g: 'Beyond', name: 'Kindle', max: 5, cost: [150, 300, 500, 800, 1200], sh: 'The beam burns hotter', desc: 'On Expeditions your beam burns 10% hotter per rank.' },
+  { id: 'heartwood', g: 'Beyond', name: 'Heartwood', max: 3, cost: [300, 700, 1300], sh: 'More hearts', desc: 'One more heart per rank, on top of Hardy.' },
+  { id: 'sandward', g: 'Beyond', name: 'Sandward', max: 3, cost: [250, 600, 1100], sh: 'Dunes hits can graze', desc: 'Out in the Dunes a hit costs two hearts. Each rank gives a 25% chance it only grazes you for one.' },
+  { id: 'drink', g: 'Beyond', name: 'Soul Drink', max: 3, cost: [200, 500, 900], sh: 'Kills heal you', desc: 'Every so many kills heal half a heart: every 30 kills, then 20, then 12.' },
 ];
+const beyondOpen = () => { try { const x = XS || exRead(); return !!x && x.orbs >= 3; } catch (e) { return false; } };   // the Beyond stats wait for the portal
 const STAT = Object.fromEntries(STATS.map(s => [s.id, s]));
 const STAT_COST = [15, 35, 70, 120, 190];
 const STAT_GROUPS = [
   { id: 'Body', line: 'Speed, hearts, healing and dodging', icon: 'hardy' },
   { id: 'Spirit', line: 'Gathering wisps', icon: 'wisp' },
+  { id: 'Beyond', line: 'Power for the Dunes', icon: 'power', lock: () => !beyondOpen(), lockLine: 'Opens when the green portal does' },
 ];
 function stRead() { try { const s = JSON.parse(localStorage.getItem(stKey())); if (s && typeof s.w === 'number' && s.r) return s; } catch (e) {} return { w: 0, r: {} }; }
 function stSave() { try { localStorage.setItem(stKey(), JSON.stringify(ST)); } catch (e) {} }
@@ -5589,7 +5599,7 @@ let ST = stRead();
   if (back) { ST.w += back; try { localStorage.setItem(stKey(), JSON.stringify(ST)); } catch (e) {} } }
 function sr(id) { return ST.r[id] || 0; }
 const statCost = (s, have) => (s.cost || STAT_COST)[have];
-const baseHearts = () => 3 + sr('hardy');
+const baseHearts = () => 3 + sr('hardy') + sr('heartwood');
 function dropWisps(e) {                      // a soul lifts out of the ash
   const rg = S.rg; let n = (WISP[e.type] || 0) * (pact('hunted') ? 2 : 1) * (inDunes() ? DUNE_WISP : 1); if (!n) return;   // the Dunes are the wisp harvest: every kill there gives more
   for (let i = 0; i < sr('fortune'); i++) if (Math.random() < 0.1) n++;
@@ -5685,6 +5695,7 @@ function statApply() {                       // hearts follow Hardy straight awa
 }
 function buyStat(id) {
   const s = STAT[id], have = sr(id); if (have >= s.max) return;
+  if (s.g === 'Beyond' && !beyondOpen()) return;
   const c = statCost(s, have); if (ST.w < c) return;
   ST.w -= c; ST.r[id] = have + 1; stSave(); statApply(); wispChime(1.5); renderStats();
 }
@@ -5714,9 +5725,10 @@ function renderStats() {
     const cats = el('div', 'cats');
     cats.append(...STAT_GROUPS.map(c => {
       const b = el('button', 'cat'); b.type = 'button';
-      const all = STATS.filter(s => s.g === c.id), got = all.reduce((a, s) => a + sr(s.id), 0), tot = all.reduce((a, s) => a + s.max, 0);
-      const t = el('span', 'ct'); t.append(el('span', 'nm', c.id), el('span', 'sh', c.line), el('span', 'cnt', `${got} of ${tot} ranks`));
+      const all = STATS.filter(s => s.g === c.id), got = all.reduce((a, s) => a + sr(s.id), 0), tot = all.reduce((a, s) => a + s.max, 0), locked = c.lock && c.lock();
+      const t = el('span', 'ct'); t.append(el('span', 'nm', c.id), el('span', 'sh', locked ? c.lockLine : c.line), el('span', 'cnt', locked ? 'Locked' : `${got} of ${tot} ranks`));
       b.append(svgIcon(c.icon), t);
+      if (locked) { b.disabled = true; b.style.opacity = '0.45'; return b; }
       b.addEventListener('click', () => { statCat = c.id; statOpen = null; renderStats(); body.querySelector('button').focus({ preventScroll: true }); });
       return b;
     }));
@@ -7692,6 +7704,11 @@ function buyGear(g) {
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 // the shop is sorted into categories; each opens into a short list of items you tap to read more
 const ICONS = {
+  might: '<path d="M5 19l9-9"/><path d="M14 10l3-6 3 3-6 3"/><path d="M4 14l6 6"/>',
+  kindle: '<path d="M12 3c3 4 5 6 5 10a5 5 0 0 1-10 0c0-2 1-4 2-5 0 2 1 3 2 3 0-3 0-5 1-8z"/>',
+  heartwood: '<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/><path d="M12 9v8M9 12l3 2 3-2"/>',
+  sandward: '<path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z"/><path d="M8 13c1.5-1 2.5-1 4 0s2.5 1 4 0"/>',
+  drink: '<circle cx="12" cy="10" r="4"/><path d="M12 14v6M9 20h6"/>',
   wisp: '<path d="M12 21c-3.6 0-6-2.6-6-5.8C6 11 12 3 12 3s6 8 6 12.2c0 3.2-2.4 5.8-6 5.8z"/><circle cx="12" cy="15.5" r="2"/>',
   swift: '<path d="M2 8h6M3 12h6M2 16h6"/><path d="M12 5l7 7-7 7"/>',
   hardy: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7.5 2.3C19.5 15.4 12 20 12 20z"/><path d="M12 10.5v5M9.5 13h5"/>',
