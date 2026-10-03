@@ -7100,7 +7100,7 @@ function exOilStep(dt, refill) {
 // ---- the teal orbs of the Dunes: three of them, each by an oasis further out, each guarded by a great centipede.
 // Carry them back through the green portal to the second shrine past the camp wall; three open the next way.
 const DORB_D = [1200, 2000, 2800];
-const DUNE_WISP = 2;
+const DUNE_WISP = 1;   // wisps per Dunes kill, times the usual (v98: back to normal, Joe)
 const DUNE_HP = 4, DUNE_HIT = 2, DUNE_SP = 1.25, DUNE_INV = 0.6;   // v95 (Joe): the Dunes are a big step up from the woods: 4x health, every hit two hearts, 25% faster, less breathing room between hits                              // wisps per kill in the Dunes, times the usual
 const DUNE_MIX = [{ type: 'spear', w: 30 }, { type: 'archer', w: 26 }, { type: 'bomber', w: 22 }, { type: 'laser', w: 22 }];   // who hunts the Dunes, and how often each comes
 function exNewDorb() {
