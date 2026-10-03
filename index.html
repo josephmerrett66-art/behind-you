@@ -1357,18 +1357,32 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
 // ---- dodge (Nightfall): a quick roll with a moment of invulnerability. Rolls the way you're going,
 // or steps back away from where the torch points if you're standing still ----
 const ROLL_T = 0.32, ROLL_DIST = 100, ROLL_SAFE = 0.26, ROLL_COOL = 0.85;   // Light Feet shortens the cooldown
+// v106 (Joe): in Expedition the dodge has two charges, two small rings at your feet that refill one at a time.
+// Roll with both spent and it burns oil instead, so chaining dodge and dash strike is a burst, not a free way to cross the map.
+const DODGE_CH_T = 1.6, DODGE_OIL = 4;          // seconds to refill one charge; oil burnt by a roll with no charge left
+const dodgeMax = () => 2 + (lv('feet') > 1 ? 1 : 0);   // Light Feet 2: a third ring
+const dodgeRefill = () => DODGE_CH_T * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble'));
 function dodge() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall) return;
   const p = S.p; if ((p.roll || 0) > 0) return;
-  const spare = (p.rollCool || 0) > 0;            // Expedition's Light Feet 2: one spare roll while the dodge recharges
-  if (spare && !(isEx() && lv('feet') > 1 && p.spare > 0)) return;
+  let burn = false;
+  if (isEx()) {
+    if (p.dch === undefined) p.dch = dodgeMax();
+    if (p.dch < 1) { if (S.t - (p.lastRoll || -9) >= ROLL_COOL * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble')) && (S.rg.inCamp || (S.rg.oil || 0) >= DODGE_OIL)) burn = true; else return; }   // out of charges: oil, no faster than the old cooldown, or nothing
+  }
+  const spare = !isEx() && (p.rollCool || 0) > 0;
+  if (spare) return;
   const mv = Math.hypot(p.vx, p.vy);
   let a;
   if (mv > 15) a = Math.atan2(p.vy, p.vx);
   else { const [wx, wy] = screenDirToWorld(-Math.cos(S.aim), -Math.sin(S.aim)); a = Math.atan2(wy, wx); }   // backstep
   p.atk = null;                                   // a roll cancels a swing, like Hades' dash
   p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollBack = mv <= 15; p.ghosts = [];
-  if (spare) p.spare = 0; else { p.rollCool = ROLL_COOL * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble')); p.spare = isEx() && lv('feet') > 1 ? 1 : 0; }
+  if (isEx()) {
+    if (burn) { if (!S.rg.inCamp) S.rg.oil -= DODGE_OIL; p.oilPuff = S.t; for (let i = 0; i < 8; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 6, vx: (Math.random() - 0.5) * 70, vy: (Math.random() - 0.5) * 70, vz: 30 + Math.random() * 40, life: 0.5 + Math.random() * 0.3, t: 0 }); }
+    else p.dch -= 1;
+    p.lastRoll = S.t;
+  } else p.rollCool = ROLL_COOL * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble'));
   if (lv('nova') && S.rg.nova >= 12) { S.rg.nova = 0; lightBurst(p.x, p.y, 230, 0.85, 'white'); hitStop(0.06); }
   for (let i = 0; i < 6; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: -Math.cos(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vy: -Math.sin(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vz: 20 + Math.random() * 30, life: 0.4 + Math.random() * 0.3 });
   if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, 3500, 500, 0.28, 0.4, sfxGain); }
@@ -1524,7 +1538,7 @@ function update(dt) {
   const k = 1 - Math.exp(-ACCEL * dt);
   p.vx += (mx * speed - p.vx) * k; p.vy += (my * speed - p.vy) * k;
   if (p.rollCool > 0) { p.rollCool -= dt; if (p.rollCool <= 0) dodgeBtn.dataset.cool = '0'; }
-  if (dodgeBtn.dataset.cool === '1' && p.spare > 0 && !(p.roll > 0)) dodgeBtn.dataset.cool = '0';
+  if (isEx()) { if (p.dch === undefined) p.dch = dodgeMax(); p.dch = Math.min(dodgeMax(), p.dch + dt / dodgeRefill()); const c = p.dch < 1 ? '1' : '0'; if (dodgeBtn.dataset.cool !== c) dodgeBtn.dataset.cool = c; }
   if (p.roll > 0) {                          // fast at the start, easing out at the end
     const u = 1 - p.roll / ROLL_T, v = ROLL_DIST / ROLL_T * 2 * (1 - u);
     p.vx = Math.cos(p.rollA) * v; p.vy = Math.sin(p.rollA) * v;
@@ -4203,7 +4217,7 @@ function hurt(e) {
   if (S.p.rollSafe > 0) {                  // rolled right through it
     rg.inv = 0.35; hitStop(0.05); addShake(0.1);
     rg.dodged = { t: 0 }; sfx(2.2, 0.35, 'highpass', 3000, 0.15);
-    if (lv('close')) { S.p.rollCool = 0; dodgeBtn.dataset.cool = '0'; rg.rushT = 1.5 + 1.5 * lv('close'); if (isEx() && lv('close') > 1) rg.adren = 2; }   // Close Call 2: a burst of speed too
+    if (lv('close')) { S.p.rollCool = 0; if (isEx()) S.p.dch = dodgeMax(); dodgeBtn.dataset.cool = '0'; rg.rushT = 1.5 + 1.5 * lv('close'); if (isEx() && lv('close') > 1) rg.adren = 2; }   // Close Call 2: a burst of speed too
     return;
   }
   if (rg.shield > 0) {                     // Second Wind: this one bounces off
@@ -5297,6 +5311,17 @@ function drawDodgeFx() {
     const k = rg.nova / 12, ready = k >= 1;
     ctx.save(); ctx.strokeStyle = ready ? `rgba(255,215,120,${0.7 + 0.3 * Math.sin(S.t * 8)})` : 'rgba(255,215,120,0.35)'; ctx.lineWidth = ready ? 3 : 1.5;
     ctx.beginPath(); ctx.ellipse(px, py, 20 * Z, 10 * Z, 0, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  if (isEx() && p.dch !== undefined && p.dch < dodgeMax() && rg.phase === 'fight') {   // the dodge charges: small rings at your feet, each filling in turn; all empty, they glow warm (the next roll burns oil)
+    const n = dodgeMax(), empty = p.dch < 1, puff = Math.max(0, 1 - (S.t - (p.oilPuff || -9)) / 0.5);
+    ctx.save(); ctx.lineWidth = 2;
+    for (let i = 0; i < n; i++) {
+      const r = Math.max(5, 4.5 * Z), cx = px + (i - (n - 1) / 2) * r * 2.9, cy = py + Math.max(10, 12 * Z), k = Math.max(0, Math.min(1, p.dch - i));
+      ctx.strokeStyle = empty ? `rgba(255,170,90,${0.35 + 0.5 * puff})` : 'rgba(239,239,234,0.22)'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
+      if (k > 0) { ctx.strokeStyle = k >= 1 ? 'rgba(239,239,234,0.85)' : 'rgba(239,239,234,0.55)'; ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke(); }
+      if (k >= 1) { ctx.fillStyle = 'rgba(239,239,234,0.6)'; ctx.beginPath(); ctx.arc(cx, cy, r * 0.45, 0, 7); ctx.fill(); }
+    }
+    ctx.restore();
   }
   if (p.rollCool > 0 && rg.phase === 'fight') {    // a thin ring at your feet fills back up while the dodge recharges
     const k = 1 - p.rollCool / (ROLL_COOL * (1 - 0.18 * lv('feet')));
