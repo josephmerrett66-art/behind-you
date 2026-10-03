@@ -7195,6 +7195,25 @@ function drawHomeArrow(gx, gy, gate) {
     ctx.fillStyle = `rgba(${ORB_COL},${0.85 * rg.homeA})`; ctx.fillText(Math.round(d / 10) + ' m', x, y + 18 * Z); ctx.restore();
   }
 }
+function drawTealArrow(t) {                       // the big teal arrow: the way to the next teal orb, at any distance (to the green portal while you're still in the woods)
+  const rg = S.rg, d = dist2(S.p, t), [tx, ty] = toScreen(t.x, t.y), on = Math.max(0.25, Math.min(1, (d - 140) / 200));
+  rg.tealA = (rg.tealA || 0) + (on - (rg.tealA || 0)) * Math.min(1, frameDt * 4);
+  if (rg.warp) return;
+  const [px, py0] = toScreen(S.p.x, S.p.y), py = py0 - 18 * Z, a = Math.atan2(ty - py, tx - px);
+  const R = 52 * Z, x = px + Math.cos(a) * R, y = py + Math.sin(a) * R * 0.8, s = 11 * Z * (1 + 0.08 * Math.sin(S.t * 4 + 1.5)), al = rg.tealA * (0.7 + 0.3 * Math.sin(S.t * 4 + 1.5));
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2.2); g.addColorStop(0, `rgba(${DORB_COL},${0.35 * al})`); g.addColorStop(1, `rgba(${DORB_COL},0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, s * 2.2, 0, 7); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(${DORB_COL},${al})`; ctx.strokeStyle = `rgba(220,255,248,${al})`; ctx.lineWidth = 1.2 * Z; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.7, -s * 0.75); ctx.lineTo(-s * 0.3, 0); ctx.lineTo(-s * 0.7, s * 0.75); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  if (d > 600) {
+    ctx.save(); ctx.font = `${Math.round(9 * Z)}px ui-monospace, monospace`; ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(${DORB_COL},${0.85 * rg.tealA})`; ctx.fillText(Math.round(d / 10) + ' m', x, y + 18 * Z); ctx.restore();
+  }
+}
 function drawPortal(tx, ty, ZT, o, sockets) {
   if (o <= 0) return;
   const t = S.t, cy = ty - 5 * ZT, G = a => `rgba(${ORB_COL},${Math.max(0, Math.min(1, a))})`, Wt = a => `rgba(220,255,232,${Math.max(0, Math.min(1, a))})`;
@@ -7421,6 +7440,9 @@ function drawExFx() {
     if (XS.dorbField && XS.dorb) asTeal(() => drawOrbBeacon(XS.dorb));
     const [px, py] = toScreen(S.p.x, S.p.y);
     if (rg.carryDorb) asTeal(() => drawOrb(px + 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4) * 2 * Z, Z * 0.75, 1));
+    if (XS.dorbField && XS.dorb && !rg.carryDorb) {   // the teal arrow: always points to the orb waiting out in the sand
+      drawTealArrow(XS.dorb);
+    }
     drawHomeArrow(gx, gy, BEYOND_GATE); drawWarpVeil(); return;
   }
   drawCampFlames();
@@ -7501,9 +7523,11 @@ function drawExFx() {
   if (rg.carryOrb) drawOrb(px + 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4) * 2 * Z, Z * 0.75, 1);
   if (rg.carryDorb) asTeal(() => drawOrb(px - 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4 + 1) * 2 * Z, Z * 0.75, 1));
   // pointers round you: green to the orb, white to home, pale to a dropped pack
-  if (!rg.inCamp || rg.loose.length || (XS.orbField && XS.orb) || rg.carryDorb) {
+  const tealHunt = XS.orbs >= 3 && (XS.dorbs || 0) < 3 && !rg.carryDorb && !rg.carryOrb;   // the forest is done: the teal arrow leads to the green portal and the Dunes past it
+  if (!rg.inCamp || rg.loose.length || (XS.orbField && XS.orb) || rg.carryDorb || tealHunt) {
     const on = (x, y) => x > 40 && x < W - 40 && y > 40 && y < H - 40;
     if (rg.carryDorb) { const [x, y] = toScreen(TELE2.x, TELE2.y); exPointer(px, py, x, y, `rgb(${DORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
+    if (tealHunt && !rg.inCamp) drawTealArrow(TELE);
     if (XS.orbField && XS.orb && !rg.carryOrb) { const [x, y] = toScreen(XS.orb.x, XS.orb.y); exPointer(px, py, x, y, `rgb(${ORB_COL})`, 'orb', on(x, y) ? 0.3 : 0.95); }
     if (!rg.inCamp) { const gp = Math.hypot(S.p.x, S.p.y) > CAMP_R + 30 ? exNearestGate(S.p.x, S.p.y) : { x: 0, y: 0 }, [x, y] = toScreen(gp.x, gp.y); exPointer(px, py, x, y, '#efefea', 'house', on(x, y) ? 0.25 : rg.carryOrb ? 0.95 : 0.7); }
     for (const L of rg.loose) { const [x, y] = toScreen(L.x, L.y); exPointer(px, py, x, y, L.orb ? `rgb(${ORB_COL})` : 'rgba(239,239,234,0.9)', 'pack', on(x, y) ? 0.25 : 0.7); }
