@@ -3683,6 +3683,11 @@ function renderScene() {
   }
   drawTargetFlash();
   drawHud();
+  if (S.flick) {                                  // a teal orb just went in: the world blinks into its negative
+    const u = S.t - S.flick.t0, on = S.flick.list.some(([a, b]) => u >= a && u < b);
+    if (u > 2) S.flick = null;
+    else if (on && !inNext()) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); }
+  }
   if (S.mode === 'expedition' && inNext()) {      // past the blue portal the world is a negative: every colour flipped, HUD too so its pale text reads dark on the white
     const k = Math.max(0, Math.min(1, (S.t - (S.rg.nextAt || 0)) / 1.2));
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'difference'; ctx.globalAlpha = k;
@@ -7464,8 +7469,17 @@ function exDepositD() {
   rg.blasts.push({ x: TELE2.x, y: TELE2.y, t: 0, life: 0.9, r: 220, col: 'teal' });
   rg.echoes.push({ r: 0, x: TELE2.x, y: TELE2.y, max: 500, burst: true });
   if (actx) { const t = actx.currentTime; boomAt(t, 55, 200, 1.2, 0.5, sfxGain); }
+  orbFlicker(XS.dorbs);
   if (XS.dorbs >= 3) { rg.portal2Fx = { t: 0, flashed: false }; S.msg = null; return; }
   S.msg = { text: `${XS.dorbs} of 3`, sub: 'Another waits in the sand, further out', t: 0 };
+}
+// each teal orb placed, the world flickers into its negative for a split second: a glimpse of what's through the blue portal.
+// One flicker for the first orb, two for the second, three and a longer hold for the last.
+function orbFlicker(n) {
+  const at = 0.25, list = [];
+  for (let k = 0; k < n; k++) list.push([at + k * 0.22, at + k * 0.22 + (k === n - 1 && n >= 3 ? 0.32 : 0.07)]);
+  S.flick = { t0: S.t, list };
+  if (actx) for (const [a, b] of list) noiseAt(actx.currentTime + a, 2400, 9000, b - a + 0.05, 0.22, sfxGain);   // a crackle with each one
 }
 function portal2Open() {
   if (!XS || (XS.dorbs || 0) < 3) return 0;
