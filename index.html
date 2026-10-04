@@ -2856,6 +2856,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   if (sx < -110 * s || sx > W + 110 * s || sy < -20 * s || sy - 200 * s > H) return;   // off screen
   if (o.kind === 'tree') {
     drawTree(o, c, mask, sx, sy, s);
+  } else if (o.kind === 'felled') { drawFelled(o, c, mask);
   } else if (o.kind === 'dprop') { drawDesertProp(o, c, mask, sx, sy, s);
   } else if (o.kind === 'sprop') { drawSnowProp(o, c, mask, sx, sy, s);
   } else if (o.kind === 'rock') {
@@ -6555,6 +6556,9 @@ function bossSay(kind) {                        // every wind-up has its own sou
   if (kind === 'stomp') { boomAt(t, 62, 30, 0.7, 0.75, o); noiseAt(t, 1200, 150, 0.4, 0.3, o); }
   if (kind === 'step') boomAt(t, 50, 32, 0.35, 0.3, o);
   if (kind === 'pain') { noiseAt(t, 1400, 300, 0.7, 0.35, o); boomAt(t, 180, 90, 0.6, 0.25, o); }
+  if (kind === 'thock') { boomAt(t, 230, 110, 0.2, 0.55, o); noiseAt(t, 2400, 700, 0.14, 0.4, o); }   // an axe biting into wood
+  if (kind === 'creak') { noiseAt(t, 520, 160, 1.1, 0.3, o); boomAt(t, 85, 55, 1.0, 0.22, o); toneAt(t + 0.1, 140, 0.9, 0.05, 'sawtooth', o); }   // a trunk giving way
+  if (kind === 'crash') { boomAt(t, 60, 24, 1.6, 1, o); noiseAt(t, 1800, 120, 1.4, 0.6, o); noiseAt(t + 0.05, 5000, 900, 0.5, 0.3, o); }   // a tree hitting the ground
 }
 const bm = { g: null, osc: null, at: 0 };
 function bossMusic(on, k2) {                    // placeholder fight music: a low drone under slow war drums, faster in the second phase
@@ -6908,7 +6912,7 @@ const MINIS = [
   { id: 'huntsman', name: 'THE HUNTSMAN', title: 'the huntsman', sub: 'The deep woods are his', d: [6900, 7400], units: ['huntsman'], wisps: 220, loot: ['r', 'r', 'r', 'r', 'r', 'r', 'r'] },
 ];
 const MK = {                                     // each fighter: health, size against you, gear, what he carries, walking speed, how close he likes to stand
-  woodcutter:  { hp: 30, s: 2.9, kit: { head: 'beanie', coat: 1, vest: 0 }, prop: 'axe', sp: 50, keep: 50 },
+  woodcutter:  { hp: 34, s: 2.9, kit: { head: 'beanie', coat: 1, vest: 0 }, prop: 'axe', sp: 50, keep: 50 },
   lamplighter: { hp: 45, s: 3.0, kit: { head: 'hood', coat: 2, vest: 0 }, prop: 'pole', sp: 42, keep: 70 },
   spear:       { hp: 28, s: 2.6, kit: { head: 'helmet', coat: 0, vest: 1 }, prop: 'spear', sp: 58, keep: 190 },
   archer:      { hp: 24, s: 2.5, kit: { head: 'goggles', coat: 1, vest: 0 }, prop: 'bow', sp: 62, keep: 300 },
@@ -6916,6 +6920,8 @@ const MK = {                                     // each fighter: health, size a
 };
 const MV = {                                     // wind-up, the blow itself, and how long he's open after
   chop:   { tell: 0.95, act: 0.16, rec: 1.5,  snd: 'slam' },
+  fell:   { tell: 1.75, act: 0.55, rec: 1.0,  snd: null },      // v113: the Woodcutter fells a tree across the clearing
+  hack:   { tell: 0.8,  act: 0.16, rec: 1.9,  snd: 'slam' },    // ... and hacks through a fallen log to reach you
   spin:   { tell: 0.85, act: 0.75, rec: 1.15, snd: 'sweep' },
   throw:  { tell: 0.7,  act: 0.25, rec: 0.7,  snd: 'whoosh' },
   swing:  { tell: 0.8,  act: 0.34, rec: 1.1,  snd: 'sweep' },
@@ -6968,8 +6974,64 @@ function lairStones() {
     if (Math.abs(L.x - S.cam.x) > vr || Math.abs(L.y - S.cam.y) > vr) continue;
     if (!lairStoneCache.has(L.id + L.x)) lairStoneCache.set(L.id + L.x, Array.from({ length: 8 }, (_, i) => { const a = i / 8 * Math.PI * 2 + 0.35; return { kind: 'stone', x: L.x + Math.cos(a) * LR, y: L.y + Math.sin(a) * LR, s: 1.05 + hash(i, 5.3) * 0.35, seed: hash(i, 2.9), r: 0, nocol: true }; }));
     out.push(...lairStoneCache.get(L.id + L.x));
+    if (L.id === 'woodcutter') {                 // his trees, still standing or felled in this fight
+      const m = S.rg && S.rg.mini, here = m && m.L === L && m.felled;
+      for (const t of woodTrees(L)) {
+        if (here && m.felled.has(t)) continue;
+        const sh = here && m.shake && m.shake.t === t ? m.shake.k : 0;
+        out.push(sh ? Object.assign({}, t, { x: t.x + Math.sin(S.t * 47) * 2.2 * sh, y: t.y + Math.cos(S.t * 39) * 1.2 * sh }) : t);
+      }
+      if (here) out.push(...m.logs);
+    }
   }
   return out;
+}
+// ---- v113 (Joe: every boss needs its own identity): the Woodcutter's clearing has trees standing in it, and he fells them ----
+// A felled tree stays down for the rest of the fight: a log you can hide behind (his hatchet sticks in it) that he has to hack through.
+const wcTreeCache = new Map();
+function woodTrees(L) {                          // six big trees standing inside his clearing, outside the stones
+  const key = L.id + L.x;
+  if (!wcTreeCache.has(key)) wcTreeCache.set(key, Array.from({ length: 6 }, (_, i) => {
+    const a = i / 6 * Math.PI * 2 + 0.5 + (hash(i, L.x * 0.01) - 0.5) * 0.6, r = 265 + hash(i * 3.1, 1.7) * 60;
+    return { kind: 'tree', type: i % 3 === 1 ? 'oak' : 'pine', seed: hash(i * 7.7, L.y * 0.01 + 2), x: L.x + Math.cos(a) * r, y: L.y + Math.sin(a) * r, r: 10, s: 1.65 + hash(i, 9.1) * 0.3, wc: i };
+  }));
+  return wcTreeCache.get(key);
+}
+const treeLen = t => SPRITE_KINDS[t.type === 'oak' ? 'oak' : 'pine'][4] * t.s * 0.95;   // how far it reaches lying down
+function segNear(px, py, ax, ay, bx, by) {        // nearest point on a segment, and how far
+  const vx = bx - ax, vy = by - ay, l2 = vx * vx + vy * vy || 1, k = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / l2));
+  const x = ax + vx * k, y = ay + vy * k; return { x, y, d: Math.hypot(px - x, py - y), k };
+}
+const logEnd = g => [g.bx + g.ux * g.len, g.by + g.uy * g.len];
+function logPush(o, r) {                         // fallen logs and standing trees are solid
+  const m = S.rg.mini; if (!m || !m.logs) return false;
+  let hit = false;
+  for (const g of m.logs) {
+    if (g.fall < 1) continue;
+    const [ex, ey] = logEnd(g), n = segNear(o.x, o.y, g.bx, g.by, ex, ey), R = r + 11;
+    if (n.d < R) { const dx = o.x - n.x, dy = o.y - n.y, dd = n.d || 1; o.x = n.x + dx / dd * R; o.y = n.y + dy / dd * R; hit = true; }
+  }
+  for (const t of m.standing || []) { const dx = o.x - t.x, dy = o.y - t.y, dd = Math.hypot(dx, dy) || 1, R = r + 12; if (dd < R) { o.x = t.x + dx / dd * R; o.y = t.y + dy / dd * R; } }
+  return hit;
+}
+function logBetween(m, a, b) {                   // a fallen log lying across the line from a to b
+  for (const g of m.logs || []) {
+    if (g.fall < 1) continue;
+    const [ex, ey] = logEnd(g);
+    const d1 = (b.x - a.x) * (g.by - a.y) - (b.y - a.y) * (g.bx - a.x), d2 = (b.x - a.x) * (ey - a.y) - (b.y - a.y) * (ex - a.x);
+    const d3 = (ex - g.bx) * (a.y - g.by) - (ey - g.by) * (a.x - g.bx), d4 = (ex - g.bx) * (b.y - g.by) - (ey - g.by) * (b.x - g.bx);
+    if (d1 * d2 < 0 && d3 * d4 < 0) return g;
+  }
+  return null;
+}
+function drawFelled(o, c, mask) {                // a tree going over, then lying where it fell; same painted sprite, turned down onto the ground
+  const [bx, by] = toScreen(o.bx, o.by), k = Math.min(1, o.fall), th = k * k * Math.PI / 2, sn = Math.sin(th), cs = Math.cos(th);
+  const g = [(o.ux - o.uy) * 0.78, (o.ux + o.uy) * 0.39];
+  const up = [sn * g[0], -cs + sn * g[1]], ul = Math.hypot(up[0], up[1]) || 1, wd = [-up[1] / ul, up[0] / ul];   // its width stays square to the trunk on screen
+  c.save(); c.transform(wd[0], wd[1], -up[0], -up[1], bx, by);
+  const ga = c.globalAlpha; if (!mask && o.gone) c.globalAlpha = ga * Math.max(0, 1 - o.gone);
+  drawTree(o, c, mask, 0, 0, o.s * Z);
+  c.globalAlpha = ga; c.restore();
 }
 // ---- poses: where his hands hold what he carries, which way it points, how low he is ----
 function miniPose(u) {
@@ -6982,14 +7044,21 @@ function miniPose(u) {
   if (u.st === 'dying' || u.st === 'dead') return { g: [6, 8, 4], d: [0.9, 0.3, -0.1], kneel: Math.min(1, u.t / 1), lean: 4, pain: 1, free: true };
   const sweep = (th) => ({ g: [3 + 4 * Math.cos(th), 6 * Math.sin(th), 18], d: [Math.cos(th), Math.sin(th), -0.05], kneel: 0.15, lean: 2, th });
   const tellPose = {
-    chop: P([-1, 1, 34], [-0.7, 0.1, 0.7], 0, -3), spin: back, throw: raise, swing: back, pot: raise,
+    chop: P([-1, 1, 34], [-0.7, 0.1, 0.7], 0, -3), hack: P([-1, 1, 34], [-0.7, 0.1, 0.7], 0, -3), fell: back, spin: back, throw: raise, swing: back, pot: raise,
     snuff: P([2, 3, 31], [0.15, 0, 1], 0, -4), spearT: P([-5, 6, 28], [0.95, 0, 0.2], 0, -3), lunge: P([2, 4, 13], [0.98, 0, 0.1], 0.35, 7),
     volley: P([9, 2, 28], [0, 0, 1], 0, -1), hop: carry, slash: back, charge: P([3, 4, 13], [0.9, 0, 0.2], 0.35, 9),
     snares: P([9, 3, 6], [1, 0, 0], 0.55, 6), call: { g: [4, 5, 30], d: [0.2, 0, 1], kneel: 0.1, lean: -5, pain: 0.35, free: true },
   };
+  if (u.st === 'tell' && m === 'fell') {         // three swings into the trunk: back, and across
+    if (uu < 0.3) return carry;
+    const f = ((uu - 0.3) / 0.7 * 3 + 0.3) % 1, hitP = P([10, 3, 18], [0.95, 0.25, 0.1], 0.2, 5);
+    return f < 0.3 ? mixPose(hitP, back, f / 0.3) : mixPose(back, hitP, (f - 0.3) / 0.7 * 1.4);
+  }
+  if (u.st === 'tell' && m === 'hack') return mixPose(carry, tellPose.chop, uu / 0.75);
   if (u.st === 'tell') return tellPose[m].free ? tellPose[m] : mixPose(carry, tellPose[m], uu / 0.75);
   if (u.st === 'act') {
-    if (m === 'chop') return mixPose(tellPose.chop, P([9, 1, 10], [0.95, 0, -0.3], 0.3, 6), uu * 1.6);
+    if (m === 'chop' || m === 'hack') return mixPose(tellPose.chop, P([9, 1, 10], [0.95, 0, -0.3], 0.3, 6), uu * 1.6);
+    if (m === 'fell') return mixPose(P([10, 3, 18], [0.95, 0.25, 0.1], 0.2, 5), carry, uu * 1.5);   // follow-through after the last chop
     if (m === 'spin') return sweep(2.4 - Math.PI * 4 * uu);
     if (m === 'swing' || m === 'slash') return sweep(2.2 - 4.1 * Math.min(1, uu * uu * (3 - 2 * uu)));
     if (m === 'throw' || m === 'pot' || m === 'spearT') return mixPose(tellPose[m], P([10, 4, 22], [0.85, 0.1, 0.5], 0.1, 5), uu * 3);
@@ -6998,7 +7067,7 @@ function miniPose(u) {
     return tellPose[m].free ? tellPose[m] : mixPose(tellPose[m], carry, uu);
   }
   if (u.st === 'recover') {
-    if (m === 'chop') return mixPose(P([9, 1, 10], [0.95, 0, -0.3], 0.3, 6), carry, (uu - 0.75) / 0.25);   // the axe stuck fast in the ground: he's open
+    if (m === 'chop' || m === 'hack') return mixPose(P([9, 1, 10], [0.95, 0, -0.3], 0.3, 6), carry, (uu - 0.75) / 0.25);   // the axe stuck fast in the ground: he's open
     if (m === 'charge') return Object.assign(mixPose(P([12, 4, 10], [1, 0, -0.2], 0.5, 9), carry, (uu - 0.7) / 0.3), { pain: 0.3 * (1 - uu) });   // winded after the run
     if (m === 'spin' || m === 'snuff') return Object.assign(mixPose(back, carry, (uu - 0.6) / 0.4), { pain: 0.25 * (1 - uu) });   // dizzy, or dazzled by his own flare
     return mixPose(tellPose[m].free ? carry : tellPose[m], carry, uu * 1.5);
@@ -7014,6 +7083,7 @@ function miniStart(L) {
     return { kind: k, x: L.x - Math.cos(a + off) * 90, y: L.y - Math.sin(a + off) * 90, dir: a + off, hp: D.hp, max: D.hp, shown: D.hp, st: 'rise', t: 0, len: 1.8, ph: 0, cd: 0.8 + i * 0.9, last: '', flinchAt: D.hp * 0.8, flinch: 0, lit: 0, gait: 0 };
   });
   rg.mini = { L, B, units, st: 'on', t: 0, mist: 0, proj: [], fires: [], snares: [], enraged: false };
+  if (L.id === 'woodcutter') { rg.mini.felled = new Set(); rg.mini.logs = []; rg.mini.standing = woodTrees(L).slice(); }
   if (L.dune) duneStart(rg.mini);
   addShake(0.4); bossSay('roar');
   S.msg = { text: B.title, sub: B.sub, t: 0 };
@@ -7030,7 +7100,15 @@ function miniHurt(n, knock, from) {              // n: 1 a whole heart, 0.5 a ha
 function miniNext(m, u, d) {                     // what he does next depends on how far away you are
   const r = Math.random(), k = u.kind, R = mReach(u), rg = S.rg;
   let mv = null;
-  if (k === 'woodcutter') { if (d < R.chop - 8) mv = r < 0.55 ? 'chop' : 'spin'; else if (d > 200 || (d > 120 && r < 0.35)) mv = 'throw'; }
+  if (k === 'woodcutter') {
+    const blk = logBetween(m, u, S.p), bn = blk && segNear(u.x, u.y, blk.bx, blk.by, ...logEnd(blk));
+    const cand = m.t - (u.fellAt || -99) > 5.5 ? m.standing.filter(t => Math.hypot(t.x - S.p.x, t.y - S.p.y) < treeLen(t) * 0.9 && Math.hypot(t.x - u.x, t.y - u.y) < 340).sort((a, b) => Math.hypot(a.x - u.x, a.y - u.y) - Math.hypot(b.x - u.x, b.y - u.y)) : [];
+    if (bn && bn.d < 75) { mv = 'hack'; u.logT = blk; }                       // a log in his way: he cuts through it
+    else if (cand.length && r < 0.6) { mv = 'fell'; u.treeT = cand[0]; }      // a tree that would reach you: he brings it down on you
+    else if (d < R.chop - 8) mv = 'chop';
+    else if (!u.axeOut && !blk && (d > 200 || (d > 120 && r < 0.35))) mv = 'throw';
+    if (mv === 'fell' && u.last === 'fell') mv = null;
+  }
   if (k === 'lamplighter') { if (m.t - (u.snuffAt || -99) > 13 && d < 420 && r < 0.3) mv = 'snuff'; else if (d < R.swing - 6) mv = 'swing'; else if (r < 0.55) mv = 'pot'; }
   if (k === 'spear') { if (d < 110) mv = 'lunge'; else if (r < 0.6) mv = 'spearT'; }
   if (k === 'archer') { if (d < 130) mv = 'hop'; else if (r < 0.65) mv = 'volley'; }
@@ -7046,7 +7124,16 @@ function miniNext(m, u, d) {                     // what he does next depends on
 function miniAct(m, u) {                         // the moment the wind-up ends: what leaves his hands
   const p = S.p, rg = S.rg, fwd = (f, r) => [u.x + Math.cos(u.dir) * f - Math.sin(u.dir) * r, u.y + Math.sin(u.dir) * f + Math.cos(u.dir) * r];
   const shot = (kind, sp, dmg, a = u.dir, max = 620) => { const [x, y] = fwd(16, 4); m.proj.push({ kind, x, y, ux: Math.cos(a), uy: Math.sin(a), sp, d: 0, max, dmg, spin: 0 }); };
-  if (u.move === 'throw') { shot('hatchet', 430, 0.5); if (actx) noiseAt(actx.currentTime, 2400, 700, 0.35, 0.3, sfxGain); }
+  if (u.move === 'throw') {                       // the hatchet curves out and comes back to his hand
+    const [x, y] = fwd(16, 4); u.axeOut = true;
+    m.proj.push({ kind: 'hatchet', ret: true, out: true, x0: x, y0: y, x, y, ux: Math.cos(u.dir), uy: Math.sin(u.dir), side: u.throwSide || 1, sp: 430, d: 0, max: u.throwMax || 400, dmg: 0.5, spin: 0, owner: u }); u.throwSide = 0;
+    if (actx) noiseAt(actx.currentTime, 2400, 700, 0.35, 0.3, sfxGain);
+  }
+  if (u.move === 'fell') {                       // the last blow: the tree goes over along the line he marked
+    const t = u.treeT; m.felled.add(t); m.standing = m.standing.filter(o => o !== t); m.shake = null; u.fellAt = m.t;
+    const a = u.fallA; m.logs.push({ kind: 'felled', type: t.type, seed: t.seed, s: t.s, r: 0, bx: t.x, by: t.y, ux: Math.cos(a), uy: Math.sin(a), len: treeLen(t), fall: 0, x: t.x + Math.cos(a) * treeLen(t) / 2, y: t.y + Math.sin(a) * treeLen(t) / 2 });
+    u.logNow = m.logs[m.logs.length - 1]; bossSay('creak');
+  }
   if (u.move === 'spearT') { shot('spear', 640, 1); if (actx) noiseAt(actx.currentTime, 3200, 900, 0.3, 0.3, sfxGain); }
   if (u.move === 'volley') { for (const o of [-0.22, 0, 0.22]) shot('arrow', 600, 0.5, u.dir + o, 700); if (actx) noiseAt(actx.currentTime, 4200, 1500, 0.25, 0.3, sfxGain); }
   if (u.move === 'pot') { const [x, y] = fwd(14, 4); m.proj.push({ kind: 'pot', fx: x, fy: y, tx: u.aimX, ty: u.aimY, x, y, t: 0, T: 0.9 }); }
@@ -7107,7 +7194,7 @@ function unitStep(m, u, dt) {
   }
   if (d < 8 * D.s) { p.x = u.x + dx / (d || 1) * 8 * D.s; p.y = u.y + dy / (d || 1) * 8 * D.s; }   // his body is solid
   const moveBy = (a, dist) => {
-    u.x += Math.cos(a) * dist; u.y += Math.sin(a) * dist; arenaClamp(u, 30);
+    u.x += Math.cos(a) * dist; u.y += Math.sin(a) * dist; arenaClamp(u, 30); if (m.logs) logPush(u, 8 * D.s);
     const p0 = u.ph; u.ph += dist * 0.78 * scrLen(u.dir) * Math.PI / (2 * 9.5 * D.s);
     if (Math.floor(p0 / Math.PI) !== Math.floor(u.ph / Math.PI)) bossSay('step');
   };
@@ -7123,15 +7210,52 @@ function unitStep(m, u, dt) {
       if (mv) { u.st = 'tell'; u.move = mv; u.t = 0; u.len = MV[mv].tell * fast; u.hit = false; u.last = mv; u.aimX = p.x; u.aimY = p.y; if (MV[mv].snd) bossSay(MV[mv].snd); }
       else u.cd = 0.3;
     }
+  } else if (u.st === 'tell' && u.move === 'fell') {   // he runs to the tree, puts himself on the far side of it from you, and chops three times
+    const t = u.treeT, uu = u.t / u.len;
+    if (uu < 0.7) u.fallA = Math.atan2(p.y - t.y, p.x - t.x);
+    const sx = t.x - Math.cos(u.fallA) * 40, sy = t.y - Math.sin(u.fallA) * 40, gd = Math.hypot(sx - u.x, sy - u.y);
+    if (gd > 4) { const a = Math.atan2(sy - u.y, sx - u.x); u.x += Math.cos(a) * Math.min(gd, 300 * dt); u.y += Math.sin(a) * Math.min(gd, 300 * dt); u.ph += Math.min(gd, 300 * dt) * 0.08; moving = true; }
+    const ta = Math.atan2(t.y - u.y, t.x - u.x); u.dir += Math.max(-8 * dt, Math.min(8 * dt, angDiff(ta, u.dir)));
+    const ch = Math.floor(Math.max(0, uu - 0.3) / 0.7 * 3 + 0.3);           // three chops into the trunk
+    if (uu > 0.3 && ch > (u.chops || 0) && ch <= 3) { u.chops = ch; bossSay('thock'); ashBurst(t.x, t.y, 4, 30); addShake(0.08); }
+    m.shake = { t, k: Math.max(0, (uu - 0.35) / 0.65) };
+    if (uu > 0.8 && !u.creaked) { u.creaked = true; bossSay('creak'); }
+    if (u.t >= u.len) { u.st = 'act'; u.t = 0; u.hit = false; u.len = MV.fell.act; u.chops = 0; u.creaked = false; miniAct(m, u); }
   } else if (u.st === 'tell') {
     const lock = u.move === 'charge' || u.move === 'lunge' ? 0.75 : u.move === 'snuff' ? 1 : 0.7;
-    if (u.t < u.len * lock) { turn(u.move === 'charge' ? 2 : 3.2); u.aimX = p.x; u.aimY = p.y; }
+    if (u.move === 'hack' && u.logT) { const n = segNear(u.x, u.y, u.logT.bx, u.logT.by, ...logEnd(u.logT)); u.dir += Math.max(-6 * dt, Math.min(6 * dt, angDiff(Math.atan2(n.y - u.y, n.x - u.x), u.dir))); }
+    else if (u.t < u.len * lock) { turn(u.move === 'charge' ? 2 : 3.2); u.aimX = p.x; u.aimY = p.y; }
+    if (u.move === 'throw' && u.t < u.len * lock) { const dd = Math.hypot(p.x - u.x, p.y - u.y); u.throwMax = Math.max(260, Math.min(470, dd + 90)); u.throwSide = u.throwSide || (Math.random() < 0.5 ? 1 : -1); }
     if (u.t >= u.len) { u.st = 'act'; u.t = 0; u.hit = false; u.len = MV[u.move].act; miniAct(m, u); }
   } else if (u.st === 'act') {
     const mvn = u.move, fwd = (f, r) => [u.x + Math.cos(u.dir) * f - Math.sin(u.dir) * r, u.y + Math.sin(u.dir) * f + Math.cos(u.dir) * r];
     if (mvn === 'chop' && u.t >= u.len && !u.hit) {
       u.hit = true; bossSay('impact'); addShake(0.6); hitStop(0.06);
       const [ex, ey] = fwd(R.chop * 0.85, 0); rg.blasts.push({ x: ex, y: ey, t: 0, life: 0.35, r: 70, col: 'white' }); ashBurst(ex, ey, 8, 16);
+      const lf = dx * Math.cos(u.dir) + dy * Math.sin(u.dir), lr = -dx * Math.sin(u.dir) + dy * Math.cos(u.dir);
+      if ((lf > 8 && lf < R.chop + 10 && Math.abs(lr) < 24) || d < 28) miniHurt(1, 26, u);
+    }
+    if (mvn === 'fell' && u.logNow) {
+      const g = u.logNow; g.fall = Math.min(1, u.t / u.len);
+      if (g.fall >= 1 && !u.hit) {               // it lands: everything along the trunk is crushed, and the log stays
+        u.hit = true; bossSay('crash'); addShake(0.75); hitStop(0.08);
+        const [ex, ey] = logEnd(g);
+        for (let f = 0.15; f <= 1; f += 0.17) { const x = g.bx + (ex - g.bx) * f, y = g.by + (ey - g.by) * f; ashBurst(x, y, 5, 12); }
+        rg.blasts.push({ x: (g.bx + ex) / 2, y: (g.by + ey) / 2, t: 0, life: 0.45, r: g.len * 0.6, col: 'white' });
+        const n = segNear(p.x, p.y, g.bx, g.by, ex, ey);
+        if (n.d < 22 + 14 * n.k) miniHurt(1, 0, { x: n.x, y: n.y });
+        logPush(p, 6);
+      }
+    }
+    if (mvn === 'hack' && u.t >= u.len && !u.hit) {   // the axe goes through the log and bites deep into the ground: the log is gone, and he's stuck a moment
+      u.hit = true; bossSay('impact'); bossSay('thock'); addShake(0.55); hitStop(0.06);
+      const g = u.logT;
+      if (g && m.logs.includes(g)) {
+        m.logs = m.logs.filter(o => o !== g);
+        const [ex, ey] = logEnd(g); for (let f = 0; f <= 1; f += 0.2) ashBurst(g.bx + (ex - g.bx) * f, g.by + (ey - g.by) * f, 6, 18);
+        rg.blasts.push({ x: (g.bx + ex) / 2, y: (g.by + ey) / 2, t: 0, life: 0.35, r: 80, col: 'white' });
+      }
+      const [hx, hy] = fwd(R.chop * 0.85, 0); ashBurst(hx, hy, 8, 16);
       const lf = dx * Math.cos(u.dir) + dy * Math.sin(u.dir), lr = -dx * Math.sin(u.dir) + dy * Math.cos(u.dir);
       if ((lf > 8 && lf < R.chop + 10 && Math.abs(lr) < 24) || d < 28) miniHurt(1, 26, u);
     }
@@ -7176,10 +7300,27 @@ function miniStep(dt) {
       }
       continue;
     }
+    if (h.ret) {                                 // the Woodcutter's hatchet: out on a curve, back to his hand; a log in the way catches it
+      h.spin += dt * (h.stuck > 0 ? 0 : 18);
+      if (h.stuck > 0) { if ((h.stuck -= dt) <= 0) { h.out = false; h.free = true; h.hitB = false; bossSay('whoosh'); } continue; }
+      if (h.out) {
+        h.d += h.sp * dt; const k = Math.min(1, h.d / h.max), bend = Math.sin(Math.PI * k) * 70 * h.side;
+        h.x = h.x0 + h.ux * h.d - h.uy * bend; h.y = h.y0 + h.uy * h.d + h.ux * bend;
+        if (k >= 1) { h.out = false; h.hitB = false; }
+      } else {
+        const o = h.owner, a = Math.atan2(o.y - h.y, o.x - h.x), dd = Math.hypot(o.x - h.x, o.y - h.y);
+        h.x += Math.cos(a) * Math.min(dd, 520 * dt); h.y += Math.sin(a) * Math.min(dd, 520 * dt);
+        if (dd < 24 || o.st === 'dying' || o.st === 'dead') { h.done = true; o.axeOut = false; }
+      }
+      if (!h.free && m.logs) for (const g of m.logs) if (g.fall >= 1 && segNear(h.x, h.y, g.bx, g.by, ...logEnd(g)).d < 14) { h.stuck = 1.3; bossSay('thock'); ashBurst(h.x, h.y, 4, 20); break; }
+      if (!h.stuck && !(h.out ? h.hitA : h.hitB) && dist2(h, p) < 20) { if (h.out) h.hitA = true; else h.hitB = true; if (miniHurt(h.dmg, 18, h)) addShake(0.35); }
+      continue;
+    }
     const st = h.sp * dt; h.x += h.ux * st; h.y += h.uy * st; h.d += st; h.spin += dt * 18;
     if (!h.hit && dist2(h, p) < (h.kind === 'arrow' ? 15 : 20)) { h.hit = true; if (miniHurt(h.dmg, 18, h)) addShake(0.35); }
   }
-  m.proj = m.proj.filter(h => !h.hit && (h.kind === 'pot' || h.d < h.max));
+  m.proj = m.proj.filter(h => h.ret ? !h.done : !h.hit && (h.kind === 'pot' || h.d < h.max));
+  if (m.logs && m.st === 'on') logPush(p, 6);
   for (const f of m.fires) { f.life -= dt; if (dist2(f, p) < 20) miniHurt(0.5, 0, f); }
   m.fires = m.fires.filter(f => f.life > 0);
   for (const s of m.snares) {                    // step in a snare and it holds your foot a moment
@@ -7289,6 +7430,12 @@ function drawMiniFigure(u) {
 function drawMiniGround(m) {                     // red marks on the ground: where the next blow will land
   const red = a => `rgba(220,40,35,${a})`;
   ctx.save();
+  if (m.logs) {                                  // the Woodcutter's trees and logs show faintly in the dark, so you can read the ground
+    const tgt = m.units[0] && m.units[0].st === 'tell' && m.units[0].move === 'fell' ? m.units[0].treeT : null;
+    for (const t of m.standing) { const [sx, sy] = toScreen(t.x, t.y); ctx.globalAlpha = t === tgt ? 0.8 : 0.4; const sh = t === tgt && m.shake ? m.shake.k : 0; drawTree(t, ctx, false, sx + Math.sin(S.t * 47) * 2.2 * sh * Z, sy, t.s * Z); }
+    for (const g of m.logs) { ctx.globalAlpha = 0.7; drawFelled(g, ctx, false); }
+    ctx.globalAlpha = 1;
+  }
   for (const u of m.units) {
     if (u.st === 'dead' || u.st === 'dying') continue;
     const R = mReach(u), uu = u.len ? Math.min(1, u.t / u.len) : 0, mv = u.move;
@@ -7300,7 +7447,21 @@ function drawMiniGround(m) {                     // red marks on the ground: whe
       if (mv === 'spin') { worldPoly(circlePts(u.x, u.y, R.spin + 10)); ctx.fillStyle = red(0.06 + 0.2 * uu); ctx.fill(); ctx.strokeStyle = red(0.3 + 0.5 * uu); ctx.lineWidth = 1.5; ctx.stroke(); }
       if (mv === 'swing') arc(R.swing + 12, 1.9);
       if (mv === 'slash') arc(R.slash + 12, 1.9);
-      if (mv === 'throw' || mv === 'spearT') rect(16, 620, 5);
+      if (mv === 'throw' && u.kind === 'woodcutter') {   // the hatchet's curve, out and back
+        const L2 = u.throwMax || 400, sd = u.throwSide || 1, pts = [];
+        for (let i = 0; i <= 20; i++) { const f = L2 * i / 20, b = Math.sin(Math.PI * i / 20) * 70 * sd; pts.push(fwd(16 + f, b)); }
+        ctx.strokeStyle = red(0.25 + 0.55 * uu); ctx.lineWidth = 6 * Z; ctx.setLineDash([8 * Z, 6 * Z]); ctx.beginPath();
+        pts.forEach(([x, y], i) => { const [sx2, sy2] = toScreen(x, y); i ? ctx.lineTo(sx2, sy2) : ctx.moveTo(sx2, sy2); }); ctx.stroke(); ctx.setLineDash([]);
+        rect(16, L2 + 16, 3);
+      }
+      else if (mv === 'throw' || mv === 'spearT') rect(16, 620, 5);
+      if (mv === 'hack') rect(10, R.chop + 10, 24);
+      if (mv === 'fell' && u.treeT && uu > 0.25) {   // the line the tree will come down along, filling in as he chops
+        const t = u.treeT, Lt = treeLen(t), a = u.fallA, w = 22;
+        const q = (f, r) => [t.x + Math.cos(a) * f - Math.sin(a) * r, t.y + Math.sin(a) * f + Math.cos(a) * r];
+        worldPoly([q(0, -w * 0.7), q(Lt, -w * 1.6), q(Lt, w * 1.6), q(0, w * 0.7)]); const k2 = Math.min(1, (uu - 0.25) / 0.75);
+        ctx.fillStyle = red(0.06 + 0.26 * k2); ctx.fill(); ctx.strokeStyle = red(0.3 + 0.55 * k2); ctx.lineWidth = 1.5; ctx.stroke();
+      }
       if (mv === 'volley') for (const o of [-0.22, 0, 0.22]) rect(16, 700, 3, u.dir + o);
       if (mv === 'lunge') rect(10, 125, 18);
       if (mv === 'charge') rect(10, 520, 26);
@@ -7645,7 +7806,7 @@ function duneStep(m, u, dt) {
   if (u.hp <= 0) { u.hp = 0; u.st = 'dying'; u.t = 0; u.hid = false; m.clones = []; hitStop(0.3); addShake(0.9); bossSay('roar'); return; }
   if (!u.hid && d < 8 * D.s) { p.x = u.x + dx / (d || 1) * 8 * D.s; p.y = u.y + dy / (d || 1) * 8 * D.s; }   // his body is solid
   const moveBy = (a, dist) => {
-    u.x += Math.cos(a) * dist; u.y += Math.sin(a) * dist; arenaClamp(u, 30);
+    u.x += Math.cos(a) * dist; u.y += Math.sin(a) * dist; arenaClamp(u, 30); if (m.logs) logPush(u, 8 * D.s);
     const p0 = u.ph; u.ph += dist * 0.78 * scrLen(u.dir) * Math.PI / (2 * 9.5 * D.s);
     if (!D.float && Math.floor(p0 / Math.PI) !== Math.floor(u.ph / Math.PI)) bossSay('step');
   };
