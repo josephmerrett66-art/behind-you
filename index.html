@@ -105,6 +105,12 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
 #craft .chips span { font: 0.72rem var(--mono); padding: 0.2rem 0.55rem; border: 1px solid rgba(239,239,234,0.3); border-radius: 99px; color: var(--bone); }
 #craft .chips span.none { color: var(--ash); }
 #craft .chips button.take { font: 0.72rem var(--mono); padding: 0.2rem 0.55rem; border: 1px solid rgba(239,239,234,0.3); border-radius: 99px; color: var(--bone); background: rgba(239,239,234,0.06); text-transform: none; letter-spacing: 0; }
+#hotbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; padding: 5px; border-radius: 12px; background: rgba(5,5,5,0.55); border: 1px solid rgba(239,239,234,0.18); touch-action: manipulation; z-index: 3; }
+#hotbar .hot { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 9px; color: var(--bone); background: rgba(239,239,234,0.06); border: 1px solid rgba(239,239,234,0.25); display: grid; place-items: center; }
+#hotbar .hot svg { width: 26px; height: 26px; }
+#hotbar .hot .k { position: absolute; left: 4px; top: 2px; font: 600 0.55rem var(--mono); color: var(--ash); }
+#hotbar .hot.sel { border: 2px solid #ffcf8a; background: rgba(255,190,120,0.18); color: #ffe2b8; }
+#hotbar .hot[disabled] { opacity: 0.25; }
 #craft .ilist { display: grid; gap: 0.35rem; }
 #craft .irow { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border: 1px solid rgba(239,239,234,0.15); border-radius: 8px; font: 0.8rem var(--mono); color: var(--bone); }
 #craft .irow i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
@@ -281,6 +287,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <button id="flaskBtn" class="exuse" hidden>Flask</button>
 <button id="craftBtn" hidden>Pack</button>
 <button id="useBtn" class="exuse" hidden>Take</button>
+<div id="hotbar" hidden></div>
 <button id="menu" hidden>Menu</button>
 <div id="picker" hidden>
   <div class="pick">
@@ -6565,8 +6572,30 @@ const RES = {   // name, colour, food it gives when eaten
 };
 const FOODS = ['berries', 'meat', 'cooked', 'stew'];
 const WPN = { fists: { n: 'Fists', k: 0.75, r: 0, rank: 0 }, club: { n: 'Wooden club', k: 1.05, r: 6, rank: 1 }, spear: { n: 'Flint spear', k: 1.35, r: 24, rank: 2 }, bone: { n: 'Bone club', k: 1.75, r: 8, rank: 3 } };
-const dayK = () => S && S.day ? WPN[S.day.wpn].k : 1;
-const dayR = () => S && S.day ? WPN[S.day.wpn].r : 0;
+// v131 (Joe): a hotbar along the bottom; what you hold decides what a swing does. Hand gathers, the axe chops, the pick breaks rock, the weapon fights.
+const HOT = [
+  { id: 'hand', key: '1', n: () => 'Hand', has: () => true, k: () => 0.6, icon: '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6 7s-6-2.5-6.5-5L3.5 12a1.5 1.5 0 0 1 2.6-1.5L8 13"/>' },
+  { id: 'axe', key: '2', n: D => ['Axe', 'Stone axe', 'Flint axe'][D.axe], has: D => D.axe > 0, k: D => [0, 0.9, 1.05][D.axe], icon: '<path d="M14 4l6 6M5 21l11-11"/><path d="M14 4c-3 0-6 2-7 5l4 4c3-1 5-4 5-7z"/>' },
+  { id: 'pick', key: '3', n: D => ['Pick', 'Stone pick', 'Flint pick'][D.pick], has: D => D.pick > 0, k: D => [0, 0.8, 0.95][D.pick], icon: '<path d="M4 20L15 9"/><path d="M5 7c4-4 10-4 14 0M12 4l8 8"/>' },
+  { id: 'weapon', key: '4', n: D => WPN[D.wpn].n, has: D => D.wpn !== 'fists', k: D => WPN[D.wpn].k, icon: '<path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>' },
+];
+const hotOf = () => HOT.find(h => h.id === (S.day.sel || 'hand'));
+const dayK = () => S && S.day ? hotOf().k(S.day) : 1;
+const dayR = () => S && S.day && S.day.sel === 'weapon' ? WPN[S.day.wpn].r : 0;
+function daySelect(id) {
+  const D = S && S.day; if (!D) return; const h = HOT.find(x => x.id === id); if (!h || !h.has(D) || D.sel === id) return;
+  D.sel = id; exNote(h.n(D).toLowerCase()); sfx(1.6, 0.12, 'bandpass', 2200, 0.12); renderHotbar();
+}
+function renderHotbar() {
+  const bar = document.getElementById('hotbar'), D = S && S.day; if (!D) { bar.hidden = true; return; }
+  bar.replaceChildren(...HOT.map(h => {
+    const b = document.createElement('button'), on = h.has(D); b.className = 'hot' + (D.sel === h.id ? ' sel' : ''); b.disabled = !on;
+    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${h.icon}</svg><span class="k">${h.key}</span>`;
+    b.title = on ? h.n(D) : h.n(D) + ' · craft one first';
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); daySelect(h.id); });
+    return b;
+  }));
+}
 const dayMax = () => PACK_SLOTS[S.day.bigPack ? 1 : 0];
 const daySlots = (inv = S.day.inv) => Object.values(inv).reduce((a, n) => a + Math.ceil(n / STACK), 0);
 const dayHave = (k, D = S.day) => (D.inv[k] || 0) + (S.rg && S.rg.inCamp ? D.box[k] || 0 : 0);
@@ -6598,7 +6627,7 @@ function dayBest() { try { return JSON.parse(localStorage.getItem(DAY_KEY) || 'n
 function dayBegin() {
   EX_TEST = true; XS = exFresh(); exMakeLairs();   // a fresh throwaway save: nothing here touches your expedition
   S.day = { t: 0, n: 1, food: FOOD_MAX, water: FOOD_MAX, st: STA_MAX, stT: 9, sick: 0, starve: 0, heal: 0, warn: {}, raidDue: false, eatT: 0, nagT: 0,
-    inv: {}, box: {}, axe: 0, pick: 0, wpn: 'fists', armour: 0, bigPack: 0, skin: 0, sips: 0,
+    sel: 'hand', inv: {}, box: {}, axe: 0, pick: 0, wpn: 'fists', armour: 0, bigPack: 0, skin: 0, sips: 0,
     cut: new Map(), felled: new Set(), builds: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {} };
   S.rg = exNewRun(); exPlaceHome();
   S.msg = { text: 'daylight', sub: matchMedia('(pointer: coarse)').matches ? 'Tap Take to pick things up · open your Pack to eat, drink and craft' : 'E picks things up · C opens your pack to eat, drink and craft', t: 0 };
@@ -6744,18 +6773,20 @@ function dayHarvest(Dk, a, inReach, spark) {
   let best = null, bd = 1e9;
   for (const o of propsNear(p.x, p.y, Dk.reach + dayR() + 30)) if ((o.kind === 'tree' || o.kind === 'rock') && inReach(o, 12)) { const d = dist2(o, p); if (d < bd) { bd = d; best = o; } }
   for (const o of dayNodesNear(p.x, p.y, Dk.reach + 40)) if ((o.t === 'bush' || o.t === 'grass') && inReach(o, 10)) { const d = dist2(o, p) - 20; if (d < bd) { bd = d; best = o; } }
+  { const want = D.sel === 'axe' ? 'tree' : D.sel === 'pick' ? 'rock' : null;   // what you hold picks the target: the axe looks for a tree, the pick for a rock
+    if (want && best && best.kind !== want) { let m = null, md = 1e9; for (const o of propsNear(p.x, p.y, Dk.reach + 30)) if (o.kind === want && inReach(o, 12) && dist2(o, p) < md) { md = dist2(o, p); m = o; } if (m) best = m; } }
   if (!best) return hits;
   A.hit.add('world'); hits++;
   const chips = col => { for (let k = 0; k < 7; k++) S.rg.ash.push({ x: best.x, y: best.y, z: 10 + Math.random() * 20, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.5) * 120, vz: 40 + Math.random() * 60, life: 0.5, col }); };
   if (best.kind === 'tree') {
-    if (!D.axe) { dayNote('axe', 'you need an axe · craft one', 4); if (actx) noiseAt(actx.currentTime, 500, 200, 0.12, 0.3, sfxGain); return hits; }
+    if (D.sel !== 'axe') { dayNote('axe', D.axe ? 'hold your axe to chop · 2' : 'you need an axe · craft one', 3); if (actx) noiseAt(actx.currentTime, 500, 200, 0.12, 0.3, sfxGain); return hits; }
     if (!dayStam(STA_CHOP)) return hits;
     const c = (D.cut.get(best.key) || 0) + 1, need = D.axe > 1 ? 3 : 5; D.cut.set(best.key, c); chips('wood');
     if (actx) { const t = actx.currentTime; boomAt(t, 180, 90, 0.12, 0.45, sfxGain); noiseAt(t, 1500, 500, 0.1, 0.35, sfxGain); }
     if (c >= need) dayFell(best);
     else exNote(`chop · ${need - c} more`);
   } else if (best.kind === 'rock') {
-    if (!D.pick) { dayNote('pick', 'you need a pick · craft one', 4); if (actx) noiseAt(actx.currentTime, 3500, 1500, 0.08, 0.3, sfxGain); return hits; }
+    if (D.sel !== 'pick') { dayNote('pick', D.pick ? 'hold your pick to break rock · 3' : 'you need a pick · craft one', 3); if (actx) noiseAt(actx.currentTime, 3500, 1500, 0.08, 0.3, sfxGain); return hits; }
     if (!dayStam(STA_CHOP)) return hits;
     const key = 'r' + best.key, c = (D.cut.get(key) || 0) + 1, need = D.pick > 1 ? 2 : 4; D.cut.set(key, c); chips('stone');
     if (actx) { const t = actx.currentTime; noiseAt(t, 4200, 1800, 0.12, 0.5, sfxGain); boomAt(t, 260, 140, 0.08, 0.3, sfxGain); }
@@ -6853,7 +6884,7 @@ function dayRaid() {
 }
 function dayDeath() {
   const rg = S.rg, D = S.day;
-  rg.phase = 'dead'; rg.deadT = 0; craftBtn.hidden = true;
+  rg.phase = 'dead'; rg.deadT = 0; craftBtn.hidden = true; document.getElementById('hotbar').hidden = true;
   const b = dayBest(); D.best = D.t > b.t;
   if (D.best) try { localStorage.setItem(DAY_KEY, JSON.stringify({ days: D.n, t: Math.round(D.t) })); } catch (e) {}
   S.msg = { text: D.cause === 'starved' ? 'You starved' : D.cause === 'thirst' ? 'Thirst took you' : 'The woods took you', sub: `Day ${D.n} · ${dayClock(D.t)}`, t: 0 };
@@ -6957,7 +6988,7 @@ function openCraft() {
   const rg = S && S.rg; if (!S || !S.day || !rg || rg.phase !== 'fight' || !S.running) return;
   S.running = false; menuBtn.hidden = true; craftBtn.hidden = true; craftEl.hidden = false; renderCraft();
 }
-function closeCraft() { craftEl.hidden = true; menuBtn.hidden = false; craftBtn.hidden = false; S.running = true; last = performance.now(); }
+function closeCraft() { craftEl.hidden = true; menuBtn.hidden = false; craftBtn.hidden = false; renderHotbar(); S.running = true; last = performance.now(); }
 function canCraft(r) {
   const D = S.day;
   if (r.fire && !S.rg.inCamp && !dayFireNear(S.p.x, S.p.y)) return 'needs a fire';
@@ -6974,7 +7005,7 @@ function dayCraft(id) {
   if (r.make) r.make(D);
   if (r.place) { dayPlace(r.place); closeCraft(); exNote(`built · ${r.name.toLowerCase()}`, true); return; }
   sfx(1.3, 0.45, 'bandpass', 1200, 0.3); if (actx) setTimeout(() => sfx(1.8, 0.3, 'bandpass', 2400, 0.25), 110);
-  exNote(`made · ${r.name.toLowerCase()}`, true);
+  exNote(`made · ${r.name.toLowerCase()}${['axe1', 'pick1', 'club', 'spear', 'bone'].includes(id) ? ' · on your hotbar' : ''}`, true); renderHotbar();
   renderCraft();
 }
 function renderCraft() {
@@ -10387,7 +10418,7 @@ function drawExHud(top) {
     let ln = ''; for (const b of bits) { const t = ln ? ln + ' · ' + b : b; if (ln && ctx.measureText(t).width > room) { ctx.fillText(ln, 16, y); y += size + 5; ln = b; } else ln = t; }
     if (ln) { ctx.fillText(ln, 16, y); y += size + 5; } return y;
   };
-  let y = row(S.day ? [`${rg.kills || 0} KILLED`, `PACK ${daySlots()}/${dayMax()}`, WPN[S.day.wpn].n.toUpperCase()] : [`${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`], hy + hs + 8, 'rgba(239,239,234,0.68)', fs - 1);
+  let y = row(S.day ? [`${rg.kills || 0} KILLED`, `PACK ${daySlots()}/${dayMax()}`, hotOf().n(S.day).toUpperCase()] : [`${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`], hy + hs + 8, 'rgba(239,239,234,0.68)', fs - 1);
   const st = [];
   if (lv('wind')) st.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's');
   st.unshift(`FLASKS ${rg.flask ?? FLASK_MAX}/${FLASK_MAX}`); if (XS.recall) st.push('FLARE'); if (XS.lanterns) st.push('LANTERN');
@@ -10661,6 +10692,8 @@ colourBtn.addEventListener('click', () => {
 colourLabel();
 campBtn.addEventListener('click', openCamp);
 craftBtn.addEventListener('click', openCraft);
+const hotbarEl = document.getElementById('hotbar');
+addEventListener('wheel', e => { if (!S || !S.day || !S.running) return; const D = S.day, own = HOT.filter(h => h.has(D)), i = own.findIndex(h => h.id === D.sel); daySelect(own[(i + (e.deltaY > 0 ? 1 : -1) + own.length) % own.length].id); }, { passive: true });
 useBtn.addEventListener('pointerdown', e => { e.preventDefault(); dayUse(); });
 document.getElementById('craftStoreAll').addEventListener('click', dayStoreAll);
 document.getElementById('craftGo').addEventListener('click', closeCraft);
@@ -10679,6 +10712,7 @@ addEventListener('keydown', e => {
   if (k === 'h') exDrink();
   if ((k === 'c' || k === 'i' || k === 'tab') && S.day) { e.preventDefault(); if (!craftEl.hidden) closeCraft(); else openCraft(); }
   if (k === 'e' && S.day) dayUse();
+  if (S.day && k >= '1' && k <= '4' && k.length === 1) daySelect(HOT[+k - 1].id);
   if (e.key === 'Escape' && !craftEl.hidden) { closeCraft(); e.stopImmediatePropagation(); }
   if (e.key === 'Escape' && !campEl.hidden) closeCamp();
 });
@@ -10699,7 +10733,7 @@ function begin(mode) {
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
   document.getElementById('deathCard').hidden = true;
-  initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = !S.day; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = true; craftBtn.hidden = true; useBtn.hidden = true; craftEl.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = !S.day; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = true; craftBtn.hidden = true; useBtn.hidden = true; hotbarEl.hidden = true; if (S.day) renderHotbar(); craftEl.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
@@ -10814,6 +10848,7 @@ function frame(now) {
   burnAudio();
   if (titleLive()) titleStep(dt);
   render();
+  hotbarEl.hidden = !(S && S.day && S.running && S.rg && S.rg.phase === 'fight');   // v131: the hotbar only while you play
   if (titleLive()) drawTitleEyes();
   requestAnimationFrame(frame);
 }
