@@ -1469,7 +1469,7 @@ function atkHit(D, a) {                          // everything in reach takes th
   const b = S.mode === 'expedition' && bossLive();
   if (b && !A.hit.has(b) && ['walk', 'tell', 'act', 'recover', 'roar'].includes(b.st) && inReach(b, 12 * BS)) {
     A.hit.add(b); hits++;
-    b.hp -= D.boss * (b.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); b.flinch = Math.max(b.flinch, 0.7); spark(b, 38 * BS, D.slam ? 18 : 10);
+    b.hp -= D.boss * (b.st === 'recover' ? 1.35 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); b.flinch = Math.max(b.flinch, 0.7); spark(b, 38 * BS, D.slam ? 18 : 10);
   }
   if (b && b.st === 'recover' && (b.move === 'slam' || b.move === 'roots') && b.t < b.len * 0.85 && (b.chunks || 0) < 3 && !A.hit.has('club')) {   // his club, stuck in the ground: break it
     const cl = { x: b.x + Math.cos(b.dir) * B_SLAM * bK(b) * 0.7, y: b.y + Math.sin(b.dir) * B_SLAM * bK(b) * 0.7 };
@@ -1488,7 +1488,7 @@ function atkHit(D, a) {                          // everything in reach takes th
   if (m) for (const u of m.units) {
     if (A.hit.has(u) || u.hid || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inReach(u, 9 * MK[u.kind].s)) continue;
     A.hit.add(u); hits++;
-    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')) * miniShield(u); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
+    u.hp -= D.boss * (u.st === 'recover' ? (MK[u.kind].dune ? 1.6 : 1.35) : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')) * miniShield(u); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
     if (MK[u.kind].dune) duneHitBy(u, D);
     if (u.st !== 'act') { push(u, D.knock * 0.35); arenaClamp(u, 30); }   // a blow can't knock him out of a swing, only nudge him
   }
@@ -4334,15 +4334,15 @@ function hurt(e) {
   const dune = inBeyond() && !(Math.random() < 0.25 * sr('sandward'));   // Sandward: sometimes it only grazes
   // out in the Dunes every hit is two hearts, and they come quicker after each other
   if (rg.steel > 0) {                      // Armour: a steel heart takes it (two in the Dunes)
-    lifeAdd('hearts', Math.min(rg.steel, dune ? DUNE_HIT : 1)); rg.steel = Math.max(0, rg.steel - (dune ? DUNE_HIT : 1)); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = 0.6;
+    lifeAdd('hearts', Math.min(rg.steel, dune ? DUNE_HIT : 1)); rg.steel = Math.max(0, rg.steel - (dune ? DUNE_HIT : 1)); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1) * (exDeep() ? EX_INV : 1); rg.hurtFx = 0.6;
     rg.pop = { t: 0, steelLost: rg.steel };
     addShake(0.55); hitStop(0.08);
     { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }
     shove(e, 90); playClang();
     return;
   }
-  const dmgH = (isEx() && e && e.type === 'shade' ? 0.5 : 1) * (pact('half') ? 0.5 : 1) * (dune ? DUNE_HIT : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
-  lifeAdd('hearts', Math.min(rg.hp, dmgH)); rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
+  const dmgH = (isEx() && e && (e.type === 'half' || (e.type === 'shade' && !exDeep())) ? 0.5 : 1) * (pact('half') ? 0.5 : 1) * (dune ? DUNE_HIT : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
+  lifeAdd('hearts', Math.min(rg.hp, dmgH)); rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1) * (exDeep() ? EX_INV : 1); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
   rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };   // a heart cracked in half, or the one that just went
   if (lv('coat')) { lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white'); if (isEx() && lv('coat') > 2) for (const o of rg.enemies) if (dist2(o, S.p) < 150 + 20 * lv('coat')) o.frozen = 2.5; }   // Thick Coat 3: the flash freezes
   addShake(0.75); hitStop(0.11);
@@ -4879,6 +4879,7 @@ function updateSurvive(dt) {
     if (S.mode === 'expedition' && farOff && d > 900 && !e.guard) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
     if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; if (e.type === 'spear') spearInit(e); if (e.type === 'archer') archerInit(e); continue; }   // left far behind: bring it back around you
     let sp = f.sp * (inBeyond() ? DUNE_SP : 1) * (pact('hunted') ? 1.3 : 1) * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
+    if (S.mode === 'expedition' && !inBeyond()) { const k = EX_PACE[exRing(Math.hypot(S.p.x, S.p.y))]; sp = e.type === 'kamikaze' ? sp * k : Math.min(sp * k, Math.max(sp, EX_PACE_MAX)); }   // v122: deeper woods, quicker hunters (never quite your sprint)
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
     if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
@@ -5597,6 +5598,9 @@ const DORB_COL = '70,225,200';
 const exRing = d => d < RINGS[0] ? 0 : d < RINGS[1] ? 1 : d < RINGS[2] ? 2 : 3;
 const exInCamp = () => Math.hypot(S.p.x, S.p.y) < CAMP_R;
 // Spawning follows distance from camp: how many may be out at once, and seconds between spawns, per ring.
+// v122 (Joe: 25 minutes, two bosses and an orb without dying, too easy): past the near woods the hunters keep pace, hits cost more and come closer together
+const EX_PACE = [1, 1.2, 1.35, 1.45], EX_PACE_MAX = 122, EX_INV = 0.75;   // forest speed per ring, a ceiling just under your sprint, safe time after a hit
+const exDeep = () => S.mode === 'expedition' && !inBeyond() && exRing(Math.hypot(S.p.x, S.p.y)) > 0;   // out past the near woods, still in the forest
 const EX_CAP = [17, 26, 35, 45], EX_GAP = [0.65, 0.48, 0.36, 0.26];   // roughly twice as many as before v86 (Joe: now you can fight back, bring more)   // the near woods: lots of weaker shades, so it never feels empty
 const EX_SPAWNS = [
   { type: 'shade',    weight: [60, 40, 28, 22] },
@@ -6562,7 +6566,7 @@ function exStep(dt) {
 
 // ---- the forest boss: the Woodwarden keeps the last green orb in a ring of standing stones ----
 // Four moves, each with a wind-up you can see and hear and a red mark on the ground; after each he is open, and the light burns him three times as hard.
-const AR = 420, RC = 1800, BS = 3.6, B_HP = 140, B_LEN = 40;   // the ring of stones you walk into; how far the cleared field reaches
+const AR = 420, RC = 1800, BS = 3.6, B_HP = 220, B_LEN = 40;   // the ring of stones you walk into; how far the cleared field reaches
 const B_AREA = 2.5e6;                          // how much ground the fight camera shows, whatever the screen's shape            // arena radius, his size against yours, his health, the trunk's length (in his own units)
 const B_TELL = { slam: 1.0, sweep: 0.8, quake: 0.9, leap: 1.2, roots: 0.95, uproot: 1.3 };
 // v117 (Joe: each boss its own identity): the Woodwarden's club sticks in the ground after a slam; hit the club, not him, and chunks
@@ -6817,11 +6821,11 @@ function bossStep(dt) {
       const [ex, ey] = fwd(B_SLAM * bK(b) * 0.6, 0); rg.blasts.push({ x: ex, y: ey, t: 0, life: 0.5, r: 120, col: 'white' });
       for (let f = 40; f <= B_SLAM * bK(b); f += 34) { const [x, y] = fwd(f, 0); ashBurst(x, y, 4, 14); if (b.phase === 2) b.fires.push({ x, y, life: 3.5 + Math.random(), max: 4.5 }); }
       const lf = dx * Math.cos(b.dir) + dy * Math.sin(b.dir), lr = -dx * Math.sin(b.dir) + dy * Math.cos(b.dir);
-      if ((lf > 10 && lf < B_SLAM * bK(b) + 10 && Math.abs(lr) < 34) || d < 40) bossHurt(1, 30);
+      if ((lf > 10 && lf < B_SLAM * bK(b) + 10 && Math.abs(lr) < 34) || d < 40) bossHurt(2, 30);
     }
     if (b.move === 'sweep') {
       const pose = bossPose(b), wa = b.dir + pose.th;
-      if (!b.hit && d > 25 && d < B_SWEEP * bK(b) + 12 && Math.abs(angDiff(toP, wa)) < 0.25) { b.hit = true; if (bossHurt(1, 70)) { addShake(0.6); hitStop(0.08); } }
+      if (!b.hit && d > 25 && d < B_SWEEP * bK(b) + 12 && Math.abs(angDiff(toP, wa)) < 0.25) { b.hit = true; if (bossHurt(2, 70)) { addShake(0.6); hitStop(0.08); } }
     }
     if (b.move === 'quake') {
       const n = Math.floor(b.t / 0.5), c0 = b.t % 0.5;
@@ -6839,7 +6843,7 @@ function bossStep(dt) {
     }
     if (b.t >= b.len && (b.move !== 'leap' || b.hit)) {
       b.st = 'recover'; b.t = 0; b.stomp = 0;
-      b.len = { slam: 1.85, sweep: 1.0, quake: 1.2, leap: 2.0, roots: 1.1, uproot: 1.0 }[b.move] * (b.phase === 2 ? 0.8 : 1);
+      b.len = { slam: 1.85, sweep: 1.0, quake: 1.2, leap: 2.0, roots: 1.1, uproot: 1.0 }[b.move] * (b.phase === 2 ? 0.8 : 1) * 0.85;   // v122: open a little less long
       if (b.phase === 2 && (b.move === 'slam' || b.move === 'sweep') && Math.random() < 0.55 && !b.chained) {   // second phase: he chains a second blow straight after
         b.chained = true; b.len = 0.35;
       } else b.chained = false;
@@ -6872,7 +6876,7 @@ function bossRootsStep(b, dt) {                 // the roots he sends through th
     if (t.t >= t.T && !t.hit) {                 // the tree comes down: everything under it is crushed
       t.hit = true; bossSay('crash'); addShake(0.8); hitStop(0.06); rg.blasts.push({ x: t.x1, y: t.y1, t: 0, life: 0.5, r: 130, col: 'white' });
       for (let i = 0; i < 5; i++) ashBurst(t.x1 + (Math.random() - 0.5) * 80, t.y1 + (Math.random() - 0.5) * 80, 5, 30);
-      if (Math.hypot(p.x - t.x1, p.y - t.y1) < 78) bossHurt(1, 60, { x: t.x1, y: t.y1 });
+      if (Math.hypot(p.x - t.x1, p.y - t.y1) < 78) bossHurt(2, 60, { x: t.x1, y: t.y1 });
     }
   }
   b.trees = b.trees.filter(t => t.t < t.T + 0.6);
@@ -7114,11 +7118,11 @@ const MINIS = [
   { id: 'huntsman', name: 'THE HUNTSMAN', title: 'the huntsman', sub: 'The deep woods are his', d: [6900, 7400], units: ['huntsman'], wisps: 220, loot: ['r', 'r', 'r', 'r', 'r', 'r', 'r'] },
 ];
 const MK = {                                     // each fighter: health, size against you, gear, what he carries, walking speed, how close he likes to stand
-  woodcutter:  { hp: 34, s: 2.9, kit: { head: 'beanie', coat: 1, vest: 0 }, prop: 'axe', sp: 50, keep: 50 },
-  lamplighter: { hp: 45, s: 3.0, kit: { head: 'hood', coat: 2, vest: 0 }, prop: 'pole', sp: 42, keep: 70 },
-  spear:       { hp: 28, s: 2.6, kit: { head: 'helmet', coat: 0, vest: 1 }, prop: 'spear', sp: 58, keep: 190 },
-  archer:      { hp: 24, s: 2.5, kit: { head: 'goggles', coat: 1, vest: 0 }, prop: 'bow', sp: 62, keep: 300 },
-  huntsman:    { hp: 60, s: 3.1, kit: { head: 'hood', coat: 2, vest: 1 }, prop: 'blade', sp: 56, keep: 60 },
+  woodcutter:  { hp: 54, s: 2.9, kit: { head: 'beanie', coat: 1, vest: 0 }, prop: 'axe', sp: 50, keep: 50 },
+  lamplighter: { hp: 72, s: 3.0, kit: { head: 'hood', coat: 2, vest: 0 }, prop: 'pole', sp: 42, keep: 70 },
+  spear:       { hp: 45, s: 2.6, kit: { head: 'helmet', coat: 0, vest: 1 }, prop: 'spear', sp: 58, keep: 190 },
+  archer:      { hp: 38, s: 2.5, kit: { head: 'goggles', coat: 1, vest: 0 }, prop: 'bow', sp: 62, keep: 300 },
+  huntsman:    { hp: 96, s: 3.1, kit: { head: 'hood', coat: 2, vest: 1 }, prop: 'blade', sp: 56, keep: 60 },
 };
 const MV = {                                     // wind-up, the blow itself, and how long he's open after
   chop:   { tell: 0.95, act: 0.16, rec: 1.5,  snd: 'slam' },
@@ -7338,8 +7342,12 @@ function miniHurt(n, knock, from) {              // n: 1 a whole heart, 0.5 a ha
   const rg = S.rg, p = S.p;
   if (rg.inv > 0) return false;
   const hp0 = rg.hp, st0 = rg.steel, sh0 = rg.shield;
-  hurt(Object.assign({}, from, { type: n < 1 ? 'shade' : 'boss' }));
+  hurt(Object.assign({}, from, { type: n < 1 ? 'half' : 'boss' }));
   if (rg.hp >= hp0 && rg.steel >= st0 && rg.shield >= sh0) return false;
+  if (n > 1 && rg.phase === 'fight') {           // v122: a big blow takes a second heart (steel first)
+    if (rg.steel < st0) rg.steel = Math.max(0, rg.steel - 1);
+    else if (rg.hp < hp0 && rg.hp > 0) { rg.hp = Math.max(0, Math.ceil(rg.hp) - 1); rg.pop = { t: 0, lost: rg.hp }; if (rg.hp <= 0) nightOver(); }
+  }
   if (knock) { const dx = p.x - from.x, dy = p.y - from.y, d = Math.hypot(dx, dy) || 1; p.x += dx / d * knock; p.y += dy / d * knock; }
   return true;
 }
@@ -7553,7 +7561,7 @@ function unitStep(m, u, dt) {
       u.hit = true; bossSay('impact'); addShake(0.6); hitStop(0.06);
       const [ex, ey] = fwd(R.chop * 0.85, 0); rg.blasts.push({ x: ex, y: ey, t: 0, life: 0.35, r: 70, col: 'white' }); ashBurst(ex, ey, 8, 16);
       const lf = dx * Math.cos(u.dir) + dy * Math.sin(u.dir), lr = -dx * Math.sin(u.dir) + dy * Math.cos(u.dir);
-      if ((lf > 8 && lf < R.chop + 10 && Math.abs(lr) < 24) || d < 28) miniHurt(1, 26, u);
+      if ((lf > 8 && lf < R.chop + 10 && Math.abs(lr) < 24) || d < 28) miniHurt(2, 26, u);
     }
     if (mvn === 'fell' && u.logNow) {
       const g = u.logNow; g.fall = Math.min(1, u.t / u.len);
@@ -7563,7 +7571,7 @@ function unitStep(m, u, dt) {
         for (let f = 0.15; f <= 1; f += 0.17) { const x = g.bx + (ex - g.bx) * f, y = g.by + (ey - g.by) * f; ashBurst(x, y, 5, 12); }
         rg.blasts.push({ x: (g.bx + ex) / 2, y: (g.by + ey) / 2, t: 0, life: 0.45, r: g.len * 0.6, col: 'white' });
         const n = segNear(p.x, p.y, g.bx, g.by, ex, ey);
-        if (n.d < 22 + 14 * n.k) miniHurt(1, 0, { x: n.x, y: n.y });
+        if (n.d < 22 + 14 * n.k) miniHurt(2, 0, { x: n.x, y: n.y });
         logPush(p, 6);
       }
     }
@@ -7577,7 +7585,7 @@ function unitStep(m, u, dt) {
       }
       const [hx, hy] = fwd(R.chop * 0.85, 0); ashBurst(hx, hy, 8, 16);
       const lf = dx * Math.cos(u.dir) + dy * Math.sin(u.dir), lr = -dx * Math.sin(u.dir) + dy * Math.cos(u.dir);
-      if ((lf > 8 && lf < R.chop + 10 && Math.abs(lr) < 24) || d < 28) miniHurt(1, 26, u);
+      if ((lf > 8 && lf < R.chop + 10 && Math.abs(lr) < 24) || d < 28) miniHurt(2, 26, u);
     }
     if (mvn === 'spin') { moveBy(u.dir, Math.min(70 * dt, Math.max(0, d - 20))); moving = true; if (!u.hit && d < R.spin + 10) { u.hit = true; if (miniHurt(0.5, 50, u)) { addShake(0.4); hitStop(0.06); } } }
     if (mvn === 'swing' || mvn === 'slash') {
@@ -7588,9 +7596,9 @@ function unitStep(m, u, dt) {
     if (mvn === 'lunge' || mvn === 'charge' || mvn === 'hop' || mvn === 'pincer') {
       const sp = mvn === 'charge' ? 560 : mvn === 'pincer' ? 540 : mvn === 'lunge' ? 380 : 340;
       moveBy(u.dash, sp * dt); moving = true;
-      if (mvn !== 'hop' && !u.hitDash && dist2(u, p) < 30 + 4 * D.s) { u.hitDash = true; const big = mvn === 'charge' || mvn === 'pincer'; if (miniHurt(big ? 1 : 0.5, big ? 70 : 30, u)) { addShake(0.6); hitStop(0.08); } }
+      if (mvn !== 'hop' && !u.hitDash && dist2(u, p) < 30 + 4 * D.s) { u.hitDash = true; const big = mvn === 'charge' || mvn === 'pincer'; if (miniHurt(big ? 2 : 0.5, big ? 70 : 30, u)) { addShake(0.6); hitStop(0.08); } }
     }
-    if (u.t >= u.len) { u.backstab = false; if (mvn === 'swap' && u === m.units[0]) twinsSwap(m); u.st = 'recover'; u.t = 0; u.len = MV[mvn].rec * fast; if (mvn === 'charge') { bossSay('impact'); addShake(0.4); ashBurst(u.x, u.y, 10, 30); } }
+    if (u.t >= u.len) { u.backstab = false; if (mvn === 'swap' && u === m.units[0]) twinsSwap(m); u.st = 'recover'; u.t = 0; u.len = MV[mvn].rec * fast * (mvn === 'stun' ? 1 : 0.8); if (mvn === 'charge') { bossSay('impact'); addShake(0.4); ashBurst(u.x, u.y, 10, 30); } }
   } else if (u.st === 'recover' && u.t >= u.len) { u.st = 'walk'; u.t = 0; u.cd = (0.4 + Math.random() * 0.5) * fast * (u.kind === 'archer' || u.kind === 'spear' ? 1.4 : 1); }
   u.gait += ((moving ? 1 : 0) - u.gait) * Math.min(1, dt * 6);
 }
