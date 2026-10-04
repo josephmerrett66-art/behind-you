@@ -89,10 +89,12 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
 .exuse { position: fixed; right: 27px; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #recallBtn { right: 112px; bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
 #lampBtn { right: 112px; bottom: calc(372px + env(safe-area-inset-bottom, 0px)); }
+#flaskBtn { right: 112px; bottom: calc(444px + env(safe-area-inset-bottom, 0px)); color: #ffd9b0; border-color: rgba(255,190,130,0.6); }
+#flaskBtn[data-empty="1"] { opacity: 0.35; }
 @media (max-height: 520px) {   /* a phone on its side: one row across, above the aiming corner */
   body.ex #autorun { right: 202px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
   #attack { right: 16px; bottom: calc(220px + env(safe-area-inset-bottom, 0px)); } #dodge, #campBtn { right: 112px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #torch { right: 196px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #autorun { right: 282px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
-  #recallBtn { right: 356px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 424px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); }
+  #recallBtn { right: 356px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 424px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); } #flaskBtn { right: 492px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); }
 }
 #camp, #stats { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding-inline: 16px; padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); background: rgba(5,5,5,0.95); }
 #camp h3, #stats h3 { margin: 0.4rem 0 0; font: 600 0.72rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); display: flex; justify-content: space-between; gap: 1rem; }
@@ -249,6 +251,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <button id="campBtn" hidden>Shop</button>
 <button id="recallBtn" class="exuse" hidden>Flare</button>
 <button id="lampBtn" class="exuse" hidden>Lantern</button>
+<button id="flaskBtn" class="exuse" hidden>Flask</button>
 <button id="menu" hidden>Menu</button>
 <div id="picker" hidden>
   <div class="pick">
@@ -531,7 +534,7 @@ function moveInput() {
   if (!go) return [0, 0, 0];
   // equal speed on screen in every direction (the iso view squashes up/down, so the world step is scaled to match)
   const [wx, wy] = screenDirToWorld(Math.cos(S.aim) * K() * 1.1, Math.sin(S.aim) * K() * 1.1);
-  return [wx, wy, speed * (isRg() ? rgSpeed() * exWeight() : 1)];
+  return [wx, wy, speed * (isRg() ? rgSpeed() * exWeight() * (S.rg && S.rg.drink ? 0.3 : 1) : 1)];
 }
 
 function viewR() { return Math.hypot(W, H * 2) / K() * 0.6; }
@@ -1385,6 +1388,8 @@ const dodgeRefill = () => DODGE_CH_T * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr(
 function dodge() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall) return;
   const p = S.p; if ((p.roll || 0) > 0) return;
+  if (S.rg.drink) return;                        // v123: mid-drink you're committed
+  if (p.atk && ATK[p.atk.i].slam) { p.atk.rollQ = true; return; }   // v123: once you leap for the slam you land it; the roll comes out after
   let burn = false;
   if (isEx()) {
     if (p.dch === undefined) p.dch = dodgeMax();
@@ -1419,6 +1424,7 @@ const ATK = [
 const ATK_CHAIN = 0.4;                           // how long after a swing the next one still chains
 function attack() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight') return;
+  if (S.rg.drink) return;                      // v123: drinking
   const p = S.p, A = p.atk;
   if (A && A.t < A.dur) { A.queued = true; return; }   // mid-swing: buffer it, the next one comes out the moment this one ends
   startSwing();
@@ -1463,7 +1469,7 @@ function atkHit(D, a) {                          // everything in reach takes th
     if (o.dead || A.hit.has(o) || !inReach(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
     A.hit.add(o); hits++;
     o.hp -= D.dmg * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); o.jit = 1;
-    if (o.type !== 'tall') push(o, D.knock);
+    if (o.type !== 'tall' && (o.type !== 'brute' || D.slam || D.dash)) push(o, D.knock);   // v123: brutes have poise; only the slam or the dash strike moves them
     spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.slam ? 14 : 9);
   }
   const b = S.mode === 'expedition' && bossLive();
@@ -1527,7 +1533,7 @@ function atkStep(dt) {                           // called from update, before y
   if (D.slam && A.t < D.hitAt && Math.random() < dt * 40) S.rg.embers.push({ x: p.x, y: p.y, z: p.hopZ + 20, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, vz: -20, life: 0.25, ember: true });   // sparks streaming off the torch as you come down
   if (A.t >= D.dur) {
     p.atkLast = { i: A.i, end: S.t }; p.atk = null; p.hopZ = 0;
-    if (A.queued) startSwing();
+    if (A.rollQ) dodge(); else if (A.queued) startSwing();
   }
 }
 function slashStep(dt) {
@@ -4331,6 +4337,7 @@ function hurt(e) {
     return;
   }
   rg.regenT = 0;
+  if (rg.drink) { rg.drink = null; exNote('the flask spilled', true); }   // v123: hit mid-drink, the flask is wasted
   const dune = inBeyond() && !(Math.random() < 0.25 * sr('sandward'));   // Sandward: sometimes it only grazes
   // out in the Dunes every hit is two hearts, and they come quicker after each other
   if (rg.steel > 0) {                      // Armour: a steel heart takes it (two in the Dunes)
@@ -4813,7 +4820,9 @@ function updateSurvive(dt) {
     rg.windT = (rg.windT || 0) + dt;
     if (rg.windT >= [60, 60, 40, 25][Math.min(3, lv('wind'))]) { rg.windT = 0; rg.shield = 1; rg.pop = { t: 0, blocked: true }; exNote('shield is back'); }
   }
-  if (sr('regen') && rg.phase === 'fight' && rg.hp > 0) {   // Regen (a wisp stat): a while without a hit heals a heart
+  flaskStep(dt);
+  const fighting = isEx() && (bossLive() || miniLive() || rg.enemies.some(e => !e.dead && dist2(e, S.p) < 300));   // v123: Regen heals between fights, not during them
+  if (sr('regen') && rg.phase === 'fight' && rg.hp > 0 && !fighting) {   // Regen (a wisp stat): a while without a hit heals a heart
     rg.regenT = (rg.regenT || 0) + dt;
     if (rg.hp < rg.maxHp && rg.regenT >= [30, 30, 20, 12, 8][Math.min(4, sr('regen'))]) { rg.regenT = 0; rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
   }
@@ -5762,6 +5771,31 @@ function exNewOrb() {                        // the next orb wakes further out, 
   XS.orbA = a; XS.orb = { x: Math.cos(a) * d, y: Math.sin(a) * d }; XS.orbField = true;
   propCache.clear();                         // the last orb's clearing is cut out of the woods
 }
+// v123 (Joe: make it hard the way Elden Ring is): healing is a few flasks, not free. Drinking takes a moment you can be punished in;
+// they fill again at camp and at a boss's lantern.
+const FLASK_MAX = 3, FLASK_T = 0.9;
+function flaskUi() { const rg = S.rg; if (!rg) return; flaskBtn.textContent = 'Flask ' + (rg.flask || 0); flaskBtn.dataset.empty = rg.flask > 0 ? '0' : '1'; }
+function exDrink() {
+  const rg = S.rg, p = S.p;
+  if (S.mode !== 'expedition' || !rg || rg.phase !== 'fight' || !S.running || rg.drink || (p.roll || 0) > 0 || p.atk) return;
+  if (!(rg.flask > 0)) return exNote('no flasks left');
+  if (rg.hp >= rg.maxHp) return exNote('already at full health');
+  rg.drink = { t: 0 }; rg.flask--; flaskUi();
+  if (actx) { const t = actx.currentTime; noiseAt(t, 900, 300, 0.5, 0.18, sfxGain); }
+}
+function flaskStep(dt) {
+  const rg = S.rg, p = S.p; if (S.mode !== 'expedition' || !rg) return;
+  if (rg.flask === undefined) rg.flask = FLASK_MAX;
+  const atLantern = rg.beyond ? XS.dgrace && !rg.next && Math.hypot(p.x - XS.dgrace.x, p.y - XS.dgrace.y) < OUT_R : XS.outposts.some(o => o.grace && Math.hypot(p.x - o.x, p.y - o.y) < OUT_R);
+  if (atLantern && rg.flask < FLASK_MAX && !miniLive() && !bossLive()) { rg.flask = FLASK_MAX; exNote('flasks refilled at the lantern'); }
+  if (rg.drink) {
+    if (rg.phase !== 'fight') { rg.drink = null; return; }
+    rg.drink.t += dt;
+    if (rg.embers.length < 320 && Math.random() < dt * 30) rg.embers.push({ x: p.x + (Math.random() - 0.5) * 10, y: p.y + (Math.random() - 0.5) * 10, z: 20 + Math.random() * 20, vz: 30 + Math.random() * 30, vx: 0, vy: 0, life: 0.5, ember: true });
+    if (rg.drink.t >= FLASK_T) { rg.drink = null; rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; sfx(1.2, 0.5, 'bandpass', 1200, 0.2); }
+  }
+  if (S.t > (rg.flaskUiT || 0)) { rg.flaskUiT = S.t + 0.25; flaskUi(); }
+}
 function exRecall() {
   const rg = S.rg;
   if (S.mode !== 'expedition' || !rg || rg.phase !== 'fight' || !S.running || rg.inCamp || rg.recall) return;
@@ -6331,7 +6365,7 @@ function exNewRun() {
   for (const id of XS.eq) rg.up[id] = XS.own[id] || 0;
   rg.maxHp = baseHearts() + (rg.up.coat || 0); rg.hp = tripHp(rg.maxHp); rg.shield = lv('wind'); rg.steel = steelMax();
   rg.pack = []; rg.carryOrb = false; rg.carryDorb = false; rg.looted = new Set(); rg.left = new Map(); rg.loose = []; rg.notes = [];
-  rg.inCamp = true; rg.oil = oilMax(); rg.oilWarn = 0; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
+  rg.inCamp = true; rg.flask = FLASK_MAX; rg.drink = null; rg.oil = oilMax(); rg.oilWarn = 0; rg.ringMax = 0; rg.spawnT = 2; rg.tallCd = 10; rg.outT = 0; rg.recall = null; rg.lamps = exPathLamps();
   return rg;
 }
 function exBegin() {
@@ -6418,6 +6452,10 @@ function exSpawn(type) {
     }
   }
 }
+function exPack(ring, n) {                      // v123: a pack of hunters coming in together from one side
+  const at = spawnSpot(); if (exSafeAt(at.x, at.y, 280)) return;
+  for (let i = 0; i < n; i++) spawnFoe(exPickFoe(ring), { x: at.x + (Math.random() - 0.5) * 70, y: at.y + (Math.random() - 0.5) * 70, d: at.d });
+}
 function exPickFoe(r) {
   const rg = S.rg, ok = EX_SPAWNS.filter(s => s.weight[r] > 0 && (!s.max || rg.enemies.filter(e => e.type === s.type).length < s.max[r]));
   let x = Math.random() * ok.reduce((a, s) => a + s.weight[r], 0);
@@ -6495,6 +6533,7 @@ function exHome() {                          // stepped inside the fence: bank t
     lifeAdd('wisps', rg.wispCarry); ST.w += rg.wispCarry; stSave(); exNote(`+${rg.wispCarry} wisps`, true); rg.wispCarry = 0; wispChime(0.75);
   }
   if (rg.hp < tripHp(rg.maxHp) || (rg.steel || 0) < steelMax()) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = Math.max(rg.hp, tripHp(rg.maxHp)); }
+  rg.flask = FLASK_MAX;
   rg.steel = steelMax(); rg.shield = lv('wind'); rg.looted.clear(); rg.left.clear(); rg.cleared = false;   // home again: the woods fill back up
   rg.oil = oilMax(); rg.oilWarn = 0;
   XS.out = null; exSave();
@@ -6518,7 +6557,7 @@ function exStep(dt) {
   if (!rg.beyond) lifeMax('far', Math.round(d0));
   tipStep(rg, inCamp, d0);
   campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
-  recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns;
+  recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns; flaskBtn.hidden = inCamp;
   rg.lamps = exPathLamps();
   if (rg.carryOrb && dist2(p, TELE) < 46) exDeposit();                       // the green shrine, out on the portal ring
   if (portalOpen() >= 1 && !rg.warp && dist2(p, TELE) < 16) warpStart('out');
@@ -6548,7 +6587,7 @@ function exStep(dt) {
     const cap = (EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1);   // Horde: twice as many   // and so does a heavy pack
     if (rg.spawnT <= 0) {
       rg.spawnT = EX_GAP[ring] * (rg.carryOrb || rg.carryDorb ? 0.55 : 1) * (pact('horde') ? 0.5 : 1) * (0.6 + Math.random() * 0.8);
-      if (rg.enemies.length < cap) exSpawn(exPickFoe(ring));
+      if (rg.enemies.length < cap) { if (ring > 0 && Math.random() < 0.25 && cap - rg.enemies.length >= 3) exPack(ring, Math.min(cap - rg.enemies.length, 3 + (Math.random() < 0.5 ? 1 : 0))); else exSpawn(exPickFoe(ring)); }   // v123: sometimes a pack
     }
   }
   if (ring === 3 && !bossLive() && !rg.cleared && !rg.enemies.some(e => e.type === 'tall') && (rg.tallCd -= dt) <= 0) {
@@ -6635,7 +6674,7 @@ function mixPose(A, B, u) {
   return { g: lerp3(A.g, B.g, u), d: d.map(v => v / m), kneel: A.kneel + (B.kneel - A.kneel) * u, lean: A.lean + (B.lean - A.lean) * u };
 }
 function bossPose(b) {
-  const u = b.len ? b.t / b.len : 0;
+  const u = b.len ? (b.st === 'tell' && b.hold ? Math.min(1, b.t / (b.len - b.hold)) : b.t / b.len) : 0;
   if (b.st === 'rise') return Object.assign(mixPose(BP.down, BP.drag, (b.t - 1.2) / 1.6), { pain: 0 });
   if (b.st === 'roar') return { g: [5, 10, 3], d: [0.95, 0.1, -0.05], kneel: 0.55, lean: -4, pain: Math.min(1, b.t * 2), free: true };
   if (b.st === 'dying') return { g: [6, 10, 3], d: [0.9, 0.3, -0.05], kneel: Math.min(1, b.t / 1.2), lean: 4, pain: 1, free: true };
@@ -6725,7 +6764,7 @@ function bossNext(b, d) {                       // what he does next depends on 
 }
 function bossTell(b, m, quick) {
   if (m === 'uproot') b.held = { kind: 'tree', type: Math.random() < 0.6 ? 'pine' : 'oak', seed: Math.random(), s: 1.1 + Math.random() * 0.2, r: 0 };
-  b.st = 'tell'; b.move = m; b.t = 0; b.len = B_TELL[m] * (b.phase === 2 ? 0.75 : 1) * (quick ? 0.6 : 1); b.hit = false; b.last = m;
+  b.st = 'tell'; b.move = m; b.t = 0; b.len = B_TELL[m] * (b.phase === 2 ? 0.75 : 1) * (quick ? 0.6 : 1); b.hold = !quick && (m === 'slam' || m === 'sweep') && Math.random() < 0.35 ? 0.4 + Math.random() * 0.2 : 0; b.len += b.hold; b.glinted = false; b.hit = false; b.last = m;
   bossSay(m);
 }
 function bossStep(dt) {
@@ -7124,6 +7163,8 @@ const MK = {                                     // each fighter: health, size a
   archer:      { hp: 38, s: 2.5, kit: { head: 'goggles', coat: 1, vest: 0 }, prop: 'bow', sp: 62, keep: 300 },
   huntsman:    { hp: 96, s: 3.1, kit: { head: 'hood', coat: 2, vest: 1 }, prop: 'blade', sp: 56, keep: 60 },
 };
+const HOLD_MV = { chop: 1, hack: 1, swing: 1, slash: 1 };   // v123: blows he sometimes holds at the top, then a glint, then it comes
+const FOLLOW_MV = { woodcutter: 'chop', lamplighter: 'swing' };
 const MV = {                                     // wind-up, the blow itself, and how long he's open after
   chop:   { tell: 0.95, act: 0.16, rec: 1.5,  snd: 'slam' },
   fell:   { tell: 1.75, act: 0.55, rec: 1.0,  snd: null },      // v113: the Woodcutter fells a tree across the clearing
@@ -7274,7 +7315,7 @@ function stakePush(m, o, r) { for (const s of m.stakes || []) { const dx = o.x -
 const isHunt = m => m && m.L && m.L.id === 'huntsman';
 // ---- poses: where his hands hold what he carries, which way it points, how low he is ----
 function miniPose(u) {
-  const k = u.kind, m = u.move, uu = u.len ? u.t / u.len : 0;
+  const k = u.kind, m = u.move, uu = u.len ? (u.st === 'tell' && u.hold ? Math.min(1, u.t / (u.len - u.hold)) : u.t / u.len) : 0;
   const P = (g, d, kneel = 0, lean = 0) => ({ g, d, kneel, lean });
   const carry = { woodcutter: P([5, 5, 15], [0.3, 0.25, 0.92]), lamplighter: P([5, 5, 18], [0.3, 0.1, 0.95]), spear: P([4, 5, 16], [0.45, 0.1, 0.88]),
     archer: P([6, 3, 20], [0, 0, 1]), huntsman: P([6, 5, 16], [0.75, 0.2, 0.35]) }[k];
@@ -7506,7 +7547,7 @@ function unitStep(m, u, dt) {
     else if (D.keep > 150 && d < D.keep * 0.6) { moveBy(u.dir + Math.PI, sp * 0.8 * dt); moving = true; }   // the ranged ones back off to their distance
     if ((u.cd -= dt) <= 0) {
       const mv = miniNext(m, u, d);
-      if (mv) { u.st = 'tell'; u.move = mv; u.t = 0; u.len = MV[mv].tell * fast; u.hit = false; u.last = mv; u.aimX = p.x; u.aimY = p.y; if (MV[mv].snd) bossSay(MV[mv].snd); }
+      if (mv) { u.st = 'tell'; u.move = mv; u.t = 0; u.len = MV[mv].tell * fast; u.hold = HOLD_MV[mv] && Math.random() < 0.35 ? 0.4 + Math.random() * 0.2 : 0; u.len += u.hold; u.glinted = false; u.hit = false; u.last = mv; u.aimX = p.x; u.aimY = p.y; if (MV[mv].snd) bossSay(MV[mv].snd); }
       else u.cd = 0.3;
     }
   } else if (u.st === 'hstalk') {                // gone: your heart quickens; a red edge shows the side he'll come from
@@ -7598,7 +7639,10 @@ function unitStep(m, u, dt) {
       moveBy(u.dash, sp * dt); moving = true;
       if (mvn !== 'hop' && !u.hitDash && dist2(u, p) < 30 + 4 * D.s) { u.hitDash = true; const big = mvn === 'charge' || mvn === 'pincer'; if (miniHurt(big ? 2 : 0.5, big ? 70 : 30, u)) { addShake(0.6); hitStop(0.08); } }
     }
-    if (u.t >= u.len) { u.backstab = false; if (mvn === 'swap' && u === m.units[0]) twinsSwap(m); u.st = 'recover'; u.t = 0; u.len = MV[mvn].rec * fast * (mvn === 'stun' ? 1 : 0.8); if (mvn === 'charge') { bossSay('impact'); addShake(0.4); ashBurst(u.x, u.y, 10, 30); } }
+    if (u.t >= u.len) { u.backstab = false; if (mvn === 'swap' && u === m.units[0]) twinsSwap(m); u.st = 'recover'; u.t = 0; u.len = MV[mvn].rec * fast * (mvn === 'stun' ? 1 : 0.8);
+      if (FOLLOW_MV[u.kind] === mvn && u.hp < u.max * 0.5 && !u.followed && Math.random() < 0.4) { u.followed = true; u.st = 'tell'; u.t = 0; u.len = 0.5; u.hold = 0; u.hit = false; u.aimX = p.x; u.aimY = p.y; if (MV[mvn].snd) bossSay(MV[mvn].snd); }   // v123: second phase, a quick second blow
+      else if (u.st === 'recover') u.followed = false;
+      if (mvn === 'charge') { bossSay('impact'); addShake(0.4); ashBurst(u.x, u.y, 10, 30); } }
   } else if (u.st === 'recover' && u.t >= u.len) { u.st = 'walk'; u.t = 0; u.cd = (0.4 + Math.random() * 0.5) * fast * (u.kind === 'archer' || u.kind === 'spear' ? 1.4 : 1); }
   u.gait += ((moving ? 1 : 0) - u.gait) * Math.min(1, dt * 6);
 }
@@ -9033,7 +9077,7 @@ function portalStep(dt) {                      // returns true when the rest of 
   }
   if (rg.next) {                               // past the second portal: the Frost, its hunters, and the way back
     stormSound(0.28);                          // a thin cold wind
-    rg.oil = oilMax(); rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false; attackBtn.hidden = false;
+    rg.oil = oilMax(); rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = false; dodgeBtn.hidden = false; attackBtn.hidden = false;
     if (dist2(p, NEXT_GATE) > 40) rg.leftGate = true;
     if (dist2(p, NEXT_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser' || e.type === 'spear' || e.type === 'archer') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the shooters off
     if (rg.phase === 'fight' && dist2(p, NEXT_GATE) > 220) {   // v105 trial (Joe): every kind of hunter comes for you in the snow
@@ -9047,7 +9091,7 @@ function portalStep(dt) {                      // returns true when the rest of 
     return true;
   }
   if (rg.beyond) {                             // the Dunes: oil burns, spear throwers and archers hunt, a teal orb waits out in the sand
-    rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false; attackBtn.hidden = false;
+    rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = false; dodgeBtn.hidden = false; attackBtn.hidden = false;
     exOilStep(dt, dist2(p, BEYOND_GATE) < 130 || !!miniLive());  // the portal's light tops the torch up, and so does a keeper's fight
     if (rg.phase === 'fight' && !miniLive()) stormStep(dt); stormSound(stormK());   // no storms blow in while you fight a keeper
     miniStep(dt);                              // the orb's keeper
@@ -9612,8 +9656,21 @@ function drawBankFx() {
   ctx.fillText('EMBERS BANKED', px, y + 22);
   ctx.restore();
 }
+function drawHoldGlints() {                       // v123: a held blow flashes just before it comes
+  const rg = S.rg; if (!rg) return;
+  const list = [];
+  const b = bossLive(); if (b && b.st === 'tell' && b.hold) list.push([b, 38 * BS]);
+  const m = miniLive(); if (m) for (const u of m.units) if (u.st === 'tell' && u.hold && MK[u.kind]) list.push([u, 34 * MK[u.kind].s]);
+  for (const [o, h] of list) {
+    const left = o.len - o.t; if (left > 0.25) continue;
+    if (!o.glinted) { o.glinted = true; if (actx) noiseAt(actx.currentTime, 9000, 6000, 0.12, 0.18, sfxGain); }
+    const k = 1 - left / 0.25, [sx, sy] = toScreen(o.x, o.y), gy = sy - h * Z, r = (8 + 18 * k) * Z;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,240,220,${0.95 - 0.3 * k})`; ctx.lineWidth = 2 * Z;
+    ctx.beginPath(); ctx.moveTo(sx - r, gy); ctx.lineTo(sx + r, gy); ctx.moveTo(sx, gy - r); ctx.lineTo(sx, gy + r); ctx.stroke(); ctx.restore();
+  }
+}
 function drawExHud(top) {
-  drawRedLaser(); drawBankFx(); drawBossBar(); drawMiniBar();
+  drawHoldGlints(); drawRedLaser(); drawBankFx(); drawBossBar(); drawMiniBar();
   const rg = S.rg; if (!rg || !XS) return;
   // the corner keeps only what you bank and where you are; hearts, pack and oil sit over your head where you're looking
   const big = W > 900, fs = big ? 15 : 13, lh = fs + 5, hs = big ? 13 : 11, hg = big ? 18 : 15;
@@ -9640,13 +9697,14 @@ function drawExHud(top) {
   let y = row([`${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`], hy + hs + 8, 'rgba(239,239,234,0.68)', fs - 1);
   const st = [];
   if (lv('wind')) st.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's');
-  if (XS.recall) st.push('FLARE'); if (XS.lanterns) st.push('LANTERN');
+  st.unshift(`FLASKS ${rg.flask ?? FLASK_MAX}/${FLASK_MAX}`); if (XS.recall) st.push('FLARE'); if (XS.lanterns) st.push('LANTERN');
   for (const t of PACTS) if (pact(t.id)) st.push(t.name.toUpperCase());
   if (st.length) row(st, y, 'rgba(239,239,234,0.42)', fs - 3);
 }
 
 // ---- the camp: shop and loadout at the fire ----
-const campEl = document.getElementById('camp'), campBtn = document.getElementById('campBtn'), recallBtn = document.getElementById('recallBtn'), lampBtn = document.getElementById('lampBtn');
+const campEl = document.getElementById('camp'), campBtn = document.getElementById('campBtn'), recallBtn = document.getElementById('recallBtn'), lampBtn = document.getElementById('lampBtn'), flaskBtn = document.getElementById('flaskBtn');
+flaskBtn.addEventListener('pointerdown', e => { e.preventDefault(); exDrink(); });
 recallBtn.addEventListener('pointerdown', e => { e.preventDefault(); exRecall(); });
 lampBtn.addEventListener('pointerdown', e => { e.preventDefault(); exPlant(); });
 function openCamp() {
@@ -9913,6 +9971,7 @@ addEventListener('keydown', e => {
   if (k === 'e') { if (!campEl.hidden) closeCamp(); else openCamp(); }
   if (k === 'g') exRecall();   // R is auto run, so the flare lives on G
   if (k === 't') exPlant();
+  if (k === 'h') exDrink();
   if (e.key === 'Escape' && !campEl.hidden) closeCamp();
 });
 const statsEl = document.getElementById('stats');
@@ -9931,7 +9990,7 @@ function begin(mode) {
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
   document.getElementById('deathCard').hidden = true;
-  initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = true; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = true; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
