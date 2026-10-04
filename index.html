@@ -1506,15 +1506,16 @@ function startSwing() {
   let i = 0;
   if ((p.roll || 0) > 0 || (p.rollEnd || 0) > 0) i = 3;   // out of a roll: the dash strike
   else if (prev && S.t - prev.end < ATK_CHAIN && prev.i < 2) i = prev.i + 1;
+  const tov = S.day && TOOL_SWING[S.day.sel] && i !== 3 ? TOOL_SWING[S.day.sel] : null; if (tov) i = 0;   // v133: a tool swings its own way, one stroke at a time
   const D = ATK[i], a = S.aimW !== undefined ? S.aimW : 0;
   if (S.day) { S.day.st = Math.max(0, S.day.st - (D.slam ? STA_SLAM : STA_SWING)); S.day.stT = 0; }
   if (i === 3) p.roll = 0;                        // the roll turns into the thrust
   lifeAdd('swings');
   const side = i === 1 ? -1 : 1;
-  p.atk = { i, t: 0, dur: D.dur, a, side, hit: new Set(), done: false, queued: false };
+  p.atk = { i, t: 0, dur: tov ? tov.dur : D.dur, a, side, hit: new Set(), done: false, queued: false, ov: tov, pose: tov ? tov.pose : S.day && S.day.sel === 'weapon' && S.day.wpn === 'spear' && i < 2 ? 3 : undefined };
   rg.atkHist = (rg.atkHist || []).filter(h => S.t - h.t < 1.6).concat([{ i, side, t: S.t }]);   // v120: a false Mirage you strike throws your own combo back
   rg.slashes = rg.slashes || [];
-  if (!D.slam) rg.slashes.push({ i, a, side, t: 0, life: 0.28, r: D.reach, arc: D.arc });
+  if (!D.slam && !tov) rg.slashes.push({ i, a, side, t: 0, life: 0.28, r: D.reach, arc: D.arc });
   addShake(D.slam ? 0.12 : 0.07); camKick(a, D.kick * 0.5);
   dustKick(p.x, p.y, a, D.slam ? 14 : 6, D.slam ? 110 : 70);
   if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, D.slam ? 1400 : 3000, D.slam ? 250 : 700, D.slam ? 0.3 : 0.14, D.slam ? 0.45 : 0.32, sfxGain); if (D.slam) boomAt(t, 90, 60, 0.15, 0.3, sfxGain); }
@@ -1590,8 +1591,9 @@ function atkStep(dt) {                           // called from update, before y
   const p = S.p;
   if (p.rollEnd > 0) p.rollEnd -= dt;
   if (S.kick) { const f = Math.exp(-12 * dt); S.kick.x *= f; S.kick.y *= f; }
+  if (S.day) dayActStep(dt);
   const A = p.atk; if (!A) { p.hopZ = 0; return; }
-  const D = ATK[A.i];
+  const D = A.ov ? Object.assign({}, ATK[A.i], A.ov) : ATK[A.i];
   A.t += dt;
   const air = D.slam ? D.hitAt : D.dur * 0.6, moveT = D.slam ? D.hitAt : D.dur * 0.45;
   p.hopZ = A.t < air ? D.hop * Math.sin(Math.PI * A.t / air) : 0;   // up and over, landing as the blow lands
@@ -1601,7 +1603,7 @@ function atkStep(dt) {                           // called from update, before y
   if (!A.done && A.t >= D.hitAt) { A.done = true; atkHit(D, A.a); }
   if (D.slam && A.t < D.hitAt && Math.random() < dt * 40) S.rg.embers.push({ x: p.x, y: p.y, z: p.hopZ + 20, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, vz: -20, life: 0.25, ember: true });   // sparks streaming off the torch as you come down
   if (A.t >= D.dur) {
-    p.atkLast = { i: A.i, end: S.t }; p.atk = null; p.hopZ = 0;
+    p.atkLast = { i: A.i, pose: A.pose, end: S.t }; p.atk = null; p.hopZ = 0;
     if (A.rollQ) dodge(); else if (A.queued) startSwing();
   }
 }
@@ -3057,7 +3059,7 @@ function lean(sx, sy) {
   return [Math.max(-1.3, Math.min(1.3, (sx - W / 2) / 600)) * 0.2, 1 + Math.max(-1, Math.min(1, (H / 2 - sy) / 600)) * 0.08];
 }
 function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
-  const [sx, sy] = toScreen(o.x, o.y), [l, hy] = lean(sx, sy);
+  const [sx, sy] = toScreen(o.x, o.y), [l0, hy] = lean(sx, sy), sk = o.shakeT !== undefined ? S.t - o.shakeT : 9, l = l0 + (sk < 0.45 ? Math.sin(sk * 45) * (1 - sk / 0.45) * (o.kind === 'tree' ? 0.09 : 0.04) : 0);   // v133: a struck tree shudders
   withXf(c, 1, -l, hy, l * sy, sy - hy * sy, () => drawPropFlat(o, c, mask, maskCol));   // shear and stretch about the object's foot
 }
 function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
@@ -3176,9 +3178,10 @@ function poseAt(i, u) {                            // the body's shape u of the 
   return o;
 }
 function atkPose(p) {                              // the pose to draw, and how much of it (it lets go over 0.16 s once the blow is done)
-  if (p.atk) return Object.assign(poseAt(p.atk.i, Math.min(1, p.atk.t / p.atk.dur)), { w: Math.min(1, p.atk.t / 0.03 + (p.atk.i === (p.atkLast && p.atkLast.i + 1) ? 1 : 0)) });
+  if (p.atk) return Object.assign(poseAt(p.atk.pose ?? p.atk.i, Math.min(1, p.atk.t / p.atk.dur)), { w: Math.min(1, p.atk.t / 0.03 + (p.atk.i === (p.atkLast && p.atkLast.i + 1) ? 1 : 0)) });
+  if (p.act) { const a = p.act; return Object.assign(poseAt(a.pose, Math.min(1, a.t / a.dur)), { w: Math.max(0, Math.min(1, a.t / 0.1, (a.dur - a.t) / 0.12)) }); }   // v133: eating, drinking, picking up, building
   const L = p.atkLast; if (!L || !S.rg || S.t - L.end > 0.16) return null;
-  return Object.assign(poseAt(L.i, 1), { w: 1 - (S.t - L.end) / 0.16 });
+  return Object.assign(poseAt(L.pose ?? L.i, 1), { w: 1 - (S.t - L.end) / 0.16 });
 }
 const KITC = { jacket: mat(0.95, 1.2, 0.72, 1.7), pants: mat(1.3, 1.18, 0.88, 1.7), pad: mat(1, 1, 0.95, 1.2), boot: mat(1.45, 1.0, 0.68, 1.6), sole: mat(1.1, 1, 0.9),
   glove: mat(1.3, 1.05, 0.8, 1.4), canvas: mat(1.32, 1.16, 0.82, 1.6), roll: mat(1.9, 0.8, 0.62, 1.5), strap: mat(1.2, 1.05, 0.85, 1.25), rig: mat(1.35, 1.17, 0.86, 1.55),
@@ -3283,12 +3286,14 @@ function drawPlayer() {
   const drawTorchArm = near => {
     line([rSh, rEl], near ? 3.9 : 3.7, G(36, near, 'jacket')); line([rEl, rHa], near ? 3.5 : 3.3, G(33, near, 'jacket'));
     detail([mid(rEl, rHa, 0.78), mid(rEl, rHa, 0.86)], 3.8, G(44, near, 'jacket'));
+    if (S.day) dayHeld(P, rHa, tipL, near, OUT); else {   // v133: in Daylight you hold a tool, not the torch
     line([[rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL], 3.4, '#2f2f2d');                 // a dented service torch
     detail([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.3), mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.55)], 3.6, '#454542');   // grip
     line([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.85), tipL], 4.2, '#3a3a37', 'butt');   // head of the torch
+    }
     if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
     const [tx, ty] = P(...tipL);
-    if (!OUT) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
+    if (!OUT && !S.day) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
     S.tip = AP ? P(...tip0) : [tx, ty];           // mid-blow the beam stays put; the torch itself goes where the swing takes it
     S.tipNow = [tx, ty];
   };
@@ -3369,6 +3374,7 @@ function drawPlayer() {
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
       for (let i = 1; i < T.length; i++) {
         const k = 1 - (S.t - T[i][2]) / 0.16;
+        if (S.day) { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = `rgba(250,248,240,${0.32 * k})`; ctx.lineWidth = (1 + 4 * k) * Z; ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke(); continue; }   // v133: a plain swish in daylight, no torch glow
         ctx.strokeStyle = `rgba(255,190,120,${0.7 * k})`; ctx.lineWidth = (1.5 + 6 * k) * Z;
         ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke();
         ctx.strokeStyle = `rgba(255,250,240,${0.7 * k})`; ctx.lineWidth = (0.5 + 1.6 * k) * Z; ctx.stroke();
@@ -6629,7 +6635,7 @@ function dayBegin() {
   EX_TEST = true; XS = exFresh(); exMakeLairs();   // a fresh throwaway save: nothing here touches your expedition
   S.day = { t: 0, n: 1, food: FOOD_MAX, water: FOOD_MAX, st: STA_MAX, stT: 9, sick: 0, starve: 0, heal: 0, warn: {}, raidDue: false, eatT: 0, nagT: 0,
     sel: 'hand', inv: {}, box: {}, axe: 0, pick: 0, wpn: 'fists', armour: 0, bigPack: 0, skin: 0, sips: 0,
-    cut: new Map(), felled: new Set(), builds: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {} };
+    cut: new Map(), felled: new Set(), builds: [], chips: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {} };
   S.rg = exNewRun(); exPlaceHome();
   S.msg = { text: 'daylight', sub: matchMedia('(pointer: coarse)').matches ? 'Tap Take to pick things up · open your Pack to eat, drink and craft' : 'E picks things up · C opens your pack to eat, drink and craft', t: 0 };
 }
@@ -6694,7 +6700,7 @@ function dayStep(dt, inCamp) {
   for (const o of dayNodesNear(p.x, p.y, 900)) if (o.t === 'bush' && !o.ber && (o.berT -= dt) <= 0) o.ber = true;   // berries grow back
   // trees going over, then the logs
   for (const g of D.logs) {
-    if (g.fall < 1) { g.fall = Math.min(1, g.fall + dt * (0.5 + g.fall * 2.6)); if (g.fall >= 1) { addShake(0.35 * monNear(g, 500)); if (actx) boomAt(actx.currentTime, 70, 40, 0.5, 0.5 * monNear(g, 600), sfxGain); for (let i = 0; i < 5; i++) ashBurst(g.bx + g.ux * g.len * i / 5, g.by + g.uy * g.len * i / 5, 4, 6); } }
+    if (g.fall < 1) { g.fall = Math.min(1, g.fall + dt * (0.5 + g.fall * 2.6)); if (g.fall >= 1) { addShake(0.35 * monNear(g, 500)); if (actx) boomAt(actx.currentTime, 70, 40, 0.5, 0.5 * monNear(g, 600), sfxGain); for (let i = 0; i < 5; i++) { ashBurst(g.bx + g.ux * g.len * i / 5, g.by + g.uy * g.len * i / 5, 4, 6); if (i > 1) dayChips(g.bx + g.ux * g.len * i / 5, g.by + g.uy * g.len * i / 5, 8, g.type === 'dead' ? 'wood' : 'leaf', 6); } } }
     else if ((g.lie += dt) > 0.7 && (g.gone = (g.gone || 0) + dt * 2) >= 1) {
       g.done = true;
       for (let i = 0; i < g.give.logs; i++) dayDrop(g.bx + g.ux * g.len * (0.3 + 0.5 * i / Math.max(1, g.give.logs)), g.by + g.uy * g.len * (0.3 + 0.5 * i / Math.max(1, g.give.logs)), 'logs', 1);
@@ -6702,6 +6708,8 @@ function dayStep(dt, inCamp) {
     }
   }
   D.logs = D.logs.filter(g => !g.done);
+  for (const c of D.chips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; }
+  D.chips = D.chips.filter(c => c.life > 0);
   beastStep(dt); buildStep(dt);
   if (!D.told.axeHint && !D.axe && dayHave('sticks') >= 3 && dayHave('stones') >= 2 && dayHave('fibre') >= 2) { D.told.axeHint = 1; rg.ringMsg = { text: 'you can make an axe', sub: matchMedia('(pointer: coarse)').matches ? 'Open your Pack to craft' : 'Press C to open your pack', t: 0 }; }
 }
@@ -6710,6 +6718,7 @@ function pickSnd() { sfx(1.5, 0.15, 'bandpass', 1600, 0.15); }
 const EATS = { berries: { food: 10, water: 3 }, meat: { food: 8, sick: 0.4 }, cooked: { food: 30, heal: 0.5 }, stew: { food: 55, water: 15, heal: 1 } };
 function dayEat(k, fromBox) {
   const D = S.day, rg = S.rg, src = fromBox ? D.box : D.inv; if (!(src[k] > 0)) return;
+  dayAct(8, 1.1, RES[k][1], k === 'stew' ? 'bowl' : 'food');
   src[k]--; if (!src[k]) delete src[k];
   const E = EATS[k]; D.food = Math.min(FOOD_MAX, D.food + E.food); if (E.water) D.water = Math.min(FOOD_MAX, D.water + E.water);
   if (E.heal && rg.hp < rg.maxHp) { rg.hp = Math.min(rg.maxHp, rg.hp + E.heal); rg.pop = { t: 0, gained: Math.ceil(rg.hp) - 1 }; }
@@ -6720,9 +6729,9 @@ function dayEat(k, fromBox) {
 const dayWaterHere = () => S.rg.inCamp ? 'the camp barrel' : wxK('rain') > 0.3 ? 'the rain' : '';
 function dayDrink(src) {                         // 'skin' for the waterskin, else the barrel or the rain where you stand
   const D = S.day;
-  if (src === 'skin') { if (!(D.sips > 0)) return; D.sips--; D.water = Math.min(FOOD_MAX, D.water + 35); }
+  if (src === 'skin') { if (!(D.sips > 0)) return; D.sips--; dayAct(9, 1.1, '#6b4a2a', 'skin'); D.water = Math.min(FOOD_MAX, D.water + 35); }
   else if (src === 'fill') { if (!dayWaterHere()) return; D.sips = 3; exNote('waterskin filled'); sfx(0.7, 0.4, 'lowpass', 700, 0.3); renderCraft(); return; }
-  else { if (!dayWaterHere()) return; D.water = Math.min(FOOD_MAX, D.water + 40); }
+  else { if (!dayWaterHere()) return; D.water = Math.min(FOOD_MAX, D.water + 40); dayAct(9, 1.1, '#8ab8e0', 'cup'); }
   exNote('a drink'); sfx(0.8, 0.3, 'lowpass', 900, 0.25); renderCraft();
 }
 function dayDropItem(k) { const D = S.day, n = D.inv[k] || 0; if (!n) return; delete D.inv[k]; dayDrop(S.p.x, S.p.y, k, n); renderCraft(); }
@@ -6738,6 +6747,7 @@ function dayUseTarget() {                        // the nearest thing in reach y
 function dayUse() {
   const D = S.day, rg = S.rg; if (!D || !rg || rg.phase !== 'fight' || !S.running) return;
   const o = dayUseTarget(); if (!o) return;
+  dayAct(7, 0.42); S.p.vx *= 0.3; S.p.vy *= 0.3;
   if (o.kind === 'dday') { const got = dayGive(o.it, o.n, o.x, o.y, true); if (got) { exNote(`+${got} ${RES[o.it][0].toLowerCase()}`); pickSnd(); } o.n -= got; if (o.n <= 0) o.gone = true; D.drops = D.drops.filter(f => !f.gone); }
   else if (o.kind === 'dnode') { if (dayRoom(o.t) <= 0) return dayNote('full', 'pack full', 1); o.gone = true; dayGive(o.t, o.n); pickSnd(); }
   else exOpen(o);
@@ -6779,7 +6789,8 @@ function dayHarvest(Dk, a, inReach, spark) {
     if (want && best && best.kind !== want) { let m = null, md = 1e9; for (const o of propsNear(p.x, p.y, Dk.reach + 30)) if (o.kind === want && inReach(o, 12) && dist2(o, p) < md) { md = dist2(o, p); m = o; } if (m) best = m; } }
   if (!best) return hits;
   A.hit.add('world'); hits++;
-  const chips = col => { for (let k = 0; k < 7; k++) S.rg.ash.push({ x: best.x, y: best.y, z: 10 + Math.random() * 20, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.5) * 120, vz: 40 + Math.random() * 60, life: 0.5, col }); };
+  const chips = col => dayChips(best.x, best.y, best.kind === 'tree' ? 26 : 10, col, best.kind === 'tree' ? 9 : 7);
+  best.shakeT = S.t;
   if (best.kind === 'tree') {
     if (D.sel !== 'axe') { dayNote('axe', D.axe ? 'hold your axe to chop · 2' : 'you need an axe · craft one', 3); if (actx) noiseAt(actx.currentTime, 500, 200, 0.12, 0.3, sfxGain); return hits; }
     if (!dayStam(STA_CHOP)) return hits;
@@ -6905,9 +6916,10 @@ function dayItems() {                          // drawn in with the trees
   return dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts));
 }
 // ---- drawing ----
-function dayDraw(o, c, sx, sy) {
+function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
   const z = Z, C = (col, grey) => COLOUR ? col : grey;
   if (o.kind === 'dnode') {
+    if (o.shakeT !== undefined && S.t - o.shakeT < 0.4) sx += Math.sin((S.t - o.shakeT) * 50) * (1 - (S.t - o.shakeT) / 0.4) * 2.5 * z;
     if (o.t === 'sticks') {
       c.strokeStyle = C('#6e5235', '#5a5a56'); c.lineWidth = 1.8 * z; c.lineCap = 'round'; c.beginPath();
       for (let i = 0; i < 3; i++) { const a = o.seed + i * 1.1, l = 9 * z; c.moveTo(sx - Math.cos(a) * l, sy - Math.sin(a) * l * 0.5); c.lineTo(sx + Math.cos(a) * l, sy + Math.sin(a) * l * 0.5); }
@@ -6973,7 +6985,7 @@ function drawDay() {                           // the sun: a warm wash from the 
   g.addColorStop(0, 'rgba(255,226,160,0.5)'); g.addColorStop(1, 'rgba(255,226,160,0)');
   ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = COLOUR ? 0.6 : 0.12; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
-  drawDayFires();
+  drawDayFires(); drawDayChips();
 }
 function dayBar(px, py) {                      // stamina, food and water over your head
   const D = S.day, tw = 46, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
@@ -7004,6 +7016,7 @@ function canCraft(r) {
 function dayCraft(id) {
   const r = RECIPES.find(x => x.id === id), D = S.day; if (!r || canCraft(r) !== true) return;
   daySpend(r.cost);
+  if (!r.place) dayAct(10, 0.7);
   if (r.give) { if (dayRoom(r.give) > 0) D.inv[r.give] = (D.inv[r.give] || 0) + 1; else D.box[r.give] = (D.box[r.give] || 0) + 1; }
   if (r.make) r.make(D);
   if (r.place) { dayPlace(r.place); closeCraft(); exNote(`built · ${r.name.toLowerCase()}`, true); return; }
@@ -7049,7 +7062,7 @@ function renderCraft() {
 const WALL_HP = 14, SPIKE_USES = 10, FIRE_R = 90;
 function dayPlace(t) {
   const p = S.p, a = S.aimW || 0, cx = p.x + Math.cos(a) * 40, cy = p.y + Math.sin(a) * 40;
-  dayMakeBuild(t, cx, cy, a); addShake(0.15); ashBurst(cx, cy, 8, 6);
+  dayMakeBuild(t, cx, cy, a); addShake(0.15); ashBurst(cx, cy, 8, 6); dayAct(10, 0.9);
   if (actx) { const t0 = actx.currentTime; boomAt(t0, 160, 80, 0.15, 0.4, sfxGain); noiseAt(t0 + 0.05, 1200, 400, 0.12, 0.3, sfxGain); }
 }
 function dayMakeBuild(t, cx, cy, a) {
@@ -7142,6 +7155,81 @@ function dayLoad(sv) {                          // pick a saved run back up wher
 }
 addEventListener('pagehide', () => daySave());
 document.addEventListener('visibilitychange', () => { if (document.hidden) daySave(); });
+
+// ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
+// straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
+// crafting and building each have a short body animation. Struck trees, rocks and bushes shake and throw chips.
+const DREST = { ph: 0, ln: 0, cr: 0, st: 1, a: 0, R: 9.5, h: -7.5, ta: 0, tp: -0.2, la: 1.5, lR: 0.7, lh: -12 };
+const dk = (u, o, e) => Object.assign({}, DREST, o, { u, e });
+POSES[4] = [dk(0, { la: null }), dk(0.38, { ph: -0.7, ln: -1.5, cr: 0.5, st: 2.5, a: 0.9, R: 5, h: 8, ta: 0.5, tp: 1.5, la: null }, 'io'),   // the chop: axe hauled up over the shoulder
+  dk(0.52, { ph: 0.45, ln: 5, cr: 3.5, st: 4, a: 0.05, R: 13, h: -6, ta: 0, tp: -0.8, la: null }, 'o'),                                        // and driven down and across into the trunk
+  dk(0.75, { ph: 0.4, ln: 4.5, cr: 3, st: 4, a: 0.05, R: 12.5, h: -7, ta: 0, tp: -0.75, la: null }, 'io'), dk(1, { la: null }, 'io')];
+POSES[5] = [dk(0, { la: null }), dk(0.4, { ph: -0.2, ln: -2.5, cr: 0, st: 2, a: 0.1, R: 2, h: 11, ta: 0, tp: 1.9, la: null }, 'io'),      // the pick: straight up over the head
+  dk(0.52, { ph: 0.1, ln: 6, cr: 4.5, st: 4, a: 0, R: 12, h: -9, ta: 0, tp: -1.15, la: null }, 'o'),                                          // and down into the rock
+  dk(0.78, { ph: 0.1, ln: 5.5, cr: 4, st: 4, a: 0, R: 11.5, h: -9.5, ta: 0, tp: -1.1, la: null }, 'io'), dk(1, { la: null }, 'io')];
+POSES[6] = [dk(0, {}), dk(0.3, { ph: 0.3, ln: 3.5, cr: 4, st: 3, a: 0.15, R: 13, h: -12, ta: 0.1, tp: -0.5, la: -0.4, lR: 8, lh: -10 }, 'o'),   // the hand: a low reach and grab
+  dk(0.55, { ph: 0.35, ln: 3, cr: 3.6, st: 3, a: 0.4, R: 10, h: -10, ta: 0.4, tp: -0.3, la: -0.5, lR: 7, lh: -10 }, 'io'), dk(1, {}, 'io')];
+POSES[7] = [dk(0, {}), dk(0.4, { ln: 4, cr: 7, st: 2, a: 0.2, R: 11, h: -18, ta: 0, tp: -1.2, la: -0.6, lR: 7, lh: -14 }, 'io'),             // pick up: down on one knee
+  dk(0.62, { ln: 4, cr: 7, st: 2, a: 0.1, R: 10, h: -17, ta: 0, tp: -1.1, la: -0.6, lR: 7, lh: -14 }, 'io'), dk(1, {}, 'io')];
+POSES[8] = [dk(0, {}), dk(0.22, { ph: -0.3, ln: -0.5, a: -1.05, R: 4.5, h: 5.5, ta: 2.4, tp: 0.6 }, 'io'),                                   // eat: hand to the mouth, two bites
+  dk(0.42, { ph: -0.3, ln: -0.3, a: -0.95, R: 4, h: 4.5, ta: 2.4, tp: 0.5 }, 'io'), dk(0.62, { ph: -0.3, ln: -0.5, a: -1.05, R: 4.5, h: 5.5, ta: 2.4, tp: 0.6 }, 'io'),
+  dk(0.8, { ph: -0.3, ln: -0.3, a: -0.95, R: 4, h: 4.5, ta: 2.4, tp: 0.5 }, 'io'), dk(1, {}, 'io')];
+POSES[9] = [dk(0, {}), dk(0.25, { ph: -0.2, ln: -2.5, a: -0.9, R: 5, h: 7, ta: 2.6, tp: 1.1 }, 'io'),                                       // drink: tipped back
+  dk(0.75, { ph: -0.2, ln: -3, a: -0.9, R: 5, h: 7.5, ta: 2.6, tp: 1.3 }, 'io'), dk(1, {}, 'io')];
+POSES[10] = [dk(0, {}), dk(0.15, { ln: 3, cr: 6, st: 2, a: 0.3, R: 9, h: -4, ta: 0, tp: 1.2, la: -0.4, lR: 9, lh: -14 }, 'io'),              // craft and build: knelt, knocking it together
+  dk(0.3, { ln: 4, cr: 6.5, st: 2, a: 0.2, R: 12, h: -16, ta: 0, tp: -1, la: -0.4, lR: 9, lh: -14 }, 'o'), dk(0.48, { ln: 3, cr: 6, st: 2, a: 0.3, R: 9, h: -4, ta: 0, tp: 1.2, la: -0.4, lR: 9, lh: -14 }, 'io'),
+  dk(0.64, { ln: 4, cr: 6.5, st: 2, a: 0.2, R: 12, h: -16, ta: 0, tp: -1, la: -0.4, lR: 9, lh: -14 }, 'o'), dk(1, {}, 'io')];
+const TOOL_SWING = { axe: { pose: 4, dur: 0.44, hitAt: 0.22, hop: 0, lunge: 8 }, pick: { pose: 5, dur: 0.46, hitAt: 0.24, hop: 0, lunge: 6 }, hand: { pose: 6, dur: 0.32, hitAt: 0.1, hop: 2, lunge: 14 } };
+function dayAct(pose, dur, col, item) { S.p.act = { pose, t: 0, dur, col, item }; }
+function dayActStep(dt) { const a = S.p.act; if (a && (a.t += dt) >= a.dur) S.p.act = null; }
+function dayChips(x, y, z, kind, n) {
+  const cols = { wood: ['#c9a26b', '#a07a48', '#5a3e28'], stone: ['#a19f98', '#77756f', '#5d6670'], leaf: ['#5f8a3a', '#7aa04a', '#a8b86a'] }[kind] || ['#999'];
+  const L = S.day.chips; for (let k = 0; k < n; k++) { const a = Math.random() * 7, v = 40 + Math.random() * 110; L.push({ x, y, z, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 60 + Math.random() * 120, rot: Math.random() * 7, vr: (Math.random() - 0.5) * 30, life: 0.7 + Math.random() * 0.5, col: COLOUR ? cols[k % cols.length] : '#9a9a94', w: kind === 'leaf' ? 2.6 : 2 }); }
+  if (L.length > 160) L.splice(0, L.length - 160);
+}
+function drawDayChips() {
+  const L = S.day && S.day.chips; if (!L || !L.length) return;
+  ctx.save();
+  for (const c of L) { const [x, y] = toScreen(c.x, c.y); ctx.globalAlpha = Math.min(1, c.life * 3); ctx.fillStyle = c.col; ctx.save(); ctx.translate(x, y - c.z * Z); ctx.rotate(c.rot); ctx.fillRect(-c.w * Z, -0.8 * Z, c.w * 2 * Z, 1.6 * Z); ctx.restore(); }
+  ctx.restore();
+}
+function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the tool you hold, or the food or water you're taking
+  const D = S.day, p = S.p, act = p.act;
+  const d = [tip[0] - hand[0], tip[1] - hand[1], tip[2] - hand[2]], dl = Math.hypot(...d) || 1, u = d.map(v => v / dl);
+  const at = k => P(hand[0] + u[0] * k, hand[1] + u[1] * k, hand[2] + u[2] * k);
+  const [hx, hy] = at(0), seg = (k0, k1, w, col) => { const [x0, y0] = at(k0), [x1, y1] = at(k1); ctx.strokeStyle = OUT ? 'rgba(239,239,234,0.2)' : col; ctx.lineWidth = (w + (OUT ? 1.6 : 0)) * Z; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+  const sdir = (k0, k1) => { const [x0, y0] = at(k0), [x1, y1] = at(k1), l = Math.hypot(x1 - x0, y1 - y0) || 1; return [(x1 - x0) / l, (y1 - y0) / l]; };
+  const C = (col, grey) => COLOUR ? col : grey;
+  if (act && act.item) {                         // food or a drink in the hand
+    if (OUT) return;
+    ctx.fillStyle = C(act.col, '#9a9a94');
+    if (act.item === 'skin') { ctx.beginPath(); ctx.ellipse(hx, hy - 1 * Z, 2.6 * Z, 3.6 * Z, 0.4, 0, 7); ctx.fill(); ctx.fillStyle = '#3a2a1a'; ctx.fillRect(hx - 0.6 * Z, hy - 5.5 * Z, 1.2 * Z, 1.6 * Z); }
+    else if (act.item === 'cup' || act.item === 'bowl') { ctx.fillStyle = C('#7a5232', '#6a6a66'); ctx.beginPath(); ctx.ellipse(hx, hy, 3 * Z, 1.4 * Z, 0, 0, Math.PI); ctx.fill(); ctx.fillStyle = C(act.col, '#aaa'); ctx.beginPath(); ctx.ellipse(hx, hy, 3 * Z, 1 * Z, 0, 0, 7); ctx.fill(); }
+    else { ctx.beginPath(); ctx.arc(hx, hy - 0.5 * Z, 2.3 * Z, 0, 7); ctx.fill(); }
+    return;
+  }
+  if (act && !act.item) return;                  // knelt working: hands only
+  const sel = D.sel;
+  if (sel === 'axe') {
+    seg(-1.5, 12, 1.5, C('#7a5a3a', '#6a6a66'));
+    if (OUT) return;
+    const [ex, ey] = at(12), [dx, dy] = sdir(0, 12), px = -dy, py = dx, k = Z;
+    ctx.fillStyle = D.axe > 1 ? C('#4d5560', '#4a4a48') : C('#8d8b85', '#8a8a86');
+    ctx.beginPath(); ctx.moveTo(ex - dx * 2.5 * k, ey - dy * 2.5 * k); ctx.lineTo(ex - dx * 3 * k + px * 5 * k, ey - dy * 3 * k + py * 5 * k); ctx.lineTo(ex + dx * 1.5 * k + px * 5.5 * k, ey + dy * 1.5 * k + py * 5.5 * k); ctx.lineTo(ex + dx * 1 * k, ey + dy * 1 * k); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C('#c8b88a', '#bbb'); ctx.lineWidth = 0.8 * Z; ctx.beginPath(); ctx.moveTo(ex - dx * 3 * k + px * 5 * k, ey - dy * 3 * k + py * 5 * k); ctx.lineTo(ex + dx * 1.5 * k + px * 5.5 * k, ey + dy * 1.5 * k + py * 5.5 * k); ctx.stroke();   // the edge catching the light
+    ctx.strokeStyle = C('#a8b86a', '#888'); ctx.lineWidth = 1.2 * Z; ctx.beginPath(); ctx.moveTo(ex - dx * 2 * k - px * 1.2 * k, ey - dy * 2 * k - py * 1.2 * k); ctx.lineTo(ex + dx * 0.5 * k - px * 1.2 * k, ey + dy * 0.5 * k - py * 1.2 * k); ctx.stroke();   // fibre lashing
+  } else if (sel === 'pick') {
+    seg(-1.5, 12, 1.5, C('#7a5a3a', '#6a6a66'));
+    if (OUT) return;
+    const [ex, ey] = at(12), [dx, dy] = sdir(0, 12), px = -dy, py = dx, k = Z;
+    ctx.strokeStyle = D.pick > 1 ? C('#4d5560', '#4a4a48') : C('#8d8b85', '#8a8a86'); ctx.lineWidth = 2.2 * Z; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(ex - px * 6 * k - dx * 2.5 * k, ey - py * 6 * k - dy * 2.5 * k); ctx.quadraticCurveTo(ex + dx * 1.2 * k, ey + dy * 1.2 * k, ex + px * 6 * k - dx * 2.5 * k, ey + py * 6 * k - dy * 2.5 * k); ctx.stroke();
+  } else if (sel === 'weapon') {
+    const w = D.wpn;
+    if (w === 'spear') { seg(-7, 22, 1.3, C('#8a6a44', '#6a6a66')); if (OUT) return; const [ex, ey] = at(22), [dx, dy] = sdir(0, 22), px = -dy, py = dx, k = Z; ctx.fillStyle = C('#4d5560', '#4a4a48'); ctx.beginPath(); ctx.moveTo(ex + dx * 6 * k, ey + dy * 6 * k); ctx.lineTo(ex + px * 2 * k, ey + py * 2 * k); ctx.lineTo(ex - px * 2 * k, ey - py * 2 * k); ctx.closePath(); ctx.fill(); }
+    else { const bone = w === 'bone', col = bone ? C('#e6dfcc', '#d8d8d2') : C('#6e5235', '#5a5a56'); seg(-1, 5, 1.8, col); seg(4, 11, bone ? 3.2 : 3.6, col); if (!OUT && bone) { ctx.fillStyle = col; for (const k of [6.5, 9.5]) { const [x, y] = at(k); ctx.beginPath(); ctx.arc(x, y, 2.2 * Z, 0, 7); ctx.fill(); } } }
+  }
+}
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
 // v112: first-trip hints, each shown once per save, one at a time when the banner slot is free. Saves that already brought an orb home skip them.
 const TIPS = [
