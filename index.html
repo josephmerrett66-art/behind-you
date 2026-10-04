@@ -1473,6 +1473,9 @@ function atkHit(D, a) {                          // everything in reach takes th
     if (MK[u.kind].dune) duneHitBy(u, D);
     if (u.st !== 'act') { push(u, D.knock * 0.35); arenaClamp(u, 30); }   // a blow can't knock him out of a swing, only nudge him
   }
+  if (m && m.hands) for (const h of m.hands) if (h.k > 0.5 && !A.hit.has(h) && inReach(h, 26)) {   // the Buried King's hand: it flinches, and he barely feels it
+    A.hit.add(h); hits++; h.flinch = 1; spark(h, 40, 8); const ku = m.units[0]; if (ku) ku.hp -= D.boss * 0.2 * (1 + 0.1 * tu('heat'));
+  }
   if (m && m.lamps) for (const l of m.lamps) if (!l.broken && !A.hit.has(l) && inReach(l, 14)) {   // the Lamplighter's lamps: two blows each
     A.hit.add(l); hits++; l.flash = 1; spark(l, 40, 8);
     if (--l.hp <= 0) lampBreak(m, l); else if (actx) noiseAt(actx.currentTime, 6000, 2600, 0.15, 0.35, sfxGain);
@@ -7881,7 +7884,11 @@ const DV = {                                     // wind-up, the blow, how long 
   mstep:  { tell: 0.7,  act: 0.15, rec: 0,   snd: 'whoosh' },
   clones: { tell: 1.1,  act: 0.3,  rec: 0,   snd: 'roar', delay: 0.5 },
   wheel:  { tell: 1.0,  act: 3.0,  rec: 1.5, snd: 'hum' },
-  dance:  { tell: 1.5,  act: 0.05, rec: 0,   snd: null },       // v118: the Dervish counts three on the drum, then dances a set combo
+  dance:  { tell: 1.5,  act: 0.05, rec: 0,   snd: null },
+  grab:   { tell: 0.95, act: 0.6,  rec: 0.35, snd: 'sand' },    // v119: the Buried King stays under the sand; a hand rises where it ripples
+  clap:   { tell: 1.1,  act: 0.35, rec: 0.4, snd: 'sand' },     // ... two hands rise either side of you and clap
+  hsweep: { tell: 1.0,  act: 0.6,  rec: 0.35, snd: 'sand' },    // ... a hand rises and drives a wave of sand at you
+  surface: { tell: 1.0, act: 0.3,  rec: 4.0, snd: 'quake' },    // ... and after three, his crowned head comes up: the only time he can be hurt properly       // v118: the Dervish counts three on the drum, then dances a set combo
   gthrow: { tell: 0.9,  act: 0.3,  rec: 0.5, snd: 'whoosh', quick: 1 },   // ... spins his glaive away to circle the arena on its own
   kick:   { tell: 0.45, act: 0.18, rec: 0.6, snd: 'whoosh', quick: 1 },   // ... and fights with his feet while it's gone
   roar2:  { tell: 1.4,  act: 0.3,  rec: 0.4, snd: 'roar' },
@@ -7927,7 +7934,8 @@ function duneStart(m) {                          // he rises where the orb lay, 
   for (const e of rg.enemies) if (!e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 8, 20); }
   rg.enemies = []; rg.storm = null;
   u.x = o.x; u.y = o.y; u.dir = Math.atan2(p.y - u.y, p.x - u.x); u.len = 2.2; u.p2 = false; u.far = 0;
-  Object.assign(m, { lines: [], waves: [], rings: [], glass: [], shards: [], prints: [], clones: [], pit: null, crack: null, beams: [], eclipse: 0, sandK: 0, devils: [], glaive: null, bt: 0, beatN: 0, pulse: 0, beatLen: u.kind === 'dervish' ? 0.5 : 0 });
+  Object.assign(m, { lines: [], waves: [], rings: [], glass: [], shards: [], prints: [], clones: [], pit: null, crack: null, beams: [], eclipse: 0, sandK: 0, devils: [], glaive: null, bt: 0, beatN: 0, pulse: 0, beatLen: u.kind === 'dervish' ? 0.5 : 0, hands: [] });
+  u.handsN = 0;
   rg.blasts.push({ x: o.x, y: o.y, t: 0, life: 0.9, r: 200, col: 'teal' });
   rg.echoes.push({ r: 0, x: o.x, y: o.y, max: 420, burst: true });
   for (let i = 0; i < 4; i++) ashBurst(o.x + (Math.random() - 0.5) * 50, o.y + (Math.random() - 0.5) * 50, 10, 60);
@@ -7941,6 +7949,10 @@ const DV_COMBOS = [['sweep', 'sweep', 'rise'], ['sweep', 'rise'], ['dlunge', 'sw
 const DV_COMBOS2 = [['sweep', 'sweepR', 'rise'], ['dlunge', 'sweep', 'sweepR'], ['rise', 'sweep', 'whirl'], ['sweep', 'sweepR', 'sweep', 'rise'], ['dlunge', 'rise', 'whirl']];
 const DV_BEATS = { sweep: 1, sweepR: 1, vslash: 1, rise: 2, dlunge: 2, whirl: 2, dance: 3, gthrow: 2, kick: 1, roar2: 2, veil: 1 };
 function dvSnap(m, minT) { const B = m.beatLen; let L = B - m.bt; while (L < minT) L += B; return L; }   // how long until a beat at least minT away
+// ---- v119: the Buried King. He stays under the sand, a bulge drifting after you; his hands rise where the sand ripples. After three
+// hand attacks his head surfaces somewhere in the arena for a few seconds: that's when he can be hurt (a hand only flinches). At half
+// health the arena becomes a sinkhole dragging you toward his mouth in the middle.
+function kingHand(m, x, y, life, extra) { const h = Object.assign({ x, y, t: 0, life, k: 0, flinch: 0, seed: Math.random() }, extra || {}); m.hands.push(h); return h; }
 // ---- poses ----
 function dunePose(u) {
   const k = u.kind, mv = u.move, uu = u.len ? u.t / u.len : 0, q = u.base ? Math.min(1, u.t / u.base) : uu;
@@ -7985,8 +7997,8 @@ function dunePose(u) {
     if (u.st === 'rise') return Object.assign(mixPose(P([6, 4, 4], [1, 0, 0], 1, 6), carry, (u.t - 0.8) / 1.2), { spread: 4 });
     const raised = P([-1, 0, 42], [0, 0, 1], 0, -4, { spread: 1 }), slammed = P([13, 0, 4], [1, 0, 0], 0.4, 9, { spread: 1 });
     const tells = { hammer: raised, ssweep: P([-4, 8, 16], [-0.5, 0.8, 0], 0.2, -2, { spread: 2 }), stomp: P([4, 6, 28], [0, 0, 1], 0, -4, { spread: 9 }),
-      sink: P([6, 5, 6], [1, 0, 0], 1, 8, { spread: 6 }), pit: P([2, 0, 40], [0, 0, 1], 0, -3, { spread: 9 }), roar2: P([3, 0, 36], [0, 0, 1], 0, -5, { spread: 8, pain: 0.3 }) };
-    if (u.st === 'tell') return Object.assign(mixPose(carry, tells[mv], q / 0.75), { spread: tells[mv].spread });
+      sink: P([6, 5, 6], [1, 0, 0], 1, 8, { spread: 6 }), surface: P([6, 5, 6], [1, 0, 0], 1, 6, { spread: 6 }), pit: P([2, 0, 40], [0, 0, 1], 0, -3, { spread: 9 }), roar2: P([3, 0, 36], [0, 0, 1], 0, -5, { spread: 8, pain: 0.3 }) };
+    if (u.st === 'tell') { const tp = tells[mv] || carry; return Object.assign(mixPose(carry, tp, q / 0.75), { spread: tp.spread }); }   // hand moves: he's under the sand, so any pose will do
     if (u.st === 'act') {
       if (mv === 'hammer') return Object.assign(mixPose(raised, slammed, uu * 1.5), { spread: 1 });
       if (mv === 'ssweep') return Object.assign(sweep(2.0 - 4.0 * ease(uu), 12, 10), { spread: 2 });
@@ -7997,6 +8009,7 @@ function dunePose(u) {
       if (u.stag > 0) return Object.assign(mixPose(slammed, slammed, 0), { pain: 0.7, spread: 3 });
       if (mv === 'hammer') return Object.assign(mixPose(slammed, carry, (uu - 0.8) / 0.2), { spread: 1 });   // fists sunk in the sand: he's open
       if (mv === 'sink') return Object.assign(mixPose(tells.sink, carry, (uu - 0.8) / 0.2), { spread: 6, pain: 0.2 });   // half-buried, dragging himself out
+      if (mv === 'surface') return Object.assign({}, tells.surface, { spread: 7, pain: 0.15 + 0.15 * Math.sin(S.t * 3) });   // chest-deep in the sand, glaring
       return Object.assign(mixPose(tells[mv] || carry, carry, uu * 1.5), { spread: 4 });
     }
     return carry;
@@ -8018,7 +8031,7 @@ function dunePose(u) {
 function duneNext(m, u, d) {
   const r = Math.random(), k = u.kind, p2 = u.p2;
   if (!p2 && u.hp < u.max * 0.5) return 'roar2';
-  if (u.far > 3 && !(k === 'dervish' && m.glaive)) return k === 'dervish' ? 'dlunge' : k === 'king' ? 'sink' : 'mstep';   // too far too long: he closes the gap
+  if (u.far > 3 && !(k === 'dervish' && m.glaive) && k !== 'king') return k === 'dervish' ? 'dlunge' : k === 'king' ? 'sink' : 'mstep';   // too far too long: he closes the gap
   let mv = null;
   if (k === 'dervish') {
     if (m.glaive) mv = d < 62 ? 'kick' : null;   // bare-handed: he walks in and kicks
@@ -8029,10 +8042,8 @@ function duneNext(m, u, d) {
     if (mv === 'dance' && u.last === 'dance') u.last = '';
   }
   if (k === 'king') {
-    if (p2 && m.t - (u.pitAt || -99) > 12 && r < 0.2) mv = 'pit';
-    else if (d < 150) mv = r < 0.35 ? 'stomp' : r < 0.75 ? 'hammer' : 'ssweep';
-    else if (d < 480) mv = r < 0.45 ? 'ssweep' : r < 0.75 ? 'hammer' : null;
-    else if (r < 0.5) mv = 'sink';
+    if (u.handsN >= 3) mv = 'surface';
+    else mv = r < 0.45 ? 'grab' : r < 0.75 ? 'clap' : 'hsweep';
   }
   if (k === 'mirage') {
     if (p2 && m.t - (u.wheelAt || -99) > 10 && r < 0.25) mv = 'wheel';
@@ -8054,6 +8065,10 @@ function duneTell(m, u, mv, quick) {             // start a wind-up; some are he
     u.rain = [{ x: p.x, y: p.y }];
     for (let i = 0; i < (u.p2 ? 7 : 5); i++) { const a = Math.random() * 7, rr = 50 + Math.random() * 130, s = { x: p.x + Math.cos(a) * rr, y: p.y + Math.sin(a) * rr }; arenaClamp(s, 20); u.rain.push(s); }
   }
+  if (mv === 'clap') { const a = Math.random() * Math.PI; u.clapA = a; }
+  if (mv === 'hsweep') { const a = Math.random() * 7; u.sweepAt = { x: p.x + Math.cos(a) * 170, y: p.y + Math.sin(a) * 170 }; arenaClamp(u.sweepAt, 30); }
+  if (mv === 'surface') { let s; for (let i = 0; i < 12; i++) { const a = Math.random() * 7, rr = 220 + Math.random() * 140; s = { x: p.x + Math.cos(a) * rr, y: p.y + Math.sin(a) * rr }; const c = { x: s.x, y: s.y }; arenaClamp(c, 60); if (Math.hypot(c.x - s.x, c.y - s.y) < 1) break; s = c; } u.surfAt = s; }
+  if (mv === 'roar2' && u.kind === 'king') { u.x = m.L.x; u.y = m.L.y; u.hid = false; u.dir = Math.atan2(p.y - u.y, p.x - u.x); ashBurst(u.x, u.y, 18, 80); addShake(0.4); }   // he heaves up in the middle to roar
   if (mv === 'veil') u.veilAt = m.t;
   if (mv === 'pit') u.pitAt = m.t;
   if (mv === 'wheel') u.wheelAt = m.t;
@@ -8064,6 +8079,14 @@ function duneAct(m, u) {
   const p = S.p, rg = S.rg, mv = u.move;
   u.st = 'act'; u.t = 0; u.hit = false; u.len = DV[mv].act;
   if (mv === 'dlunge') { u.dash = u.dir; u.hitDash = false; }
+  if (mv === 'grab') { u.hand = kingHand(m, u.aimX, u.aimY, DV.grab.act + DV.grab.rec + 0.1); u.hand.grab = true; addShake(0.35); duneSay('sand'); }
+  if (mv === 'clap') { const ox = -Math.sin(u.clapA) * 120, oy = Math.cos(u.clapA) * 120; u.clapC = { x: u.aimX, y: u.aimY }; u.hands2 = [kingHand(m, u.aimX + ox, u.aimY + oy, 0.95, { fx: u.aimX + ox, fy: u.aimY + oy, side: 1 }), kingHand(m, u.aimX - ox, u.aimY - oy, 0.95, { fx: u.aimX - ox, fy: u.aimY - oy, side: -1 })]; addShake(0.3); }
+  if (mv === 'hsweep') { const h = u.sweepAt; kingHand(m, h.x, h.y, 1.1); const a = Math.atan2(u.aimY - h.y, u.aimX - h.x); m.waves.push({ x: h.x, y: h.y, a, span: 0.55, r: 30, max: 520, sp: 640, hit: false }); addShake(0.3); }
+  if (mv === 'surface') {                        // he bursts up out of the sand, crown first
+    u.x = u.surfAt.x; u.y = u.surfAt.y; u.dir = Math.atan2(p.y - u.y, p.x - u.x); u.hid = false; u.handsN = 0; u.waved = false;
+    rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.5, r: 150, col: 'white' }); for (let i = 0; i < 4; i++) ashBurst(u.x + (Math.random() - 0.5) * 60, u.y + (Math.random() - 0.5) * 60, 10, 60);
+    addShake(0.6); bossSay('roar'); exNote('his head is up · strike it', true);
+  }
   if (mv === 'gthrow') {                         // the glaive leaves his hands and circles the arena on its own
     const L = m.L, a = Math.atan2(u.y - L.y, u.x - L.x), cw = angDiff(Math.atan2(p.y - L.y, p.x - L.x), a) > 0 ? 1 : -1;
     m.glaive = { x: u.x, y: u.y, a, r: Math.hypot(u.x - L.x, u.y - L.y), s: cw, t: 0, life: 7, back: false, cd: 0, spin: 0 };
@@ -8087,7 +8110,7 @@ function duneAct(m, u) {
   if (mv === 'roar2') {                          // the second wind
     u.p2 = true; addShake(0.7); hitStop(0.12); rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.8, r: 240, col: 'white' });
     if (u.kind === 'dervish') exNote('he moves like the wind now', true);
-    if (u.kind === 'king') { rg.storm = { st: 'storm', t: 999, k: 0.8 }; exNote('the sand rises with him', true); }
+    if (u.kind === 'king') { m.pit = { x: m.L.x, y: m.L.y, t: 0, perm: true }; exNote('the ground sinks toward his mouth · keep moving out', true); }
     if (u.kind === 'mirage') exNote('she puts out the sun', true);
   }
 }
@@ -8139,7 +8162,7 @@ function duneStep(m, u, dt) {
   };
   const fwd = (f, r, a = u.dir) => [u.x + Math.cos(a) * f - Math.sin(a) * r, u.y + Math.sin(a) * f + Math.cos(a) * r];
   let moving = false;
-  if (u.st === 'rise') { if (u.t >= u.len) { u.st = 'walk'; u.t = 0; u.cd = 0.6; } return; }
+  if (u.st === 'rise') { if (u.t >= u.len) { u.st = 'walk'; u.t = 0; u.cd = 0.6; if (u.kind === 'king') { u.hid = true; ashBurst(u.x, u.y, 16, 60); duneSay('sand'); exNote('he sinks · watch the sand', true); } } return; }
   if (u.st === 'walk') {
     turn(2.6);
     u.far = d > 330 ? u.far + dt : 0;
@@ -8195,6 +8218,15 @@ function duneStep(m, u, dt) {
       if (cd < 520) { const pull = 75 * Math.min(1, pt.t / 0.6); p.x += cx / cd * pull * dt + cy / cd * 30 * dt; p.y += cy / cd * pull * dt - cx / cd * 30 * dt; }
       if (cd < 50) miniHurt(0.5, 0, pt);
     }
+    if (mv === 'grab' && !u.hit && u.t > 0.12) { u.hit = true; if (Math.hypot(p.x - u.aimX, p.y - u.aimY) < 50) { if (miniHurt(1, 50, { x: u.aimX, y: u.aimY })) { addShake(0.5); hitStop(0.07); } } bossSay('impact'); }
+    if (mv === 'clap' && u.hands2) {               // the hands slide together; whatever's between them is crushed
+      const k = Math.min(1, u.t / u.len), e = k * k;
+      for (const h of u.hands2) { h.x = h.fx + (u.clapC.x - h.fx) * e * 0.92; h.y = h.fy + (u.clapC.y - h.fy) * e * 0.92; }
+      if (k >= 1 && !u.hit) {
+        u.hit = true; bossSay('impact'); addShake(0.6); hitStop(0.06); rg.blasts.push({ x: u.clapC.x, y: u.clapC.y, t: 0, life: 0.35, r: 90, col: 'white' }); ashBurst(u.clapC.x, u.clapC.y, 12, 40);
+        const [a, b] = u.hands2, n = segNear(p.x, p.y, a.fx, a.fy, b.fx, b.fy); if (n.d < 34) miniHurt(1, 60, u.clapC);
+      }
+    }
     if (mv === 'kick' && !u.hit && u.t > 0.08) { u.hit = true; const [kx, ky] = fwd(30, 0); if (Math.hypot(p.x - kx, p.y - ky) < 36) { if (miniHurt(0.5, 45, u)) { addShake(0.35); hitStop(0.05); } } ashBurst(kx, ky, 3, 10); }
     if (mv === 'lance' && u.t > 0.05) duneBeam(m, u, u.dir, R.lance);
     if (mv === 'wheel') {                        // four lances turning round her, glass falling on you
@@ -8203,7 +8235,13 @@ function duneStep(m, u, dt) {
       if ((u.wheelR = (u.wheelR ?? 0.6) - dt) <= 0) { u.wheelR = 0.95; m.shards.push({ x: p.x, y: p.y, t: 0, T: 0.9 }); }
     }
     if (u.t >= u.len) duneEnd(m, u, d);
-  } else if (u.st === 'recover' && u.t >= u.len) { u.st = 'walk'; u.t = 0; u.cd = (0.35 + Math.random() * 0.45) * fast; u.pun = 0; }
+  } else if (u.st === 'recover' && u.t >= u.len) {
+    u.st = 'walk'; u.t = 0; u.cd = (0.35 + Math.random() * 0.45) * fast; u.pun = 0;
+    if (u.kind === 'king' && !u.hid) { u.hid = true; ashBurst(u.x, u.y, 14, 50); duneSay('sand'); }   // back under
+  }
+  if (u.kind === 'king' && u.st === 'recover' && u.move === 'surface' && !u.waved && u.t > 0.9 && d < 280) {   // you came close: he drives you off with a wave of sand
+    u.waved = true; m.waves.push({ x: u.x, y: u.y, a: toP, span: 1.0, r: 40, max: 420, sp: 700, hit: false }); duneSay('sand'); addShake(0.3);
+  }
   u.gait += ((moving ? 1 : 0) - u.gait) * Math.min(1, dt * 6);
 }
 function duneBeam(m, u, a, len) {                // a lance of light: hurts along its whole length
@@ -8215,6 +8253,7 @@ function duneBeam(m, u, a, len) {                // a lance of light: hurts alon
 function duneEnd(m, u, d) {                      // the blow is spent: open, or straight into the next
   const mv = u.move, rg = S.rg, p = S.p, R = dReach(u);
   u.hid = false;
+  if (u.kind === 'king' && mv !== 'surface') { u.hid = true; if (mv === 'grab' || mv === 'clap' || mv === 'hsweep') u.handsN++; }   // still under the sand
   if (mv === 'hammer') {
     bossSay('impact'); addShake(0.75); hitStop(0.08);
     const ex = u.x + Math.cos(u.dir) * R.hammer, ey = u.y + Math.sin(u.dir) * R.hammer;
@@ -8259,6 +8298,13 @@ function duneFxStep(m, dt) {                     // what's left on the ground an
       m.bt -= m.beatLen; m.beatN++; m.pulse = 1;
       if (actx) { const t = actx.currentTime, dancing = dv.st === 'tell' && dv.move === 'dance'; boomAt(t, m.beatN % 4 === 0 ? 70 : 105, 42, 0.28, m.beatN % 4 === 0 ? 0.7 : 0.45, sfxGain); if (dancing) noiseAt(t, 3200, 1400, 0.09, 0.35, sfxGain); else if (m.beatN % 2) noiseAt(t, 6000, 3000, 0.04, 0.12, sfxGain); }
     }
+  }
+  for (const h of m.hands) { h.t += dt; h.flinch = Math.max(0, h.flinch - dt * 3); h.k = h.t < 0.14 ? h.t / 0.14 : h.t > h.life - 0.3 ? Math.max(0, (h.life - h.t) / 0.3) : 1; }
+  m.hands = m.hands.filter(h => h.t < h.life);
+  if (m.pit && m.pit.perm) {                     // the sinkhole: always pulling you in toward the middle
+    const pt = m.pit; pt.t += dt; const cx = pt.x - p.x, cy = pt.y - p.y, cd = Math.hypot(cx, cy) || 1;
+    if (rg.phase === 'fight' && m.st === 'on') { const pull = 34 * Math.min(1, pt.t / 2); p.x += cx / cd * pull * dt; p.y += cy / cd * pull * dt; if (cd < 60) miniHurt(0.5, 50, pt); }
+    if (m.st !== 'on') m.pit = null;
   }
   for (const v of m.devils) {                    // dust devils drift after you
     v.life -= dt; v.cd -= dt; const a = Math.atan2(p.y - v.y, p.x - v.x), sp = (dv && dv.p2 ? 95 : 70) * dt; v.x += Math.cos(a) * sp; v.y += Math.sin(a) * sp; arenaClamp(v, 20);
@@ -8498,6 +8544,52 @@ function drawDuneGround(m) {                     // marks on the sand in the kee
   }
   ctx.restore();
 }
+function drawKingFx(m, top) {                   // the Buried King: ripples where a hand will rise, the hands, the bulge of him moving under the sand
+  const u = m.units.find(o => o.kind === 'king'), col = m.B.col, cc = a => `rgba(${col},${a})`;
+  if (!u || u.st === 'dead') return;
+  ctx.save();
+  if (!top) {
+    const ripple = (x, y, k, R = 50) => { const [sx, sy] = toScreen(x, y); for (let i = 0; i < 3; i++) { const r = ((S.t * 1.6 + i / 3) % 1) * R * Z; ctx.strokeStyle = cc((0.25 + 0.5 * k) * (1 - r / (R * Z))); ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, 7); ctx.stroke(); } worldPoly(circlePts(x, y, R)); ctx.fillStyle = cc(0.06 + 0.22 * k); ctx.fill(); };
+    if (u.st === 'tell') {
+      const k = Math.min(1, u.t / u.len);
+      if (u.move === 'grab') ripple(u.aimX, u.aimY, k);
+      if (u.move === 'clap') { const ox = -Math.sin(u.clapA) * 120, oy = Math.cos(u.clapA) * 120; ripple(u.aimX + ox, u.aimY + oy, k, 40); ripple(u.aimX - ox, u.aimY - oy, k, 40); worldPoly([[u.aimX + ox - oy * 0.25, u.aimY + oy + ox * 0.25], [u.aimX - ox - oy * 0.25, u.aimY - oy + ox * 0.25], [u.aimX - ox + oy * 0.25, u.aimY - oy - ox * 0.25], [u.aimX + ox + oy * 0.25, u.aimY + oy - ox * 0.25]]); ctx.fillStyle = cc(0.05 + 0.18 * k); ctx.fill(); }
+      if (u.move === 'hsweep' && u.sweepAt) { ripple(u.sweepAt.x, u.sweepAt.y, k, 40); const a = Math.atan2(u.aimY - u.sweepAt.y, u.aimX - u.sweepAt.x), pts = [[u.sweepAt.x, u.sweepAt.y]]; for (let i = 0; i <= 12; i++) { const b = a - 0.55 + 1.1 * i / 12; pts.push([u.sweepAt.x + Math.cos(b) * 520, u.sweepAt.y + Math.sin(b) * 520]); } worldPoly(pts); ctx.fillStyle = cc(0.04 + 0.14 * k); ctx.fill(); }
+      if (u.move === 'surface' && u.surfAt) ripple(u.surfAt.x, u.surfAt.y, k, 80);
+    }
+    if (u.hid && u.st !== 'dying') {               // the bulge of him moving under the sand
+      const [sx, sy] = toScreen(u.x, u.y);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(sx, sy, 46 * Z, 20 * Z, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = cc(0.3); ctx.lineWidth = 1.5 * Z; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(sx, sy, (30 + i * 12) * Z, (12 + i * 5) * Z, 0, Math.PI * 1.1 + i * 0.2 + S.t, Math.PI * 1.9 + i * 0.2 + S.t); ctx.stroke(); }
+    }
+    if (!u.hid && u.st === 'recover' && u.move === 'surface') {   // the window: a timer ring round him
+      const [sx, sy] = toScreen(u.x, u.y), f = 1 - u.t / u.len;
+      ctx.strokeStyle = cc(0.8); ctx.lineWidth = 2.5 * Z; ctx.beginPath(); ctx.ellipse(sx, sy, 70 * Z, 35 * Z, 0, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke();
+    }
+  } else {
+    if (!u.hid && u.st !== 'dying' && (u.move === 'surface' || u.st === 'rise')) {   // a mound of sand round him, over his legs
+      const [sx, sy] = toScreen(u.x, u.y);
+      const g = ctx.createRadialGradient(sx, sy, 10 * Z, sx, sy, 62 * Z); g.addColorStop(0, 'rgba(120,108,84,0.95)'); g.addColorStop(0.7, 'rgba(96,86,66,0.85)'); g.addColorStop(1, 'rgba(60,54,42,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(sx, sy - 6 * Z, 62 * Z, 28 * Z, 0, 0, 7); ctx.fill();
+    }
+    for (const h of m.hands) {                     // a great hand out of the sand: forearm, palm, four fingers and a thumb
+      const [sx, sy] = toScreen(h.x, h.y), k = h.k, Hh = 70 * k * Z, jx = h.flinch ? (Math.random() - 0.5) * 6 * Z : 0, x = sx + jx, top = sy - Hh;
+      if (k <= 0.02) continue;
+      ctx.fillStyle = 'rgba(80,70,52,0.9)'; ctx.beginPath(); ctx.ellipse(sx, sy, 34 * Z, 14 * Z, 0, 0, 7); ctx.fill();   // the sand thrown up round it
+      const skin = h.flinch ? '#b8ab94' : '#8f8676', dark = '#141413', grip = h.grab ? 0.7 : 0.15;
+      ctx.lineCap = 'round';
+      for (const [w, c] of [[17, dark], [13, skin]]) { ctx.strokeStyle = c; ctx.lineWidth = w * Z; ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x + 2 * Z, top + 14 * Z); ctx.stroke(); }
+      for (const [w, c] of [[7, dark], [4.2, skin]]) {
+        ctx.strokeStyle = c; ctx.lineWidth = w * Z;
+        for (let i = 0; i < 4; i++) { const fx = x - 9 * Z + i * 6 * Z, len = (16 + (i === 1 || i === 2 ? 4 : 0)) * Z; ctx.beginPath(); ctx.moveTo(fx, top + 12 * Z); ctx.quadraticCurveTo(fx - 2 * Z, top + 2 * Z - len * 0.5, fx + len * grip, top + 8 * Z - len * (1 - grip)); ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(x + 9 * Z, top + 20 * Z); ctx.quadraticCurveTo(x + 18 * Z, top + 12 * Z, x + 16 * Z, top + 4 * Z); ctx.stroke();
+      }
+      ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(x + 1 * Z, top + 16 * Z, 11 * Z, 9 * Z, 0, 0, 7); ctx.fill(); ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(x + 1 * Z, top + 16 * Z, 9 * Z, 7 * Z, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = cc(0.5); ctx.lineWidth = 1 * Z; ctx.beginPath(); ctx.moveTo(x - 4 * Z, top + 26 * Z); ctx.lineTo(x + 6 * Z, top + 40 * Z); ctx.stroke();   // ochre veins of light
+    }
+  }
+  ctx.restore();
+}
 function drawDervishFx(m) {                      // the beat at his feet, the counts over his head, his glaive's circle, the dust devils
   const dv = m.units.find(u => u.kind === 'dervish'), col = m.B.col, cc = a => `rgba(${col},${a})`;
   if (!dv) return;
@@ -8571,12 +8663,14 @@ function drawDuneFx() {
   if (!m || m.st === 'gone' || !m.B.dune) return;
   drawDuneGround(m);
   drawDervishFx(m);
+  drawKingFx(m, false);
   const [, psy] = toScreen(S.p.x, S.p.y);
   let over = false;
   const figs = m.units.map(u => ({ u, c: null })).concat(m.clones.map(c => ({ u: m.units[0], c })));
   figs.sort((a, b) => toScreen((a.c || a.u).x, (a.c || a.u).y)[1] - toScreen((b.c || b.u).x, (b.c || b.u).y)[1]);
   for (const f of figs) { drawDuneFigure(m, f.u, f.c); if (!f.c && toScreen(f.u.x, f.u.y)[1] < psy && f.u.st !== 'dead') over = true; }
   if (over) drawPlayer();
+  drawKingFx(m, true);
   drawDuneBeams(m);
   if (m.eclipse > 0.01) {                        // the eclipse: the sky goes dark round a burning ring
     ctx.save(); ctx.fillStyle = `rgba(0,0,0,${0.3 * m.eclipse})`; ctx.fillRect(0, 0, W, H);
