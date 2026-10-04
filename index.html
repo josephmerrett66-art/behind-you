@@ -1420,6 +1420,7 @@ function startSwing() {
   if (i === 3) p.roll = 0;                        // the roll turns into the thrust
   const side = i === 1 ? -1 : 1;
   p.atk = { i, t: 0, dur: D.dur, a, side, hit: new Set(), done: false, queued: false };
+  rg.atkHist = (rg.atkHist || []).filter(h => S.t - h.t < 1.6).concat([{ i, side, t: S.t }]);   // v120: a false Mirage you strike throws your own combo back
   rg.slashes = rg.slashes || [];
   if (!D.slam) rg.slashes.push({ i, a, side, t: 0, life: 0.28, r: D.reach, arc: D.arc });
   addShake(D.slam ? 0.12 : 0.07); camKick(a, D.kick * 0.5);
@@ -1480,7 +1481,7 @@ function atkHit(D, a) {                          // everything in reach takes th
     A.hit.add(l); hits++; l.flash = 1; spark(l, 40, 8);
     if (--l.hp <= 0) lampBreak(m, l); else if (actx) noiseAt(actx.currentTime, 6000, 2600, 0.15, 0.35, sfxGain);
   }
-  if (m && m.clones) for (const c of m.clones) if (!c.pop && !A.hit.has(c) && inReach(c, 20)) { A.hit.add(c); hits++; duneClonePop(c); }   // a false Mirage bursts at a touch
+  if (m && m.clones) for (const c of m.clones) if (!c.pop && !c.copy && !A.hit.has(c) && inReach(c, 20)) { A.hit.add(c); hits++; duneCloneCopy(c); }   // a false Mirage you strike copies your combo back at you
   if (D.slam) {                                  // the landing: a shockwave of light rolling out across the ground, a ring of dust, the ground bucks
     rg.slashes.push({ i: 2, a, side: 1, t: 0, life: 0.42, r: D.reach, ring: true });
     rg.echoes.push({ r: 0, x: p.x, y: p.y, max: D.reach * 1.3, burst: true });
@@ -8056,7 +8057,7 @@ function duneNext(m, u, d) {
 }
 function duneTell(m, u, mv, quick) {             // start a wind-up; some are held a beat longer than you expect
   const p = S.p, Dv = DV[mv], fast = u.p2 ? 0.8 : 1;
-  u.st = 'tell'; u.move = mv; u.t = 0; u.hit = false; u.last = mv; u.aimX = p.x; u.aimY = p.y; u.glinted = false;
+  u.st = 'tell'; u.move = mv; u.t = 0; u.hit = false; u.last = mv; u.aimX = p.x; u.aimY = p.y; u.glinted = false; u.bounced = false;
   u.base = (quick || Dv.tell) * fast; u.len = u.base;
   if (Dv.delay && !quick && Math.random() < 0.4) u.len += Dv.delay * fast;
   if (u.kind === 'dervish' && m.beatLen) { u.len = u.base = dvSnap(m, (DV_BEATS[mv] || 1) * m.beatLen * 0.9) + (mv === 'vslash' ? m.beatLen / 2 : 0); if (mv === 'dance') u.danceN = m.beatN; }   // on the beat (the veil's slash comes off it)
@@ -8069,6 +8070,16 @@ function duneTell(m, u, mv, quick) {             // start a wind-up; some are he
   if (mv === 'hsweep') { const a = Math.random() * 7; u.sweepAt = { x: p.x + Math.cos(a) * 170, y: p.y + Math.sin(a) * 170 }; arenaClamp(u.sweepAt, 30); }
   if (mv === 'surface') { let s; for (let i = 0; i < 12; i++) { const a = Math.random() * 7, rr = 220 + Math.random() * 140; s = { x: p.x + Math.cos(a) * rr, y: p.y + Math.sin(a) * rr }; const c = { x: s.x, y: s.y }; arenaClamp(c, 60); if (Math.hypot(c.x - s.x, c.y - s.y) < 1) break; s = c; } u.surfAt = s; }
   if (mv === 'roar2' && u.kind === 'king') { u.x = m.L.x; u.y = m.L.y; u.hid = false; u.dir = Math.atan2(p.y - u.y, p.x - u.x); ashBurst(u.x, u.y, 18, 80); addShake(0.4); }   // he heaves up in the middle to roar
+  u.bounce = null;
+  if (mv === 'lance' && u.kind === 'mirage' && u.p2 && Math.random() < 0.6) {   // phase two: the lance bounces off a pillar
+    let best = null, bs = 1e9; const toPd = Math.atan2(p.y - u.y, p.x - u.x);
+    for (const pl of dunePillars()) {
+      const d1 = Math.hypot(pl.x - u.x, pl.y - u.y), d2 = Math.hypot(p.x - pl.x, p.y - pl.y);
+      if (d1 < 120 || d2 < 90 || Math.abs(angDiff(Math.atan2(pl.y - u.y, pl.x - u.x), toPd)) < 0.5) continue;
+      if (d1 + d2 < bs) { bs = d1 + d2; best = pl; }
+    }
+    if (best) u.bounce = { x: best.x, y: best.y, a2: Math.atan2(p.y - best.y, p.x - best.x) };
+  }
   if (mv === 'veil') u.veilAt = m.t;
   if (mv === 'pit') u.pitAt = m.t;
   if (mv === 'wheel') u.wheelAt = m.t;
@@ -8176,7 +8187,11 @@ function duneStep(m, u, dt) {
     if (DV[u.move].quick && !u.glinted && u.len - u.t < 0.24) { u.glinted = true; duneSay('glint'); }   // the glint: now
     if (u.move === 'whirl' && Math.random() < dt * 30) { const a = Math.random() * 7; S.rg.embers.push({ x: u.x + Math.cos(a) * R.whirl, y: u.y + Math.sin(a) * R.whirl, z: 4, vz: 30, vx: -Math.sin(a) * 90, vy: Math.cos(a) * 90, life: 0.5, ember: true }); }   // gold dust spun up round him
     if (u.move === 'sink' && Math.random() < dt * 12) ashBurst(u.x + (Math.random() - 0.5) * 60, u.y + (Math.random() - 0.5) * 60, 3, 30);
-    for (const c of m.clones) c.dir = Math.atan2(p.y - c.y, p.x - c.x);
+    for (const c of m.clones) if (!c.copy) c.dir = Math.atan2(p.y - c.y, p.x - c.x);
+    if (u.move === 'lance' && u.bounce) {            // the mirror lance: she aims at a pillar, and the bounce comes off it at you
+      const b = u.bounce; u.dir = Math.atan2(b.y - u.y, b.x - u.x);
+      if (u.t < u.base * 0.75) b.a2 = Math.atan2(p.y - b.y, p.x - b.x);
+    }
     if (u.t >= u.len) duneAct(m, u);
   } else if (u.st === 'act') {
     const mv = u.move;
@@ -8228,7 +8243,10 @@ function duneStep(m, u, dt) {
       }
     }
     if (mv === 'kick' && !u.hit && u.t > 0.08) { u.hit = true; const [kx, ky] = fwd(30, 0); if (Math.hypot(p.x - kx, p.y - ky) < 36) { if (miniHurt(0.5, 45, u)) { addShake(0.35); hitStop(0.05); } } ashBurst(kx, ky, 3, 10); }
-    if (mv === 'lance' && u.t > 0.05) duneBeam(m, u, u.dir, R.lance);
+    if (mv === 'lance' && u.t > 0.05) {
+      if (u.bounce) { const b = u.bounce; duneBeam(m, u, u.dir, Math.hypot(b.x - u.x, b.y - u.y) - 20); duneBeam(m, { x: b.x - Math.cos(b.a2) * 20, y: b.y - Math.sin(b.a2) * 20 }, b.a2, 700); if (!u.bounced) { u.bounced = true; ashBurst(b.x, b.y, 10, 50); S.rg.blasts.push({ x: b.x, y: b.y, t: 0, life: 0.3, r: 60, col: 'white' }); } }
+      else duneBeam(m, u, u.dir, R.lance);
+    }
     if (mv === 'wheel') {                        // four lances turning round her, glass falling on you
       const a0 = u.wheelA + 0.85 * u.t * (u.wheelS || 1);
       for (let i = 0; i < 4; i++) duneBeam(m, u, a0 + i * Math.PI / 2, 800);
@@ -8281,7 +8299,7 @@ function duneEnd(m, u, d) {                      // the blow is spent: open, or 
   if (mv === 'pit') { m.pit = null; return duneTell(m, u, 'hammer', 0.75); }
   if (mv === 'sweep' && u.p2 && u.kind !== 'dervish' && Math.random() < 0.55) return duneTell(m, u, 'sweepR');   // phase two: the sweep comes back the other way
   if (mv === 'hammer' && u.p2 && !u.chained && Math.random() < 0.4) { u.chained = true; return duneTell(m, u, 'stomp', 0.5); }
-  if (mv === 'lance') { for (const c of m.clones) if (!c.pop) { c.pop = 0.01; ashBurst(c.x, c.y, 8, 40); } }   // the copies fade once the true one has fired
+  if (mv === 'lance') { for (const c of m.clones) if (!c.pop && !c.copy) { c.pop = 0.01; ashBurst(c.x, c.y, 8, 40); } }   // the copies fade once the true one has fired
   if (mv === 'wheel') u.wheelA = null;
   u.chained = false;
   u.st = 'recover'; u.t = 0; u.pun = 0; u.len = DV[mv].rec * (u.p2 ? 0.85 : 1) * (u.kind === 'dervish' && u.combo ? 1.35 : 1);   // a full dance leaves him winded
@@ -8354,6 +8372,7 @@ function duneFxStep(m, dt) {                     // what's left on the ground an
   for (const c of m.clones) {                    // a copy pops when your light or a blow finds it
     c.t += dt;
     if (c.pop) { c.pop += dt; continue; }
+    if (c.copy) { duneCloneStep(c, dt); continue; }
     const bi = S.beamInfo;
     if (bi && S.torchLvl > 0.6) {
       const [sx, sy] = toScreen(c.x, c.y), yy = sy - 30 * 3 * Z, dd = Math.hypot(sx - bi.bx, yy - bi.by);
@@ -8365,6 +8384,29 @@ function duneFxStep(m, dt) {                     // what's left on the ground an
   const mir = m.units.find(u => u.kind === 'mirage'), wantE = mir && mir.p2 && mir.st !== 'dying' && mir.st !== 'dead' ? 1 : 0;
   m.eclipse += (wantE - m.eclipse) * Math.min(1, dt * 0.8);
   m.sandK = Math.min(1, m.sandK + dt * 1.5);
+}
+function duneCloneCopy(c) {                      // the copy flashes, then swings your own last combo back at you before it breaks
+  const hist = (S.rg.atkHist || []).filter(h => S.t - h.t < 1.4).slice(-3);
+  c.copy = (hist.length ? hist : [{ i: 0, side: 1 }]).map(h => ({ i: h.i, side: h.side }));
+  if (c.copy.length < 3 && c.copy[c.copy.length - 1].i < 2) c.copy.push({ i: c.copy[c.copy.length - 1].i + 1, side: -c.copy[c.copy.length - 1].side });   // it always answers with one more than you gave it
+  c.ct = -0.5; c.ci = 0; c.lit = 0; c.swings = [];
+  ashBurst(c.x, c.y, 8, 40); S.rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.25, r: 50, col: 'white' });
+  if (actx) noiseAt(actx.currentTime, 5000, 2000, 0.25, 0.2, sfxGain);
+  duneSay('glint'); exNote('it copies you', true);
+}
+function duneCloneStep(c, dt) {
+  const p = S.p; c.ct += dt;
+  for (const s of c.swings) s.t += dt; c.swings = c.swings.filter(s => s.t < 0.3);
+  if (c.ci >= c.copy.length) { if (c.ct > 0.35) duneClonePop(c); return; }
+  if (c.ct < 0.3) { if (c.ct < 0) c.dir = Math.atan2(p.y - c.y, p.x - c.x); return; }   // a held breath, aiming (the first one waits longer)
+  const mv = c.copy[c.ci++], D = ATK[mv.i], a = c.dir = Math.atan2(p.y - c.y, p.x - c.x), lunge = Math.min(D.lunge * 0.6, Math.max(0, Math.hypot(p.x - c.x, p.y - c.y) - 30));
+  c.x += Math.cos(a) * lunge; c.y += Math.sin(a) * lunge; arenaClamp(c, 20);
+  c.swings.push({ a, side: mv.side, r: D.reach, arc: Math.min(D.arc, 6.3), slam: !!D.slam, t: 0 });
+  const dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy);
+  if (d < D.reach + 8 && (D.slam || Math.abs(angDiff(Math.atan2(dy, dx), a)) < D.arc / 2)) { if (miniHurt(D.slam ? 1 : 0.5, D.knock, c)) { addShake(D.shake); hitStop(D.stop); } }
+  if (D.slam) { addShake(0.35); S.rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.35, r: D.reach, col: 'white' }); }
+  if (actx) noiseAt(actx.currentTime, 2600, 1800, 0.12, 0.18, sfxGain);
+  c.ct = D.slam ? -0.1 : 0.05;
 }
 function duneClonePop(c) {
   c.pop = 0.01; ashBurst(c.x, c.y, 14, 60); S.rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.3, r: 70, col: 'white' });
@@ -8500,13 +8542,15 @@ function drawDuneGround(m) {                     // marks on the sand in the kee
       if (mv === 'lance' || (mv === 'wheel')) {
         const fl = 0.5 + 0.5 * Math.sin(S.t * 40) * Math.sin(S.t * 13);   // a flickering line: the lance about to fire
         const lines = mv === 'wheel' ? [0, 1, 2, 3].map(i => (u.wheelA || 0) + i * Math.PI / 2) : [u.dir];
-        for (const a of lines) rect(20, mv === 'wheel' ? 800 : R.lance, 4 + 6 * uu, a, 0.5 + 0.5 * fl);
-        if (mv === 'lance') for (const c of m.clones) if (!c.pop) rect(20, R.lance, 4 + 6 * uu, c.dir, 0.5 + 0.5 * fl, c);   // the copies aim too
+        if (mv === 'lance' && u.bounce) { const b = u.bounce, d1 = Math.hypot(b.x - u.x, b.y - u.y); rect(20, d1, 4 + 6 * uu, u.dir, 0.5 + 0.5 * fl); rect(0, 700, 4 + 6 * uu, b.a2, 0.5 + 0.5 * fl, b); const [bx, by] = toScreen(b.x, b.y); ctx.strokeStyle = cc(0.4 + 0.5 * fl); ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.ellipse(bx, by, 24 * Z, 12 * Z, 0, 0, 7); ctx.stroke(); }   // the bend in the line: where it will glance off
+        else for (const a of lines) rect(20, mv === 'wheel' ? 800 : R.lance, 4 + 6 * uu, a, 0.5 + 0.5 * fl);
+        if (mv === 'lance') for (const c of m.clones) if (!c.pop && !c.copy) rect(20, R.lance, 4 + 6 * uu, c.dir, 0.5 + 0.5 * fl, c);   // the copies aim too
       }
       if (mv === 'rain' && u.rain) for (const s of u.rain) { worldPoly(circlePts(s.x, s.y, 8 + 22 * uu)); ctx.fillStyle = `rgba(0,0,0,${0.2 + 0.35 * uu})`; ctx.fill(); ctx.strokeStyle = cc(0.3 + 0.5 * uu); ctx.lineWidth = 1.2; ctx.stroke(); }
     }
     if (u.st === 'act' && mv === 'whirl') fill(circlePts(u.x, u.y, R.whirl + 12), 0.5);
   }
+  for (const c of m.clones) if (c.copy && c.ci < c.copy.length) { const D = ATK[c.copy[c.ci].i], k = Math.max(0, Math.min(1, (c.ct + 0.5) / 0.8)); fill(circlePts(c.x, c.y, D.reach + 8), k, 0.7); }   // a copy about to swing: its reach
   if (m.crack) {                                 // spiral cracks chasing you; when they stop, the sand glows
     const c = m.crack, [x, y] = toScreen(c.x, c.y), lk = c.lock ? 1 : 0;
     ctx.strokeStyle = cc(0.5 + 0.4 * lk); ctx.lineWidth = 1.6 * Z;
@@ -8628,8 +8672,15 @@ function drawDervishFx(m) {                      // the beat at his feet, the co
   ctx.restore();
 }
 function drawDuneBeams(m) {                      // the lances: white-gold light, drawn bright over the dark
-  if (!m.beams.length) return;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const c of m.clones) if (c.copy) for (const s of c.swings) {   // a copy's swing: your own slash, in her light
+    const k = 1 - s.t / 0.3, [x, y] = toScreen(c.x, c.y), r = s.r * Z;
+    ctx.strokeStyle = `rgba(${m.B.col},${0.85 * k})`; ctx.lineWidth = (s.slam ? 6 : 4) * Z * k + 1;
+    ctx.beginPath();
+    if (s.slam) ctx.ellipse(x, y, r * (0.6 + 0.4 * (1 - k)), r * 0.5 * (0.6 + 0.4 * (1 - k)), 0, 0, 7);
+    else { const pts = []; for (let i = 0; i <= 16; i++) { const a = s.a + s.side * (-s.arc / 2 + s.arc * i / 16); pts.push(toScreen(c.x + Math.cos(a) * s.r, c.y + Math.sin(a) * s.r)); } ctx.moveTo(pts[0][0], pts[0][1] - 20 * Z); for (const q of pts) ctx.lineTo(q[0], q[1] - 20 * Z); }
+    ctx.stroke();
+  }
   for (const b of m.beams) {
     const [x0, y0] = toScreen(b.x, b.y), [x1, y1] = toScreen(b.x + Math.cos(b.a) * b.len, b.y + Math.sin(b.a) * b.len), lift = 24 * Z;
     for (const [w, a] of [[22, 0.18], [10, 0.45], [3.5, 0.95]]) { ctx.strokeStyle = `rgba(${m.B.col},${a})`; ctx.lineWidth = w * Z; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0 - lift); ctx.lineTo(x1, y1 - lift * 0.3); ctx.stroke(); }
