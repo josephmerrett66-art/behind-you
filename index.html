@@ -310,6 +310,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <p class="small">Bonus modes, separate from your expedition.</p>
     <div class="modegrid">
       <button id="start4" class="mode big"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/><circle cx="16.5" cy="6" r=".6"/><circle cx="19.5" cy="9.5" r=".5"/></svg></span><span class="mt"><span class="nm">Nightfall</span><span class="sh">Survive the waves. Burn them with your light.</span><span class="best" id="bestSurvive"></span></span></button>
+      <button id="start6" class="mode big"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></span><span class="mt"><span class="nm">Daylight</span><span class="sh">No torch. Find food, last the days.</span><span class="best" id="bestDay"></span></span></button>
     </div>
     <p class="eyebrow">Classic</p>
     <div class="modegrid three">
@@ -3885,6 +3886,7 @@ function renderScene() {
   ctx.globalAlpha = isRg() ? rgDarkAlpha() : 1;
   ctx.drawImage(dark, 0, 0);
   ctx.globalAlpha = 1;
+  if (S.day) drawDay();
   if (S.mode === 'expedition' && inWoods()) { drawRain(false); drawFog(false); drawLightning(); }   // v126: weather over the dark
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   drawLightGlow(lights); drawSparks(); drawSlashes();
@@ -4163,6 +4165,7 @@ overlay.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click',
 function menuBests() {
   const put = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
   put('bestSurvive', bests.survive ? `Best · wave ${bests.survive}` : '');
+  { const b = dayBest(); put('bestDay', b.days ? `Best · day ${b.days} · ${dayClock(b.t)}` : ''); }
   put('bestChase', bests.chase ? `Best ${bests.chase}` : '');
   put('bestBlink', bests.blink ? `Best ${bests.blink}` : '');
   let ex = null; try { ex = JSON.parse(localStorage.getItem(exKey()) || 'null'); } catch (e) {}
@@ -4325,7 +4328,7 @@ function rgBurn0() {
   return 1.05 * (1 + 0.1 * tu('heat')) * (isEx() ? 1 + 0.1 * sr('kindle') : 1) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 2 : 1) : 1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
 }
 function rgSpeed() { return 1.4 * (1 + 0.04 * sr('swift')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
-function rgDarkAlpha() { const w = S.wx; return w && inWoods() && w.flash > 0 ? 1 - 0.82 * Math.min(1, w.flash) : 1; }   // v126: lightning lifts the dark for a blink   // the Dunes are as dark as the woods outside your light
+function rgDarkAlpha() { if (S.day) return 0; const w = S.wx; return w && inWoods() && w.flash > 0 ? 1 - 0.82 * Math.min(1, w.flash) : 1; }   // v126: lightning lifts the dark for a blink   // the Dunes are as dark as the woods outside your light
 // Wave size: how many shades must burn before dawn. 11, 14, 17, 21, 25 ... 50 at wave 10, 83 at wave 15.
 function rgWaveCount(w) { return Math.max(6, Math.round(8 + 2.6 * w + 0.16 * w * w)); }
 function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
@@ -4497,6 +4500,7 @@ function killFoe(e) {
   if (lv('embers')) rg.fires.push({ x: e.x, y: e.y, r: 28 + 8 * lv('embers'), life: 2 + 1.5 * lv('embers'), max: 2 + 1.5 * lv('embers'), seed: Math.random() * 9, freeze: isEx() && rawLv('smoulder') > 2 });
   if (lv('nova') && rg.nova < 12) { rg.nova++; if (rg.nova === 12) sfx(2.5, 0.4, 'bandpass', 2200, 0.3); }
   if (e.type === 'splitter') splitApart(e);
+  if (S.day && Math.random() < (e.type === 'brute' || e.type === 'tall' ? 0.8 : 0.3)) S.day.eats.push({ x: e.x, y: e.y, v: e.type === 'brute' || e.type === 'tall' ? 30 : 14, t: 0, seed: Math.random() * 9 });   // Daylight: some leave meat
   e.dead = true; rg.kills++; rg.waveKills++; lifeAdd('kills'); lifeTally('kt', e.type);
   rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0, segs: e.type === 'centi' ? centiSegs(e).filter((q, i) => centiOut(e, i)) : null, hz: e.hz, k: e.k });
   if (e.guard) { rg.guardDone = true; addShake(0.6); hitStop(0.1); }   // the orb's keeper is dead: it stays dead this trip
@@ -6495,6 +6499,103 @@ function exBegin() {
   S.msg = note ? { text: note[0], sub: note[1], t: 0 }
     : { text: 'expedition', sub: XS.dorbs >= 3 ? 'Both portals are open' : XS.orbs >= 3 ? `The portal is open · ${XS.dorbs || 0} of 3 teal orbs home` : XS.orbs ? `${XS.orbs} of 3 orbs home` : 'A green light waits in the deep', t: 0 };
 }
+// ---- v127 Daylight (Joe): an Extras mode on Expedition's woods in full day. No torch, so nothing burns: you fight with the blade.
+// Food runs down and starving eats your hearts; chests hold food and don't refill, so the woods round camp get picked clean.
+// Some kills leave meat. Each day ends in a raid, and every day they come tougher and thicker. Last as long as you can.
+const DAY_LEN = 100, FOOD_MAX = 100, FOOD_RATE = 0.65, STARVE_T = 5, DAY_KEY = 'behind-you-day-best';
+const dayClock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+function dayBest() { try { return JSON.parse(localStorage.getItem(DAY_KEY) || 'null') || { days: 0, t: 0 }; } catch (e) { return { days: 0, t: 0 }; } }
+function dayBegin() {
+  EX_TEST = true; XS = exFresh(); exMakeLairs();   // a fresh throwaway save: nothing here touches your expedition
+  S.day = { t: 0, n: 1, food: FOOD_MAX, starve: 0, heal: 0, warn: 0, raidDue: false, eats: [] };
+  S.rg = exNewRun(); exPlaceHome();
+  S.msg = { text: 'daylight', sub: 'No torch. Find food. Last the days.', t: 0 };
+}
+function dayStep(dt, inCamp) {
+  const D = S.day, rg = S.rg, p = S.p;
+  D.t += dt;
+  const n = 1 + Math.floor(D.t / DAY_LEN);
+  if (n > D.n) { D.n = n; rg.flask = Math.min(FLASK_MAX, rg.flask + 1); if (inCamp) { D.raidDue = true; rg.ringMsg = { text: `day ${n}`, sub: 'They wait outside the fence', t: 0 }; } else dayRaid(); }
+  if (D.raidDue && !inCamp) { D.raidDue = false; dayRaid(); }
+  D.food = Math.max(0, D.food - dt * FOOD_RATE * (1 + 0.06 * (D.n - 1)));
+  if (D.food < 30 && D.warn < 1) { D.warn = 1; exNote('hungry', true); }
+  if (D.food <= 0 && D.warn < 2) { D.warn = 2; exNote('starving', true); }
+  if (D.food > 40) D.warn = 0;
+  if (D.food <= 0) {
+    if ((D.starve += dt) >= STARVE_T) {   // starving: half a heart every few seconds, fence or no fence
+      D.starve = 0; rg.hp = Math.max(0, rg.hp - 0.5); rg.hurtFx = 0.6; addShake(0.3);
+      rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };
+      sfx(0.45, 0.5, 'lowpass', 400, 0.3);
+      if (rg.hp <= 0) { D.cause = 'starved'; nightOver(); return; }
+    }
+  } else D.starve = 0;
+  const calm = !rg.enemies.some(e => !e.dead && dist2(e, p) < 300);
+  if (D.food > 70 && rg.hp < rg.maxHp && calm) {   // well fed and nothing near: your hearts come back slowly
+    if ((D.heal += dt) >= 15) { D.heal = 0; rg.hp = Math.min(rg.maxHp, rg.hp + 0.5); D.food -= 6; rg.pop = { t: 0, gained: Math.ceil(rg.hp) - 1 }; }
+  } else D.heal = 0;
+  for (const f of D.eats) { f.t += dt; if (dist2(f, p) < 26) { f.gone = true; dayEat(f.v, f.x, f.y); } else if (f.t > 45) f.gone = true; }
+  D.eats = D.eats.filter(f => !f.gone);
+}
+function dayEat(v, x, y) {
+  const D = S.day; D.food = Math.min(FOOD_MAX, D.food + v); exNote(`+${v} food`);
+  sfx(1.2, 0.25, 'bandpass', 900, 0.25); if (actx) setTimeout(() => sfx(1.6, 0.2, 'bandpass', 1400, 0.2), 90);
+  for (let i = 0; i < 8; i++) S.rg.ash.push({ x, y, z: 4, vx: (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, vz: 40 + Math.random() * 40, life: 0.5 });
+}
+function dayChest(c) {                         // a chest out here is a cache of food, once
+  const rg = S.rg; rg.looted.add(c.key);
+  const v = 25 + Math.floor(Math.random() * 20);
+  (rg.chestFx = rg.chestFx || []).push({ x: c.x, y: c.y, t: 0, best: 1 }); playChestOpen(1); addShake(0.1);
+  dayEat(v, c.x, c.y);
+  if (rg.flask < FLASK_MAX && Math.random() < 0.25) { rg.flask++; exNote('+1 flask', true); }
+}
+function dayRaid() {
+  const rg = S.rg, D = S.day, ring = Math.min(3, exRing(Math.hypot(S.p.x, S.p.y)) + (D.n > 3 ? 1 : 0)), n = Math.min(16, 3 + 2 * D.n);
+  for (let i = 0; i < n; i++) exSpawn(exPickFoe(ring));
+  rg.ringMsg = { text: `day ${D.n}`, sub: `A raid · ${n} of them`, t: 0 }; playRingSting(); addShake(0.35);
+}
+function dayDeath() {
+  const rg = S.rg, D = S.day;
+  rg.phase = 'dead'; rg.deadT = 0;
+  const b = dayBest(); D.best = D.t > b.t;
+  if (D.best) try { localStorage.setItem(DAY_KEY, JSON.stringify({ days: D.n, t: Math.round(D.t) })); } catch (e) {}
+  S.msg = { text: D.cause === 'starved' ? 'You starved' : 'The woods took you', sub: `Day ${D.n} · ${dayClock(D.t)}`, t: 0 };
+}
+function dayCard() {
+  const rg = S.rg, D = S.day, b = dayBest();
+  const rows = [['Lasted', `Day ${D.n} · ${dayClock(D.t)}${D.best ? ' · new best' : ''}`, D.best ? '' : ''], ['Killed', `${rg.kills || 0}`], ['Fell to', D.cause === 'starved' ? 'Hunger' : 'The woods'], ['Best', `Day ${b.days} · ${dayClock(b.t)}`]];
+  document.getElementById('dcList').replaceChildren(...rows.flatMap(([k, v]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; return [dt, dd]; }));
+  deathCard.hidden = false; menuBtn.hidden = true;
+  document.getElementById('dcGo').focus({ preventScroll: true });
+}
+function drawDay() {                           // the sun: a warm wash from the top, and food lying where it fell
+  const D = S.day;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, W * DPR * 0.4, H * DPR);
+  g.addColorStop(0, 'rgba(255,226,160,0.5)'); g.addColorStop(1, 'rgba(255,226,160,0)');
+  ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = COLOUR ? 0.6 : 0.12; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
+  ctx.restore();
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  for (const f of D.eats) {
+    const [x, y] = toScreen(f.x, f.y), bob = Math.sin(S.t * 3 + f.seed) * 2 * Z, s = Z * (f.v > 20 ? 1.9 : 1.5), fade = f.t > 38 ? 0.5 + 0.5 * Math.sin(S.t * 12) : 1;
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x, y, 7 * s, 3 * s, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(x, y - 8 * Z + bob); ctx.rotate(-0.5);
+    ctx.fillStyle = '#efe6d2'; ctx.fillRect(2 * s, -1.2 * s, 7 * s, 2.4 * s); ctx.beginPath(); ctx.arc(9 * s, -1.4 * s, 1.6 * s, 0, 7); ctx.arc(9 * s, 1.4 * s, 1.6 * s, 0, 7); ctx.fill();   // the bone
+    ctx.fillStyle = COLOUR ? '#a8432c' : '#6d6a66'; ctx.beginPath(); ctx.ellipse(-2 * s, 0, 6 * s, 4.4 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = COLOUR ? 'rgba(255,170,120,0.55)' : 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(-3.5 * s, -1.5 * s, 2.6 * s, 1.4 * s, 0, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function dayBar(px, py) {                      // food, a bar over your head where the oil used to be
+  const D = S.day, tw = 44, x0 = px - tw / 2, y0 = py - 50 * Z - 4, f = D.food / FOOD_MAX, low = f < 0.3, op = low ? 0.55 + 0.45 * Math.sin(S.t * (f <= 0 ? 14 : 7)) : 1;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 - 1, tw + 2, 5);
+  ctx.fillStyle = low ? `rgba(226,84,60,${0.95 * op})` : 'rgba(150,200,110,0.85)'; ctx.fillRect(x0, y0, tw * f, 3);
+  if (low) {
+    ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = `rgba(239,239,234,${0.8 * op})`; ctx.fillText(f <= 0 ? 'STARVING' : 'HUNGRY', px, y0 - 3);
+  }
+}
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
 // v112: first-trip hints, each shown once per save, one at a time when the banner slot is free. Saves that already brought an orb home skip them.
 const TIPS = [
@@ -6518,6 +6619,7 @@ function exDropPack(src) {                   // nothing is left behind: what you
 }
 function exDeath() {
   const rg = S.rg;
+  if (S.day) return dayDeath();
   rg.phase = 'dead'; rg.deadT = 0;
   const had = rg.pack.length || rg.carryOrb || rg.carryDorb || rg.wispCarry;
   rg.lost = { embers: rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1), wisps: rg.wispCarry || 0, orb: rg.carryOrb ? 'a green orb' : rg.carryDorb ? 'a teal orb' : '',
@@ -6530,6 +6632,8 @@ function exDeath() {
 const deathCard = document.getElementById('deathCard');
 function showDeathCard() {                    // what the dark took, and how far you got, before you wake by the fire
   const rg = S.rg, L = rg.lost || {}; rg.cardShown = true; S.msg = null;
+  deathCard.querySelector('.eyebrow').textContent = S.day ? 'Daylight' : 'Expedition'; deathCard.querySelector('h2').textContent = S.day ? (S.day.cause === 'starved' ? 'You starved' : 'The woods took you') : 'The dark took you'; document.getElementById('dcGo').textContent = S.day ? 'Try again' : 'Back to the fire';
+  if (S.day) return dayCard();
   const rows = [];
   const lostBits = [L.embers ? `${L.embers} embers of loot` : '', L.wisps ? `${L.wisps} wisp${L.wisps > 1 ? 's' : ''}` : '', L.orb].filter(Boolean);
   rows.push(['Lost', lostBits.length ? lostBits.join(' · ') : 'Nothing. Your pack was empty.', lostBits.length ? 'lost' : '']);
@@ -6540,7 +6644,7 @@ function showDeathCard() {                    // what the dark took, and how far
   deathCard.hidden = false; menuBtn.hidden = true;
   document.getElementById('dcGo').focus({ preventScroll: true });
 }
-document.getElementById('dcGo').addEventListener('click', () => { deathCard.hidden = true; menuBtn.hidden = false; if (S.mode === 'expedition' && S.rg && S.rg.phase === 'dead') exWake(); });
+document.getElementById('dcGo').addEventListener('click', () => { deathCard.hidden = true; menuBtn.hidden = false; if (S.mode === 'expedition' && S.rg && S.rg.phase === 'dead') { if (S.day) begin('day'); else exWake(); } });
 function exWake() {
   S.rg = exNewRun(); exPlaceHome(); S.msg = null;
   S.rg.pop = { t: 0, refill: 0 };
@@ -6596,6 +6700,7 @@ function exGot(x, y, took) {
   if (packUsed(rg.pack) >= packMax()) { rg.fullFx = 1; sfx(0.5, 0.6, 'lowpass', 400, 0.3); addShake(0.12); }
 }
 function exOpen(c) {
+  if (S.day) return dayChest(c);
   const rg = S.rg, left = rg.left.get(c.key) || c.items.slice(), took = exTake(left);
   if (!took.length) return exFull();
   if (!rg.left.has(c.key)) lifeAdd('chests');
@@ -6634,6 +6739,7 @@ function exDeposit() {
 }
 function exHome() {                          // stepped inside the fence: bank the pack, heal up
   const rg = S.rg;
+  if (S.day) { rg.oil = oilMax(); rg.wispCarry = 0; return; }   // Daylight: the fence keeps them out, but there's no food or healing in camp
   lifeAdd('home');
   if (rg.pack.length) {
     const v = rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // Short Wick: banked loot is worth double
@@ -6662,7 +6768,8 @@ function exStep(dt) {
   if (portalStep(dt)) return;                 // opening, warping, or out in the other world
   weatherStep(dt);                            // v126: forest weather
   const rg = S.rg, p = S.p, d0 = Math.hypot(p.x, p.y), ring = exRing(d0), inCamp = d0 < CAMP_R;
-  rg.wave = Math.min(13, 1 + d0 / 800);      // enemy toughness follows distance
+  rg.wave = Math.min(13, 1 + d0 / 800 + (S.day ? 0.6 * (S.day.n - 1) : 0));   // Daylight: tougher each day
+  if (S.day) dayStep(dt, inCamp);      // enemy toughness follows distance
   for (const n of rg.notes) n.t += dt;
   rg.notes = rg.notes.filter(n => n.t < 2.4);
   if (rg.ringMsg && !(S.msg && S.msg.t < 2.2)) { rg.ringMsg.t += dt; if (rg.ringMsg.t > 2.8) rg.ringMsg = null; }   // waits for any big banner to clear
@@ -6670,7 +6777,7 @@ function exStep(dt) {
   if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
   if (!rg.beyond) lifeMax('far', Math.round(d0));
   tipStep(rg, inCamp, d0);
-  campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
+  campBtn.hidden = !inCamp || !!S.day; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns; flaskBtn.hidden = inCamp;
   rg.lamps = exPathLamps();
   if (rg.carryOrb && dist2(p, TELE) < 46) exDeposit();                       // the green shrine, out on the portal ring
@@ -6692,13 +6799,13 @@ function exStep(dt) {
     return;
   }
   const outpost = exSafeAt(p.x, p.y);
-  exOilStep(dt, !!outpost || !!bossLive() || !!miniLive());   // the braziers keep your oil topped up while you fight him too  // an outpost's lamp tops the torch up, and so does a boss fight: the oil stays full
+  exOilStep(dt, !!outpost || !!bossLive() || !!miniLive() || !!S.day);   // Daylight: no torch, so the oil only feeds rolls   // the braziers keep your oil topped up while you fight him too  // an outpost's lamp tops the torch up, and so does a boss fight: the oil stays full
   if (outpost) {                             // safe in an outpost's light: nothing new comes, the ranged ones back off
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }
   } else if (!bossLive() && !miniLive() && !rg.cleared) {   // nothing else comes into the mist while the Woodwarden fights, nor on the walk home after he falls
     rg.spawnT -= dt;
     const bait = rg.carryOrb || rg.carryDorb ? 5 : 0;         // a carried orb draws them in from all round
-    const cap = (EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1);   // Horde: twice as many   // and so does a heavy pack
+    const cap = Math.round((EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1) * (S.day ? 0.8 + 0.2 * S.day.n : 1));   // Horde: twice as many   // and so does a heavy pack
     if (rg.spawnT <= 0) {
       rg.spawnT = EX_GAP[ring] * (rg.carryOrb || rg.carryDorb ? 0.55 : 1) * (pact('horde') ? 0.5 : 1) * (0.6 + Math.random() * 0.8);
       if (rg.enemies.length < cap) { if (ring > 0 && Math.random() < 0.25 && cap - rg.enemies.length >= 3) exPack(ring, Math.min(cap - rg.enemies.length, 3 + (Math.random() < 0.5 ? 1 : 0))); else exSpawn(exPickFoe(ring)); }   // v123: sometimes a pack
@@ -9719,7 +9826,8 @@ function drawExFx() {
     const LC = lairCur(); if (LC && !miniLive()) { const [x, y] = toScreen(LC.x, LC.y); exPointer(px, py, x, y, 'rgb(255,160,80)', 'flame', on(x, y) ? 0.3 : 0.85); }   // the flame always points to the boss you're due to face next
   }
   // the pack, as a row of small slots over your head
-  if (!rg.inCamp) {
+  if (S.day) dayBar(px, py);
+  else if (!rg.inCamp) {
     const n = packMax(), used = packUsed(rg.pack), sw = 5, gap = 1.5, tw = n * sw + (n - 1) * gap, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
     const full = used >= n, pulse = full ? 0.6 + 0.4 * Math.sin(S.t * 6) : 1;
     for (let i = 0; i < n; i++) {
@@ -9790,7 +9898,7 @@ function drawExHud(top) {
   const big = W > 900, fs = big ? 15 : 13, lh = fs + 5, hs = big ? 13 : 11, hg = big ? 18 : 15;
   ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.font = `600 ${fs}px "IBM Plex Mono", monospace`; ctx.fillStyle = 'rgba(239,239,234,0.88)';
-  ctx.fillText((EX_TEST ? 'PLAYTEST · ' : '') + (rg.next ? 'THE FROST' : rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
+  ctx.fillText((S.day ? `DAY ${S.day.n} · ${dayClock(S.day.t)} · ` : EX_TEST ? 'PLAYTEST · ' : '') + (rg.next ? 'THE FROST' : rg.beyond ? 'THE DUNES' : rg.inCamp ? 'CAMP' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))].toUpperCase()), 16, 16 + top);
   const hy = 20 + lh + top;
   for (let i = 0; i < rg.maxHp + steelMax(); i++) {
     const x = 16 + i * hg, y = hy, st = i >= rg.maxHp, cx = x + hs / 2, cy = y + hs / 2;
@@ -9808,7 +9916,7 @@ function drawExHud(top) {
     let ln = ''; for (const b of bits) { const t = ln ? ln + ' · ' + b : b; if (ln && ctx.measureText(t).width > room) { ctx.fillText(ln, 16, y); y += size + 5; ln = b; } else ln = t; }
     if (ln) { ctx.fillText(ln, 16, y); y += size + 5; } return y;
   };
-  let y = row([`${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`], hy + hs + 8, 'rgba(239,239,234,0.68)', fs - 1);
+  let y = row(S.day ? [`${rg.kills || 0} KILLED`, `FOOD ${Math.round(S.day.food)}`] : [`${XS.embers} EMBERS`, `${rg.wispCarry || 0} WISPS`, XS.orbs >= 3 ? `TEAL ORBS ${XS.dorbs || 0}/3` : `ORBS ${XS.orbs}/3`], hy + hs + 8, 'rgba(239,239,234,0.68)', fs - 1);
   const st = [];
   if (lv('wind')) st.push(rg.shield > 0 ? 'SHIELD UP' : 'SHIELD ' + Math.max(0, Math.ceil([60, 60, 40, 25][Math.min(3, lv('wind'))] - (rg.windT || 0))) + 's');
   st.unshift(`FLASKS ${rg.flask ?? FLASK_MAX}/${FLASK_MAX}`); if (XS.recall) st.push('FLARE'); if (XS.lanterns) st.push('LANTERN');
@@ -9822,6 +9930,7 @@ flaskBtn.addEventListener('pointerdown', e => { e.preventDefault(); exDrink(); }
 recallBtn.addEventListener('pointerdown', e => { e.preventDefault(); exRecall(); });
 lampBtn.addEventListener('pointerdown', e => { e.preventDefault(); exPlant(); });
 function openCamp() {
+  if (S.day) return;
   const rg = S.rg;
   if (S.mode !== 'expedition' || !rg || !rg.inCamp || rg.phase !== 'fight' || !S.running) return;
   S.running = false; menuBtn.hidden = true; campBtn.hidden = true; campEl.hidden = false;
@@ -10102,21 +10211,23 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && !statsEl.hidden) cl
 statsLabel();
 
 function begin(mode) {
+  const day = mode === 'day'; if (day) mode = 'expedition';   // v127: Daylight runs on Expedition's woods
   camZv = 1;                                    // the title's close-up zoom doesn't carry into the game
   reset(); S.mode = mode; EX_TEST = false;
   if (mode === 'free') { S.q = null; }
   else if (mode === 'survive') { S.q = null; S.rg = newRun(); picker.hidden = true; startWave(); }
-  else if (mode === 'expedition') { S.q = null; picker.hidden = true; exBegin(); }
+  else if (mode === 'expedition') { S.q = null; picker.hidden = true; day ? dayBegin() : exBegin(); }
   else if (mode === 'blink') { S.blinkPhase = 'dark'; S.darkT = BLINK_DARK; S.torchOn = true; spawnQuarry(); S.q.hiddenUntilLit = true; }
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
   document.getElementById('deathCard').hidden = true;
-  initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = true; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
+  initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = !S.day; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
 document.getElementById('start3').addEventListener('click', () => begin('free'));
 document.getElementById('start4').addEventListener('click', () => begin('survive'));
 document.getElementById('start5').addEventListener('click', () => begin('expedition'));
+document.getElementById('start6').addEventListener('click', () => begin('day'));
 document.getElementById('testPortal').addEventListener('click', () => {   // straight to the last orb, on a throwaway copy of the save
   begin('expedition'); EX_TEST = true;
   XS = JSON.parse(JSON.stringify(XS)); XS.orbs = 2; XS.orb = null; XS.orbField = false; XS.out = null;
