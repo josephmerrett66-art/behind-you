@@ -5176,7 +5176,7 @@ function drawSurviveFx(bx, by, br) {
   drawRangedTells(); drawDarts();
   // Mirror Shard: a white-hot point where the laser meets your beam, and the bounce to a second one
   for (const e of rg.enemies) {
-    if (!(e.mirrorT > 0)) continue; e.mirrorT -= 1 / 60;
+    if (!(e.mirrorT > 0)) continue; e.mirrorT -= frameDt;
     const [x, y] = toScreen(S.p.x, S.p.y), lift = FOES.laser.h * 0.72 * Z, g = ctx.createRadialGradient(x, y - lift, 0, x, y - lift, 22 * Z);
     g.addColorStop(0, 'rgba(235,245,255,0.95)'); g.addColorStop(1, 'rgba(90,170,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - lift, 22 * Z, 0, 7); ctx.fill();
     if (e.mirrorTo && !e.mirrorTo.dead) { const [x0, y0] = toScreen(e.x, e.y), [x1, y1] = toScreen(e.mirrorTo.x, e.mirrorTo.y); ctx.strokeStyle = 'rgba(160,210,255,0.8)'; ctx.lineWidth = 3 * Z; ctx.beginPath(); ctx.moveTo(x0, y0 - lift); ctx.lineTo(x1, y1 - lift); ctx.stroke(); }
@@ -5270,7 +5270,7 @@ function drawSurviveFx(bx, by, br) {
   for (const ec of rg.echoes) {
     const cx = ec.x ?? S.p.x, cy = ec.y ?? S.p.y, max = ec.max || (ec.salt ? 200 : viewR());
     ctx.strokeStyle = ec.burst ? `rgba(239,200,160,${0.6 * (1 - ec.r / max)})` : `rgba(239,239,234,${(ec.salt ? 0.6 : 0.25) * (1 - ec.r / max)})`;
-    ctx.lineWidth = ec.burst ? 4 : 2.5; ctx.beginPath(); ctx.arc(cx, cy, ec.r, 0, 7); ctx.stroke();
+    ctx.lineWidth = ec.burst ? 4 : 2.5; ctx.beginPath(); ctx.arc(cx, cy, Math.max(0, ec.r), 0, 7); ctx.stroke();
   }
   ctx.restore();
   // candle flames, flare cores, fireflies
@@ -5693,6 +5693,7 @@ function exNewOrb() {                        // the next orb wakes further out, 
 function exRecall() {
   const rg = S.rg;
   if (S.mode !== 'expedition' || !rg || rg.phase !== 'fight' || !S.running || rg.inCamp || rg.recall) return;
+  if (rg.beyond || rg.next) return exNote('the flare only burns in the woods');   // v111: out here it rooted you for good
   if (!XS.recall) return exNote('no recall flare');
   rg.recall = { t: 0 }; exNote('flare lit');
   if (actx) { const t = actx.currentTime; noiseAt(t, 4000, 1500, RECALL_T, 0.25, sfxGain); }
@@ -5700,6 +5701,7 @@ function exRecall() {
 function exPlant() {
   const rg = S.rg, p = S.p;
   if (S.mode !== 'expedition' || !rg || rg.phase !== 'fight' || !S.running || rg.inCamp) return;
+  if (rg.beyond || rg.next) return exNote('lanterns only take root in the woods');   // v111: it used to plant a woods outpost in the sand
   if (!XS.lanterns) return exNote('no lantern');
   if (Math.hypot(p.x, p.y) < RINGS[0]) return exNote('too near camp');
   if (XS.outposts.some(o => dist2(o, p) < 500)) return exNote('too near another outpost');
@@ -6082,7 +6084,7 @@ function drawWispPop() {                     // the count above your head after 
     const [px, py] = toScreen(S.p.x, S.p.y), cy = py - 30 * Z;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (const f of rg.wispFx) {
-      f.t += 1 / 60; const k = Math.min(1, f.t / 0.4), R = (10 + 30 * k) * Z;
+      f.t += frameDt; const k = Math.min(1, f.t / 0.4), R = (10 + 30 * k) * Z;
       const g = ctx.createRadialGradient(px, cy, 0, px, cy, R); g.addColorStop(0, `rgba(${WISP_COL},${0.5 * (1 - k)})`); g.addColorStop(1, `rgba(${WISP_COL},0)`);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, cy, R, 0, 7); ctx.fill();
     }
@@ -6206,7 +6208,7 @@ function exDeath() {
   rg.phase = 'dead'; rg.deadT = 0;
   const had = rg.pack.length || rg.carryOrb || rg.carryDorb || rg.wispCarry;
   rg.lost = { embers: rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1), wisps: rg.wispCarry || 0, orb: rg.carryOrb ? 'a green orb' : rg.carryDorb ? 'a teal orb' : '',
-    where: rg.beyond ? 'the Dunes' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))], far: Math.round(Math.hypot(S.p.x, S.p.y) / 10) * 10, burned: rg.kills || 0 };
+    where: rg.next ? 'the Frost' : rg.beyond ? 'the Dunes' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))], far: Math.round(Math.hypot(S.p.x, S.p.y) / 10) * 10, burned: rg.kills || 0 };
   exDropPack({ x: S.p.x, y: S.p.y, items: rg.pack, orb: rg.carryOrb, dorb: rg.carryDorb });
   XS.out = null; exSave();
   S.msg = { text: 'The dark took you', sub: had ? 'Everything you carried is gone' : 'You wake by the fire', t: 0 };
@@ -6219,7 +6221,7 @@ function showDeathCard() {                    // what the dark took, and how far
   rows.push(['Lost', lostBits.length ? lostBits.join(' · ') : 'Nothing. Your pack was empty.', lostBits.length ? 'lost' : '']);
   rows.push(['Fell in', `${L.where || 'the woods'} · ${L.far || 0} m from camp`]);
   rows.push(['Burned', `${L.burned || 0} this trip`]);
-  rows.push(['Kept', `${XS.embers} embers banked · ${XS.orbs} of 3 orbs home`]);
+  rows.push(['Kept', `${XS.embers} embers banked · ${rg.beyond || rg.next ? `${XS.dorbs || 0} of 3 teal orbs home` : `${XS.orbs} of 3 orbs home`}`]);
   document.getElementById('dcList').replaceChildren(...rows.flatMap(([k, v, c]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; if (c) dd.className = c; return [dt, dd]; }));
   deathCard.hidden = false; menuBtn.hidden = true;
   document.getElementById('dcGo').focus({ preventScroll: true });
@@ -7158,10 +7160,11 @@ function miniWin(m) {                            // the last of them goes to ash
   m.st = 'won'; m.wt = 0; m.proj = []; m.snares = []; rg.rooted = 0; rg.snuff = 0;
   const W0 = rg.wisps || (rg.wisps = []), per = Math.max(1, Math.round(B.wisps / 10));   // a burst of wisps rising out of the ash, streaming to you
   for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; W0.push({ x: u.x + Math.cos(a) * 26, y: u.y + Math.sin(a) * 26, z: 30, t: 0, n: per * (pact('hunted') ? 2 : 1), life: 30, seed: Math.random() * 9, v: 0, fly: true }); }
-  rg.loose.push({ kind: 'pack', x: u.x, y: u.y, items: B.loot.slice(), orb: false });   // his chest
+  const chest = B.loot.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // v111: his chest is banked on the spot (it never fit a pack, and the Dunes ones couldn't be picked up)
+  XS.embers += chest; rg.bankFx = { v: chest, t: 0 };
   m.L.beat = true; exSave();
   const next = lairCur();
-  S.msg = { text: B.title + ' felled', sub: `His wisps and his chest are yours · get them home${next ? ' · a new fire burns somewhere out there' : ''}`, t: 0 };
+  S.msg = { text: B.title + ' felled', sub: `His chest is banked · his wisps are yours${next ? ' · a new fire burns somewhere out there' : ''}`, t: 0 };
   if (B.dune) duneWin(m);
   if (actx) { const t = actx.currentTime; boomAt(t, 50, 22, 2.4, 0.9, sfxGain); noiseAt(t, 3000, 100, 2, 0.45, sfxGain); }
 }
@@ -7768,7 +7771,7 @@ function duneWin(m) {                            // the orb falls out of him and
   XS.dbBeat = XS.dorbs || 0; XS.dorb = { x: u.x, y: u.y, arena: m.L }; rg.duneT = 6; XS.dorbField = true; desertCache.clear();
   rg.storm = null; m.pit = null; m.clones = []; m.lines = []; m.waves = []; m.rings = []; m.shards = []; m.glass = [];
   rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.9, r: 200, col: 'teal' });
-  S.msg = { text: m.B.title + ' felled', sub: 'The teal orb is yours · his wisps and his chest too · get them home', t: 0 };
+  S.msg = { text: m.B.title + ' felled', sub: 'His chest is banked · the teal orb is yours · get it home', t: 0 };
 }
 // ---- drawing ----
 function drawGlaive(u, pal, grip, dir, P, Zs, OUT, c) {   // a long glaive: a curved blade, the teal orb set where blade meets haft
@@ -8642,7 +8645,7 @@ function drawExFx() {
     ctx.beginPath(); ctx.moveTo(x - r, yy); ctx.lineTo(x + r, yy); ctx.moveTo(x, yy - r); ctx.lineTo(x, yy + r); ctx.stroke();
   }
   for (const f of rg.chestFx || []) {        // a chest thrown open: a gold flash and a ring of light
-    f.t += 1 / 60; const k = f.t / 0.6; if (k >= 1) continue;
+    f.t += frameDt; const k = f.t / 0.6; if (k >= 1) continue;
     const [x, y] = toScreen(f.x, f.y), cy = y - 10 * Z, R = (18 + 50 * k) * Z * (1 + 0.15 * f.best);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createRadialGradient(x, cy, 0, x, cy, R); g.addColorStop(0, `rgba(255,210,110,${0.7 * (1 - k)})`); g.addColorStop(1, 'rgba(255,170,60,0)');
@@ -8737,7 +8740,7 @@ function drawExFx() {
 }
 function drawBankFx() {
   const rg = S.rg, B = rg && rg.bankFx; if (!B) return;
-  B.t += 1 / 60; if (B.t > 2.2) { rg.bankFx = null; return; }
+  B.t += frameDt; if (B.t > 2.2) { rg.bankFx = null; return; }
   const [px, py] = toScreen(S.p.x, S.p.y), k = Math.min(1, B.t / 0.8), n = Math.round(B.v * (1 - Math.pow(1 - k, 3)));
   const a = B.t < 1.6 ? 1 : 1 - (B.t - 1.6) / 0.6, y = py - 80 * Z - 18 * Math.min(1, B.t / 0.4), pop = 1 + 0.25 * Math.max(0, 1 - B.t / 0.25);
   ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -9124,6 +9127,7 @@ function watchSpeed(raw) {
   speed.sum += raw; speed.n++;
   if (speed.sum < 1.5) return;
   if (speed.sum / speed.n > 1 / 45 && QUALITY > 0.55) { QUALITY = Math.max(0.55, QUALITY * 0.8); resize(); speed.wait = 1; }
+  else if (speed.sum / speed.n < 1 / 57 && QUALITY < 1) { QUALITY = Math.min(1, QUALITY * 1.12); resize(); speed.wait = 6; }   // v111: smooth again (left a heavy scene), sharpen back up
   speed.sum = speed.n = 0;
 }
 
@@ -9158,7 +9162,7 @@ function drawTitleEyes() {
 
 let last = performance.now();
 function frame(now) {
-  const raw = (now - last) / 1000;
+  const raw = Math.max(0, (now - last) / 1000);   // v111: rAF's stamp can come before a resume's performance.now(); a negative step once froze the game
   const dt = Math.min(0.05, raw); last = now; frameDt = dt;
   watchSpeed(raw);
   if (S.running) { if (S.hitstop > 0) S.hitstop -= raw; else update(dt); } else S.t += dt;
