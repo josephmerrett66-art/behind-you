@@ -104,6 +104,7 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
 #craft .pick { max-width: 40rem; }
 #craft .chips span { font: 0.72rem var(--mono); padding: 0.2rem 0.55rem; border: 1px solid rgba(239,239,234,0.3); border-radius: 99px; color: var(--bone); }
 #craft .chips span.none { color: var(--ash); }
+#craft .chips button.take { font: 0.72rem var(--mono); padding: 0.2rem 0.55rem; border: 1px solid rgba(239,239,234,0.3); border-radius: 99px; color: var(--bone); background: rgba(239,239,234,0.06); text-transform: none; letter-spacing: 0; }
 #craft .rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.6rem; margin-top: 0.5rem; }
 #craft .rc { width: 100%; text-transform: none; letter-spacing: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; text-align: left; padding: 0.7rem 0.8rem; border: 1px solid rgba(239,239,234,0.35); background: rgba(239,239,234,0.05); color: var(--bone); border-radius: 10px; font: inherit; }
 #craft .rc b { font: 600 0.9rem var(--mono); }
@@ -1653,7 +1654,7 @@ function update(dt) {
   if (S.mode === 'expedition' && !inBeyond()) exWall(p, ox, oy);
 
   // bump into trees and rocks (and the camp's towers, tent and stores)
-  for (const o of propsNear(p.x, p.y, 60).concat(lightsNear(p.x, p.y, 60).filter(L => L.r), S.mode === 'expedition' && Math.hypot(p.x, p.y) < CAMP_R + 40 ? CAMP_SOLID : [], S.mode === 'expedition' && !inBeyond() && Math.hypot(p.x, p.y) < PRING + 80 && !(S.rg && S.rg.warp) ? [TELE, TELE2, ...PLINTHS] : [])) {
+  for (const o of propsNear(p.x, p.y, 60).concat(daySolidsNear(p.x, p.y, 60), lightsNear(p.x, p.y, 60).filter(L => L.r), S.mode === 'expedition' && Math.hypot(p.x, p.y) < CAMP_R + 40 ? CAMP_SOLID : [], S.mode === 'expedition' && !inBeyond() && Math.hypot(p.x, p.y) < PRING + 80 && !(S.rg && S.rg.warp) ? [TELE, TELE2, ...PLINTHS] : [])) {
     if (o.nocol || (o === TELE2 && portal2Open() >= 1) || (o === TELE && portalOpen() >= 1)) continue;   // an open portal you walk into
     const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy), min = o.r * o.s + 7;
     if (d < min && d > 0) { p.x = o.x + dx / d * min; p.y = o.y + dy / d * min; }
@@ -5042,7 +5043,7 @@ function updateSurvive(dt) {
     if (e.lit) sp *= f.lightSp;
     if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
     else chase(e, sp, d, dt);
-    for (const o of propsNear(e.x, e.y, 40)) {
+    for (const o of propsNear(e.x, e.y, 40).concat(daySolidsNear(e.x, e.y, 40))) {
       const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy), min = o.r * o.s + f.w * 0.5;
       if (od < min && od > 0) { e.x = o.x + ox / od * min; e.y = o.y + oy / od * min; }
     }
@@ -6306,6 +6307,7 @@ function wispStep(dt) {
   rg.wisps = L.filter(w => !w.got && w.life > 0);
 }
 function gainWisps(n) {
+  if (S.day) return;   // Daylight keeps no wisps
   const rg = S.rg;
   if (S.mode === 'expedition') rg.wispCarry = (rg.wispCarry || 0) + n;   // only counts once you carry it home
   else { ST.w += n; rg.wispRun = (rg.wispRun || 0) + n; lifeAdd('wisps', n); stSave(); }
@@ -6563,8 +6565,11 @@ const RECIPES = [
   { id: 'armour', g: 'Gear', name: 'Hide armour', sh: 'One more heart', cost: { hide: 4, fibre: 4 }, show: D => !D.armour, make: D => { D.armour = 1; S.rg.maxHp++; S.rg.hp++; } },
   { id: 'pack', g: 'Gear', name: 'Hide pack', sh: `Carry ${PACK_SLOTS[1]} stacks, not ${PACK_SLOTS[0]}`, cost: { hide: 3, fibre: 6 }, show: D => !D.bigPack, make: D => { D.bigPack = 1; } },
   { id: 'skin', g: 'Gear', name: 'Waterskin', sh: 'Carry 3 drinks out with you', cost: { hide: 2, fibre: 2 }, show: D => !D.skin, make: D => { D.skin = 1; D.sips = 3; } },
-  { id: 'cook', g: 'Food', name: 'Cook meat', sh: 'Raw meat over the camp fire', cost: { meat: 1 }, fire: true, give: 'cooked', show: () => true },
+  { id: 'cook', g: 'Food', name: 'Cook meat', sh: 'Raw meat over a fire', cost: { meat: 1 }, fire: true, give: 'cooked', show: () => true },
   { id: 'stew', g: 'Food', name: 'Stew', sh: 'A big meal', cost: { cooked: 2, berries: 2 }, fire: true, give: 'stew', show: () => true },
+  { id: 'wall', g: 'Build', name: 'Wall', sh: 'Four logs across your path · holds a while', cost: { logs: 3 }, place: 'wall', show: () => true },
+  { id: 'spikes', g: 'Build', name: 'Spike trap', sh: 'Stakes that hurt whatever walks in', cost: { sticks: 4, flint: 2 }, place: 'spikes', show: () => true },
+  { id: 'fire', g: 'Build', name: 'Outpost fire', sh: 'Cook out here · rest heals faster by it', cost: { logs: 4, stones: 3 }, place: 'fire', show: () => true },
   { id: 'tonic', g: 'Food', name: 'Healing tonic', sh: 'One more flask', cost: { berries: 4, fibre: 2 }, show: () => true, ok: () => S.rg.flask < FLASK_MAX, make: () => { S.rg.flask++; } },
 ];
 const BEAST = {   // health, run speed, size, how close you get before it reacts, what it leaves
@@ -6578,7 +6583,7 @@ function dayBegin() {
   EX_TEST = true; XS = exFresh(); exMakeLairs();   // a fresh throwaway save: nothing here touches your expedition
   S.day = { t: 0, n: 1, food: FOOD_MAX, water: FOOD_MAX, st: STA_MAX, stT: 9, sick: 0, starve: 0, heal: 0, warn: {}, raidDue: false, eatT: 0, nagT: 0,
     inv: {}, box: {}, axe: 0, pick: 0, wpn: 'fists', armour: 0, bigPack: 0, skin: 0, sips: 0,
-    cut: new Map(), felled: new Set(), logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {} };
+    cut: new Map(), felled: new Set(), builds: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {} };
   S.rg = exNewRun(); exPlaceHome();
   S.msg = { text: 'daylight', sub: 'Gather sticks, stones and fibre · craft an axe', t: 0 };
 }
@@ -6642,8 +6647,9 @@ function dayStep(dt, inCamp) {
     }
   } else D.starve = 0;
   const calm = !rg.enemies.some(e => !e.dead && dist2(e, p) < 300);
-  if (D.food > 70 && D.water > 50 && rg.hp < rg.maxHp && calm) {   // well fed and nothing near: your hearts come back slowly
-    if ((D.heal += dt) >= 15) { D.heal = 0; rg.hp = Math.min(rg.maxHp, rg.hp + 0.5); D.food -= 6; rg.pop = { t: 0, gained: Math.ceil(rg.hp) - 1 }; }
+  const byFire = dayFireNear(p.x, p.y);
+  if ((D.food > (byFire ? 40 : 70)) && D.water > (byFire ? 30 : 50) && rg.hp < rg.maxHp && calm) {   // well fed and nothing near: your hearts come back slowly
+    if ((D.heal += dt * (byFire ? 2 : 1)) >= 15) { D.heal = 0; rg.hp = Math.min(rg.maxHp, rg.hp + 0.5); D.food -= 6; rg.pop = { t: 0, gained: Math.ceil(rg.hp) - 1 }; }
   } else D.heal = 0;
   // pick up what lies at your feet
   for (const f of D.drops) { f.t += dt; if (dist2(f, p) < 26 && dayRoom(f.it) > 0) { const got = dayGive(f.it, f.n, f.x, f.y, true); exNote(`+${got} ${RES[f.it][0].toLowerCase()}`); f.n -= got; if (f.n <= 0) f.gone = true; pickSnd(); } else if (f.t > 120) f.gone = true; }
@@ -6660,7 +6666,7 @@ function dayStep(dt, inCamp) {
     }
   }
   D.logs = D.logs.filter(g => !g.done);
-  beastStep(dt);
+  beastStep(dt); buildStep(dt);
   if (!D.told.axeHint && !D.axe && dayHave('sticks') >= 3 && dayHave('stones') >= 2 && dayHave('fibre') >= 2) { D.told.axeHint = 1; rg.ringMsg = { text: 'you can make an axe', sub: matchMedia('(pointer: coarse)').matches ? 'Tap Craft' : 'Press C to craft', t: 0 }; }
 }
 function pickSnd() { sfx(1.5, 0.15, 'bandpass', 1600, 0.15); }
@@ -6832,7 +6838,7 @@ function dayCard() {
 function dayItems() {                          // drawn in with the trees
   const D = S.day; if (!D) return [];
   const R = viewR(), cx = S.cam.x, cy = S.cam.y, near = o => Math.abs(o.x - cx) < R && Math.abs(o.y - cy) < R;
-  return dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs);
+  return dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts));
 }
 // ---- drawing ----
 function dayDraw(o, c, sx, sy) {
@@ -6903,6 +6909,7 @@ function drawDay() {                           // the sun: a warm wash from the 
   g.addColorStop(0, 'rgba(255,226,160,0.5)'); g.addColorStop(1, 'rgba(255,226,160,0)');
   ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = COLOUR ? 0.6 : 0.12; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
+  drawDayFires();
 }
 function dayBar(px, py) {                      // stamina, food and water over your head
   const D = S.day, tw = 46, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
@@ -6922,7 +6929,8 @@ function openCraft() {
 function closeCraft() { craftEl.hidden = true; menuBtn.hidden = false; craftBtn.hidden = false; S.running = true; last = performance.now(); }
 function canCraft(r) {
   const D = S.day;
-  if (r.fire && !S.rg.inCamp) return 'needs the camp fire';
+  if (r.fire && !S.rg.inCamp && !dayFireNear(S.p.x, S.p.y)) return 'needs a fire';
+  if (r.place && Math.hypot(S.p.x, S.p.y) < CAMP_R + 30) return 'build outside the fence';
   if (r.ok && !r.ok()) return 'not now';
   for (const [k, n] of Object.entries(r.cost)) if (dayHave(k) < n) return '';
   if (r.give && dayRoom(r.give) <= 0 && !S.rg.inCamp) return 'pack full';
@@ -6933,19 +6941,20 @@ function dayCraft(id) {
   daySpend(r.cost);
   if (r.give) { if (dayRoom(r.give) > 0) D.inv[r.give] = (D.inv[r.give] || 0) + 1; else D.box[r.give] = (D.box[r.give] || 0) + 1; }
   if (r.make) r.make(D);
+  if (r.place) { dayPlace(r.place); closeCraft(); exNote(`built · ${r.name.toLowerCase()}`, true); return; }
   sfx(1.3, 0.45, 'bandpass', 1200, 0.3); if (actx) setTimeout(() => sfx(1.8, 0.3, 'bandpass', 2400, 0.25), 110);
   exNote(`made · ${r.name.toLowerCase()}`, true);
   renderCraft();
 }
 function renderCraft() {
   const D = S.day, el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
-  const chips = (inv, id) => { const box = document.getElementById(id), ks = Object.keys(RES).filter(k => inv[k] > 0); box.replaceChildren(...(ks.length ? ks.map(k => { const s = el('span', '', `${RES[k][0]} ${inv[k]}`); s.style.borderColor = RES[k][1]; return s; }) : [el('span', 'none', 'Empty')])); };
+  const chips = (inv, id, take) => { const box = document.getElementById(id), ks = Object.keys(RES).filter(k => inv[k] > 0); box.replaceChildren(...(ks.length ? ks.map(k => { const s = el(take ? 'button' : 'span', take ? 'take' : '', `${RES[k][0]} ${inv[k]}${take ? ' · take' : ''}`); s.style.borderColor = RES[k][1]; if (take) s.addEventListener('click', () => dayTake(k)); return s; }) : [el('span', 'none', 'Empty')])); };
   document.getElementById('craftPack').textContent = `${daySlots()} of ${dayMax()} stacks`;
-  chips(D.inv, 'craftInv'); chips(D.box, 'craftBox');
+  chips(D.inv, 'craftInv'); chips(D.box, 'craftBox', true);
   document.getElementById('craftBoxH').hidden = document.getElementById('craftBox').hidden = !S.rg.inCamp;
   document.getElementById('craftKit').textContent = `${WPN[D.wpn].n} · ${['no axe', 'stone axe', 'flint axe'][D.axe]} · ${['no pick', 'stone pick', 'flint pick'][D.pick]}${D.armour ? ' · hide armour' : ''}${D.skin ? ` · waterskin ${D.sips}/3` : ''}`;
   const body = document.getElementById('craftBody'), out = [];
-  for (const g of ['Tools', 'Weapons', 'Gear', 'Food']) {
+  for (const g of ['Tools', 'Weapons', 'Gear', 'Food', 'Build']) {
     const list = RECIPES.filter(r => r.g === g && r.show(D)); if (!list.length) continue;
     out.push(el('h3', '', g)); const grid = el('div', 'rgrid');
     for (const r of list) {
@@ -6958,6 +6967,63 @@ function renderCraft() {
     out.push(grid);
   }
   body.replaceChildren(...out);
+}
+
+// ---- v129: building. Walls, spike traps and outpost fires, put down just in front of you outside the fence ----
+const WALL_HP = 14, SPIKE_USES = 10, FIRE_R = 90;
+function dayPlace(t) {
+  const D = S.day, p = S.p, a = S.aimW || 0, cx = p.x + Math.cos(a) * 40, cy = p.y + Math.sin(a) * 40, ux = -Math.sin(a), uy = Math.cos(a);
+  const B = { t, x: cx, y: cy, parts: [] };
+  if (t === 'wall') {                            // four log sections across your path
+    B.hp = B.max = WALL_HP;
+    for (let k = 0; k < 4; k++) { const f0 = (k - 2) * 18, f1 = f0 + 18; B.parts.push({ camp: 'wall', kind: 'wall', x: cx + ux * (f0 + 9), y: cy + uy * (f0 + 9), ax: cx + ux * f0, ay: cy + uy * f0, bx: cx + ux * f1, by: cy + uy * f1, s: 1, r: 10, seq: Math.floor(Math.random() * 99), cast: null, build: B }); }
+  } else if (t === 'spikes') {                   // two rows of stakes leaning out at whatever comes
+    B.uses = SPIKE_USES;
+    for (const k of [-1, 1]) B.parts.push({ camp: 'stakes', kind: 'stakes', x: cx + ux * k * 13, y: cy + uy * k * 13, a, s: 1, seed: Math.random(), build: B });
+  } else {
+    B.parts.push({ kind: 'fire', x: cx, y: cy, r: 10, s: 1, build: B, dfire: true });
+  }
+  D.builds.push(B); addShake(0.15); ashBurst(cx, cy, 8, 6);
+  if (actx) { const t0 = actx.currentTime; boomAt(t0, 160, 80, 0.15, 0.4, sfxGain); noiseAt(t0 + 0.05, 1200, 400, 0.12, 0.3, sfxGain); }
+}
+const dayFireNear = (x, y) => S.day && S.day.builds.some(B => B.t === 'fire' && Math.hypot(B.x - x, B.y - y) < FIRE_R);
+function daySolidsNear(x, y, R) { const out = []; if (!S.day) return out; for (const B of S.day.builds) if (B.t !== 'spikes' && Math.abs(B.x - x) < R + 50 && Math.abs(B.y - y) < R + 50) for (const o of B.parts) out.push(o); return out; }
+function buildStep(dt) {
+  const D = S.day, rg = S.rg;
+  for (const B of D.builds) {
+    if (B.t === 'wall') {                        // whatever pushes against it batters it down
+      for (const e of rg.enemies) if (!e.dead && Math.abs(e.x - B.x) < 70 && Math.abs(e.y - B.y) < 70 && B.parts.some(o => dist2(o, e) < 26)) { B.hp -= dt * (e.type === 'brute' || e.type === 'tall' ? 3 : 1); B.hitT = 0.15; }
+      if ((B.hitT = Math.max(0, (B.hitT || 0) - dt)) > 0 && Math.random() < dt * 6 && actx && monNear(B, 600) > 0) boomAt(actx.currentTime, 140, 70, 0.08, 0.25 * monNear(B, 600), sfxGain);
+      if (B.hp <= 0) { B.gone = true; for (const o of B.parts) ashBurst(o.x, o.y, 6, 20); addShake(0.25 * monNear(B, 600)); exNote('a wall came down', true); if (actx) boomAt(actx.currentTime, 90, 40, 0.4, 0.5 * monNear(B, 600), sfxGain); }
+    } else if (B.t === 'spikes') {
+      for (const e of rg.enemies.concat(D.beasts)) if (!e.dead && B.parts.some(o => dist2(o, e) < 18) && (e.spikeT = (e.spikeT || 0) - dt) <= 0) {
+        e.spikeT = 0.7; e.hp -= 1; e.jit = 1; e.flash = 1; B.uses--; ashBurst(e.x, e.y, 4, 14);
+        if (actx && monNear(e, 600) > 0) noiseAt(actx.currentTime, 2600, 900, 0.1, 0.3 * monNear(e, 600), sfxGain);
+        if (e.kind === 'beast' && e.hp <= 0) beastDie(e);
+      }
+      if (B.uses <= 0) { B.gone = true; for (const o of B.parts) ashBurst(o.x, o.y, 5, 12); }
+    }
+  }
+  D.builds = D.builds.filter(B => !B.gone);
+}
+function drawDayFires() {                       // flames on your outpost fires
+  const D = S.day; if (!D) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const B of D.builds) if (B.t === 'fire') {
+    const [x, y] = toScreen(B.x, B.y); if (x < -60 || x > W + 60 || y < -60 || y > H + 60) continue;
+    for (let i = 0; i < 4; i++) {
+      const h = (12 + 6 * Math.sin(S.t * 9 + i * 2)) * Z, w = (5 - i) * Z, ox = Math.sin(S.t * 5 + i * 1.7) * 2 * Z;
+      ctx.fillStyle = ['rgba(255,120,40,0.75)', 'rgba(255,170,60,0.7)', 'rgba(255,215,120,0.65)', 'rgba(255,245,200,0.6)'][i];
+      ctx.beginPath(); ctx.moveTo(x - w + ox, y - 3 * Z); ctx.quadraticCurveTo(x + ox, y - 3 * Z - h * 1.4, x + w + ox, y - 3 * Z); ctx.closePath(); ctx.fill();
+    }
+    const g = ctx.createRadialGradient(x, y - 6 * Z, 0, x, y - 6 * Z, 50 * Z); g.addColorStop(0, 'rgba(255,170,80,0.28)'); g.addColorStop(1, 'rgba(255,170,80,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 6 * Z, 50 * Z, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+function dayTake(k) {                           // a stack out of the box into your pack
+  const D = S.day, n = Math.min(STACK, D.box[k] || 0, dayRoom(k)); if (n <= 0) { dayNote('full', 'pack full', 1); return; }
+  D.box[k] -= n; if (!D.box[k]) delete D.box[k]; D.inv[k] = (D.inv[k] || 0) + n; pickSnd(); renderCraft();
 }
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
 // v112: first-trip hints, each shown once per save, one at a time when the banner slot is free. Saves that already brought an orb home skip them.
