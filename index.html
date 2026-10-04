@@ -38,7 +38,8 @@ button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14
 #attack { position: fixed; right: 16px; bottom: calc(290px + env(safe-area-inset-bottom, 0px)); width: 76px; height: 76px; padding: 0; border-radius: 50%; font-size: 0.58rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
 #attack:active { background: rgba(255,190,130,0.35); }
 #autorun { position: fixed; right: 28px; bottom: calc(572px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
-body.ex #autorun { bottom: calc(488px + env(safe-area-inset-bottom, 0px)); }   /* no torch button in Expedition: auto run takes its place */
+body.ex #autorun { bottom: calc(488px + env(safe-area-inset-bottom, 0px)); }
+body.ex #torch { bottom: calc(572px + env(safe-area-inset-bottom, 0px)); }   /* v136: the Searchers trial's torch switch, above auto run */   /* no torch button in Expedition: auto run takes its place */
 #autorun[aria-pressed="true"] { color: var(--void); background: var(--bone); border-color: var(--bone); }
 #torch[aria-pressed="false"] { color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); }
 .modes { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -95,6 +96,7 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
   body.ex #autorun { right: 202px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
   #attack { right: 16px; bottom: calc(220px + env(safe-area-inset-bottom, 0px)); } #dodge, #campBtn { right: 112px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #torch { right: 196px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #autorun { right: 282px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
   /* v125 (Joe: the flask button sat in the middle of the screen): the extra buttons stack in a second row just above dodge and auto run, at the right edge */
+  body.ex #torch { right: 288px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }   /* v136: the Searchers trial's torch switch, next to auto run */
   #flaskBtn { right: 120px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } #recallBtn { right: 204px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 272px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); }
 }
 #craftBtn { position: fixed; right: 22px; bottom: calc(392px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
@@ -4119,7 +4121,7 @@ setInterval(musTick, 200);
 const soundBtn = document.getElementById('sound');
 const torchBtn = document.getElementById('torch');
 function toggleTorch() {
-  if (S && S.mode === 'expedition') return;     // v94: in Expedition the torch is always on (Joe)
+  if (S && S.mode === 'expedition' && !srchOn()) return;     // v94: in Expedition the torch is always on (Joe); v136: except with the Searchers trial, where going dark helps you hide
   S.torchOn = !S.torchOn; S.torchOnT = 0;
   const rg = S.rg;
   if (isRg() && rg && lv('blackout')) {
@@ -4127,6 +4129,7 @@ function toggleTorch() {
     else if (S.t - (rg.offAt ?? -9) > 0.15 && rg.blackT <= 0) { rg.blackPend = 0.22; rg.blackT = 5 - 1.5 * (lv('blackout') - 1); }   // fires once the light is back up
   }
   torchBtn.setAttribute('aria-pressed', S.torchOn ? 'true' : 'false');
+  if (S.mode === 'expedition') exNote(S.torchOn ? 'torch on' : 'torch off · harder to spot');
 }
 torchBtn.addEventListener('click', toggleTorch);
 // field of view: drag right to see more of the woods, left to get closer; remembered on this device
@@ -7743,6 +7746,7 @@ function exLeave() {
   if (actx) { const t = actx.currentTime; noiseAt(t, 900, 200, 0.5, 0.25, sfxGain); }   // the gate creaks shut behind you
 }
 function exStep(dt) {
+  torchBtn.hidden = !srchOn(); if (!srchOn() && !S.day && !S.torchOn) { S.torchOn = true; torchBtn.setAttribute('aria-pressed', 'true'); }   // v136: the torch switch is part of the Searchers trial only
   if (portalStep(dt)) return;                 // opening, warping, or out in the other world
   weatherStep(dt);                            // v126: forest weather
   const rg = S.rg, p = S.p, d0 = Math.hypot(p.x, p.y), ring = exRing(d0), inCamp = d0 < CAMP_R;
@@ -7926,8 +7930,22 @@ function srchStep(dt, inCamp, ring) {
       edge = s;
     }
     if (edge) { if ((rg.srGr = (rg.srGr || 0) + dt) > SR_GRACE) return srchSpot(edge); } else rg.srGr = 0;
+    if (S.torchLvl > 0.6 && beamGeo) for (const s of rg.srch) {   // v136: shine your torch on one and it sees the light; switch it off to slip past
+      if (srchLit(s)) { if ((s.litT = (s.litT || 0) + dt) > 0.25) return srchSpot(s); } else s.litT = 0;
+    }
     if (near < 800 && (rg.crackT = (rg.crackT ?? 3) - dt) <= 0) { rg.crackT = 4 + Math.random() * 6; srchFar(near); }   // somewhere out there a radio crackles
   }
+}
+function srchLit(s) {                            // is your beam on it, with no tree in the way?
+  const [sx, sy0] = toScreen(s.x, s.y), sy = sy0 - 19 * Z, { bx, by, br } = beamGeo;
+  if (Math.hypot(sx - bx, sy - by) > br * 0.9 || Math.abs(angDiff(Math.atan2(sy - by, sx - bx), S.aim)) > HALF) return false;
+  const p = S.p, dx = s.x - p.x, dy = s.y - p.y, L = Math.hypot(dx, dy) || 1;
+  for (const o of propsNear((p.x + s.x) / 2, (p.y + s.y) / 2, L / 2 + 30)) {
+    const c = caster(o); if (!c || c.len < 200) continue;
+    const t = ((o.x - p.x) * dx + (o.y - p.y) * dy) / (L * L); if (t < 0.05 || t > 0.95) continue;
+    if (Math.hypot(p.x + dx * t - o.x, p.y + dy * t - o.y) < c.r) return false;   // in a tree's shadow
+  }
+  return true;
 }
 function drawSearcher(s) {                        // a searcher: a pale figure in its own colour, its lamp held out in front
   const pal = foePalette(0, 'searcher'), a = scrAng(s.face);
