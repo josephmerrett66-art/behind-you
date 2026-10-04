@@ -7853,17 +7853,29 @@ function srchSpawn(rg, n, nearX, nearY, r0, r1, home) {   // place up to n, off 
     rg.srch.push(s); n--;
   }
 }
+function srchFlee(s, wait) {                      // v138: turn tail and run back to base, away from you
+  const p = S.p; s.st = 'flee'; s.t = wait; s.ft = 1.2; s.want = Math.atan2(s.y - p.y, s.x - p.x) + (Math.random() - 0.5) * 0.6;
+}
 function srchSpot(s) {                            // caught: it calls it in, and the woods wake up
   const rg = S.rg, p = S.p, ring = exRing(Math.hypot(p.x, p.y));
   rg.alarm = true; rg.srGr = 0; lifeAdd('spotted');
-  if (s) { s.st = 'radio'; s.t = 1.6; s.face = Math.atan2(p.y - s.y, p.x - s.x); s.spot = 1; }
+  if (s) { s.st = 'radio'; s.t = 0.8; s.face = Math.atan2(p.y - s.y, p.x - s.x); s.spot = 1; }
+  for (const o of rg.srch) if (o !== s && !o.dead) srchFlee(o, 0.15 + Math.random() * 0.5);   // v138 (Joe): job done, every searcher runs for home
   rg.spotFx = { t: 0, s }; rg.safeFx = null;     // v137: the arcade "!" (drawSpotFx)
   addShake(0.6); hitStop(0.16);
   if (actx) { const t = actx.currentTime; toneAt(t, 988, 0.14, 0.16, 'square', sfxGain); toneAt(t + 0.07, 1480, 0.22, 0.16, 'square', sfxGain); }   // the alert sting, ahead of the radio
   rg.blasts.push({ x: p.x, y: p.y, t: 0, life: 0.5, r: 120, col: 'white' });
   rg.echoes.push({ r: 0, x: p.x, y: p.y, max: 600, burst: true });
   srchRadio(1);
-  for (let i = 0; i < 3; i++) exPack(ring, 2 + ring);   // the first of them, from all round
+  { // v138 (Joe): no slow trickle; a big wave comes at you from every side at once, then the woods settle to the usual numbers
+    const n = Math.round((EX_CAP[ring] + 8) * (pact('horde') ? 1.5 : 1)), a0 = Math.random() * Math.PI * 2, pk = rg.pkN = (rg.pkN || 0) + 1;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + i / n * Math.PI * 2 + (Math.random() - 0.5) * 0.4; let d = 380 + Math.random() * 120, at;
+      do { at = { x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, d }; d += 40; } while (seenAt(at.x, at.y) && d < 2500);
+      if (exSafeAt(at.x, at.y, 120)) continue;
+      spawnFoe(exPickFoe(ring), at); const e = rg.enemies[rg.enemies.length - 1]; e.reveal = 1; e.pk = pk;
+    }
+  }
   rg.spawnT = 0.4;
   for (const e of rg.enemies) e.reveal = 1;
 }
@@ -7895,19 +7907,23 @@ function srchStep(dt, inCamp, ring) {
   rg.srch = rg.srch || [];
   if (bossLive() || miniLive() || rg.cleared) { rg.srch = []; rg.guardFor = null; return; }   // the mist clears them out with everything else
   // keep the woods stocked round you: thin near camp, thicker further out
-  rg.srch = rg.srch.filter(s => !s.dead && (s.home ? Math.hypot(p.x - s.home.x, p.y - s.home.y) < 2600 : Math.hypot(s.x - p.x, s.y - p.y) < SR_R + 450 || seenAt(s.x, s.y)));
+  rg.srch = rg.srch.filter(s => !s.dead && !(s.st === 'flee' && s.ft <= 0 && !seenAt(s.x, s.y) && Math.hypot(s.x - p.x, s.y - p.y) > 650) && (s.home ? Math.hypot(p.x - s.home.x, p.y - s.home.y) < 2600 : Math.hypot(s.x - p.x, s.y - p.y) < SR_R + 450 || seenAt(s.x, s.y)));
   const roam = rg.srch.filter(s => !s.home).length, want = Math.round(SR_N[ring] * (pact('horde') ? 1.5 : 1));
-  if (!inCamp && roam < want) srchSpawn(rg, Math.min(4, want - roam), p.x, p.y, 650, SR_R, null);
+  if (!inCamp && !rg.alarm && roam < want) srchSpawn(rg, Math.min(4, want - roam), p.x, p.y, 650, SR_R, null);
   // the orbs are the most heavily guarded places in the world: a wall of overlapping light
   const o = XS.orbField && XS.orb && XS.orbs < 2 ? XS.orb : null;
   if (rg.guardFor !== o) { rg.srch = rg.srch.filter(s => !s.home); rg.guardFor = o; }
   if (o && Math.hypot(p.x - o.x, p.y - o.y) < 2300) {
     const g = rg.srch.filter(s => s.home).length;
-    if (g < SR_GUARD) srchSpawn(rg, Math.min(4, SR_GUARD - g), o.x, o.y, 110, SR_GUARD_R, o);
+    if (g < SR_GUARD && !rg.alarm) srchSpawn(rg, Math.min(4, SR_GUARD - g), o.x, o.y, 110, SR_GUARD_R, o);
   }
   for (const s of rg.srch) {
     const x0 = s.x, y0 = s.y;
-    if (s.st === 'radio') { s.face += angDiff(Math.atan2(p.y - s.y, p.x - s.x), s.face) * Math.min(1, dt * 8); if ((s.t -= dt) <= 0) srchBeat(s); }
+    if (s.st === 'radio') { s.face += angDiff(Math.atan2(p.y - s.y, p.x - s.x), s.face) * Math.min(1, dt * 8); if ((s.t -= dt) <= 0) srchFlee(s, 0); }
+    else if (s.st === 'flee') {                    // running for home: a beat to turn, then flat out away from you
+      if (s.t > 0) { s.t -= dt; s.face += angDiff(s.want, s.face) * Math.min(1, dt * 10); }
+      else { s.face += angDiff(s.want, s.face) * Math.min(1, dt * 4); const v = 150 * dt; s.x += Math.cos(s.face) * v; s.y += Math.sin(s.face) * v; s.ft -= dt; }
+    }
     else if (s.st === 'look') { if ((s.t -= dt) <= 0) srchBeat(s); }
     else if (s.st === 'turn') {
       const dA = angDiff(s.want, s.face), stp = s.rate * dt;
