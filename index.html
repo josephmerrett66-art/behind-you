@@ -346,6 +346,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <p class="small">Starts in the Dunes with the green portal open and no teal orbs home yet, so you can hunt the first one.</p>
       <button id="testPortal2" class="alt">Test the second portal</button>
       <p class="small">Starts by the second shrine with two teal orbs home and the third in your hands.</p>
+      <button id="testRain" class="alt">Test a thunderstorm</button>
+      <p class="small">Starts in the middle woods with a thunderstorm a few seconds away.</p>
       <button id="testStorm" class="alt">Test a dust storm</button>
       <p class="small">Starts in the Dunes with a dust storm two seconds away.</p>
       <button id="testBoss" class="alt">Test the boss fight</button>
@@ -2752,6 +2754,82 @@ function stormStep(dt) {
   s.k += (want - s.k) * Math.min(1, dt * (want > s.k ? 0.9 : 0.5));
   if (s.k < 0.002) s.k = 0;
 }
+// ---- v126 (Joe: a weather system for the forest): clear spells, rain, fog and thunderstorms come and go while you're out ----
+// Rain makes the torch hiss and burn oil faster; fog swallows a quarter of the beam; a storm is heavy rain, and lightning that
+// lights the whole wood for a blink, showing everything that's out there, before the thunder rolls in after it.
+const WX_MSG = { rain: ['it starts to rain', 'the torch hisses · oil burns faster'], fog: ['a fog rolls in', 'the beam won\'t reach as far'], storm: ['a storm breaks', 'lightning shows what hides'] };
+const inWoods = () => S && S.mode === 'expedition' && S.rg && !S.rg.beyond;
+function wxK(kind) { const w = S.wx; return inWoods() && w && (!kind || w.kind === kind || (kind === 'rain' && w.kind === 'storm')) ? w.k : 0; }
+function weatherStep(dt) {
+  const w = S.wx || (S.wx = { st: 'clear', kind: null, t: 50 + Math.random() * 40, k: 0, flash: 0, boltT: 8 });
+  w.t -= dt; w.flash = Math.max(0, w.flash - dt * 4.5);
+  if (w.t <= 0) {
+    if (w.st === 'clear') { const r = Math.random(); w.kind = w.next || (r < 0.45 ? 'rain' : r < 0.75 ? 'fog' : 'storm'); w.next = null; w.st = 'on'; w.t = w.kind === 'storm' ? 35 + Math.random() * 25 : 45 + Math.random() * 30;
+      if (S.rg && !S.rg.inCamp) S.rg.ringMsg = { text: WX_MSG[w.kind][0], sub: WX_MSG[w.kind][1], t: 0 }; }
+    else { w.st = 'clear'; w.t = 60 + Math.random() * 60; if (S.rg && !S.rg.inCamp) S.rg.ringMsg = { text: w.kind === 'fog' ? 'the fog lifts' : 'the sky clears', t: 0 }; }
+  }
+  const want = w.st === 'on' ? 1 : 0;
+  w.k += (want - w.k) * Math.min(1, dt * 0.35); if (w.k < 0.003) { w.k = 0; if (w.st === 'clear') w.kind = null; }
+  if (w.kind === 'storm' && w.k > 0.5 && (w.boltT -= dt) <= 0) {   // lightning: a double flash, the thunder a moment later
+    w.boltT = 6 + Math.random() * 9; w.flash = 1; w.flash2 = S.t + 0.16 + Math.random() * 0.1; addShake(0.12);
+    const delay = 0.3 + Math.random() * 1.4; if (actx) { const t = actx.currentTime + delay; boomAt(t, 70, 26, 2.4, 0.7, sfxGain); noiseAt(t, 900, 80, 2.8, 0.55, sfxGain); noiseAt(t + 0.05, 3000, 300, 0.5, 0.25, sfxGain); }
+  }
+  if (w.flash2 && S.t >= w.flash2) { w.flash2 = 0; w.flash = Math.max(w.flash, 0.8); }
+  rainSound(inWoods() ? wxK('rain') * (w.kind === 'storm' ? 1.3 : 1) : 0);
+}
+const rainS = { g: null, at: 0 };
+function rainSound(k) {                          // a hiss of falling rain under the drips off the leaves
+  if (!actx || !noiseBuf || !sfxGain) return;
+  if (!rainS.g) {
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
+    rainS.g = actx.createGain(); rainS.g.gain.value = 0;
+    src.connect(hp); hp.connect(lp); lp.connect(rainS.g); rainS.g.connect(sfxGain); src.start();
+    setInterval(() => { if (rainS.g && performance.now() - rainS.at > 400) rainS.g.gain.setTargetAtTime(0, actx.currentTime, 0.3); }, 250);
+  }
+  rainS.at = performance.now();
+  rainS.g.gain.setTargetAtTime(0.22 * k * (0.9 + 0.1 * Math.sin(S.t * 0.7)), actx.currentTime, 0.3);
+  if (k > 0.2 && Math.random() < 0.08 * k) sfx(2 + Math.random() * 2, 0.06 * k, 'bandpass', 2500 + Math.random() * 3000, 0.08);   // a drip
+}
+function drawRain(lit) {                         // lit: drawn under the dark, so only rain in your light shows; else a faint veil over everything
+  const k = wxK('rain'); if (k < 0.01) return;
+  const heavy = S.wx.kind === 'storm' ? 1.4 : 1, n = Math.round((lit ? 340 : 110) * k * heavy), L = Math.max(W, H), t = S.t, sl = 0.22;
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.lineCap = 'round';
+  ctx.strokeStyle = COLOUR ? `rgba(200,215,235,${(lit ? 0.75 : 0.08) * k})` : `rgba(225,225,222,${(lit ? 0.7 : 0.07) * k})`; ctx.lineWidth = lit ? 1 : 0.8;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const sp = 700 + (i % 5) * 90, len = (16 + (i % 4) * 6) * heavy;
+    const x = ((hash(i, 3) * L * 1.3 - (S.cam.x - S.cam.y) * K() + t * sp * sl) % (W + 60) + W + 60) % (W + 60) - 30;
+    const y = ((hash(i, 5) * L * 1.3 - (S.cam.x + S.cam.y) * K() * 0.5 + t * sp) % (H + 60) + H + 60) % (H + 60) - 30;
+    ctx.moveTo(x, y); ctx.lineTo(x - len * sl, y - len);
+  }
+  ctx.stroke();
+  if (lit) {                                     // splashes: little rings that open and fade on the ground
+    ctx.strokeStyle = COLOUR ? `rgba(200,215,235,${0.35 * k})` : `rgba(225,225,222,${0.3 * k})`; ctx.lineWidth = 0.8;
+    for (let i = 0; i < 70 * k * heavy; i++) {
+      const per = 0.5 + hash(i, 9) * 0.4, u = ((t + hash(i, 11) * per) % per) / per, cyc = Math.floor((t + hash(i, 11) * per) / per);
+      const wx = S.cam.x + (hash(i * 7 + cyc, 13) - 0.5) * L * 1.2 / K(), wy = S.cam.y + (hash(i * 5 + cyc, 17) - 0.5) * L * 1.2 / K(), [sx, sy] = toScreen(wx, wy);
+      ctx.globalAlpha = 1 - u; ctx.beginPath(); ctx.ellipse(sx, sy, (1 + 5 * u) * Z, (0.5 + 2.5 * u) * Z, 0, 0, 7); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+function drawFog(lit) {                          // lit: a pale haze in your light; else a grey wall closing in at the edges
+  const k = wxK('fog'); if (k < 0.01) return;
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const [px, py] = toScreen(S.p.x, S.p.y), L = Math.max(W, H), drift = Math.sin(S.t * 0.2) * 0.1;
+  if (lit) { ctx.fillStyle = `rgba(190,196,200,${0.28 * k})`; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 7; i++) { const x = ((hash(i, 21) * W * 1.5 - (S.cam.x - S.cam.y) * K() * 0.7 + S.t * 9) % (W * 1.5) + W * 1.5) % (W * 1.5) - W * 0.25, y = hash(i, 23) * H, r = L * (0.15 + hash(i, 25) * 0.2);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(205,210,214,${0.22 * k})`); g.addColorStop(1, 'rgba(205,210,214,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); } }
+  else { const g = ctx.createRadialGradient(px, py - 20 * Z, L * (0.1 + drift * 0.1), px, py - 20 * Z, L * 0.6); g.addColorStop(0, 'rgba(120,124,128,0)'); g.addColorStop(1, `rgba(90,94,98,${0.3 * k})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+  ctx.restore();
+}
+function drawLightning() {                       // the flash: a cold white wash over everything for a blink
+  const w = S.wx; if (!w || w.flash < 0.01 || !inWoods()) return;
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = COLOUR ? `rgba(215,225,255,${0.22 * w.flash})` : `rgba(235,235,235,${0.22 * w.flash})`; ctx.fillRect(0, 0, W, H); ctx.restore();
+}
 const storm = { g: null, at: 0 };
 function stormSound(k) {                         // a howl of filtered noise that swells and gusts with the storm
   if (!actx || !noiseBuf || !sfxGain) return;
@@ -3698,6 +3776,7 @@ function renderScene() {
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
   airStep(); snowStep(frameDt); sparkFires(lights); drawMistLow(); drawMoths(); drawSnowfall();
+  if (S.mode === 'expedition' && inWoods()) { drawFog(true); drawRain(true); }   // v126: weather in the light
 
   // darkness
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -3806,6 +3885,7 @@ function renderScene() {
   ctx.globalAlpha = isRg() ? rgDarkAlpha() : 1;
   ctx.drawImage(dark, 0, 0);
   ctx.globalAlpha = 1;
+  if (S.mode === 'expedition' && inWoods()) { drawRain(false); drawFog(false); drawLightning(); }   // v126: weather over the dark
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   drawLightGlow(lights); drawSparks(); drawSlashes();
   drawEyeshine(bx, by, br, casters, lx, ly);
@@ -4238,14 +4318,14 @@ const sweepK = () => S.rg && lv('sweep') && !isEx() ? Math.min(1, (S.rg.sweepT |
 const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / (isEx() ? (lv('spot') > 1 ? 0.5 : 1) : 0.9)) : 0;
 const exSpot = () => isEx() && spotK() >= 1;   // Expedition's Spotlight: fully charged, the beam narrows to a long, hot spotlight
 function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.28 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 0.6 : 1) : 1 - 0.15 * spotK()) * (lastHeart() ? 1.5 : 1)) * (1 + 0.06 * tu('width')); }
-function rgRange() { return (isEx() ? 0.62 * (exSpot() ? (lv('spot') > 2 ? 2 : 1.5) : 1) : Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK()))) * (1 + 0.08 * tu('reach')) * (1 - 0.5 * stormK()) * duneDim(); }   // a dust storm halves the beam; the Mirage's eclipse shrinks it
+function rgRange() { return (isEx() ? 0.62 * (exSpot() ? (lv('spot') > 2 ? 2 : 1.5) : 1) : Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK()))) * (1 + 0.08 * tu('reach')) * (1 - 0.5 * stormK()) * (1 - 0.25 * (bossLive() || miniLive() ? 0 : wxK('fog'))) * duneDim(); }   // a dust storm halves the beam; the Mirage's eclipse shrinks it
 function rgBurn() { return rgBurn0() * (pact('horde') ? 2 : 1); }   // Horde: twice the burn
 function rgBurn0() {
   const rg = S.rg || {}, grow = 1 + 0.05 * Math.min(14, Math.max(0, (rg.wave || 1) - 1));   // the torch grows with the night
   return 1.05 * (1 + 0.1 * tu('heat')) * (isEx() ? 1 + 0.1 * sr('kindle') : 1) * grow * (1 + 0.35 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 2 : 1) : 1 + 0.5 * lv('spot') * spotK()) * ((rg.rushT || 0) > 0 ? 2 : 1) * (lastHeart() ? 2 : 1);
 }
 function rgSpeed() { return 1.4 * (1 + 0.04 * sr('swift')) * (S.rg && S.rg.adren > 0 ? 1.5 : 1); }
-function rgDarkAlpha() { return 1; }   // the Dunes are as dark as the woods outside your light
+function rgDarkAlpha() { const w = S.wx; return w && inWoods() && w.flash > 0 ? 1 - 0.82 * Math.min(1, w.flash) : 1; }   // v126: lightning lifts the dark for a blink   // the Dunes are as dark as the woods outside your light
 // Wave size: how many shades must burn before dawn. 11, 14, 17, 21, 25 ... 50 at wave 10, 83 at wave 15.
 function rgWaveCount(w) { return Math.max(6, Math.round(8 + 2.6 * w + 0.16 * w * w)); }
 function rgMaxAlive(w) { return Math.min(40, 8 + 2 * w); }            // most shades on the field at once
@@ -6580,6 +6660,7 @@ function exLeave() {
 }
 function exStep(dt) {
   if (portalStep(dt)) return;                 // opening, warping, or out in the other world
+  weatherStep(dt);                            // v126: forest weather
   const rg = S.rg, p = S.p, d0 = Math.hypot(p.x, p.y), ring = exRing(d0), inCamp = d0 < CAMP_R;
   rg.wave = Math.min(13, 1 + d0 / 800);      // enemy toughness follows distance
   for (const n of rg.notes) n.t += dt;
@@ -9149,7 +9230,7 @@ function portalStep(dt) {                      // returns true when the rest of 
 function exOilStep(dt, refill) {
   const rg = S.rg;
   if (refill) { rg.oil = Math.min(oilMax(), rg.oil + OIL_REFILL * dt); return; }
-  rg.oil = Math.min(oilMax(), Math.max(0, rg.oil - dt * (S.torchLvl > 0.3 ? OIL_LIT * (1 - 0.15 * tu('clean')) * (tu('laser') ? 1.25 : 1) : OIL_IDLE)));   // Clean Burn: the beam sips less
+  rg.oil = Math.min(oilMax(), Math.max(0, rg.oil - dt * (1 + 0.25 * wxK('rain')) * (S.torchLvl > 0.3 ? OIL_LIT * (1 - 0.15 * tu('clean')) * (tu('laser') ? 1.25 : 1) : OIL_IDLE)));   // Clean Burn: the beam sips less
   const f = rg.oil / oilMax();
   if (f < 0.3 && rg.oilWarn < 1) { rg.oilWarn = 1; exNote('oil low, head back', true); }
   if (f < 0.1 && rg.oilWarn < 2) { rg.oilWarn = 2; exNote('the torch is guttering', true); }
@@ -10079,6 +10160,10 @@ function testDune(i) {                           // playtest: the Dunes with orb
 document.getElementById('testDune1').addEventListener('click', () => testDune(0));
 document.getElementById('testDune2').addEventListener('click', () => testDune(1));
 document.getElementById('testDune3').addEventListener('click', () => testDune(2));
+document.getElementById('testRain').addEventListener('click', () => {
+  exTestCopy(0, 0); const p = S.p; p.x = 2600; p.y = 900; S.cam.x = p.x; S.cam.y = p.y; S.rg.inCamp = false;
+  S.wx = { st: 'clear', kind: 'storm', next: 'storm', t: 2, k: 0, flash: 0, boltT: 3 }; S.msg = { text: 'playtest', sub: 'A thunderstorm is on its way', t: 0 };
+});
 document.getElementById('testStorm').addEventListener('click', () => {
   document.getElementById('testDunes').click();
   S.rg.storm = { st: 'calm', t: 2, k: 0 }; S.msg = { text: 'playtest', sub: 'A dust storm is on its way', t: 0 };
