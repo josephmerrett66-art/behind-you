@@ -424,7 +424,7 @@ function resize() {
   SAFE_TOP = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0;
   shA.width = shB.width = lA.width = lAcc.width = lB.width = wA.width = wT.width = wH.width = Math.ceil(W / SH) + 2;
   shA.height = shB.height = lA.height = lAcc.height = lB.height = wA.height = wT.height = wH.height = Math.ceil(H / SH) + 2;
-  ZB = ZOOM() * Math.max(0.55, Math.min(W, H) / 720); Z = ZB * CAMZ();
+  ZB = ZOOM() * Math.max(0.7, Math.min(W, H) / 720); Z = ZB * CAMZ();   // v112: phone floor 0.55 -> 0.7, figures were ~20 px tall
 }
 window.addEventListener('resize', resize); resize();
 
@@ -2277,7 +2277,15 @@ function desertPropAt(i, j) {
   desertCache.set(key, p);
   return p;
 }
+const desertDec = new Map();                     // v112: decor lookups are cached like the props (they were ~5 ms a frame in the Dunes)
+{ const clr = desertCache.clear.bind(desertCache); desertCache.clear = () => { clr(); desertDec.clear(); }; }
 function desertDecorAt(i, j) {
+  const key = i * 2097152 + j;
+  if (desertDec.has(key)) return desertDec.get(key);
+  if (desertDec.size > 100000) desertDec.clear();
+  const o = desertDecorMake(i, j); desertDec.set(key, o); return o;
+}
+function desertDecorMake(i, j) {
   if (desertPropAt(i, j)) return null;
   const h = hash(i * 1.71 - 3, j * 0.53 + 21), x = i * T + 6 + hash(j, i + 2) * (T - 12), y = j * T + 6 + hash(i + 4, j) * (T - 12), v = hash(i * 3.7, j * 1.3);
   const [oa, sd] = oasisAt(x, y);
@@ -2404,7 +2412,15 @@ function snowPropAt(i, j) {
   snowCache.set(key, p);
   return p;
 }
+const snowDec = new Map();
+{ const clr = snowCache.clear.bind(snowCache); snowCache.clear = () => { clr(); snowDec.clear(); }; }
 function snowDecorAt(i, j) {
+  const key = i * 2097152 + j;
+  if (snowDec.has(key)) return snowDec.get(key);
+  if (snowDec.size > 100000) snowDec.clear();
+  const o = snowDecorMake(i, j); snowDec.set(key, o); return o;
+}
+function snowDecorMake(i, j) {
   if (snowPropAt(i, j)) return null;
   const h = hash(i * 0.61 + 13, j * 1.93 - 2), x = i * T + 6 + hash(j + 5, i) * (T - 12), y = j * T + 6 + hash(i, j + 8) * (T - 12), v = hash(i * 2.9, j * 0.37);
   if (pondAt(x, y) < 8) return null;
@@ -3200,10 +3216,11 @@ function drawWarmth() {
   ctx.drawImage(wT, x0, y0, bw, bh, x0 * SH, y0 * SH, bw * SH, bh * SH);
   ctx.restore();
 }
-function blurSmall(src, dstCtx, w, h) {
-  dstCtx.setTransform(1, 0, 0, 1, 0, 0); dstCtx.clearRect(0, 0, w, h);
+function blurSmall(src, dstCtx, w, h, U) {
+  dstCtx.setTransform(1, 0, 0, 1, 0, 0);
+  if (!U) { dstCtx.clearRect(0, 0, w, h); U = [0, 0, w, h]; } else dstCtx.clearRect(0, 0, w, h);   // cleared whole (cheap); only the box is copied
   dstCtx.globalCompositeOperation = 'lighter'; dstCtx.globalAlpha = 0.2;
-  for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) dstCtx.drawImage(src, ox, oy);
+  for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) dstCtx.drawImage(src, U[0], U[1], U[2], U[3], U[0] + ox, U[1] + oy, U[2], U[3]);
   dstCtx.globalCompositeOperation = 'source-over'; dstCtx.globalAlpha = 1;
 }
 
@@ -3212,12 +3229,20 @@ function applyWorldLights(lights, items) {
   warmOn = false;
   if (!lights.some(L => L.kind !== 'flies')) return;   // nothing to light (always the case outside free roam): skip the full-screen pass
   const w = lA.width, h = lA.height;
-  lAccctx.setTransform(1, 0, 0, 1, 0, 0); lAccctx.clearRect(0, 0, w, h);
+  // v111+: every pass below works only inside the lights' screen boxes, not the whole screen (the camp was the slowest scene)
+  const boxOf = L => { const [sx, sy] = toScreen(L.x, L.y), R = 185 * 1.6 * K(), x0 = Math.max(0, Math.floor((sx - R * 1.42) / SH) - 3), y0 = Math.max(0, Math.floor((sy - R * 0.71) / SH) - 3);
+    return [x0, y0, Math.min(w, Math.ceil((sx + R * 1.42) / SH) + 3) - x0, Math.min(h, Math.ceil((sy + R * 0.71) / SH) + 3) - y0]; };
+  const lit = lights.filter(L => L.kind !== 'flies').map(L => [L, boxOf(L)]).filter(([, b]) => b[2] > 0 && b[3] > 0);
+  if (!lit.length) return;
+  let U = null;
+  for (const [, b] of lit) U = U ? (() => { const x0 = Math.min(U[0], b[0]), y0 = Math.min(U[1], b[1]); return [x0, y0, Math.max(U[0] + U[2], b[0] + b[2]) - x0, Math.max(U[1] + U[3], b[1] + b[3]) - y0]; })() : b.slice();
+  lAccctx.setTransform(1, 0, 0, 1, 0, 0); lAccctx.clearRect(...U);
+  lActx.setTransform(1, 0, 0, 1, 0, 0); lActx.clearRect(...U);
   const obstacles = items.map(it => it.o).filter(o => caster(o));
   const playerCaster = { x: S.p.x, y: S.p.y };
   const relight = [];
-  for (const L of lights) {
-    if (L.kind === 'flies') continue;
+  let prevBox = null;
+  for (const [L, box] of lit) {
     const fire = L.kind === 'fire', t = S.t, sd = L.seed;
     // the light's centre: fire dances about, a lantern hangs off its post's arm and swings a little
     let cx = L.x, cy = L.y;
@@ -3225,7 +3250,7 @@ function applyWorldLights(lights, items) {
     else { const [ox, oy] = screenDirToWorld(10 * Z, 0), sw = Math.sin(t * 1.3 + sd) * 1.5; cx += ox + sw; cy += oy - sw; }
     const base = (fire ? 185 : 135) * (1 + Math.sin(t * 9 + sd) * (fire ? 0.05 : 0.015) + (fire ? (Math.random() - 0.5) * 0.04 : 0));
 
-    lActx.setTransform(1, 0, 0, 1, 0, 0); lActx.clearRect(0, 0, w, h);
+    lActx.setTransform(1, 0, 0, 1, 0, 0); if (prevBox) lActx.clearRect(...prevBox); prevBox = box;
     worldMatrix(lActx, 1 / SH);
     // uneven edge: radius wobbles with angle (and with time for fire), so it is never a clean circle
     lActx.beginPath();
@@ -3255,22 +3280,23 @@ function applyWorldLights(lights, items) {
       const a = Math.max(0, 0.85 * (1 - c.d / (base * 1.1)));
       if (a > 0.02) relight.push({ o: c.o, a });
     }
-    lAccctx.globalCompositeOperation = 'lighter'; lAccctx.drawImage(lA, 0, 0); lAccctx.globalCompositeOperation = 'source-over';
+    lActx.setTransform(1, 0, 0, 1, 0, 0);
+    lAccctx.globalCompositeOperation = 'lighter'; lAccctx.drawImage(lA, ...box, ...box); lAccctx.globalCompositeOperation = 'source-over';
     if (fire || S.mode === 'expedition') {      // keep a copy of the fire's light (with its shadows) for its colour; in Expedition every lantern too
       if (!warmOn) { wActx.setTransform(1, 0, 0, 1, 0, 0); wActx.clearRect(0, 0, w, h); }
-      wActx.globalCompositeOperation = 'lighter'; wActx.drawImage(lA, 0, 0); wActx.globalCompositeOperation = 'source-over';
+      wActx.globalCompositeOperation = 'lighter'; wActx.drawImage(lA, ...box, ...box); wActx.globalCompositeOperation = 'source-over';
       const [sx, sy] = toScreen(cx, cy), R = base * 1.6 * K(), bx0 = sx - R * 1.42, by0 = sy - R * 0.71, bx1 = sx + R * 1.42, by1 = sy + R * 0.71;
       if (!warmOn) warmBox = [bx0, by0, bx1 - bx0, by1 - by0];
       else { const x0 = Math.min(warmBox[0], bx0), y0 = Math.min(warmBox[1], by0); warmBox = [x0, y0, Math.max(warmBox[0] + warmBox[2], bx1) - x0, Math.max(warmBox[1] + warmBox[3], by1) - y0]; }
       warmOn = true;
     }
   }
-  blurSmall(lAcc, lBctx, w, h); blurSmall(lB, lAccctx, w, h);
-  if (warmOn) { blurSmall(wA, lBctx, w, h); blurSmall(lB, wActx, w, h); }
+  blurSmall(lAcc, lBctx, w, h, U); blurSmall(lB, lAccctx, w, h, U);
+  if (warmOn) { blurSmall(wA, lBctx, w, h, U); blurSmall(lB, wActx, w, h, U); }
   dctx.setTransform(1, 0, 0, 1, 0, 0);
   dctx.globalCompositeOperation = 'destination-out';
   dctx.imageSmoothingEnabled = true; dctx.imageSmoothingQuality = 'low';
-  dctx.drawImage(lAcc, 0, 0, w * SH * DPR, h * SH * DPR);
+  { const k = SH * DPR; dctx.drawImage(lAcc, ...U, U[0] * k, U[1] * k, U[2] * k, U[3] * k); }
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   for (const r of relight) { dctx.globalAlpha = r.a; drawProp(r.o, dctx, true); }
   dctx.globalAlpha = 1;
@@ -6197,6 +6223,20 @@ function exBegin() {
     : { text: 'expedition', sub: XS.dorbs >= 3 ? 'Both portals are open' : XS.orbs >= 3 ? `The portal is open · ${XS.dorbs || 0} of 3 teal orbs home` : XS.orbs ? `${XS.orbs} of 3 orbs home` : 'A green light waits in the deep', t: 0 };
 }
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
+// v112: first-trip hints, each shown once per save, one at a time when the banner slot is free. Saves that already brought an orb home skip them.
+const TIPS = [
+  ['start', (rg, c) => c, 'the woods are dark', 'Bring loot back to this fire'],
+  ['oil', (rg, c, d) => !c && d > CAMP_R + 120, 'your torch burns oil', 'Turn back before it runs dry'],
+  ['fight', rg => rg.enemies.some(e => !e.dead && dist2(e, S.p) < 220), 'they burn in your light', 'Burn them, strike, roll away'],
+  ['loot', rg => rg.pack.length > 0, 'carry it home', 'Bank it at the fire to keep it'],
+  ['shop', (rg, c) => c && XS.embers >= 10, 'embers buy upgrades', 'Upgrades stay when you die'],
+];
+function tipStep(rg, inCamp, d) {
+  if (EX_TEST || rg.ringMsg || (S.msg && S.msg.t < 2.6) || rg.phase !== 'fight') return;
+  const seen = XS.tips || (XS.tips = {});
+  if (XS.orbs > 0 && !seen.vet) { seen.vet = 1; for (const [id] of TIPS) seen[id] = 1; exSave(); return; }
+  for (const [id, when, text, sub] of TIPS) if (!seen[id] && when(rg, inCamp, d)) { seen[id] = 1; rg.ringMsg = { text, sub, t: 0 }; exSave(); return; }
+}
 function exNote(text, big) { S.rg.notes.push({ text, t: 0, big: !!big }); if (S.rg.notes.length > 3) S.rg.notes.shift(); }
 function exDropPack(src) {                   // nothing is left behind: what you carried is lost, and a carried orb goes back to where it was found
   if (src.orb) XS.orbField = true;
@@ -6345,6 +6385,7 @@ function exStep(dt) {
   if (rg.ringMsg && !(S.msg && S.msg.t < 2.2)) { rg.ringMsg.t += dt; if (rg.ringMsg.t > 2.8) rg.ringMsg = null; }   // waits for any big banner to clear
   rg.fullFx = Math.max(0, (rg.fullFx || 0) - dt * 1.5);
   if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
+  tipStep(rg, inCamp, d0);
   campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns;
   rg.lamps = exPathLamps();
@@ -6354,6 +6395,7 @@ function exStep(dt) {
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }   // the ranged ones melt back into the dark
     return;                                  // nothing new comes while you're home
   }
+  if (rg.cleared > 0 && !bossLive() && (rg.cleared -= dt) <= 0) { rg.cleared = 0; rg.ringMsg = { text: 'the deep wakes', sub: 'Get the orb home', t: 0 }; playRingSting(); addShake(0.3); }
   if (ring > rg.ringMax) { rg.ringMax = ring; rg.ringMsg = { text: RING_NAMES[ring], t: 0 }; if (ring > 0) playRingSting(); }
   if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // where your pack ends up if you quit out here
   for (const o of XS.outposts) o.n = Math.min(LAMP_MAX, (o.n || 0) + dt / 20);   // outposts lay a new lamp every 20 s you're out
@@ -6670,8 +6712,8 @@ function bossDie(b, dt) {                        // he falls to his knees, burns
       for (let i = 0; i < 6; i++) ashBurst(b.x + (Math.random() - 0.5) * 50, b.y + (Math.random() - 0.5) * 50, 12, 180);
       const c = bossArena(); if (c) { ashBurst(c.x, c.y, 16, 40); rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.7, r: 160, col: 'green' }); }
       XS.wardenDead = true; XS.embers += 60; exSave();
-      rg.cleared = true; for (const e of rg.enemies) e.dead = e.gone = true; rg.enemies = [];   // the woods fall quiet until you're home
-      S.msg = { text: 'warden felled', sub: '+60 embers banked · the woods are quiet · take the orb home', t: 0 };
+      rg.cleared = 25; for (const e of rg.enemies) e.dead = e.gone = true; rg.enemies = [];   // v112: the woods fall quiet for a breath (was: until you're home), then the deep wakes
+      S.msg = { text: 'warden felled', sub: '+60 embers banked · the woods are quiet, for now · take the orb home', t: 0 };
       if (actx) { const t = actx.currentTime; boomAt(t, 45, 20, 3, 1, sfxGain); noiseAt(t, 3000, 100, 2.5, 0.5, sfxGain); }
     }
   } else if (b.t > 3) b.st = 'gone';
