@@ -1456,9 +1456,13 @@ function atkHit(D, a) {                          // everything in reach takes th
   if (m) for (const u of m.units) {
     if (A.hit.has(u) || u.hid || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inReach(u, 9 * MK[u.kind].s)) continue;
     A.hit.add(u); hits++;
-    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
+    u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')) * miniShield(u); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
     if (MK[u.kind].dune) duneHitBy(u, D);
     if (u.st !== 'act') { push(u, D.knock * 0.35); arenaClamp(u, 30); }   // a blow can't knock him out of a swing, only nudge him
+  }
+  if (m && m.lamps) for (const l of m.lamps) if (!l.broken && !A.hit.has(l) && inReach(l, 14)) {   // the Lamplighter's lamps: two blows each
+    A.hit.add(l); hits++; l.flash = 1; spark(l, 40, 8);
+    if (--l.hp <= 0) lampBreak(m, l); else if (actx) noiseAt(actx.currentTime, 6000, 2600, 0.15, 0.35, sfxGain);
   }
   if (m && m.clones) for (const c of m.clones) if (!c.pop && !A.hit.has(c) && inReach(c, 20)) { A.hit.add(c); hits++; duneClonePop(c); }   // a false Mirage bursts at a touch
   if (D.slam) {                                  // the landing: a shockwave of light rolling out across the ground, a ring of dust, the ground bucks
@@ -6922,6 +6926,8 @@ const MV = {                                     // wind-up, the blow itself, an
   chop:   { tell: 0.95, act: 0.16, rec: 1.5,  snd: 'slam' },
   fell:   { tell: 1.75, act: 0.55, rec: 1.0,  snd: null },      // v113: the Woodcutter fells a tree across the clearing
   hack:   { tell: 0.8,  act: 0.16, rec: 1.9,  snd: 'slam' },    // ... and hacks through a fallen log to reach you
+  relight: { tell: 2.0, act: 0.3,  rec: 1.7,  snd: null },      // v114: the Lamplighter walks to a broken lamp and lights it again
+  fetch:  { tell: 3.0,  act: 0.3,  rec: 1.2,  snd: null },      // ... and goes back for the lantern he left as a decoy
   spin:   { tell: 0.85, act: 0.75, rec: 1.15, snd: 'sweep' },
   throw:  { tell: 0.7,  act: 0.25, rec: 0.7,  snd: 'whoosh' },
   swing:  { tell: 0.8,  act: 0.34, rec: 1.1,  snd: 'sweep' },
@@ -7033,6 +7039,17 @@ function drawFelled(o, c, mask) {                // a tree going over, then lyin
   drawTree(o, c, mask, 0, 0, o.s * Z);
   c.globalAlpha = ga; c.restore();
 }
+// ---- v114: the Lamplighter's lamps. Three posts round his clearing; while any burns he takes half harm and his fire spreads wider. ----
+// Two blows break one. He goes back to relight them (and is open while he does). When he steals your light he leaves his lantern
+// on the ground as a decoy and comes for you from behind in the dark: listen for your heartbeat.
+const lampsLit = m => !!(m && m.lamps && m.lamps.some(l => !l.broken));
+const miniShield = u => u.kind === 'lamplighter' && lampsLit(S.rg.mini) ? 0.5 : 1;
+function aimWorld() { const [x, y] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)), l = Math.hypot(x, y) || 1; return [x / l, y / l]; }
+function lampBreak(m, l, hard) {                 // glass bursts, the flame dies
+  l.broken = true; l.hp = 0; l.flash = 1; bossSay('impact'); addShake(0.35); ashBurst(l.x, l.y, 8, 50);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 7000, 2500, 0.35, 0.5, sfxGain); noiseAt(t + 0.03, 4000, 1200, 0.25, 0.3, sfxGain); }
+  exNote(lampsLit(m) ? 'a lamp breaks · ' + m.lamps.filter(o => !o.broken).length + ' still burn' : 'his last lamp is out · he can be hurt', true);
+}
 // ---- poses: where his hands hold what he carries, which way it points, how low he is ----
 function miniPose(u) {
   const k = u.kind, m = u.move, uu = u.len ? u.t / u.len : 0;
@@ -7044,7 +7061,7 @@ function miniPose(u) {
   if (u.st === 'dying' || u.st === 'dead') return { g: [6, 8, 4], d: [0.9, 0.3, -0.1], kneel: Math.min(1, u.t / 1), lean: 4, pain: 1, free: true };
   const sweep = (th) => ({ g: [3 + 4 * Math.cos(th), 6 * Math.sin(th), 18], d: [Math.cos(th), Math.sin(th), -0.05], kneel: 0.15, lean: 2, th });
   const tellPose = {
-    chop: P([-1, 1, 34], [-0.7, 0.1, 0.7], 0, -3), hack: P([-1, 1, 34], [-0.7, 0.1, 0.7], 0, -3), fell: back, spin: back, throw: raise, swing: back, pot: raise,
+    chop: P([-1, 1, 34], [-0.7, 0.1, 0.7], 0, -3), hack: P([-1, 1, 34], [-0.7, 0.1, 0.7], 0, -3), fell: back, relight: carry, fetch: carry, spin: back, throw: raise, swing: back, pot: raise,
     snuff: P([2, 3, 31], [0.15, 0, 1], 0, -4), spearT: P([-5, 6, 28], [0.95, 0, 0.2], 0, -3), lunge: P([2, 4, 13], [0.98, 0, 0.1], 0.35, 7),
     volley: P([9, 2, 28], [0, 0, 1], 0, -1), hop: carry, slash: back, charge: P([3, 4, 13], [0.9, 0, 0.2], 0.35, 9),
     snares: P([9, 3, 6], [1, 0, 0], 0.55, 6), call: { g: [4, 5, 30], d: [0.2, 0, 1], kneel: 0.1, lean: -5, pain: 0.35, free: true },
@@ -7084,6 +7101,10 @@ function miniStart(L) {
   });
   rg.mini = { L, B, units, st: 'on', t: 0, mist: 0, proj: [], fires: [], snares: [], enraged: false };
   if (L.id === 'woodcutter') { rg.mini.felled = new Set(); rg.mini.logs = []; rg.mini.standing = woodTrees(L).slice(); }
+  if (L.id === 'lamplighter') {
+    rg.mini.lamps = [0, 1, 2].map(i => { const b = a + Math.PI + (i - 1) * 2.1; return { x: L.x + Math.cos(b) * 280, y: L.y + Math.sin(b) * 280, hp: 2, broken: false, flash: 0, seed: i * 1.7 }; });
+    setTimeout(() => { if (S.rg && S.rg.mini && S.rg.mini.lamps) exNote('his lamps shield him · break them', true); }, 1800);
+  }
   if (L.dune) duneStart(rg.mini);
   addShake(0.4); bossSay('roar');
   S.msg = { text: B.title, sub: B.sub, t: 0 };
@@ -7109,7 +7130,15 @@ function miniNext(m, u, d) {                     // what he does next depends on
     else if (!u.axeOut && !blk && (d > 200 || (d > 120 && r < 0.35))) mv = 'throw';
     if (mv === 'fell' && u.last === 'fell') mv = null;
   }
-  if (k === 'lamplighter') { if (m.t - (u.snuffAt || -99) > 13 && d < 420 && r < 0.3) mv = 'snuff'; else if (d < R.swing - 6) mv = 'swing'; else if (r < 0.55) mv = 'pot'; }
+  if (k === 'lamplighter') {
+    const brk = (m.lamps || []).filter(l => l.broken).sort((a, b) => dist2(a, u) - dist2(b, u));
+    if (m.decoy) mv = 'fetch';
+    else if (m.t - (u.snuffAt || -99) > 12 && d < 460 && r < 0.3) mv = 'snuff';
+    else if (brk.length && m.t - (u.relitAt || -99) > 9 && r < 0.4) { mv = 'relight'; u.lampT = brk[0]; }
+    else if (d < R.swing - 6) mv = 'swing';
+    else if (r < 0.6) mv = 'pot';
+    if (mv === 'fetch') u.last = '';
+  }
   if (k === 'spear') { if (d < 110) mv = 'lunge'; else if (r < 0.6) mv = 'spearT'; }
   if (k === 'archer') { if (d < 130) mv = 'hop'; else if (r < 0.65) mv = 'volley'; }
   if (k === 'huntsman') {
@@ -7137,12 +7166,15 @@ function miniAct(m, u) {                         // the moment the wind-up ends:
   if (u.move === 'spearT') { shot('spear', 640, 1); if (actx) noiseAt(actx.currentTime, 3200, 900, 0.3, 0.3, sfxGain); }
   if (u.move === 'volley') { for (const o of [-0.22, 0, 0.22]) shot('arrow', 600, 0.5, u.dir + o, 700); if (actx) noiseAt(actx.currentTime, 4200, 1500, 0.25, 0.3, sfxGain); }
   if (u.move === 'pot') { const [x, y] = fwd(14, 4); m.proj.push({ kind: 'pot', fx: x, fy: y, tx: u.aimX, ty: u.aimY, x, y, t: 0, T: 0.9 }); }
-  if (u.move === 'snuff') {
-    u.snuffAt = m.t;
-    if (S.torchOn && S.torchLvl > 0.3) { rg.snuff = 2.6; exNote('he stole your light', true); addShake(0.3); if (actx) noiseAt(actx.currentTime, 1200, 120, 0.8, 0.4, sfxGain); }
-    else exNote('he found no light to steal', true);
-    m.flare = 1;
+  if (u.move === 'snuff') {                      // your light goes out; he sets his lantern down and slips away into the dark
+    u.snuffAt = m.t; rg.snuff = 3.6; exNote('he stole your light · his lantern lies · listen', true); addShake(0.3);
+    if (actx) noiseAt(actx.currentTime, 1200, 120, 0.8, 0.4, sfxGain);
+    m.flare = 1; m.decoy = { x: u.x + Math.cos(u.dir) * 18, y: u.y + Math.sin(u.dir) * 18 }; u.hid = true; u.stalkNow = true;
   }
+  if (u.move === 'relight' && u.lampT && u.lampT.broken && dist2(u, u.lampT) < 60) {   // the flame catches again
+    const l = u.lampT; l.broken = false; l.hp = 2; l.flash = 1; u.relitAt = m.t; bossSay('whoosh'); exNote('he relights a lamp', true);
+  }
+  if (u.move === 'fetch' && m.decoy && dist2(u, m.decoy) < 40) m.decoy = null;
   if (u.move === 'lunge' || u.move === 'charge') { u.dash = u.dir; u.hitDash = false; }
   if (u.move === 'hop') u.dash = u.dir + Math.PI;
   if (u.move === 'snares') {                     // three iron traps round you, out in the open where you can see them
@@ -7182,7 +7214,7 @@ function unitStep(m, u, dt) {
   u.lit += (lit - u.lit) * Math.min(1, dt * 8);
   const open = u.st === 'recover';
   if (lit > 0) {
-    u.hp -= dt * rgBurn() * lit * (open ? 1.1 : 0.3);
+    u.hp -= dt * rgBurn() * lit * (open ? 1.1 : 0.3) * miniShield(u);
     if (rg.laserOn && laserHits(u.x, u.y, 38 * D.s)) u.hp -= dt * rgBurn() * (tu('laser') > 1 ? 2.2 : 1.5) * (open ? 1 : 0.5);
     if (rg.embers.length < 320 && Math.random() < dt * (open ? 26 : 8)) rg.embers.push({ x: u.x + (Math.random() - 0.5) * 20, y: u.y + (Math.random() - 0.5) * 20, z: 20 + Math.random() * 80, vz: 30 + Math.random() * 50, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.5 + Math.random() * 0.5, ember: true });
   }
@@ -7210,6 +7242,24 @@ function unitStep(m, u, dt) {
       if (mv) { u.st = 'tell'; u.move = mv; u.t = 0; u.len = MV[mv].tell * fast; u.hit = false; u.last = mv; u.aimX = p.x; u.aimY = p.y; if (MV[mv].snd) bossSay(MV[mv].snd); }
       else u.cd = 0.3;
     }
+  } else if (u.st === 'stalk') {                 // unseen, he circles round behind you; your heart knows before you do
+    const [ax, ay] = aimWorld(), bx = p.x - ax * 80, by = p.y - ay * 80, bd = Math.hypot(bx - u.x, by - u.y);
+    if (bd > 6) { moveBy(Math.atan2(by - u.y, bx - u.x), Math.min(bd, 230 * dt)); moving = true; }
+    u.dir = toP; rg.snuff = Math.max(rg.snuff, 0.4);
+    if ((u.beat -= dt) <= 0) { const k = Math.min(1, u.t / 1.8); playHeartbeat(0.5 + 0.5 * k); rg.beatFx = 0.6 + 0.4 * k; u.beat = 0.7 - 0.4 * k; }
+    if ((bd < 24 && u.t > 1.1) || u.t > 2.4) {   // he's there: a red flash of eyes, then the swing
+      u.hid = false; u.st = 'tell'; u.move = 'swing'; u.t = 0; u.len = 0.6 * fast; u.hit = false; u.last = 'swing'; u.ambush = 1; bossSay('sweep'); addShake(0.15);
+    }
+  } else if (u.st === 'tell' && (u.move === 'relight' || u.move === 'fetch')) {   // he walks to the lamp, or back to his lantern; open to you all the way
+    const tg = u.move === 'relight' ? u.lampT : m.decoy;
+    if (!tg) { u.st = 'walk'; u.t = 0; u.cd = 0.3; }
+    else {
+      const gd = Math.hypot(tg.x - u.x, tg.y - u.y), ta = Math.atan2(tg.y - u.y, tg.x - u.x);
+      u.dir += Math.max(-5 * dt, Math.min(5 * dt, angDiff(ta, u.dir)));
+      if (gd > 26) { moveBy(u.dir, Math.min(gd - 20, (u.move === 'fetch' ? 150 : 170) * dt)); moving = true; if (u.t > u.len - 0.3) u.t = u.len - 0.3; }
+      if (u.t > 4) u.t = u.len;                 // can't get there: give up
+      if (u.t >= u.len) { u.st = 'act'; u.t = 0; u.hit = false; u.len = MV[u.move].act; miniAct(m, u); }
+    }
   } else if (u.st === 'tell' && u.move === 'fell') {   // he runs to the tree, puts himself on the far side of it from you, and chops three times
     const t = u.treeT, uu = u.t / u.len;
     if (uu < 0.7) u.fallA = Math.atan2(p.y - t.y, p.x - t.x);
@@ -7226,7 +7276,7 @@ function unitStep(m, u, dt) {
     if (u.move === 'hack' && u.logT) { const n = segNear(u.x, u.y, u.logT.bx, u.logT.by, ...logEnd(u.logT)); u.dir += Math.max(-6 * dt, Math.min(6 * dt, angDiff(Math.atan2(n.y - u.y, n.x - u.x), u.dir))); }
     else if (u.t < u.len * lock) { turn(u.move === 'charge' ? 2 : 3.2); u.aimX = p.x; u.aimY = p.y; }
     if (u.move === 'throw' && u.t < u.len * lock) { const dd = Math.hypot(p.x - u.x, p.y - u.y); u.throwMax = Math.max(260, Math.min(470, dd + 90)); u.throwSide = u.throwSide || (Math.random() < 0.5 ? 1 : -1); }
-    if (u.t >= u.len) { u.st = 'act'; u.t = 0; u.hit = false; u.len = MV[u.move].act; miniAct(m, u); }
+    if (u.t >= u.len) { u.st = 'act'; u.t = 0; u.hit = false; u.len = MV[u.move].act; miniAct(m, u); if (u.stalkNow) { u.stalkNow = false; u.st = 'stalk'; u.t = 0; u.beat = 0; } }
   } else if (u.st === 'act') {
     const mvn = u.move, fwd = (f, r) => [u.x + Math.cos(u.dir) * f - Math.sin(u.dir) * r, u.y + Math.sin(u.dir) * f + Math.cos(u.dir) * r];
     if (mvn === 'chop' && u.t >= u.len && !u.hit) {
@@ -7295,8 +7345,9 @@ function miniStep(dt) {
       h.t += dt; const k = Math.min(1, h.t / h.T); h.x = h.fx + (h.tx - h.fx) * k; h.y = h.fy + (h.ty - h.fy) * k;
       if (k >= 1 && !h.hit) {
         h.hit = true; rg.blasts.push({ x: h.tx, y: h.ty, t: 0, life: 0.4, r: 90, col: 'white' }); bossSay('impact'); addShake(0.3);
-        if (Math.hypot(p.x - h.tx, p.y - h.ty) < 48) miniHurt(0.5, 30, { x: h.tx, y: h.ty });
-        for (let i = 0; i < 4; i++) { const a = i / 4 * 7 + Math.random(); m.fires.push({ x: h.tx + Math.cos(a) * 18, y: h.ty + Math.sin(a) * 18, life: 3.5 + Math.random(), max: 4.5 }); }
+        const big = lampsLit(m), n = big ? 7 : 4, rr = big ? 34 : 18;   // with his lamps burning the fire spreads further
+        if (Math.hypot(p.x - h.tx, p.y - h.ty) < (big ? 62 : 48)) miniHurt(0.5, 30, { x: h.tx, y: h.ty });
+        for (let i = 0; i < n; i++) { const a = i / n * 7 + Math.random(); m.fires.push({ x: h.tx + Math.cos(a) * rr * (i % 2 ? 1 : 0.5), y: h.ty + Math.sin(a) * rr * (i % 2 ? 1 : 0.5), life: 3.5 + Math.random(), max: 4.5 }); }
       }
       continue;
     }
@@ -7381,6 +7432,7 @@ function drawMiniProp(u, pal, grip, dir, P, Zs, OUT, c) {
   if (D.prop === 'pole') {                       // a lantern hung from the top of the pole
     const lx = x1 + nx * 2 * Zs, ly = y1 + 2.5 * Zs;
     if (OUT) { c.fillStyle = dark; c.fillRect(lx - 2.6 * Zs, ly - 0.6 * Zs, 5.2 * Zs, 6.2 * Zs); }
+    else if (S.rg.mini && S.rg.mini.decoy) {}    // he set the lantern down: an empty hook
     else { c.fillStyle = shadeC(pal.near, 0.4); c.fillRect(lx - 2 * Zs, ly, 4 * Zs, 5 * Zs); c.fillStyle = 'rgba(255,200,120,0.95)'; c.fillRect(lx - 1.2 * Zs, ly + 1 * Zs, 2.4 * Zs, 3 * Zs); }
     u.lampS = [lx, ly + 2.5 * Zs];
   }
@@ -7393,7 +7445,8 @@ function drawMiniFigure(u) {
   let alpha = 1;
   if (u.st === 'rise') alpha = Math.min(1, u.t / 0.8);
   if (u.st === 'dying') alpha = Math.max(0, 1 - Math.max(0, u.t - 1.6) / 0.6);
-  if (u.st === 'dead' || alpha <= 0) return;
+  if (u.st === 'dead' || alpha <= 0 || u.hid) return;
+  if (u.ambush) { alpha *= Math.min(1, 0.25 + u.t / 0.25); if (u.st !== 'tell') u.ambush = 0; }   // he steps out of the dark
   const [sx, sy] = toScreen(u.x, u.y), grip = pose.g, dir = pose.d;
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(sx, sy, 9 * D.s * Z * 1.4, 9 * D.s * Z * 0.7, 0, 0, 7); ctx.fill();
@@ -7420,7 +7473,7 @@ function drawMiniFigure(u) {
       ctx.fillStyle = 'rgb(255,70,60)'; ctx.beginPath(); ctx.arc(ex, ey, 0.45 * Zs, 0, 7); ctx.fill();
     }
   }
-  if (u.kind === 'lamplighter' && u.lampS && u.st !== 'dying') {   // his lantern glows warm; it flares white-hot as he reaches for your light
+  if (u.kind === 'lamplighter' && u.lampS && u.st !== 'dying' && !(S.rg.mini && S.rg.mini.decoy)) {   // his lantern glows warm; it flares white-hot as he reaches for your light
     const [lx, ly] = u.lampS, f = u.st === 'tell' && u.move === 'snuff' ? u.t / u.len : 0, R = (14 + 50 * f) * Z;
     const g = ctx.createRadialGradient(lx, ly, 0, lx, ly, R); g.addColorStop(0, `rgba(255,${210 + 40 * f | 0},${140 + 100 * f | 0},${0.45 + 0.4 * f})`); g.addColorStop(1, 'rgba(255,170,80,0)');
     ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(lx, ly, R, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
@@ -7435,6 +7488,31 @@ function drawMiniGround(m) {                     // red marks on the ground: whe
     for (const t of m.standing) { const [sx, sy] = toScreen(t.x, t.y); ctx.globalAlpha = t === tgt ? 0.8 : 0.4; const sh = t === tgt && m.shake ? m.shake.k : 0; drawTree(t, ctx, false, sx + Math.sin(S.t * 47) * 2.2 * sh * Z, sy, t.s * Z); }
     for (const g of m.logs) { ctx.globalAlpha = 0.7; drawFelled(g, ctx, false); }
     ctx.globalAlpha = 1;
+  }
+  if (m.lamps) {                                 // the Lamplighter's lamp posts; a thread of warm light runs from each burning one to him
+    const lu = m.units[0];
+    for (const l of m.lamps) {
+      l.flash = Math.max(0, l.flash - frameDt * 3);
+      const [sx, sy] = toScreen(l.x, l.y), s = 1.5 * Z, top = sy - 50 * s, fl = 1 + 0.08 * Math.sin(S.t * 9 + l.seed * 5);
+      if (!l.broken && lu && !lu.hid && lu.st !== 'dying' && lu.st !== 'dead') {
+        const [ux, uy] = toScreen(lu.x, lu.y);
+        ctx.strokeStyle = `rgba(255,190,110,${0.18 + 0.1 * Math.sin(S.t * 6 + l.seed)})`; ctx.lineWidth = 1.5 * Z; ctx.setLineDash([3 * Z, 7 * Z]);
+        ctx.beginPath(); ctx.moveTo(sx, top); ctx.quadraticCurveTo((sx + ux) / 2, Math.min(top, uy) - 40 * Z, ux, uy - 40 * MK.lamplighter.s * Z); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.globalAlpha = l.broken ? 0.55 : 0.9; stamp(ctx, sprite('lamp', 0), sx, sy, s, 1, 0, false); ctx.globalAlpha = 1;
+      if (!l.broken) {
+        const R = (26 + 10 * l.flash) * Z * fl, g = ctx.createRadialGradient(sx + 6 * s, top + 8 * s, 0, sx + 6 * s, top + 8 * s, R);
+        g.addColorStop(0, `rgba(255,214,150,${0.75 + 0.25 * l.flash})`); g.addColorStop(1, 'rgba(255,170,80,0)');
+        ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx + 6 * s, top + 8 * s, R, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+        for (let i = 0; i < l.hp; i++) { ctx.fillStyle = 'rgba(255,214,150,0.85)'; ctx.beginPath(); ctx.arc(sx - 4 * Z + i * 8 * Z, sy + 8 * Z, 2 * Z, 0, 7); ctx.fill(); }   // blows left
+      } else if (l.flash > 0) { ctx.fillStyle = `rgba(255,240,220,${l.flash * 0.8})`; ctx.beginPath(); ctx.arc(sx + 6 * s, top + 8 * s, 18 * Z * (2 - l.flash), 0, 7); ctx.fill(); }
+    }
+    if (m.decoy) {                               // his lantern on the ground, still burning: it's not him
+      const [x, y] = toScreen(m.decoy.x, m.decoy.y), R = 30 * Z * (1 + 0.06 * Math.sin(S.t * 11));
+      ctx.fillStyle = '#1e1e1c'; ctx.fillRect(x - 3.5 * Z, y - 9 * Z, 7 * Z, 9 * Z); ctx.fillStyle = 'rgba(255,205,130,0.95)'; ctx.fillRect(x - 2 * Z, y - 7.5 * Z, 4 * Z, 5.5 * Z);
+      const g = ctx.createRadialGradient(x, y - 5 * Z, 0, x, y - 5 * Z, R); g.addColorStop(0, 'rgba(255,205,130,0.6)'); g.addColorStop(1, 'rgba(255,170,80,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 5 * Z, R, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+    }
   }
   for (const u of m.units) {
     if (u.st === 'dead' || u.st === 'dying') continue;
@@ -7465,11 +7543,11 @@ function drawMiniGround(m) {                     // red marks on the ground: whe
       if (mv === 'volley') for (const o of [-0.22, 0, 0.22]) rect(16, 700, 3, u.dir + o);
       if (mv === 'lunge') rect(10, 125, 18);
       if (mv === 'charge') rect(10, 520, 26);
-      if (mv === 'pot') { worldPoly(circlePts(u.aimX, u.aimY, 48)); ctx.fillStyle = red(0.1 + 0.25 * uu); ctx.fill(); ctx.strokeStyle = red(0.35 + 0.5 * uu); ctx.lineWidth = 1.5; ctx.stroke(); }
+      if (mv === 'pot') { worldPoly(circlePts(u.aimX, u.aimY, lampsLit(m) ? 62 : 48)); ctx.fillStyle = red(0.1 + 0.25 * uu); ctx.fill(); ctx.strokeStyle = red(0.35 + 0.5 * uu); ctx.lineWidth = 1.5; ctx.stroke(); }
     }
     if (u.st === 'act' && mv === 'spin') { worldPoly(circlePts(u.x, u.y, R.spin + 10)); ctx.fillStyle = red(0.14); ctx.fill(); }
   }
-  for (const h of m.proj) if (h.kind === 'pot' && !h.hit) { worldPoly(circlePts(h.tx, h.ty, 48)); ctx.fillStyle = red(0.3); ctx.fill(); }
+  for (const h of m.proj) if (h.kind === 'pot' && !h.hit) { worldPoly(circlePts(h.tx, h.ty, lampsLit(m) ? 62 : 48)); ctx.fillStyle = red(0.3); ctx.fill(); }
   for (const s of m.snares) {                    // the snares: iron jaws on the ground, red once they're set
     const [x, y] = toScreen(s.x, s.y), r = 9 * Z, set = s.arm <= 0;
     ctx.strokeStyle = set ? red(0.85) : 'rgba(200,200,195,0.6)'; ctx.lineWidth = 1.6 * Z; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.5, 0, 0, 7); ctx.stroke();
@@ -7525,7 +7603,7 @@ function drawLairFx() {                          // braziers burn on the stones 
   for (const u of m.units) if (u.st === 'tell' && u.move === 'snuff') {   // a warning over your head: hide the light, or lose it
     const [px, py] = toScreen(S.p.x, S.p.y);
     ctx.save(); ctx.font = '600 12px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(255,200,140,${0.6 + 0.4 * Math.sin(S.t * 12)})`;
-    ctx.fillText('HE REACHES FOR YOUR LIGHT · TORCH OFF', px, py - 84 * Z - 26); ctx.restore();
+    ctx.fillText('HE REACHES FOR YOUR LIGHT', px, py - 84 * Z - 26); ctx.restore();
   }
   drawMist(m.L, m.mist);
 }
@@ -7798,7 +7876,7 @@ function duneStep(m, u, dt) {
   u.lit += (lit - u.lit) * Math.min(1, dt * 8);
   const open = u.st === 'recover';
   if (lit > 0) {
-    u.hp -= dt * rgBurn() * lit * (open ? 1.1 : 0.3);
+    u.hp -= dt * rgBurn() * lit * (open ? 1.1 : 0.3) * miniShield(u);
     if (rg.laserOn && laserHits(u.x, u.y, 38 * D.s)) u.hp -= dt * rgBurn() * (tu('laser') > 1 ? 2.2 : 1.5) * (open ? 1 : 0.5);
     if (rg.embers.length < 320 && Math.random() < dt * (open ? 26 : 8)) rg.embers.push({ x: u.x + (Math.random() - 0.5) * 20, y: u.y + (Math.random() - 0.5) * 20, z: 20 + Math.random() * 80, vz: 30 + Math.random() * 50, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.5 + Math.random() * 0.5, ember: true });
   }
@@ -8306,6 +8384,7 @@ function exHoles(hole) {                     // light the orb puts out round its
   const vr = viewR() + 60;
   for (const l of rg.lamps) if (Math.abs(l.x - S.cam.x) < vr && Math.abs(l.y - S.cam.y) < vr) hole(l.x, l.y, 52 * (1 + 0.06 * Math.sin(S.t * 7 + l.seed)), 0.5);
   if (rg.recall) hole(S.p.x, S.p.y, 60 + 60 * Math.min(1, rg.recall.t), 0.9);
+  const mm = rg.mini; if (mm && mm.st === 'on' && mm.lamps) { for (const l of mm.lamps) if (!l.broken) hole(l.x, l.y, 70 * (1 + 0.06 * Math.sin(S.t * 9 + l.seed * 5)), 0.6); if (mm.decoy) hole(mm.decoy.x, mm.decoy.y, 55, 0.6); }   // the Lamplighter's lamps, and the lantern he left behind
   const LC = lairCur(); if (LC) for (const o of lairStones()) if (Math.hypot(o.x - LC.x, o.y - LC.y) < LR + 20 && Math.abs(o.x - S.cam.x) < vr && Math.abs(o.y - S.cam.y) < vr) hole(o.x, o.y, 75 * (1 + 0.07 * Math.sin(S.t * 8 + o.seed * 20)), 0.6);   // the lair's braziers light the stones
 }
 function exPointer(px, py, tx, ty, col, glyph, a) {   // a chevron circling you, pointing at something
