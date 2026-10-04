@@ -329,6 +329,9 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <button id="testMini2" class="alt">Test the Lamplighter</button>
       <button id="testMini3" class="alt">Test the Twins</button>
       <button id="testMini4" class="alt">Test the Huntsman</button>
+      <button id="testDune1" class="alt">Test the Dervish</button>
+      <button id="testDune2" class="alt">Test the Buried King</button>
+      <button id="testDune3" class="alt">Test the Mirage</button>
       <p class="small">Starts at the edge of that boss's stones. Nothing from the test is saved.</p>
     </details>
   </section>
@@ -1451,11 +1454,13 @@ function atkHit(D, a) {                          // everything in reach takes th
   }
   const m = S.mode === 'expedition' && miniLive();
   if (m) for (const u of m.units) {
-    if (A.hit.has(u) || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inReach(u, 9 * MK[u.kind].s)) continue;
+    if (A.hit.has(u) || u.hid || !['walk', 'tell', 'act', 'recover'].includes(u.st) || !inReach(u, 9 * MK[u.kind].s)) continue;
     A.hit.add(u); hits++;
     u.hp -= D.boss * (u.st === 'recover' ? 1.6 : 1) * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); u.flinch = Math.max(u.flinch, 0.7); spark(u, 38 * MK[u.kind].s, D.slam ? 16 : 9);
+    if (MK[u.kind].dune) duneHitBy(u, D);
     if (u.st !== 'act') { push(u, D.knock * 0.35); arenaClamp(u, 30); }   // a blow can't knock him out of a swing, only nudge him
   }
+  if (m && m.clones) for (const c of m.clones) if (!c.pop && !A.hit.has(c) && inReach(c, 20)) { A.hit.add(c); hits++; duneClonePop(c); }   // a false Mirage bursts at a touch
   if (D.slam) {                                  // the landing: a shockwave of light rolling out across the ground, a ring of dust, the ground bucks
     rg.slashes.push({ i: 2, a, side: 1, t: 0, life: 0.42, r: D.reach, ring: true });
     rg.echoes.push({ r: 0, x: p.x, y: p.y, max: D.reach * 1.3, burst: true });
@@ -2854,6 +2859,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   } else if (o.kind === 'tele') { drawTele(o, c, sx, sy, col);
   } else if (o.kind === 'plinth') { drawPlinth(o, c, sx, sy, col);
   } else if (o.kind === 'stone') { drawStone(o, c, sx, sy, col);
+  } else if (o.kind === 'pillar') { drawPillar(o, c, sx, sy, col);
   } else if (o.kind === 'pack') { if (!mask) drawPackProp(o, c, sx, sy);
   } else if (o.kind === 'lamp') {
     if (!mask) shadow(sx, sy, 6 * Z);
@@ -4129,7 +4135,7 @@ const sweepK = () => S.rg && lv('sweep') && !isEx() ? Math.min(1, (S.rg.sweepT |
 const spotK = () => S.rg && lv('spot') ? Math.min(1, (S.rg.still || 0) / (isEx() ? (lv('spot') > 1 ? 0.5 : 1) : 0.9)) : 0;
 const exSpot = () => isEx() && spotK() >= 1;   // Expedition's Spotlight: fully charged, the beam narrows to a long, hot spotlight
 function rgHalf() { return Math.min(1.2, 0.34 * (1 + 0.28 * lv('sweep') * sweepK()) * (isEx() ? (exSpot() ? 0.6 : 1) : 1 - 0.15 * spotK()) * (lastHeart() ? 1.5 : 1)) * (1 + 0.06 * tu('width')); }
-function rgRange() { return (isEx() ? 0.62 * (exSpot() ? (lv('spot') > 2 ? 2 : 1.5) : 1) : Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK()))) * (1 + 0.08 * tu('reach')) * (1 - 0.5 * stormK()); }   // a dust storm halves the beam
+function rgRange() { return (isEx() ? 0.62 * (exSpot() ? (lv('spot') > 2 ? 2 : 1.5) : 1) : Math.min(1.45, 0.62 * (1 + 0.22 * lv('spot') * spotK()))) * (1 + 0.08 * tu('reach')) * (1 - 0.5 * stormK()) * duneDim(); }   // a dust storm halves the beam; the Mirage's eclipse shrinks it
 function rgBurn() { return rgBurn0() * (pact('horde') ? 2 : 1); }   // Horde: twice the burn
 function rgBurn0() {
   const rg = S.rg || {}, grow = 1 + 0.05 * Math.min(14, Math.max(0, (rg.wave || 1) - 1));   // the torch grows with the night
@@ -5653,6 +5659,7 @@ function exWeight() {                       // heavy loot slows you; a burning r
 function exSafeAt(x, y, pad = 0) {           // inside the camp fence or an outpost's light?
   if (Math.hypot(x, y) < CAMP_R + pad) return { x: 0, y: 0, r: CAMP_R };
   if (XS) for (const o of XS.outposts) if (Math.hypot(x - o.x, y - o.y) < OUT_R + pad) return { x: o.x, y: o.y, r: OUT_R };
+  if (XS && XS.dgrace && S.rg && S.rg.beyond && !S.rg.next && Math.hypot(x - XS.dgrace.x, y - XS.dgrace.y) < OUT_R + pad) return { x: XS.dgrace.x, y: XS.dgrace.y, r: OUT_R };   // the lantern by a keeper's ground
   return null;
 }
 function exLightsIn(ci, cj) {
@@ -5963,7 +5970,8 @@ function drawCampFlames() {
   ctx.restore();
 }
 function exItems() {   // camp, chests and dropped packs, drawn in with the trees
-  const rg = S.rg; if (!rg || rg.beyond) return [];
+  const rg = S.rg; if (!rg) return [];
+  if (rg.beyond) return rg.next ? [] : dunePillars();
   return CAMP.concat([TELE, TELE2], PLINTHS, exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones(), lairStones());
 }
 
@@ -6224,6 +6232,11 @@ function exWake() {
     const p = S.p; p.x = XS.grace.x; p.y = XS.grace.y; S.cam.x = p.x; S.cam.y = p.y; S.rg.inCamp = false; S.rg.ringMax = 3;
     exNote('you wake at the lantern'); return;
   }
+  if (XS.dgrace && XS.dgrace.n === (XS.dorbs || 0) && XS.dbBeat !== (XS.dorbs || 0) && (XS.dorbs || 0) < 3 && XS.orbs >= 3) {   // killed by a Dunes keeper: wake at his lantern
+    const p = S.p, rg = S.rg; rg.beyond = true; rg.next = false; rg.inCamp = false; rg.leftGate = true;
+    p.x = XS.dgrace.x; p.y = XS.dgrace.y; S.cam.x = p.x; S.cam.y = p.y;
+    exNote('you wake at the lantern in the sand'); return;
+  }
   exNote('back by the fire');
 }
 function exSpawn(type) {
@@ -6386,7 +6399,7 @@ const bossArena = () => S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb
 const bossLive = () => { const b = S.rg && S.rg.boss; return b && b.st !== 'gone' ? b : null; };
 function bossCam() {                            // while he fights, the camera frames the whole field and holds still
   const m = S && S.mode === 'expedition' && S.rg && S.rg.mini;
-  if (m && (m.st === 'on' || m.st === 'won')) { const k = Math.sqrt(W * H / M_AREA); return { x: m.L.x, y: m.L.y, z: Math.max(0.45, Math.min(1.6, k / (0.78 * ZB))), k, cap: MRC }; }   // a mini-boss's clearing: smaller, so the camera sits closer
+  if (m && (m.st === 'on' || m.st === 'won')) { const k = Math.sqrt(W * H / (m.B.area || M_AREA)); return { x: m.L.x, y: m.L.y, z: Math.max(0.45, Math.min(1.6, k / (0.78 * ZB))), k, cap: m.B.cap || MRC }; }   // a mini-boss's clearing: smaller, so the camera sits closer
   const b = S && S.mode === 'expedition' && S.rg && S.rg.boss, c = bossArena();
   if (!b || !c || b.st === 'dead' || b.st === 'gone') return null;
   const k = Math.sqrt(W * H / B_AREA);         // same amount of ground on every screen
@@ -6950,13 +6963,14 @@ function miniPose(u) {
 }
 // ---- the fight ----
 function miniStart(L) {
-  const rg = S.rg, p = S.p, B = miniDef(L), a = Math.atan2(p.y - L.y, p.x - L.x);
+  const rg = S.rg, p = S.p, B = L.dune ? DUNE_BOSSES[L.n] : miniDef(L), a = Math.atan2(p.y - L.y, p.x - L.x);
   for (const e of rg.enemies) if (!e.dead && dist2(e, L) < MRC + 300) { e.dead = e.gone = true; ashBurst(e.x, e.y, 8, 20); }   // the clearing is his: the rest keep away
   const units = B.units.map((k, i) => {
     const off = B.units.length > 1 ? (i ? 0.9 : -0.9) : 0, D = MK[k];
     return { kind: k, x: L.x - Math.cos(a + off) * 90, y: L.y - Math.sin(a + off) * 90, dir: a + off, hp: D.hp, max: D.hp, shown: D.hp, st: 'rise', t: 0, len: 1.8, ph: 0, cd: 0.8 + i * 0.9, last: '', flinchAt: D.hp * 0.8, flinch: 0, lit: 0, gait: 0 };
   });
   rg.mini = { L, B, units, st: 'on', t: 0, mist: 0, proj: [], fires: [], snares: [], enraged: false };
+  if (L.dune) duneStart(rg.mini);
   addShake(0.4); bossSay('roar');
   S.msg = { text: B.title, sub: B.sub, t: 0 };
 }
@@ -7097,6 +7111,14 @@ function miniStep(dt) {
   if (rg.mini && rg.mini.st === 'gone') rg.mini = null;   // that fight's over: the next fire can wake
   const m0 = rg.mini, L = lairCur();
   if (!m0 && L && rg.phase === 'fight' && dist2(p, L) < LR - 25) miniStart(L);
+  const DL = !m0 && rg.phase === 'fight' ? duneLair() : null;   // the Dunes: walk in among the pillars and the orb's keeper rises
+  if (DL) {
+    if ((!XS.dgrace || XS.dgrace.n !== (XS.dorbs || 0)) && dist2(p, DL) < 1500) {   // a lantern outside his ground: wake here if he kills you
+      const k = DUNE_BOSSES[DL.n].cap + OUT_R + 40; XS.dgrace = { x: DL.x + Math.cos(DL.a) * k, y: DL.y + Math.sin(DL.a) * k, n: XS.dorbs || 0 }; exSave();
+      exNote('a lantern stirs in the sand · you will wake here', true);
+    }
+    if (!rg.carryDorb && (dist2(p, DL) < 320 || dist2(p, XS.dorb) < 260)) miniStart(DL);
+  }
   const m = rg.mini; if (!m || m.st === 'gone') return;
   m.t += dt; m.flare = Math.max(0, (m.flare || 0) - dt * 1.5);
   m.mist = m.st === 'on' ? Math.min(1, m.mist + dt * 1.5) : Math.max(0, m.mist - dt * 0.5);
@@ -7122,11 +7144,13 @@ function miniStep(dt) {
   }
   m.snares = m.snares.filter(s => !s.gone);
   if (rg.rooted > 0) { rg.rooted -= dt; p.x = rg.rootAt.x; p.y = rg.rootAt.y; }
-  if (m.st === 'won') { for (const u of m.units) unitStep(m, u, dt); if ((m.wt += dt) > 3) m.st = 'gone'; return; }
+  const uStep = u => (MK[u.kind].dune ? duneStep : unitStep)(m, u, dt);
+  if (m.st === 'won') { m.units.forEach(uStep); if ((m.wt += dt) > 3) m.st = 'gone'; return; }
   if (rg.phase !== 'fight') return;
   bossMusic(true, m.enraged || m.units.some(u => u.hp < u.max * 0.5));
   arenaClamp(p);                                 // the mist at the screen's edge won't let you out
-  for (const u of m.units) unitStep(m, u, dt);
+  if (m.B.dune) duneFxStep(m, dt);
+  m.units.forEach(uStep);
   if (m.units.every(u => u.st === 'dead')) miniWin(m);
 }
 function miniWin(m) {                            // the last of them goes to ash; what he kept spills out
@@ -7138,6 +7162,7 @@ function miniWin(m) {                            // the last of them goes to ash
   m.L.beat = true; exSave();
   const next = lairCur();
   S.msg = { text: B.title + ' felled', sub: `His wisps and his chest are yours · get them home${next ? ' · a new fire burns somewhere out there' : ''}`, t: 0 };
+  if (B.dune) duneWin(m);
   if (actx) { const t = actx.currentTime; boomAt(t, 50, 22, 2.4, 0.9, sfxGain); noiseAt(t, 3000, 100, 2, 0.45, sfxGain); }
 }
 // ---- drawing ----
@@ -7314,6 +7339,650 @@ function drawMiniBar() {                         // the name and one health bar 
   ctx.restore();
 }
 
+// ---- the Dunes bosses (v110, Joe): one keeper for each teal orb, Elden Ring style ----
+// Come close to the orb and its keeper rises out of the sand and takes it up: the Dervish into his glaive, the Buried King into his chest,
+// the Mirage between her hands. Beat him and it drops where he falls. Same held camera as the lairs; a wall of whirling sand holds you in.
+// Every move has a wind-up you can read: the body, a sound, a glint in his eye colour just before a fast blow, and marks on the ground in his colour.
+// One move in each set is sometimes held a beat longer, to catch a panic roll. Far away too long and he closes the gap.
+// After a blow he's open: the light burns him hard and your swings land 1.6x; a full combo with the slam in that window staggers him.
+// Half health: a roar, quicker tells, one new move, and blows that chain.
+const DUNE_BOSSES = [
+  { id: 'dervish', name: 'THE DERVISH', title: 'the dervish', sub: 'He dances with the first teal light', units: ['dervish'], wisps: 60, loot: ['r', 'r', 'r', 'c', 'c'], col: '255,196,70', area: 1.5e6, cap: 900, dune: true },
+  { id: 'king', name: 'THE BURIED KING', title: 'the buried king', sub: 'The sand gives him back', units: ['king'], wisps: 100, loot: ['r', 'r', 'r', 'r', 'c', 'c'], col: '222,142,50', area: 1.6e6, cap: 940, dune: true },
+  { id: 'mirage', name: 'THE MIRAGE', title: 'the mirage', sub: 'Only the true one throws a shadow', units: ['mirage'], wisps: 160, loot: ['r', 'r', 'r', 'r', 'r', 'c', 'c'], col: '255,234,168', area: 1.6e6, cap: 940, dune: true },
+];
+Object.assign(MK, {
+  dervish: { hp: 110, s: 2.4, kit: { head: 'hood', coat: 2, vest: 0 }, prop: 'glaive', sp: 72, keep: 70, dune: true },
+  king:    { hp: 150, s: 4.0, kit: { head: 'helmet', coat: 1, vest: 1 }, prop: null, sp: 34, keep: 70, dune: true },
+  mirage:  { hp: 130, s: 3.0, kit: { head: 'hood', coat: 2, vest: 0 }, prop: null, sp: 52, keep: 240, dune: true, float: 12 },
+});
+const DV = {                                     // wind-up, the blow, how long he's open after; delay: sometimes held this much longer; quick: a glint before it lands
+  sweep:  { tell: 0.9,  act: 0.36, rec: 1.0, snd: 'sweep', quick: 1 },
+  sweepR: { tell: 0.42, act: 0.36, rec: 1.4, snd: 'sweep', quick: 1 },
+  rise:   { tell: 0.85, act: 0.2,  rec: 1.5, snd: 'slam', delay: 0.6, quick: 1 },
+  dlunge: { tell: 0.8,  act: 0.5,  rec: 1.2, snd: 'leap', quick: 1 },
+  whirl:  { tell: 1.1,  act: 2.0,  rec: 2.0, snd: 'roar' },
+  veil:   { tell: 0.7,  act: 1.0,  rec: 0,   snd: 'whoosh' },
+  vslash: { tell: 0.5,  act: 0.3,  rec: 1.4, snd: 'sweep', quick: 1 },
+  hammer: { tell: 1.0,  act: 0.16, rec: 1.8, snd: 'slam', delay: 0.7, quick: 1 },
+  ssweep: { tell: 0.9,  act: 0.5,  rec: 1.0, snd: 'sweep' },
+  sink:   { tell: 0.6,  act: 2.2,  rec: 2.0, snd: 'quake' },
+  stomp:  { tell: 0.8,  act: 0.12, rec: 0.8, snd: 'stomp' },
+  pit:    { tell: 0.9,  act: 4.0,  rec: 0.1, snd: 'roar' },
+  lance:  { tell: 1.0,  act: 0.6,  rec: 1.3, snd: 'hum', quick: 1 },
+  rain:   { tell: 1.2,  act: 0.3,  rec: 0.8, snd: 'whoosh' },
+  mstep:  { tell: 0.7,  act: 0.15, rec: 0,   snd: 'whoosh' },
+  clones: { tell: 1.1,  act: 0.3,  rec: 0,   snd: 'roar', delay: 0.5 },
+  wheel:  { tell: 1.0,  act: 3.0,  rec: 1.5, snd: 'hum' },
+  roar2:  { tell: 1.4,  act: 0.3,  rec: 0.4, snd: 'roar' },
+};
+const dReach = u => { const s = MK[u.kind].s; return { sweep: 40 * s, rise: 44 * s, whirl: 30 * s, hammer: 22 * s, stomp: 260, wave: 560, lance: 900 }; };
+const SPAN = 1.75;                               // the crescent sweep: 200 degrees
+const duneDef = () => DUNE_BOSSES[Math.min(2, XS.dorbs || 0)];
+function duneLair() {                            // the keeper's ground: centred a little in from the orb, so you fight on the sand, the water at your back
+  if (!inDunes() || !XS.dorbField || !XS.dorb || (XS.dorbs || 0) >= 3 || XS.dbBeat === (XS.dorbs || 0)) return null;
+  const o = XS.dorb;
+  if (!o.arena) { const a = Math.atan2(BEYOND_GATE.y - o.y, BEYOND_GATE.x - o.x); o.arena = { id: duneDef().id, x: o.x + Math.cos(a) * 170, y: o.y + Math.sin(a) * 170, a, dune: true, n: XS.dorbs || 0 }; }
+  return o.arena;
+}
+const duneHeld = () => { const m = S.rg && S.rg.mini; return !!(m && m.B.dune && m.st === 'on'); };   // he has the orb: nothing waits at the oasis
+const duneDim = () => { const m = S.rg && S.rg.mini; return m && m.B.dune ? 1 - 0.35 * (m.eclipse || 0) : 1; };   // the Mirage's eclipse shrinks your light
+const pillarCache = new Map();
+function dunePillars() {                         // half-buried pillars round the keeper's ground (they stay after he falls)
+  if (!inDunes() || !XS.dorb) return [];
+  const L = duneLair() || XS.dorb.arena; if (!L) return [];
+  const k = L.id + L.x;
+  if (!pillarCache.has(k)) pillarCache.set(k, Array.from({ length: 10 }, (_, i) => { const a = i / 10 * Math.PI * 2 + 0.3; return { kind: 'pillar', x: L.x + Math.cos(a) * 330, y: L.y + Math.sin(a) * 330, s: 0.9 + hash(i, 6.1) * 0.5, seed: hash(i, 1.7), r: 0, nocol: true }; }));
+  return pillarCache.get(k);
+}
+function drawPillar(o, c, sx, sy, col) {         // a sandstone column sunk in the dunes, its top broken off, sand drifted up one side
+  const s = o.s * Z, h = (30 + 26 * o.seed) * s, w = 8 * s, lean = (o.seed - 0.5) * 5 * s;
+  c.fillStyle = col('#2a2622'); c.beginPath(); c.ellipse(sx, sy, w * 1.7, w * 0.7, 0, 0, 7); c.fill();
+  c.fillStyle = col('#77706a'); c.beginPath(); c.moveTo(sx - w, sy); c.lineTo(sx - w + lean, sy - h); c.lineTo(sx + lean * 0.3, sy - h - 3 * s); c.lineTo(sx, sy + 1); c.closePath(); c.fill();
+  c.fillStyle = col('#4a4540'); c.beginPath(); c.moveTo(sx, sy + 1); c.lineTo(sx + lean * 0.3, sy - h - 3 * s); c.lineTo(sx + w + lean, sy - h + 4 * s); c.lineTo(sx + w, sy); c.closePath(); c.fill();
+  c.strokeStyle = col('#3a3632'); c.lineWidth = 1 * s;                       // flutes, and a carved band
+  for (const f of [-0.5, 0.45]) { c.beginPath(); c.moveTo(sx + f * w, sy - 2 * s); c.lineTo(sx + f * w + lean, sy - h + 3 * s); c.stroke(); }
+  c.beginPath(); c.moveTo(sx - w + lean * 0.6, sy - h * 0.62); c.lineTo(sx + w + lean * 0.6, sy - h * 0.6); c.stroke();
+  c.fillStyle = col('#8a7f70'); c.beginPath(); c.moveTo(sx - w * 1.8, sy + 1); c.quadraticCurveTo(sx - w * 1.1, sy - h * 0.32, sx - w * 0.2, sy - h * 0.12); c.lineTo(sx + w * 0.4, sy + 2); c.closePath(); c.fill();   // drifted sand
+}
+function duneSay(kind) {
+  if (!actx) return; const t = actx.currentTime;
+  if (kind === 'hum') { boomAt(t, 210, 240, 1.0, 0.22, sfxGain); boomAt(t, 420, 470, 0.9, 0.08, sfxGain); return; }
+  if (kind === 'glint') { noiseAt(t, 9000, 6000, 0.12, 0.18, sfxGain); return; }
+  if (kind === 'sand') { noiseAt(t, 900, 200, 0.7, 0.4, sfxGain); return; }
+  bossSay(kind);
+}
+function duneStart(m) {                          // he rises where the orb lay, and the orb goes up into him
+  const rg = S.rg, o = XS.dorb, L = m.L, u = m.units[0], p = S.p;
+  for (const e of rg.enemies) if (!e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 8, 20); }
+  rg.enemies = []; rg.storm = null;
+  u.x = o.x; u.y = o.y; u.dir = Math.atan2(p.y - u.y, p.x - u.x); u.len = 2.2; u.p2 = false; u.far = 0;
+  Object.assign(m, { lines: [], waves: [], rings: [], glass: [], shards: [], prints: [], clones: [], pit: null, crack: null, beams: [], eclipse: 0, sandK: 0 });
+  rg.blasts.push({ x: o.x, y: o.y, t: 0, life: 0.9, r: 200, col: 'teal' });
+  rg.echoes.push({ r: 0, x: o.x, y: o.y, max: 420, burst: true });
+  for (let i = 0; i < 4; i++) ashBurst(o.x + (Math.random() - 0.5) * 50, o.y + (Math.random() - 0.5) * 50, 10, 60);
+  addShake(0.6); duneSay('sand');
+  if (actx) { const t = actx.currentTime; boomAt(t, 55, 25, 2.6, 0.8, sfxGain); }
+}
+// ---- poses ----
+function dunePose(u) {
+  const k = u.kind, mv = u.move, uu = u.len ? u.t / u.len : 0, q = u.base ? Math.min(1, u.t / u.base) : uu;
+  const P = (g, d, kneel = 0, lean = 0, extra) => Object.assign({ g, d, kneel, lean }, extra || {});
+  const sweep = (th, g = 18, r = 6) => ({ g: [3 + 4 * Math.cos(th), r * Math.sin(th), g], d: [Math.cos(th), Math.sin(th), -0.05], kneel: 0.15, lean: 2, th });
+  const ease = x => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+  if (u.st === 'dying' || u.st === 'dead') return { g: [6, 8, 4], d: [0.9, 0.3, -0.1], kneel: Math.min(1, u.t / 1), lean: 4, pain: 1, free: true };
+  if (k === 'dervish') {
+    const carry = P([5, 5, 16], [0.55, 0.15, 0.82]);
+    if (u.st === 'rise') return mixPose(P([8, 4, 6], [0.9, 0.2, -0.3], 0.8, 6), carry, (u.t - 0.6) / 1.2);
+    const back = P([-3, 7, 19], [-0.6, 0.8, 0], 0.2, -1), backR = P([-3, -7, 19], [-0.6, -0.8, 0], 0.2, -1), over = P([-1, 1, 36], [-0.6, 0.1, 0.8], 0, -3), chopped = P([10, 1, 10], [0.95, 0, -0.3], 0.3, 6);
+    const crouch = P([2, 4, 13], [0.98, 0, 0.1], 0.45, 8), up = P([2, 3, 32], [0.1, 0, 1], 0, -4);
+    const tells = { sweep: back, sweepR: backR, vslash: back, rise: over, dlunge: crouch, whirl: Object.assign({}, back, { kneel: 0.35 }), veil: up, roar2: P([4, 5, 30], [0.2, 0, 1], 0, -5, { pain: 0.3 }) };
+    if (u.st === 'tell') return mixPose(carry, tells[mv], q / 0.75);
+    if (u.st === 'act') {
+      if (mv === 'sweep' || mv === 'vslash') return sweep(SPAN - 2 * SPAN * ease(uu));
+      if (mv === 'sweepR') return sweep(-SPAN + 2 * SPAN * ease(uu));
+      if (mv === 'rise') return mixPose(over, chopped, uu * 1.6);
+      if (mv === 'dlunge') return P([13, 4, 15], [1, 0, 0.05], 0.2, 10);
+      if (mv === 'whirl') return sweep(u.t * 15);
+      return tells[mv] || carry;
+    }
+    if (u.st === 'recover') {
+      if (u.stag > 0) return Object.assign(mixPose(chopped, carry, 0), { pain: 0.7 });
+      if (mv === 'rise') return mixPose(chopped, carry, (uu - 0.75) / 0.25);
+      if (mv === 'whirl') return Object.assign(mixPose(back, carry, (uu - 0.6) / 0.4), { pain: 0.4 * (1 - uu) });   // dizzy
+      if (mv === 'dlunge') return mixPose(P([13, 4, 10], [1, 0, -0.2], 0.4, 9), carry, (uu - 0.7) / 0.3);
+      return mixPose(tells[mv] || carry, carry, uu * 1.5);
+    }
+    return carry;
+  }
+  if (k === 'king') {                            // no weapon: two great fists
+    const carry = P([6, 4, 14], [1, 0, 0], 0, 1, { spread: 4 });
+    if (u.st === 'rise') return Object.assign(mixPose(P([6, 4, 4], [1, 0, 0], 1, 6), carry, (u.t - 0.8) / 1.2), { spread: 4 });
+    const raised = P([-1, 0, 42], [0, 0, 1], 0, -4, { spread: 1 }), slammed = P([13, 0, 4], [1, 0, 0], 0.4, 9, { spread: 1 });
+    const tells = { hammer: raised, ssweep: P([-4, 8, 16], [-0.5, 0.8, 0], 0.2, -2, { spread: 2 }), stomp: P([4, 6, 28], [0, 0, 1], 0, -4, { spread: 9 }),
+      sink: P([6, 5, 6], [1, 0, 0], 1, 8, { spread: 6 }), pit: P([2, 0, 40], [0, 0, 1], 0, -3, { spread: 9 }), roar2: P([3, 0, 36], [0, 0, 1], 0, -5, { spread: 8, pain: 0.3 }) };
+    if (u.st === 'tell') return Object.assign(mixPose(carry, tells[mv], q / 0.75), { spread: tells[mv].spread });
+    if (u.st === 'act') {
+      if (mv === 'hammer') return Object.assign(mixPose(raised, slammed, uu * 1.5), { spread: 1 });
+      if (mv === 'ssweep') return Object.assign(sweep(2.0 - 4.0 * ease(uu), 12, 10), { spread: 2 });
+      if (mv === 'stomp') return Object.assign(mixPose(tells.stomp, P([6, 6, 12], [1, 0, 0], 0.45, 4), uu * 2), { spread: 9 });
+      return tells[mv] || carry;
+    }
+    if (u.st === 'recover') {
+      if (u.stag > 0) return Object.assign(mixPose(slammed, slammed, 0), { pain: 0.7, spread: 3 });
+      if (mv === 'hammer') return Object.assign(mixPose(slammed, carry, (uu - 0.8) / 0.2), { spread: 1 });   // fists sunk in the sand: he's open
+      if (mv === 'sink') return Object.assign(mixPose(tells.sink, carry, (uu - 0.8) / 0.2), { spread: 6, pain: 0.2 });   // half-buried, dragging himself out
+      return Object.assign(mixPose(tells[mv] || carry, carry, uu * 1.5), { spread: 4 });
+    }
+    return carry;
+  }
+  // the Mirage: hands held out, open, the orb's light between them
+  const carry = P([7, 0, 22], [1, 0, 0], 0, -1, { spread: 6 });
+  if (u.st === 'rise') return mixPose(P([6, 0, 10], [1, 0, 0], 0.6, 4, { spread: 3 }), carry, (u.t - 0.6) / 1.2);
+  const tells = { lance: P([10, 0, 28], [1, 0, 0], 0, -2, { spread: 1.5 }), rain: P([2, 0, 42], [0, 0, 1], 0, -4, { spread: 6 }), mstep: P([3, 0, 24], [1, 0, 0], 0.2, 2, { spread: 0.6 }),
+    clones: P([4, 0, 32], [0, 0, 1], 0, -3, { spread: 10 }), wheel: P([0, 0, 30], [0, 0, 1], 0, -2, { spread: 12 }), roar2: P([3, 0, 38], [0, 0, 1], 0, -5, { spread: 8, pain: 0.3 }) };
+  if (u.st === 'tell') return Object.assign(mixPose(carry, tells[mv], q / 0.75), { spread: tells[mv].spread });
+  if (u.st === 'act') return mv === 'lance' ? Object.assign(P([12, 0, 28], [1, 0, 0], 0, 3), { spread: 1.5 }) : tells[mv] || carry;
+  if (u.st === 'recover') {
+    if (u.stag > 0) return Object.assign(P([5, 0, 12], [1, 0, 0], 0.5, 5), { pain: 0.7, spread: 4 });
+    return Object.assign(mixPose(tells[mv] || carry, carry, uu * 1.4), { spread: 4, pain: mv === 'lance' ? 0.25 * (1 - uu) : 0 });
+  }
+  return carry;
+}
+// ---- what he does next ----
+function duneNext(m, u, d) {
+  const r = Math.random(), k = u.kind, p2 = u.p2;
+  if (!p2 && u.hp < u.max * 0.5) return 'roar2';
+  if (u.far > 3) return k === 'dervish' ? 'dlunge' : k === 'king' ? 'sink' : 'mstep';   // too far too long: he closes the gap
+  let mv = null;
+  if (k === 'dervish') {
+    if (p2 && m.t - (u.veilAt || -99) > 8 && r < 0.22) mv = 'veil';
+    else if (d < dReach(u).sweep - 6) mv = r < 0.45 ? 'sweep' : r < 0.75 ? 'rise' : 'whirl';
+    else if (d < 300) mv = r < 0.35 ? 'whirl' : r < 0.65 ? 'rise' : null;
+    else if (r < 0.5) mv = 'dlunge';
+  }
+  if (k === 'king') {
+    if (p2 && m.t - (u.pitAt || -99) > 12 && r < 0.2) mv = 'pit';
+    else if (d < 150) mv = r < 0.35 ? 'stomp' : r < 0.75 ? 'hammer' : 'ssweep';
+    else if (d < 480) mv = r < 0.45 ? 'ssweep' : r < 0.75 ? 'hammer' : null;
+    else if (r < 0.5) mv = 'sink';
+  }
+  if (k === 'mirage') {
+    if (p2 && m.t - (u.wheelAt || -99) > 10 && r < 0.25) mv = 'wheel';
+    else if (m.t - (u.cloneAt || -99) > 11 && r < 0.3) mv = 'clones';
+    else if (d < 120) mv = r < 0.55 ? 'mstep' : 'rain';
+    else mv = r < 0.5 ? 'lance' : r < 0.85 ? 'rain' : null;
+  }
+  if (mv && mv === u.last && Math.random() < 0.5) mv = null;
+  return mv;
+}
+function duneTell(m, u, mv, quick) {             // start a wind-up; some are held a beat longer than you expect
+  const p = S.p, Dv = DV[mv], fast = u.p2 ? 0.8 : 1;
+  u.st = 'tell'; u.move = mv; u.t = 0; u.hit = false; u.last = mv; u.aimX = p.x; u.aimY = p.y; u.glinted = false;
+  u.base = (quick || Dv.tell) * fast; u.len = u.base;
+  if (Dv.delay && !quick && Math.random() < 0.4) u.len += Dv.delay * fast;
+  if (Dv.snd) duneSay(Dv.snd);
+  if (mv === 'rain') {                           // where the glass will fall: round you, and one right on you
+    u.rain = [{ x: p.x, y: p.y }];
+    for (let i = 0; i < (u.p2 ? 7 : 5); i++) { const a = Math.random() * 7, rr = 50 + Math.random() * 130, s = { x: p.x + Math.cos(a) * rr, y: p.y + Math.sin(a) * rr }; arenaClamp(s, 20); u.rain.push(s); }
+  }
+  if (mv === 'veil') u.veilAt = m.t;
+  if (mv === 'pit') u.pitAt = m.t;
+  if (mv === 'wheel') u.wheelAt = m.t;
+  if (mv === 'clones') u.cloneAt = m.t;
+}
+// the moment the wind-up ends
+function duneAct(m, u) {
+  const p = S.p, rg = S.rg, mv = u.move;
+  u.st = 'act'; u.t = 0; u.hit = false; u.len = DV[mv].act;
+  if (mv === 'dlunge') { u.dash = u.dir; u.hitDash = false; }
+  if (mv === 'veil') { u.hid = true; u.printD = 0; }
+  if (mv === 'sink') { u.hid = true; m.crack = { x: u.x, y: u.y, lock: 0 }; ashBurst(u.x, u.y, 14, 60); duneSay('sand'); addShake(0.3); }
+  if (mv === 'ssweep') { m.waves.push({ x: u.x, y: u.y, a: u.dir, span: 1.15, r: 40, max: dReach(u).wave, sp: 820, hit: false }); duneSay('sand'); }
+  if (mv === 'pit') { m.pit = { x: m.L.x, y: m.L.y, t: 0 }; exNote('the sand is swallowing · keep running', true); addShake(0.3); }
+  if (mv === 'mstep') {                          // gone, and behind you
+    const [wx, wy] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)), at = { x: p.x - wx * 130, y: p.y - wy * 130 };
+    arenaClamp(at, 30); duneBlink(u, at);
+  }
+  if (mv === 'clones') {                         // copies of her stand round you; only the true one throws a shadow
+    const n = u.p2 ? 4 : 3, slot = Math.floor(Math.random() * n), a0 = Math.random() * 7, spots = [];
+    for (let i = 0; i < n; i++) { const a = a0 + i / n * Math.PI * 2, s = { x: p.x + Math.cos(a) * 250, y: p.y + Math.sin(a) * 250 }; arenaClamp(s, 40); spots.push(s); }
+    duneBlink(u, spots[slot]);
+    m.clones = spots.filter((_, i) => i !== slot).map(s => ({ x: s.x, y: s.y, dir: Math.atan2(p.y - s.y, p.x - s.x), lit: 0, pop: 0, t: 0 }));
+    exNote('which one throws a shadow?', true);
+  }
+  if (mv === 'roar2') {                          // the second wind
+    u.p2 = true; addShake(0.7); hitStop(0.12); rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.8, r: 240, col: 'white' });
+    if (u.kind === 'dervish') exNote('he moves like the wind now', true);
+    if (u.kind === 'king') { rg.storm = { st: 'storm', t: 999, k: 0.8 }; exNote('the sand rises with him', true); }
+    if (u.kind === 'mirage') exNote('she puts out the sun', true);
+  }
+}
+function duneBlink(u, at) {                      // a shimmer where she was, and where she lands
+  const rg = S.rg;
+  rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.35, r: 90, col: 'white' });
+  u.x = at.x; u.y = at.y; u.dir = Math.atan2(S.p.y - u.y, S.p.x - u.x);
+  rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.35, r: 90, col: 'white' });
+  if (actx) noiseAt(actx.currentTime, 6000, 2000, 0.25, 0.25, sfxGain);
+}
+function duneStep(m, u, dt) {
+  const rg = S.rg, p = S.p, D = MK[u.kind], R = dReach(u);
+  u.t += dt; u.flinch = Math.max(0, u.flinch - dt * 1.6); u.stag = Math.max(0, (u.stag || 0) - dt);
+  u.shown += (u.hp - u.shown) * Math.min(1, dt * (u.shown - u.hp > 0 ? 1.2 : 8));
+  if (u.st === 'dead') return;
+  if (u.st === 'dying') {
+    if (rg.embers.length < 320 && Math.random() < dt * 30) rg.embers.push({ x: u.x + (Math.random() - 0.5) * 30, y: u.y + (Math.random() - 0.5) * 30, z: 10 + Math.random() * 100, vz: 40 + Math.random() * 60, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40, life: 0.7 + Math.random() * 0.7, ember: true });
+    if (Math.random() < dt * 5) ashBurst(u.x, u.y, 5, 90);
+    if (u.t > 2.4) { u.st = 'dead'; u.t = 0; hitStop(0.15); addShake(0.7); rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.9, r: 220, col: 'white' }); for (let i = 0; i < 3; i++) ashBurst(u.x + (Math.random() - 0.5) * 40, u.y + (Math.random() - 0.5) * 40, 10, 120); }
+    return;
+  }
+  if (rg.phase !== 'fight') return;
+  const dx = p.x - u.x, dy = p.y - u.y, d = Math.hypot(dx, dy), toP = Math.atan2(dy, dx);
+  const turn = rate => { u.dir += Math.max(-rate * dt, Math.min(rate * dt, angDiff(toP, u.dir))); };
+  const fast = u.p2 ? 0.8 : 1;
+  // the torch: a slow burn, hard while he's open
+  let lit = 0; const bi = S.beamInfo;
+  if (bi && S.torchLvl > 0.6 && u.st !== 'rise' && !u.hid) {
+    const [sx, sy0] = toScreen(u.x, u.y);
+    for (const hgt of [0.15, 0.5, 0.85]) {
+      const sy = sy0 - (hgt * 38 * D.s + (D.float || 0) * D.s) * Z, dd = Math.hypot(sx - bi.bx, sy - bi.by);
+      if (dd < bi.br * 0.95 && Math.abs(angDiff(Math.atan2(sy - bi.by, sx - bi.bx), S.aim)) < HALF) lit = Math.max(lit, 1 - 0.5 * dd / bi.br);
+    }
+  }
+  u.lit += (lit - u.lit) * Math.min(1, dt * 8);
+  const open = u.st === 'recover';
+  if (lit > 0) {
+    u.hp -= dt * rgBurn() * lit * (open ? 1.1 : 0.3);
+    if (rg.laserOn && laserHits(u.x, u.y, 38 * D.s)) u.hp -= dt * rgBurn() * (tu('laser') > 1 ? 2.2 : 1.5) * (open ? 1 : 0.5);
+    if (rg.embers.length < 320 && Math.random() < dt * (open ? 26 : 8)) rg.embers.push({ x: u.x + (Math.random() - 0.5) * 20, y: u.y + (Math.random() - 0.5) * 20, z: 20 + Math.random() * 80, vz: 30 + Math.random() * 50, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.5 + Math.random() * 0.5, ember: true });
+  }
+  if (u.hp <= u.flinchAt && u.hp > 0) { u.flinchAt -= u.max * 0.2; u.flinch = 1; ashBurst(u.x, u.y, 10, 80); bossSay('pain'); addShake(0.12); }
+  if (u.hp <= 0) { u.hp = 0; u.st = 'dying'; u.t = 0; u.hid = false; m.clones = []; hitStop(0.3); addShake(0.9); bossSay('roar'); return; }
+  if (!u.hid && d < 8 * D.s) { p.x = u.x + dx / (d || 1) * 8 * D.s; p.y = u.y + dy / (d || 1) * 8 * D.s; }   // his body is solid
+  const moveBy = (a, dist) => {
+    u.x += Math.cos(a) * dist; u.y += Math.sin(a) * dist; arenaClamp(u, 30);
+    const p0 = u.ph; u.ph += dist * 0.78 * scrLen(u.dir) * Math.PI / (2 * 9.5 * D.s);
+    if (!D.float && Math.floor(p0 / Math.PI) !== Math.floor(u.ph / Math.PI)) bossSay('step');
+  };
+  const fwd = (f, r, a = u.dir) => [u.x + Math.cos(a) * f - Math.sin(a) * r, u.y + Math.sin(a) * f + Math.cos(a) * r];
+  let moving = false;
+  if (u.st === 'rise') { if (u.t >= u.len) { u.st = 'walk'; u.t = 0; u.cd = 0.6; } return; }
+  if (u.st === 'walk') {
+    turn(2.6);
+    u.far = d > 330 ? u.far + dt : 0;
+    const sp = D.sp * (u.p2 ? 1.25 : 1);
+    if (d > D.keep) { moveBy(u.dir, Math.min(sp * dt, d - D.keep)); moving = true; }
+    else if (D.keep > 150 && d < D.keep * 0.6) { moveBy(u.dir + Math.PI, sp * 0.8 * dt); moving = true; }   // the Mirage drifts back to her distance
+    if ((u.cd -= dt) <= 0) { const mv = duneNext(m, u, d); if (mv) { u.far = 0; duneTell(m, u, mv); } else u.cd = 0.3; }
+  } else if (u.st === 'tell') {
+    const lock = u.move === 'dlunge' || u.move === 'lance' ? 0.75 : u.move === 'hammer' || u.move === 'rise' ? 0.6 : 0.7;
+    if (u.t < u.base * lock && u.move !== 'pit' && u.move !== 'wheel') { turn(u.move === 'dlunge' ? 2 : 3.2); u.aimX = p.x; u.aimY = p.y; }
+    if (DV[u.move].quick && !u.glinted && u.len - u.t < 0.24) { u.glinted = true; duneSay('glint'); }   // the glint: now
+    if (u.move === 'whirl' && Math.random() < dt * 30) { const a = Math.random() * 7; S.rg.embers.push({ x: u.x + Math.cos(a) * R.whirl, y: u.y + Math.sin(a) * R.whirl, z: 4, vz: 30, vx: -Math.sin(a) * 90, vy: Math.cos(a) * 90, life: 0.5, ember: true }); }   // gold dust spun up round him
+    if (u.move === 'sink' && Math.random() < dt * 12) ashBurst(u.x + (Math.random() - 0.5) * 60, u.y + (Math.random() - 0.5) * 60, 3, 30);
+    for (const c of m.clones) c.dir = Math.atan2(p.y - c.y, p.x - c.x);
+    if (u.t >= u.len) duneAct(m, u);
+  } else if (u.st === 'act') {
+    const mv = u.move;
+    if (mv === 'sweep' || mv === 'sweepR' || mv === 'vslash') {
+      const th = dunePose(u).th, wa = u.dir + th;
+      if (!u.hit && d > 12 && d < R.sweep + 14 && Math.abs(angDiff(toP, wa)) < 0.32) { u.hit = true; if (miniHurt(1, 55, u)) { addShake(0.5); hitStop(0.07); } }
+    }
+    if (mv === 'rise' && u.t >= u.len && !u.hit) {
+      u.hit = true; bossSay('impact'); addShake(0.6); hitStop(0.06);
+      const [ex, ey] = fwd(R.rise * 0.85, 0); rg.blasts.push({ x: ex, y: ey, t: 0, life: 0.35, r: 80, col: 'white' }); ashBurst(ex, ey, 10, 20);
+      const lf = dx * Math.cos(u.dir) + dy * Math.sin(u.dir), lr = -dx * Math.sin(u.dir) + dy * Math.cos(u.dir);
+      if ((lf > 8 && lf < R.rise + 12 && Math.abs(lr) < 26) || d < 30) miniHurt(1, 30, u);
+      m.lines.push({ x: ex, y: ey, a: u.dir, d: 0, max: 420, w: 22, sp: 760, hit: false, t: 0 });   // a line of sand bursts runs on from the blade
+    }
+    if (mv === 'dlunge') {
+      moveBy(u.dash, 1150 * dt); moving = true;
+      if (Math.random() < dt * 40) ashBurst(u.x, u.y, 2, 30);
+      if (!u.hitDash && dist2(u, p) < 30 + 5 * D.s) { u.hitDash = true; if (miniHurt(1, 70, u)) { addShake(0.6); hitStop(0.08); } }
+    }
+    if (mv === 'whirl') {
+      turn(1.2); moveBy(u.dir, Math.min(100 * dt, Math.max(0, d - 20))); moving = true;
+      if (d < R.whirl + 12 && (u.whirlHit || 0) <= u.t) { u.whirlHit = u.t + 0.6; if (miniHurt(0.5, 50, u)) { addShake(0.4); hitStop(0.05); } }
+      if (Math.floor((u.t - dt) * 6) !== Math.floor(u.t * 6)) noiseAt && actx && noiseAt(actx.currentTime, 2600, 900, 0.2, 0.12, sfxGain);
+    }
+    if (mv === 'veil') {                         // unseen: only his footprints in the sand, racing at you
+      const sp = Math.max(300, d * 1.2); moveBy(toP, Math.min(sp * dt, Math.max(0, d - 60)));
+      u.printD += sp * dt; if (u.printD > 26) { u.printD = 0; m.prints.push({ x: u.x, y: u.y, a: toP, t: 0, side: (m.prints.length % 2) ? 1 : -1 }); }
+    }
+    if (mv === 'sink') {                         // cracks chase you under the sand, then stop, and the ground under you glows
+      const c = m.crack, chase = u.len - 0.8;
+      if (u.t < chase) { const cx = p.x - c.x, cy = p.y - c.y, cd = Math.hypot(cx, cy) || 1, st = Math.min(cd, 300 * dt); c.x += cx / cd * st; c.y += cy / cd * st; }
+      else if (!c.lock) { c.lock = 1; duneSay('glint'); }
+      u.x = c.x; u.y = c.y;
+      if (Math.random() < dt * 10) ashBurst(c.x + (Math.random() - 0.5) * 30, c.y + (Math.random() - 0.5) * 30, 2, 20);
+    }
+    if (mv === 'pit') {                          // a whirlpool of sand in the middle drags you in
+      const pt = m.pit; pt.t += dt;
+      const cx = pt.x - p.x, cy = pt.y - p.y, cd = Math.hypot(cx, cy) || 1;
+      if (cd < 520) { const pull = 75 * Math.min(1, pt.t / 0.6); p.x += cx / cd * pull * dt + cy / cd * 30 * dt; p.y += cy / cd * pull * dt - cx / cd * 30 * dt; }
+      if (cd < 50) miniHurt(0.5, 0, pt);
+    }
+    if (mv === 'lance' && u.t > 0.05) duneBeam(m, u, u.dir, R.lance);
+    if (mv === 'wheel') {                        // four lances turning round her, glass falling on you
+      const a0 = u.wheelA + 0.85 * u.t * (u.wheelS || 1);
+      for (let i = 0; i < 4; i++) duneBeam(m, u, a0 + i * Math.PI / 2, 800);
+      if ((u.wheelR = (u.wheelR ?? 0.6) - dt) <= 0) { u.wheelR = 0.95; m.shards.push({ x: p.x, y: p.y, t: 0, T: 0.9 }); }
+    }
+    if (u.t >= u.len) duneEnd(m, u, d);
+  } else if (u.st === 'recover' && u.t >= u.len) { u.st = 'walk'; u.t = 0; u.cd = (0.35 + Math.random() * 0.45) * fast; u.pun = 0; }
+  u.gait += ((moving ? 1 : 0) - u.gait) * Math.min(1, dt * 6);
+}
+function duneBeam(m, u, a, len) {                // a lance of light: hurts along its whole length
+  const p = S.p, ox = u.x + Math.cos(a) * 20, oy = u.y + Math.sin(a) * 20, dx = p.x - ox, dy = p.y - oy;
+  const along = dx * Math.cos(a) + dy * Math.sin(a), perp = Math.abs(-dx * Math.sin(a) + dy * Math.cos(a));
+  m.beams.push({ x: ox, y: oy, a, len });
+  if (along > 0 && along < len && perp < 17) { if (miniHurt(1, 30, { x: ox + Math.cos(a) * along, y: oy + Math.sin(a) * along })) { addShake(0.45); hitStop(0.06); } }
+}
+function duneEnd(m, u, d) {                      // the blow is spent: open, or straight into the next
+  const mv = u.move, rg = S.rg, p = S.p, R = dReach(u);
+  u.hid = false;
+  if (mv === 'hammer') {
+    bossSay('impact'); addShake(0.75); hitStop(0.08);
+    const ex = u.x + Math.cos(u.dir) * R.hammer, ey = u.y + Math.sin(u.dir) * R.hammer;
+    rg.blasts.push({ x: ex, y: ey, t: 0, life: 0.45, r: 120, col: 'white' }); ashBurst(ex, ey, 14, 40);
+    if (Math.hypot(p.x - ex, p.y - ey) < 64) miniHurt(1, 40, { x: ex, y: ey });
+    m.lines.push({ x: ex, y: ey, a: u.dir, d: 0, max: 480, w: 26, sp: 820, hit: false, t: 0 });
+  }
+  if (mv === 'stomp') { bossSay('stomp'); addShake(0.5); m.rings.push({ x: u.x, y: u.y, r: 20, max: R.stomp, sp: 430, hit: false }); ashBurst(u.x, u.y, 12, 40); }
+  if (mv === 'sink') {                           // he bursts up out of the sand where it glowed
+    bossSay('impact'); addShake(0.8); hitStop(0.08);
+    rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.5, r: 150, col: 'white' }); for (let i = 0; i < 3; i++) ashBurst(u.x + (Math.random() - 0.5) * 60, u.y + (Math.random() - 0.5) * 60, 10, 60);
+    if (dist2(p, u) < 80) miniHurt(1, 80, u);
+    m.crack = null;
+  }
+  if (mv === 'rain') { for (const s of u.rain) m.shards.push({ x: s.x, y: s.y, t: 0.9, T: 0.9 }); u.rain = null; }   // the shards land now
+  if (mv === 'veil') {                           // out of nowhere, behind you
+    const [wx, wy] = screenDirToWorld(Math.cos(S.aim), Math.sin(S.aim)), at = { x: p.x - wx * 75, y: p.y - wy * 75 };
+    arenaClamp(at, 30); u.x = at.x; u.y = at.y; u.dir = Math.atan2(p.y - u.y, p.x - u.x);
+    rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.3, r: 70, col: 'white' }); ashBurst(u.x, u.y, 10, 40);
+    return duneTell(m, u, 'vslash');
+  }
+  if (mv === 'mstep' || mv === 'clones') return duneTell(m, u, 'lance', mv === 'mstep' ? 0.65 : 0);
+  if (mv === 'pit') { m.pit = null; return duneTell(m, u, 'hammer', 0.75); }
+  if (mv === 'sweep' && u.p2 && Math.random() < 0.55) return duneTell(m, u, 'sweepR');   // phase two: the sweep comes back the other way
+  if (mv === 'hammer' && u.p2 && !u.chained && Math.random() < 0.4) { u.chained = true; return duneTell(m, u, 'stomp', 0.5); }
+  if (mv === 'lance') { for (const c of m.clones) if (!c.pop) { c.pop = 0.01; ashBurst(c.x, c.y, 8, 40); } }   // the copies fade once the true one has fired
+  if (mv === 'wheel') u.wheelA = null;
+  u.chained = false;
+  u.st = 'recover'; u.t = 0; u.pun = 0; u.len = DV[mv].rec * (u.p2 ? 0.85 : 1);
+  if (!u.len) { u.st = 'walk'; u.cd = 0.4; }
+}
+function duneFxStep(m, dt) {                     // what's left on the ground and in the air
+  const p = S.p, rg = S.rg;
+  m.beams = [];
+  for (const u of m.units) if (u.st === 'tell' && u.move === 'wheel') u.wheelA = u.wheelA ?? Math.atan2(p.y - u.y, p.x - u.x) + Math.PI / 4, u.wheelS = u.wheelS || (Math.random() < 0.5 ? 1 : -1);
+  for (const l of m.lines) {                     // a line of sand bursts running along the ground
+    l.d += l.sp * dt; l.t += dt;
+    const fx = l.x + Math.cos(l.a) * l.d, fy = l.y + Math.sin(l.a) * l.d;
+    if (Math.random() < dt * 40) ashBurst(fx, fy, 3, 30);
+    if (!l.hit && Math.hypot(p.x - fx, p.y - fy) < l.w + 6) { l.hit = true; if (miniHurt(0.5, 30, { x: fx, y: fy })) addShake(0.35); }
+  }
+  m.lines = m.lines.filter(l => l.d < l.max);
+  for (const w of m.waves) {                     // a wave of sand rolling out across a wide arc: roll through it
+    w.r += w.sp * dt;
+    const dd = dist2(p, w), a = Math.atan2(p.y - w.y, p.x - w.x);
+    if (!w.hit && Math.abs(dd - w.r) < 20 && Math.abs(angDiff(a, w.a)) < w.span) { w.hit = true; if (miniHurt(1, 45, w)) addShake(0.45); }
+  }
+  m.waves = m.waves.filter(w => w.r < w.max);
+  for (const r of m.rings) { r.r += r.sp * dt; if (!r.hit && Math.abs(dist2(r, p) - r.r) < 16) { r.hit = true; miniHurt(0.5, 30, r); } }
+  m.rings = m.rings.filter(r => r.r < r.max);
+  for (const s of m.shards) {                    // glass falling out of the sky: its shadow grows, it lands, it stays sharp a while
+    s.t += dt;
+    if (s.t >= s.T && !s.landed) { s.landed = true; s.life = 4; if (actx) noiseAt(actx.currentTime, 7000, 2500, 0.18, 0.2, sfxGain); if (Math.hypot(p.x - s.x, p.y - s.y) < 30) miniHurt(0.5, 12, s); m.glass.push({ x: s.x, y: s.y, life: 4, seed: Math.random() }); }
+  }
+  m.shards = m.shards.filter(s => !s.landed);
+  for (const g of m.glass) { g.life -= dt; if (g.life > 0.3 && Math.hypot(p.x - g.x, p.y - g.y) < 17) miniHurt(0.5, 0, g); }
+  m.glass = m.glass.filter(g => g.life > 0);
+  for (const f of m.prints) f.t += dt; m.prints = m.prints.filter(f => f.t < 1.6);
+  for (const c of m.clones) {                    // a copy pops when your light or a blow finds it
+    c.t += dt;
+    if (c.pop) { c.pop += dt; continue; }
+    const bi = S.beamInfo;
+    if (bi && S.torchLvl > 0.6) {
+      const [sx, sy] = toScreen(c.x, c.y), yy = sy - 30 * 3 * Z, dd = Math.hypot(sx - bi.bx, yy - bi.by);
+      if (dd < bi.br * 0.95 && Math.abs(angDiff(Math.atan2(yy - bi.by, sx - bi.bx), S.aim)) < HALF) c.lit += dt; else c.lit = Math.max(0, c.lit - dt);
+      if (c.lit > 0.5) duneClonePop(c);
+    }
+  }
+  m.clones = m.clones.filter(c => !c.pop || c.pop < 0.5);
+  const mir = m.units.find(u => u.kind === 'mirage'), wantE = mir && mir.p2 && mir.st !== 'dying' && mir.st !== 'dead' ? 1 : 0;
+  m.eclipse += (wantE - m.eclipse) * Math.min(1, dt * 0.8);
+  m.sandK = Math.min(1, m.sandK + dt * 1.5);
+}
+function duneClonePop(c) {
+  c.pop = 0.01; ashBurst(c.x, c.y, 14, 60); S.rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.3, r: 70, col: 'white' });
+  if (actx) noiseAt(actx.currentTime, 8000, 3000, 0.2, 0.25, sfxGain);
+}
+function duneHitBy(u, D) {                       // a full combo with the slam, in his open window: he staggers
+  if (u.st !== 'recover') return;
+  u.pun = (u.pun || 0) + 1;
+  if (D.slam && u.pun >= 3 && !(u.stag > 0)) { u.stag = 2.5; u.len = u.t + 2.5; u.pun = 0; exNote('staggered', true); addShake(0.5); hitStop(0.12); bossSay('pain'); }
+}
+function duneWin(m) {                            // the orb falls out of him and lies in the sand
+  const rg = S.rg, u = m.units[0];
+  XS.dbBeat = XS.dorbs || 0; XS.dorb = { x: u.x, y: u.y, arena: m.L }; rg.duneT = 6; XS.dorbField = true; desertCache.clear();
+  rg.storm = null; m.pit = null; m.clones = []; m.lines = []; m.waves = []; m.rings = []; m.shards = []; m.glass = [];
+  rg.blasts.push({ x: u.x, y: u.y, t: 0, life: 0.9, r: 200, col: 'teal' });
+  S.msg = { text: m.B.title + ' felled', sub: 'The teal orb is yours · his wisps and his chest too · get them home', t: 0 };
+}
+// ---- drawing ----
+function drawGlaive(u, pal, grip, dir, P, Zs, OUT, c) {   // a long glaive: a curved blade, the teal orb set where blade meets haft
+  const len = 34, butt = grip.map((v, i) => v - dir[i] * 10), tip = grip.map((v, i) => v + dir[i] * len);
+  const [x0, y0] = P(...butt), [x1, y1] = P(...tip);
+  const ux = x1 - x0, uy = y1 - y0, ul = Math.hypot(ux, uy) || 1, nx = -uy / ul, ny = ux / ul, ax = ux / ul, ay = uy / ul;
+  const dark = '#111110', wood = shadeC(pal.body, 0.45), iron = shadeC(pal.near, 0.6), edge = shadeC(pal.head, 1);
+  c.lineCap = 'round';
+  c.strokeStyle = OUT ? dark : wood; c.lineWidth = (OUT ? 3.2 : 1.6) * Zs; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+  const bl = [[x1, y1], [x1 + ax * 4 * Zs + nx * 5 * Zs, y1 + ay * 4 * Zs + ny * 5 * Zs], [x1 + ax * 13 * Zs + nx * 3 * Zs, y1 + ay * 13 * Zs + ny * 3 * Zs], [x1 + ax * 9 * Zs - nx * 0.5 * Zs, y1 + ay * 9 * Zs - ny * 0.5 * Zs]];
+  c.beginPath(); c.moveTo(bl[0][0], bl[0][1]); c.quadraticCurveTo(bl[1][0], bl[1][1], bl[2][0], bl[2][1]); c.quadraticCurveTo(bl[3][0], bl[3][1], bl[0][0], bl[0][1]); c.closePath();
+  if (OUT) { c.strokeStyle = dark; c.lineWidth = 1.6 * Zs; c.stroke(); } else { c.fillStyle = iron; c.fill(); c.strokeStyle = edge; c.lineWidth = 0.7 * Zs; c.beginPath(); c.moveTo(bl[1][0], bl[1][1]); c.quadraticCurveTo((bl[1][0] + bl[2][0]) / 2 + nx * Zs, (bl[1][1] + bl[2][1]) / 2 + ny * Zs, bl[2][0], bl[2][1]); c.stroke(); }
+  u.orbS = [x1, y1]; u.tipS = bl[2];
+}
+function drawDuneFigure(m, u, clone) {
+  const D = MK[u.kind], B = m.B, col = B.col, pose = dunePose(clone ? m.units[0] : u);
+  const src = clone ? m.units[0] : u;
+  const burn = clone ? 0.1 : Math.min(1, (1 - u.hp / u.max) * 0.5 + u.flinch * 0.35 + u.lit * 0.3 + (u.st === 'dying' ? Math.min(1, u.t / 1.6) : 0));
+  const vis = u.st === 'dying' ? 1 : 0.55 + 0.45 * Math.min(1, (clone ? 0.5 : u.lit) * 2);
+  const pl = foePalette(burn), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
+  let alpha = 1;
+  if (!clone) {
+    if (u.st === 'rise') alpha = Math.min(1, u.t / 0.9);
+    if (u.st === 'dying') alpha = Math.max(0, 1 - Math.max(0, u.t - 1.8) / 0.6);
+    if (u.st === 'dead' || u.hid) return;
+    if (u.st === 'tell' && u.move === 'veil') alpha = Math.max(0, 1 - u.t / u.len);   // he fades into the haze
+    if (u.st === 'tell' && (u.move === 'mstep' || u.move === 'clones')) alpha = 0.55 + 0.45 * Math.cos(u.t * 30);   // a shimmer
+  }
+  if (clone) alpha = Math.max(0, 1 - (clone.pop || 0) / 0.4) * Math.min(1, clone.t / 0.3);
+  if (alpha <= 0) return;
+  const at = clone || u, dir0 = clone ? clone.dir : u.dir;
+  const [sx, sy] = toScreen(at.x, at.y), grip = pose.g, dir = pose.d, Zs = Z * D.s;
+  const hover = D.float ? (D.float + 2 * Math.sin(S.t * 2 + (clone ? clone.x : 0))) * Zs : 0;
+  ctx.save(); ctx.globalAlpha = alpha;
+  if (!clone) {                                  // a shadow on the sand; the Mirage's real one stretches away from your torch
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(sx, sy, 9 * Zs * 1.4, 9 * Zs * 0.7, 0, 0, 7); ctx.fill();
+    if (u.kind === 'mirage') {
+      const [px, py] = toScreen(S.p.x, S.p.y), a = Math.atan2(sy - py, sx - px), L = (60 + 80 * Math.min(1, u.lit * 1.5)) * Z * 1.4;
+      ctx.save(); ctx.translate(sx, sy); ctx.rotate(a);
+      const g = ctx.createLinearGradient(0, 0, L, 0); g.addColorStop(0, `rgba(0,0,0,${0.35 + 0.35 * u.lit})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, -8 * Zs * 0.5); ctx.lineTo(L, -11 * Zs * 0.5); ctx.lineTo(L, 11 * Zs * 0.5); ctx.lineTo(0, 8 * Zs * 0.5); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  }
+  ctx.translate(0, -hover);
+  const glaive = D.prop === 'glaive';
+  const opt = {
+    scale: D.s, jx: u.flinch && !clone ? (Math.random() - 0.5) * 5 * Z * u.flinch : 0, pal, pain: pose.pain || (clone ? 0 : u.flinch * 0.5), reach: 0, leanAdd: pose.lean || 0, kneel: pose.kneel || 0,
+    kit: D.kit, gait: clone ? 0 : u.gait,
+    arms: pose.free ? null : (sd, def) => {
+      const sp = pose.spread === undefined ? 1.5 : pose.spread;
+      const ha = glaive ? (sd === 1 ? grip : grip.map((v, i) => v + dir[i] * 6)) : [grip[0], grip[1] + sd * sp, grip[2]];
+      const sh = def[0], el = [(sh[0] + ha[0]) / 2 - 1.5, (sh[1] + ha[1]) / 2 + sd * 2, (sh[2] + ha[2]) / 2 - 2.5];
+      if (!glaive && sd === 1) src.handG = ha;
+      return [sh, el, ha];
+    },
+    prop: pose.free ? null : (P, Zs2, OUT, c) => { if (glaive) drawGlaive(src, pal, grip, dir, P, Zs2, OUT, c); else if (!OUT) { const [hx, hy] = P(grip[0] + 1, grip[1], grip[2] + (u.kind === 'king' ? -10 : 0)); src.orbS = u.kind === 'king' ? P(3.5, 0, 25) : [hx, hy]; } },
+  };
+  const sa = scrAng(dir0);
+  drawQuarry({ x: at.x, y: at.y, dir: sa, phase: clone ? 0 : u.ph, state: 'run', t: 0 }, ctx, false, opt);
+  if (u.kind === 'king' && !clone) {             // a crown of rough gold-dark iron on the helmet
+    const hh = 36 - 14 * (pose.kneel || 0) + 3.5, cx = sx + 1 * Math.cos(sa) * Zs, cy = sy + (Math.sin(sa) - hh) * Zs;
+    ctx.fillStyle = '#3a3428'; ctx.beginPath(); ctx.moveTo(cx - 4.4 * Zs, cy); for (let i = 0; i <= 4; i++) { const x = cx - 4.4 * Zs + i * 2.2 * Zs; ctx.lineTo(x, cy - (i % 2 ? 1.2 : 3.2) * Zs); } ctx.lineTo(cx + 4.4 * Zs, cy); ctx.closePath(); ctx.fill();
+  }
+  const held = m.st === 'on' && u.st !== 'dying';
+  if (held && src.orbS) {                        // the orb he took: teal, alive, part of him
+    const [ox, oy] = src.orbS, R = (u.kind === 'king' ? 9 : 6) * Z * (1 + 0.1 * Math.sin(S.t * 4));
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(ox, oy, 0, ox, oy, R * 3); g.addColorStop(0, `rgba(${DORB_COL},0.6)`); g.addColorStop(1, `rgba(${DORB_COL},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ox, oy, R * 3, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgb(160,255,235)'; ctx.beginPath(); ctx.arc(ox, oy, R * 0.45, 0, 7); ctx.fill();
+  }
+  if (Math.sin(sa) > -0.35 && u.st !== 'dying') {   // eyes in his own colour
+    const hh = 36 - 14 * (pose.kneel || 0);
+    const hx = sx + 4.2 * Math.cos(sa) * Zs, hy = sy + (3 * Math.sin(sa) - hh) * Zs;
+    for (const o of [-1, 1]) {
+      const ex = hx - Math.sin(sa) * o * 1.4 * Zs, ey = hy + Math.cos(sa) * 0.5 * o * 1.4 * Zs;
+      const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, 1.4 * Zs); g.addColorStop(0, `rgba(${col},0.55)`); g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, 1.4 * Zs, 0, 7); ctx.fill();
+      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(ex, ey, 0.5 * Zs, 0, 7); ctx.fill();
+    }
+    if (!clone && u.st === 'tell' && DV[u.move].quick && u.len - u.t < 0.3) {   // the glint: a star of his colour off the eye and the blade
+      const k = 1 - (u.len - u.t) / 0.3, pts = [[hx, hy]]; if (u.tipS && u.kind === 'dervish') pts.push(u.tipS); else if (u.orbS) pts.push(u.orbS);
+      ctx.globalCompositeOperation = 'lighter';
+      for (const [gx, gy] of pts) {
+        const r = (6 + 16 * k) * Z;
+        ctx.strokeStyle = `rgba(${col},${0.9 * (1 - k * 0.3)})`; ctx.lineWidth = 1.6 * Z;
+        ctx.beginPath(); ctx.moveTo(gx - r, gy); ctx.lineTo(gx + r, gy); ctx.moveTo(gx, gy - r); ctx.lineTo(gx, gy + r); ctx.stroke();
+        const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 0.6); g.addColorStop(0, `rgba(255,255,240,${0.9})`); g.addColorStop(1, `rgba(${col},0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gx, gy, r * 0.6, 0, 7); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+  ctx.restore();
+}
+function drawDuneGround(m) {                     // marks on the sand in the keeper's colour: where the next blow lands
+  const col = m.B.col, cc = a => `rgba(${col},${a})`;
+  ctx.save();
+  const fill = (pts, uu, f = 1) => { worldPoly(pts); ctx.fillStyle = cc((0.07 + 0.22 * uu) * f); ctx.fill(); ctx.strokeStyle = cc((0.3 + 0.5 * uu) * f); ctx.lineWidth = 1.5; ctx.stroke(); };
+  for (const u of m.units) {
+    if (u.st === 'dead' || u.st === 'dying') continue;
+    const R = dReach(u), uu = u.base ? Math.min(1, u.t / u.base) : 0, mv = u.move;
+    const fwd = (f, r, a = u.dir, o = u) => [o.x + Math.cos(a) * f - Math.sin(a) * r, o.y + Math.sin(a) * f + Math.cos(a) * r];
+    const rect = (f0, f1, w, a = u.dir, k = 1, o = u) => fill([fwd(f0, -w, a, o), fwd(f1, -w, a, o), fwd(f1, w, a, o), fwd(f0, w, a, o)], uu, k);
+    const arc = (r, span, k = 1) => { const pts = []; for (let i = 0; i <= 24; i++) { const a = -span + 2 * span * i / 24; pts.push([u.x + Math.cos(u.dir + a) * r, u.y + Math.sin(u.dir + a) * r]); } for (let i = 24; i >= 0; i--) { const a = -span + 2 * span * i / 24; pts.push([u.x + Math.cos(u.dir + a) * 25, u.y + Math.sin(u.dir + a) * 25]); } fill(pts, uu, k); };
+    if (u.st === 'tell') {
+      if (mv === 'sweep' || mv === 'sweepR') arc(R.sweep + 14, SPAN);
+      if (mv === 'vslash') arc(R.sweep + 14, 1.3);
+      if (mv === 'rise') { rect(10, R.rise + 12, 26); rect(R.rise, R.rise + 420, 12, u.dir, 0.55); }
+      if (mv === 'dlunge') rect(10, 600, 28);
+      if (mv === 'whirl') fill(circlePts(u.x, u.y, R.whirl + 12), uu);
+      if (mv === 'hammer') { const [ex, ey] = fwd(R.hammer, 0); fill(circlePts(ex, ey, 64), uu); rect(R.hammer, R.hammer + 480, 14, u.dir, 0.55); }
+      if (mv === 'ssweep') { const pts = []; for (let i = 0; i <= 24; i++) { const a = u.dir - 1.15 + 2.3 * i / 24; pts.push([u.x + Math.cos(a) * R.wave, u.y + Math.sin(a) * R.wave]); } pts.push([u.x, u.y]); fill(pts, uu, 0.6); }
+      if (mv === 'stomp') { worldPoly(circlePts(u.x, u.y, R.stomp)); ctx.strokeStyle = cc(0.3 + 0.5 * uu); ctx.lineWidth = 2; ctx.stroke(); fill(circlePts(u.x, u.y, 60), uu); }
+      if (mv === 'pit') fill(circlePts(m.L.x, m.L.y, 220), uu, 0.8);
+      if (mv === 'lance' || (mv === 'wheel')) {
+        const fl = 0.5 + 0.5 * Math.sin(S.t * 40) * Math.sin(S.t * 13);   // a flickering line: the lance about to fire
+        const lines = mv === 'wheel' ? [0, 1, 2, 3].map(i => (u.wheelA || 0) + i * Math.PI / 2) : [u.dir];
+        for (const a of lines) rect(20, mv === 'wheel' ? 800 : R.lance, 4 + 6 * uu, a, 0.5 + 0.5 * fl);
+        if (mv === 'lance') for (const c of m.clones) if (!c.pop) rect(20, R.lance, 4 + 6 * uu, c.dir, 0.5 + 0.5 * fl, c);   // the copies aim too
+      }
+      if (mv === 'rain' && u.rain) for (const s of u.rain) { worldPoly(circlePts(s.x, s.y, 8 + 22 * uu)); ctx.fillStyle = `rgba(0,0,0,${0.2 + 0.35 * uu})`; ctx.fill(); ctx.strokeStyle = cc(0.3 + 0.5 * uu); ctx.lineWidth = 1.2; ctx.stroke(); }
+    }
+    if (u.st === 'act' && mv === 'whirl') fill(circlePts(u.x, u.y, R.whirl + 12), 0.5);
+  }
+  if (m.crack) {                                 // spiral cracks chasing you; when they stop, the sand glows
+    const c = m.crack, [x, y] = toScreen(c.x, c.y), lk = c.lock ? 1 : 0;
+    ctx.strokeStyle = cc(0.5 + 0.4 * lk); ctx.lineWidth = 1.6 * Z;
+    for (let arm = 0; arm < 3; arm++) { ctx.beginPath(); for (let i = 0; i <= 18; i++) { const r = i * 3.6 * Z, a = arm * 2.1 + i * 0.35 + S.t * 3; const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.5; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
+    if (lk) { worldPoly(circlePts(c.x, c.y, 80)); ctx.fillStyle = cc(0.2 + 0.2 * Math.sin(S.t * 20)); ctx.fill(); }
+  }
+  if (m.pit) {                                   // the whirlpool
+    const pt = m.pit, [x, y] = toScreen(pt.x, pt.y);
+    for (let ring = 0; ring < 6; ring++) { const r = (40 + ring * 34) * Z; ctx.strokeStyle = cc(0.75 - ring * 0.09); ctx.lineWidth = 2.6 * Z; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.5, 0, S.t * (3 - ring * 0.3) + ring, S.t * (3 - ring * 0.3) + ring + 4); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(x, y, 40 * Z, 20 * Z, 0, 0, 7); ctx.fill();
+  }
+  for (const w of m.waves) {                     // the wave front: a curling wall of sand
+    const pts = []; for (let i = 0; i <= 24; i++) { const a = w.a - w.span + 2 * w.span * i / 24; pts.push([w.x + Math.cos(a) * (w.r + 14), w.y + Math.sin(a) * (w.r + 14)]); }
+    for (let i = 24; i >= 0; i--) { const a = w.a - w.span + 2 * w.span * i / 24; pts.push([w.x + Math.cos(a) * Math.max(0, w.r - 14), w.y + Math.sin(a) * Math.max(0, w.r - 14)]); }
+    worldPoly(pts); ctx.fillStyle = 'rgba(210,190,150,0.55)'; ctx.fill(); ctx.strokeStyle = cc(0.7); ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  for (const r of m.rings) { worldPoly(circlePts(r.x, r.y, r.r)); ctx.strokeStyle = 'rgba(220,200,160,0.8)'; ctx.lineWidth = 4 * Z; ctx.stroke(); }
+  for (const l of m.lines) for (let d = Math.max(0, l.d - 120); d < l.d; d += 24) {   // sand spurting up along the line
+    const x0 = l.x + Math.cos(l.a) * d, y0 = l.y + Math.sin(l.a) * d, [x, y] = toScreen(x0, y0), k = 1 - (l.d - d) / 120;
+    ctx.fillStyle = `rgba(210,190,150,${0.6 * k})`; ctx.beginPath(); ctx.ellipse(x, y - 6 * k * Z, 9 * Z, (6 + 10 * k) * Z, 0, 0, 7); ctx.fill();
+  }
+  for (const f of m.prints) {                    // his footprints, racing at you
+    const [x, y] = toScreen(f.x + Math.cos(f.a + Math.PI / 2) * 5 * f.side, f.y + Math.sin(f.a + Math.PI / 2) * 5 * f.side);
+    ctx.fillStyle = `rgba(${col},${0.7 * (1 - f.t / 1.6)})`; ctx.beginPath(); ctx.ellipse(x, y, 3.2 * Z, 1.8 * Z, scrAng(f.a), 0, 7); ctx.fill();
+  }
+  for (const s of m.shards) { const k = Math.min(1, s.t / s.T); worldPoly(circlePts(s.x, s.y, 8 + 22 * k)); ctx.fillStyle = `rgba(0,0,0,${0.2 + 0.35 * k})`; ctx.fill(); ctx.strokeStyle = cc(0.4 + 0.5 * k); ctx.lineWidth = 1.2; ctx.stroke(); }
+  for (const g of m.glass) {                     // sharp glass left on the sand, glinting
+    const [x, y] = toScreen(g.x, g.y), a = Math.min(1, g.life / 0.5);
+    for (let i = 0; i < 5; i++) { const b = g.seed * 9 + i * 1.3, r = (4 + 8 * hash(i, g.seed)) * Z; ctx.fillStyle = `rgba(235,240,235,${0.55 * a})`; ctx.beginPath(); ctx.moveTo(x + Math.cos(b) * r, y + Math.sin(b) * r * 0.5); ctx.lineTo(x + Math.cos(b + 0.3) * r * 0.3, y + Math.sin(b + 0.3) * r * 0.15 - 5 * Z); ctx.lineTo(x + Math.cos(b - 0.4) * r * 0.4, y + Math.sin(b - 0.4) * r * 0.2); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle = cc(0.4 * a); ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y, 17 * Z, 8.5 * Z, 0, 0, 7); ctx.stroke();
+  }
+  for (const s of m.shards) {                    // the glass in the air above its shadow
+    const [x, y] = toScreen(s.x, s.y), k = Math.min(1, s.t / s.T), yy = y - (1 - k) * 260 * Z;
+    ctx.fillStyle = 'rgba(235,240,235,0.85)'; ctx.beginPath(); ctx.moveTo(x, yy - 9 * Z); ctx.lineTo(x + 3 * Z, yy); ctx.lineTo(x, yy + 9 * Z); ctx.lineTo(x - 3 * Z, yy); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawDuneBeams(m) {                      // the lances: white-gold light, drawn bright over the dark
+  if (!m.beams.length) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const b of m.beams) {
+    const [x0, y0] = toScreen(b.x, b.y), [x1, y1] = toScreen(b.x + Math.cos(b.a) * b.len, b.y + Math.sin(b.a) * b.len), lift = 24 * Z;
+    for (const [w, a] of [[22, 0.18], [10, 0.45], [3.5, 0.95]]) { ctx.strokeStyle = `rgba(${m.B.col},${a})`; ctx.lineWidth = w * Z; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0 - lift); ctx.lineTo(x1, y1 - lift * 0.3); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function drawSandWall(k) {                       // a whirling wall of sand round the edge of the framed arena
+  if (k <= 0.01) return;
+  const bx = arenaBox(), t = S.t;
+  ctx.save();
+  const edge = (x0, y0, x1, y1) => { const g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, `rgba(196,180,146,${0.42 * k})`); g.addColorStop(0.45, `rgba(196,180,146,${0.12 * k})`); g.addColorStop(1, 'rgba(196,180,146,0)'); return g; };
+  const F = 80;
+  ctx.fillStyle = edge(bx.l - 26, 0, bx.l + F, 0); ctx.fillRect(0, 0, bx.l + F, H);
+  ctx.fillStyle = edge(bx.r + 26, 0, bx.r - F, 0); ctx.fillRect(bx.r - F, 0, W - bx.r + F, H);
+  ctx.fillStyle = edge(0, bx.b + 34, 0, bx.b - F); ctx.fillRect(0, bx.b - F, W, H - bx.b + F);
+  ctx.fillStyle = edge(0, bx.t - 30, 0, bx.t + F); ctx.fillRect(0, 0, W, bx.t + F);
+  ctx.strokeStyle = `rgba(214,198,160,${0.35 * k})`; ctx.lineWidth = 1.2;      // streaks racing round the walls, clockwise
+  const per = 2 * (bx.r - bx.l) + 2 * (bx.b - bx.t);
+  const at = s => { s = ((s % per) + per) % per; const w = bx.r - bx.l, h = bx.b - bx.t; if (s < w) return [bx.l + s, bx.t, 1, 0]; s -= w; if (s < h) return [bx.r, bx.t + s, 0, 1]; s -= h; if (s < w) return [bx.r - s, bx.b, -1, 0]; s -= w; return [bx.l, bx.b - s, 0, -1]; };
+  for (let i = 0; i < 90; i++) {
+    const s = hash(i, 3.1) * per + t * (380 + 300 * hash(i, 5.2)), [x, y, ux, uy] = at(s), off = (hash(i, 8.8) - 0.5) * 70, len = 20 + 40 * hash(i, 1.9);
+    const ox = -uy * off, oy = ux * off;
+    ctx.beginPath(); ctx.moveTo(x + ox, y + oy); ctx.lineTo(x + ox - ux * len, y + oy - uy * len); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawDuneFx() {
+  const m = S.rg && S.rg.mini;
+  const L = duneLair();
+  if (L && XS.dgrace && XS.dgrace.n === (XS.dorbs || 0)) { const g = XS.dgrace, [x, y] = toScreen(g.x, g.y); if (x > -60 && x < W + 60 && y > -100 && y < H + 60) { ctx.fillStyle = '#2b2925'; ctx.fillRect(x - 2 * Z, y - 20 * Z, 4 * Z, 20 * Z); drawFlame(x, y - 22 * Z, Z * 1.1, g.x); } }   // the checkpoint lantern
+  if (!m || m.st === 'gone' || !m.B.dune) return;
+  drawDuneGround(m);
+  const [, psy] = toScreen(S.p.x, S.p.y);
+  let over = false;
+  const figs = m.units.map(u => ({ u, c: null })).concat(m.clones.map(c => ({ u: m.units[0], c })));
+  figs.sort((a, b) => toScreen((a.c || a.u).x, (a.c || a.u).y)[1] - toScreen((b.c || b.u).x, (b.c || b.u).y)[1]);
+  for (const f of figs) { drawDuneFigure(m, f.u, f.c); if (!f.c && toScreen(f.u.x, f.u.y)[1] < psy && f.u.st !== 'dead') over = true; }
+  if (over) drawPlayer();
+  drawDuneBeams(m);
+  if (m.eclipse > 0.01) {                        // the eclipse: the sky goes dark round a burning ring
+    ctx.save(); ctx.fillStyle = `rgba(0,0,0,${0.3 * m.eclipse})`; ctx.fillRect(0, 0, W, H);
+    const x = W / 2, y = SAFE_TOP + (W < 600 ? 250 : 175), r = 22;
+    ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, y, r * 0.9, x, y, r * 2.4); g.addColorStop(0, `rgba(${m.B.col},${0.7 * m.eclipse})`); g.addColorStop(1, `rgba(${m.B.col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = `rgba(0,0,0,${m.eclipse})`; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.restore();
+  }
+  drawSandWall(m.mist);
+}
+
 // ---- drawing ----
 function drawChest(o, c, sx, sy) {
   const rg = S.rg, open = rg && (rg.looted.has(o.key) || rg.left.has(o.key));
@@ -7417,7 +8086,7 @@ function exHoles(hole) {                     // light the orb puts out round its
   if (rg.next) { hole(NEXT_GATE.x, NEXT_GATE.y, 120, 0.6, 0); return; }
   if (rg.beyond) {
     hole(BEYOND_GATE.x, BEYOND_GATE.y, 120, 0.6, 0);
-    if (XS.dorbField && XS.dorb) hole(XS.dorb.x, XS.dorb.y, 95 * (1 + 0.05 * Math.sin(S.t * 2)), 0.8, 0);
+    if (XS.dorbField && XS.dorb && !duneHeld()) hole(XS.dorb.x, XS.dorb.y, 95 * (1 + 0.05 * Math.sin(S.t * 2)), 0.8, 0);
     if (rg.carryDorb) hole(S.p.x, S.p.y, 70, 0.55, 0);
     return;
   }
@@ -7515,14 +8184,14 @@ function portalStep(dt) {                      // returns true when the rest of 
   }
   if (rg.beyond) {                             // the Dunes: oil burns, spear throwers and archers hunt, a teal orb waits out in the sand
     rg.inCamp = false; campBtn.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; dodgeBtn.hidden = false; attackBtn.hidden = false;
-    exOilStep(dt, dist2(p, BEYOND_GATE) < 130);  // the portal's light tops the torch up
-    if (rg.phase === 'fight') stormStep(dt); stormSound(stormK());
+    exOilStep(dt, dist2(p, BEYOND_GATE) < 130 || !!miniLive());  // the portal's light tops the torch up, and so does a keeper's fight
+    if (rg.phase === 'fight' && !miniLive()) stormStep(dt); stormSound(stormK());   // no storms blow in while you fight a keeper
+    miniStep(dt);                              // the orb's keeper
     if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // quitting out here loses what you carry
     if (dist2(p, BEYOND_GATE) > 40) rg.leftGate = true;
-    if (XS.dorbField && XS.dorb && !rg.carryDorb && dist2(XS.dorb, p) < 30) exTakeDorb();
-    if (XS.dorbField && XS.dorb && !rg.guardDone && dist2(p, XS.dorb) < 750 && !rg.enemies.some(e => e.guard)) spawnGuard();
+    if (XS.dorbField && XS.dorb && !rg.carryDorb && !duneHeld() && XS.dbBeat === (XS.dorbs || 0) && dist2(XS.dorb, p) < 30) exTakeDorb();   // v110: each orb's keeper must fall first
     if (dist2(p, BEYOND_GATE) < 130) { for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser' || e.type === 'spear' || e.type === 'archer') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); } }   // the portal's light drives the ranged ones off, like an outpost
-    if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220) {   // hunters roam the open sand; the ground round the portal is safe
+    if (rg.phase === 'fight' && dist2(p, BEYOND_GATE) > 220 && !miniLive() && !(duneLair() && dist2(p, duneLair()) < 700)) {   // hunters roam the open sand (but keep off a keeper's ground); the ground round the portal is safe
       // harder than the deep woods: no limit per kind, only on how many hunt at once, and that grows the further out you are
       const dg = dist2(p, BEYOND_GATE), cap = (Math.min(66, 44 + dg / 110) + (rg.carryDorb ? 10 : 0)) * (pact('horde') ? 1.5 : 1);   // v91: no bosses out here, just a crowd (Joe)
       if ((rg.duneT = (rg.duneT ?? 3) - dt) <= 0) {
@@ -7932,13 +8601,14 @@ function drawExFx() {
   if (rg.next) { const [gx, gy] = toScreen(NEXT_GATE.x, NEXT_GATE.y); asTeal(() => { drawPortal(gx, gy, Z * TELE_S, 1, null); drawHomeArrow(gx, gy, NEXT_GATE); drawWarpVeil(); }); return; }
   if (rg.beyond) {
     drawLagoonGlints(); drawSandWind(); const [gx, gy] = toScreen(BEYOND_GATE.x, BEYOND_GATE.y); drawPortal(gx, gy, Z * TELE_S, 1, null);
-    if (XS.dorbField && XS.dorb) asTeal(() => drawOrbBeacon(XS.dorb));
+    if (XS.dorbField && XS.dorb && !duneHeld()) asTeal(() => drawOrbBeacon(XS.dorb));
     const [px, py] = toScreen(S.p.x, S.p.y);
     if (rg.carryDorb) asTeal(() => drawOrb(px + 12 * Z, py - 58 * Z + Math.sin(S.t * 2.4) * 2 * Z, Z * 0.75, 1));
-    if (XS.dorbField && XS.dorb && !rg.carryDorb) {   // the teal arrow: always points to the orb waiting out in the sand
+    if (XS.dorbField && XS.dorb && !rg.carryDorb && !duneHeld()) {   // the teal arrow: always points to the orb waiting out in the sand
       drawTealArrow(XS.dorb);
     }
-    drawHomeArrow(gx, gy, BEYOND_GATE); drawWarpVeil(); return;
+    drawDuneFx();                              // the orb's keeper, his marks on the sand, the wall of sand
+    if (!duneHeld()) drawHomeArrow(gx, gy, BEYOND_GATE); drawWarpVeil(); return;
   }
   drawCampFlames();
   const p = S.p, [px, py] = toScreen(p.x, p.y), alive = rg.phase === 'fight';
@@ -7985,7 +8655,7 @@ function drawExFx() {
   drawWarpVeil();
   // the orb out in the deep: a beacon you can see from a long way off, then the crystal itself
   if (XS.orbField && XS.orb) drawOrbBeacon(XS.orb);
-  drawLairFx();
+  drawLairFx(); drawDuneFx();
   drawBossFx();                               // the Woodwarden, his stones and mist, drawn over the orb he keeps
   // dropped packs: a faint pale marker so you can find your things
   for (const L of rg.loose) {
@@ -8425,6 +9095,16 @@ document.getElementById('testMini').addEventListener('click', () => testMini(0))
 document.getElementById('testMini2').addEventListener('click', () => testMini(1));
 document.getElementById('testMini3').addEventListener('click', () => testMini(2));
 document.getElementById('testMini4').addEventListener('click', () => testMini(3));
+function testDune(i) {                           // playtest: the Dunes with orb i waiting, its keeper not yet beaten; you stand just outside his pillars
+  exTestCopy(3, i); XS.dbBeat = -1; XS.dgrace = null; exNewDorb();
+  const rg = S.rg, p = S.p; rg.beyond = true; rg.next = false; rg.inCamp = false; rg.leftGate = true;
+  const L = duneLair();
+  p.x = L.x + Math.cos(L.a) * 520; p.y = L.y + Math.sin(L.a) * 520; S.cam.x = p.x; S.cam.y = p.y; rg.duneT = 999;
+  S.msg = { text: 'playtest', sub: 'Walk in among the pillars to face ' + DUNE_BOSSES[i].title, t: 0 };
+}
+document.getElementById('testDune1').addEventListener('click', () => testDune(0));
+document.getElementById('testDune2').addEventListener('click', () => testDune(1));
+document.getElementById('testDune3').addEventListener('click', () => testDune(2));
 document.getElementById('testStorm').addEventListener('click', () => {
   document.getElementById('testDunes').click();
   S.rg.storm = { st: 'calm', t: 2, k: 0 }; S.msg = { text: 'playtest', sub: 'A dust storm is on its way', t: 0 };
