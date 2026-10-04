@@ -1936,14 +1936,45 @@ function paintGrass(g, R) {
     g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + lean * 0.3, -h * 0.6, x + lean, -h); g.stroke();
   }
 }
-function paintStump(g, R) {
-  const r = 5 + R() * 2, h = 4 + R() * 3;
-  g.fillStyle = grey(44); g.beginPath(); g.moveTo(-r - 1.5, 0); g.lineTo(-r, -h); g.lineTo(r, -h); g.lineTo(r + 1.5, 0); g.closePath(); g.fill();
-  g.fillStyle = grey(58); g.fillRect(r * 0.2, -h, r * 0.8, h);
-  g.fillStyle = grey(96); g.beginPath(); g.ellipse(0, -h, r, r * 0.5, 0, 0, 7); g.fill();
-  g.strokeStyle = grey(76); g.lineWidth = 0.35;
-  for (let k = 1; k < 4; k++) { g.beginPath(); g.ellipse(0.4, -h, r * k / 4, r * k / 8, 0, 0, 7); g.stroke(); }
-  g.strokeStyle = grey(40); g.lineWidth = 1; g.beginPath(); g.moveTo(-r, 0); g.lineTo(-r - 4, 1.5); g.moveTo(r, 0); g.lineTo(r + 3.5, 1.2); g.stroke();   // roots
+function paintStump(g, R, Ld = 1) {             // v108: a felled tree's stump in the same hand as the trunks: root flare, fissured bark, a cut or snapped top
+  const r = 6 + R() * 2.5, h = 6 + R() * 6, top = -h, snapped = R() < 0.4, tone = 46 + R() * 10;
+  for (let k = 0; k < 5; k++) {                    // roots spreading over the ground, the far ones first
+    const sd = k % 2 ? 1 : -1, sp = 0.6 + R() * 0.5, len = r * (0.55 + R() * 0.5), x0 = sd * r * sp, ex = sd * (r * (0.9 + sp * 0.5) + len), ey = 0.6 + R() * 1.6;   // they hug the ground and reach out sideways
+    g.fillStyle = grey(tone - 8 + (sd * Ld > 0 ? 16 : 0));
+    g.beginPath(); g.moveTo(x0 - sd * 1.5, -4); g.quadraticCurveTo(x0 + sd * len * 0.4, -2.4, ex, ey - 0.6); g.quadraticCurveTo(x0 + sd * len * 0.4, ey + 0.6, x0 - sd * 2, 1.2); g.closePath(); g.fill();
+  }
+  g.fillStyle = grey(tone);                        // the stump's side, flaring at the foot
+  g.beginPath(); g.moveTo(-r * 1.45, 1); g.quadraticCurveTo(-r, -1, -r, -4); g.lineTo(-r * 0.95, top); g.lineTo(r * 0.95, top); g.lineTo(r, -4); g.quadraticCurveTo(r, -1, r * 1.45, 1); g.closePath(); g.fill();
+  g.fillStyle = grey(tone + 18);                   // the side facing the light
+  g.beginPath(); g.moveTo(Ld * r * 0.15, 1); g.lineTo(Ld * r * 0.2, top); g.lineTo(Ld * r * 0.95, top); g.lineTo(Ld * r, -4); g.quadraticCurveTo(Ld * r, -1, Ld * r * 1.45, 1); g.closePath(); g.fill();
+  g.lineWidth = 0.4;
+  for (let n = 0; n < 12; n++) {                   // bark fissures running up the side
+    const f = R() * 2 - 1, x0 = f * r * 0.92, y0 = -R() * 2, len = 2 + R() * (h - 2);
+    g.strokeStyle = grey(tone - 12 + (f * Ld > 0 ? 22 : 0)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + (R() - 0.5) * 0.8, Math.max(top + 0.6, y0 - len)); g.stroke();
+  }
+  if (snapped) {                                   // broken off: jagged splinters standing up from a ragged top
+    g.fillStyle = grey(tone + 6); g.beginPath(); g.moveTo(-r * 0.95, top);
+    const n = 9, tall = R() < 0.5 ? 2 : 6;            // a ragged break, one long splinter left standing
+    for (let k = 0; k <= n; k++) { const x = -r * 0.95 + k / n * r * 1.9; g.lineTo(x, top - (Math.abs(k - tall) < 1 ? 6 + R() * 4 : Math.abs(k - tall) < 2 ? 2.5 + R() * 2 : R() * 1.8)); }
+    g.lineTo(r * 0.95, top + 1.5); g.lineTo(-r * 0.95, top + 1.5); g.closePath(); g.fill();
+    g.strokeStyle = grey(tone + 40); g.lineWidth = 0.5;
+    for (let k = 0; k < 4; k++) { const x = (R() - 0.5) * r * 1.4; g.beginPath(); g.moveTo(x, top + 1); g.lineTo(x + (R() - 0.5), top - 1 - R() * 4); g.stroke(); }   // pale torn wood showing
+  } else {                                          // sawn: a flat face of old pale wood with rings, a dark heart and drying cracks
+    g.fillStyle = grey(tone - 8); g.beginPath(); g.ellipse(0, top + 0.6, r, r * 0.45, 0, 0, 7); g.fill();   // the bark rim
+    g.fillStyle = grey(96 + R() * 14); g.beginPath(); g.ellipse(0, top, r * 0.86, r * 0.38, 0, 0, 7); g.fill();
+    g.strokeStyle = grey(78); g.lineWidth = 0.3;
+    for (let k = 1; k < 5; k++) { g.beginPath(); g.ellipse(r * 0.06, top, r * 0.86 * k / 5, r * 0.38 * k / 5, 0, 0, 7); g.stroke(); }
+    g.fillStyle = grey(66); g.beginPath(); g.ellipse(r * 0.06, top, r * 0.12, r * 0.06, 0, 0, 7); g.fill();
+    g.strokeStyle = grey(54); g.lineWidth = 0.45;
+    for (let k = 0; k < 3; k++) { const a = R() * Math.PI * 2; g.beginPath(); g.moveTo(r * 0.06, top); g.lineTo(Math.cos(a) * r * 0.8, top + Math.sin(a) * r * 0.34); g.stroke(); }
+    g.fillStyle = 'rgba(255,255,240,0.1)'; g.beginPath(); g.ellipse(Ld * r * 0.3, top - r * 0.08, r * 0.4, r * 0.15, 0, 0, 7); g.fill();   // a sheen where the light catches it
+  }
+  if (R() < 0.55) {                                // a bracket fungus or a patch of moss on the shady side
+    const x = -Ld * r * (0.5 + R() * 0.4), y = top * (0.3 + R() * 0.4);
+    if (R() < 0.5) { g.fillStyle = grey(150); g.beginPath(); g.ellipse(x, y, 2.4, 1, 0, Math.PI, 0); g.fill(); g.fillStyle = grey(110); g.fillRect(x - 2.4, y, 4.8, 0.5); }
+    else for (let k = 0; k < 12; k++) { g.fillStyle = oakG(36 + R() * 18); g.beginPath(); g.arc(x + (R() - 0.5) * 4, y + (R() - 0.5) * 3, 0.5 + R() * 0.5, 0, 7); g.fill(); }
+  }
+  shadeRound(g, Ld, r * 1.3, h + 4, 0, top * 0.5);
 }
 function paintLog(g, R) {                        // a fallen log lying across the screen-diagonal
   const L = 16 + R() * 8, r = 2.6 + R() * 1.2, dx = L * 0.9, dy = L * 0.45;
@@ -2120,7 +2151,7 @@ function paintWoodpile(g, R) {                   // split logs stacked three hig
 const SPRITE_KINDS = {                           // kind: [variants, w, h, ax, ay, painter]
   pine: [6, 70, 118, 35, 112, paintPine], oak: [5, 84, 96, 42, 90, paintOak], cherry: [5, 100, 104, 50, 92, paintCherry], dead: [4, 76, 72, 38, 66, paintSnag],
   bush: [4, 28, 20, 14, 17, paintBush], fern: [4, 34, 16, 17, 13, paintFern], grass: [5, 16, 13, 8, 12, paintGrass],
-  stump: [3, 22, 13, 11, 10, paintStump], flowerY: [3, 40, 22, 20, 15, paintFlowers('flowerY')], flowerB: [3, 40, 22, 20, 15, paintFlowers('flowerB')], flowerR: [3, 40, 22, 20, 15, paintFlowers('flowerR')], flowerW: [3, 40, 22, 20, 15, paintFlowers('flowerW')], flowerV: [3, 40, 22, 20, 15, paintFlowers('flowerV')], pebbles: [4, 16, 8, 8, 5, paintPebbles],
+  stump: [4, 36, 30, 18, 23, paintStump], flowerY: [3, 40, 22, 20, 15, paintFlowers('flowerY')], flowerB: [3, 40, 22, 20, 15, paintFlowers('flowerB')], flowerR: [3, 40, 22, 20, 15, paintFlowers('flowerR')], flowerW: [3, 40, 22, 20, 15, paintFlowers('flowerW')], flowerV: [3, 40, 22, 20, 15, paintFlowers('flowerV')], pebbles: [4, 16, 8, 8, 5, paintPebbles],
   rock: [5, 36, 26, 18, 21, paintRock], post: [3, 16, 38, 8, 35, paintPost], lamp: [1, 22, 58, 6, 55, paintLamp],
   firepit: [1, 40, 22, 20, 12, paintFirePit], crateS: [1, 20, 22, 10, 18, paintCrate(false)], crateB: [1, 24, 26, 12, 22, paintCrate(true)],
   barrel: [1, 16, 22, 8, 19, paintBarrel], woodpile: [1, 26, 20, 13, 17, paintWoodpile], pack: [1, 24, 22, 12, 18, paintPack],
@@ -2322,7 +2353,7 @@ function paintIcicles(g, R, Ld) {                // a frozen fallen log with sno
 }
 const SNOW_KINDS = {                             // kind: [variants, w, h, ax, ay, painter, snow on top]
   sPine: [6, 70, 118, 35, 112, snowy(paintPine, 16), 1.7], sDead: [4, 76, 72, 38, 66, snowy(paintSnag, 8), 1], sRock: [5, 36, 26, 18, 21, snowy(paintRock, 14), 1],
-  sBush: [4, 28, 20, 14, 17, snowy(paintBush, 11), 1], sStump: [3, 22, 13, 11, 10, snowy(paintStump, 8), 1], sLog: [3, 56, 34, 28, 19, paintIcicles, 1],
+  sBush: [4, 28, 20, 14, 17, snowy(paintBush, 11), 1], sStump: [4, 36, 30, 18, 23, snowy(paintStump, 10), 1], sLog: [3, 56, 34, 28, 19, paintIcicles, 1],
   drift: [5, 40, 14, 20, 11, paintDrift], dGrass: [4, 18, 14, 9, 12, paintDeadGrass], sStone: [4, 22, 10, 11, 7, paintSnowStone],
 };
 Object.assign(SPRITE_KINDS, SNOW_KINDS);
