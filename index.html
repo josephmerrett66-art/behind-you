@@ -328,6 +328,10 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <button class="backbtn" data-back><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>Back</button>
     <h2>Settings</h2>
     <label class="fov"><span>Field of view</span><input id="fov" type="range" min="0.75" max="1.4" step="0.05"><output id="fovOut"></output></label>
+    <div class="audio"><h2>Look</h2>
+      <button id="colourBtn" class="alt">Colour</button>
+      <p class="small">Colour paints the world: bark, moss, earth and kit. Black and white is the original grey look.</p>
+    </div>
     <div class="audio"><h2>Audio</h2>
       <label class="fov"><span>Music</span><input id="volMusic" type="range" min="0" max="100" step="5"><output id="volMusicOut"></output></label>
       <label class="fov"><span>Ambience</span><input id="volAmb" type="range" min="0" max="100" step="5"><output id="volAmbOut"></output></label>
@@ -428,6 +432,8 @@ let warmHoles = false, warmHoleBox = null;
 let warmOn = false, warmBox = null, beamGeo = null;
 let W = 0, H = 0, DPR = 1, Z = 1, ZB = 1, SAFE_TOP = 0;   // ZB: the usual zoom; Z eases away from it when a boss fight frames its arena
 let FOV = 1;   // field of view from the menu slider: above 1 sees more (zoomed out), below 1 is closer
+// v124 (Joe: a full colour pass, with a colour or black and white mode): COLOUR switches every painted material between colour and the original greys
+let COLOUR = true; try { COLOUR = localStorage.getItem('behind-you-colour') !== 'bw'; } catch (e) {}
 try { const f = parseFloat(localStorage.getItem('behind-you-fov')); if (f >= 0.75 && f <= 1.4) FOV = f; } catch (e) {}
 const ZOOM = () => 1 / FOV; // camera zoom: bigger is closer
 let camZv = 1;                 // extra zoom for a framed boss arena (1 = normal)
@@ -1689,28 +1695,29 @@ function update(dt) {
 // ---- draw ----
 // forest floor: fallen needles, leaves, twigs and damp patches, painted once into a big tile that repeats across the ground
 let floorPat = null, floorT = null;
+const LEAF_HUES = [v => `rgba(${v * 1.45 | 0},${v * 0.78 | 0},${v * 0.35 | 0},0.75)`, v => `rgba(${v * 1.4 | 0},${v * 1.1 | 0},${v * 0.4 | 0},0.75)`, v => `rgba(${v * 1.05 | 0},${v * 0.72 | 0},${v * 0.5 | 0},0.75)`, v => `rgba(${v * 1.5 | 0},${v * 0.6 | 0},${v * 0.4 | 0},0.75)`];   // v124: autumn leaves
 function floorPattern() {
   if (floorPat) return floorPat;
   const P = 384, q = 1, cv = document.createElement('canvas'); cv.width = cv.height = P * q;
   const g = cv.getContext('2d'), R = sprRand(4242); g.scale(q, q); g.lineCap = 'round';
-  g.fillStyle = '#9a9a96'; g.fillRect(0, 0, P, P);   // the bare ground colour is part of the tile, so the floor is one fill
+  g.fillStyle = COLOUR ? '#8d7a5c' : '#9a9a96'; g.fillRect(0, 0, P, P);   // the bare ground colour is part of the tile, so the floor is one fill
   const wrap = f => { for (const ox of [-P, 0, P]) for (const oy of [-P, 0, P]) { g.save(); g.translate(ox, oy); f(); g.restore(); } };
   for (let n = 0; n < 34; n++) {                    // damp dark and dry pale patches
     const x = R() * P, y = R() * P, r = 18 + R() * 50, dark = R() < 0.6;
-    wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, dark ? 'rgba(60,60,56,0.16)' : 'rgba(190,190,184,0.12)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
+    wrap(() => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, COLOUR ? (dark ? 'rgba(52,78,34,0.3)' : 'rgba(196,170,120,0.16)') : dark ? 'rgba(60,60,56,0.16)' : 'rgba(190,190,184,0.12)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); });
   }
   for (let n = 0; n < 1400; n++) {                  // pine needles
     const x = R() * P, y = R() * P, a = R() * 6.3, l = 1.5 + R() * 2.5, v = 105 + R() * 40 | 0;
-    wrap(() => { g.strokeStyle = `rgba(${v},${v},${v - 3},0.7)`; g.lineWidth = 0.45; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); });
+    wrap(() => { g.strokeStyle = COLOUR ? `rgba(${v * 1.25 | 0},${v * 0.86 | 0},${v * 0.55 | 0},0.7)` : `rgba(${v},${v},${v - 3},0.7)`; g.lineWidth = 0.45; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); });
   }
   for (let n = 0; n < 380; n++) {                   // dead leaves, each with a midrib
     const x = R() * P, y = R() * P, a = R() * 6.3, l = 1.6 + R() * 1.6, v = 112 + R() * 46 | 0;
-    wrap(() => { g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = `rgba(${v},${v},${v - 4},0.7)`; g.beginPath(); g.ellipse(0, 0, l, l * 0.5, 0, 0, 7); g.fill();
+    wrap(() => { g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = COLOUR ? LEAF_HUES[n % LEAF_HUES.length](v) : `rgba(${v},${v},${v - 4},0.7)`; g.beginPath(); g.ellipse(0, 0, l, l * 0.5, 0, 0, 7); g.fill();
       g.strokeStyle = 'rgba(80,80,76,0.5)'; g.lineWidth = 0.25; g.beginPath(); g.moveTo(-l, 0); g.lineTo(l, 0); g.stroke(); g.restore(); });
   }
   for (let n = 0; n < 50; n++) {                    // twigs
     const x = R() * P, y = R() * P, a = R() * 6.3, l = 5 + R() * 9, b = R() * 0.6 + 0.3;
-    wrap(() => { g.strokeStyle = 'rgba(78,78,74,0.75)'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+    wrap(() => { g.strokeStyle = COLOUR ? 'rgba(92,66,44,0.8)' : 'rgba(78,78,74,0.75)'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
       g.moveTo(x + Math.cos(a) * l * 0.5, y + Math.sin(a) * l * 0.5); g.lineTo(x + Math.cos(a) * l * 0.5 + Math.cos(a + b) * l * 0.35, y + Math.sin(a) * l * 0.5 + Math.sin(a + b) * l * 0.35); g.stroke(); });
   }
   for (let n = 0; n < 500; n++) {                   // grit
@@ -1759,9 +1766,18 @@ function shadow() {}   // round blob shadows removed; real shadows come from the
 let SPR = 0;                                     // sprite pixels per world unit: matched to the screen, so stamping never shrinks a big picture
 let SPRITES = {};
 function sprRand(seed) { let a = seed * 2654435761 >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const grey = v => { v = Math.max(0, Math.min(255, v | 0)); return `rgb(${v},${v},${v - 2})`; };
+let MATK = null;                                 // v124: while a sprite paints in colour, its greys become this material
+const grey = v => { v = Math.max(0, Math.min(255, v | 0)); return MATK ? MATK(v) : `rgb(${v},${v},${v - 2})`; };
+const mat = (r, g, b, k = 1) => v => `rgb(${Math.max(0, Math.min(255, v * r * k | 0))},${Math.max(0, Math.min(255, v * g * k | 0))},${Math.max(0, Math.min(255, v * b * k | 0))})`;
+const MAT = { bark: mat(1.32, 1.0, 0.7), dead: mat(1.12, 1.0, 0.86), wood: mat(1.38, 1.04, 0.66), stone: mat(0.92, 0.98, 1.08), moss: mat(0.8, 1.15, 0.6),
+  grass: mat(0.72, 1.22, 0.5), canvas: mat(1.3, 1.16, 0.82), shroom: mat(1.45, 0.9, 0.72), leaf: mat(0.82, 1.2, 0.55) };
+const MAT_NAME = new Map(Object.entries(MAT).map(([k, f]) => [f, k]));
+const KIND_MAT = { pine: MAT.bark, oak: MAT.bark, cherry: MAT.bark, stump: MAT.bark, log: MAT.bark, dead: MAT.dead, bush: MAT.leaf, fern: MAT.grass, grass: MAT.grass,
+  rock: MAT.stone, pebbles: MAT.stone, firepit: MAT.stone, post: MAT.wood, lamp: MAT.wood, crateS: MAT.wood, crateB: MAT.wood, barrel: MAT.wood, woodpile: MAT.wood,
+  chest1: MAT.wood, chest2: MAT.wood, chest3: MAT.wood, chest1o: MAT.wood, chest2o: MAT.wood, chest3o: MAT.wood, pack: MAT.canvas, shrooms: MAT.shroom };
 const tint = (r, g, b) => v => `rgb(${Math.max(0, Math.min(255, v * r | 0))},${Math.max(0, Math.min(255, v * g | 0))},${Math.max(0, Math.min(255, v * b | 0))})`;
-let LEAF_K = 2.2;                                  // how much green the leaves carry (1 = the normal amount); a gentle tint, never a pop like the flowers
+const LEAF_BW = 2.2, LEAF_COL = 3.1;              // v124: richer greens in colour
+let LEAF_K = COLOUR ? LEAF_COL : LEAF_BW;                                  // how much green the leaves carry (1 = the normal amount); a gentle tint, never a pop like the flowers
 const pineG = v => tint(1 - 0.16 * LEAF_K, 1 + 0.05 * LEAF_K, 1 - 0.1 * LEAF_K)(v);   // pine needles: a dark blue-green
 const oakG = v => tint(1 - 0.1 * LEAF_K, 1 + 0.06 * LEAF_K, 1 - 0.24 * LEAF_K)(v);    // oak and bush leaves: a soft olive
 function makeSprite(key, w, h, ax, ay, paint, post) { // w, h, ax, ay in world units; (ax, ay) is where it meets the ground
@@ -2213,7 +2229,8 @@ function sprite(kind, v, Ld = 1) {
   if (want !== SPR) { SPR = want; SPRITES = {}; }   // zoom or quality changed: repaint at the new size
   const key = kind + v + (Ld > 0 ? 'r' : 'l'); if (SPRITES[key]) return SPRITES[key];
   const [, w, h, ax, ay, paint, snow] = SPRITE_KINDS[kind];
-  return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld), snow ? cv => snowify(cv, ax, Ld, snow) : null);
+  MATK = COLOUR ? KIND_MAT[kind] || null : null;
+  try { return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld), snow ? cv => snowify(cv, ax, Ld, snow) : null); } finally { MATK = null; }
 }
 // ================= THE DUNES: the first world through the portal =================
 // Rolling sand under the moon, mostly empty: the odd rock, dry scrub, a dead tree. Now and then an oasis: a small lagoon
@@ -2889,6 +2906,14 @@ function litStamp(c, kind, v, sx, sy, s, mask, sw = 0) {
 }
 // a touch of perspective: we look down on the world from above the player, so anything standing up leans gently away from
 // the middle of the screen and stands a little taller toward the top; as you walk past, things turn and shift like solid objects
+const hexMatC = new Map();
+function hexMat(x, m) {                          // v124: a grey '#rrggbb' as the same brightness of a material; anything already coloured is left alone
+  if (typeof x !== 'string' || x[0] !== '#' || x.length !== 7) return x;
+  const key = x + m.name; let v = hexMatC.get(x + '|' + MAT_NAME.get(m)); if (v) return v;
+  const r = parseInt(x.slice(1, 3), 16), g = parseInt(x.slice(3, 5), 16), b = parseInt(x.slice(5, 7), 16);
+  v = Math.max(r, g, b) - Math.min(r, g, b) > 14 ? x : m((r + g + b) / 3);
+  hexMatC.set(x + '|' + MAT_NAME.get(m), v); return v;
+}
 function lean(sx, sy) {
   return [Math.max(-1.3, Math.min(1.3, (sx - W / 2) / 600)) * 0.2, 1 + Math.max(-1, Math.min(1, (H / 2 - sy) / 600)) * 0.08];
 }
@@ -2897,7 +2922,8 @@ function drawProp(o, c = ctx, mask = false, maskCol = '#000') {
   withXf(c, 1, -l, hy, l * sy, sy - hy * sy, () => drawPropFlat(o, c, mask, maskCol));   // shear and stretch about the object's foot
 }
 function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
-  const col = x => mask ? maskCol : x;
+  const cm = COLOUR && !mask ? (o.camp || o.kind === 'fence' ? MAT.wood : o.kind === 'stone' || o.kind === 'tele' || o.kind === 'plinth' ? MAT.stone : null) : null;
+  const col = x => mask ? maskCol : cm ? hexMat(x, cm) : x;   // v124: camp timber and standing stones take their material in colour
   const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
   if (sx < -110 * s || sx > W + 110 * s || sy < -20 * s || sy - 200 * s > H) return;   // off screen
   if (o.kind === 'tree') {
@@ -3014,6 +3040,9 @@ function atkPose(p) {                              // the pose to draw, and how 
   const L = p.atkLast; if (!L || !S.rg || S.t - L.end > 0.16) return null;
   return Object.assign(poseAt(L.i, 1), { w: 1 - (S.t - L.end) / 0.16 });
 }
+const KITC = { jacket: mat(0.95, 1.2, 0.72, 1.7), pants: mat(1.3, 1.18, 0.88, 1.7), pad: mat(1, 1, 0.95, 1.2), boot: mat(1.45, 1.0, 0.68, 1.6), sole: mat(1.1, 1, 0.9),
+  glove: mat(1.3, 1.05, 0.8, 1.4), canvas: mat(1.32, 1.16, 0.82, 1.6), roll: mat(1.9, 0.8, 0.62, 1.5), strap: mat(1.2, 1.05, 0.85, 1.25), rig: mat(1.35, 1.17, 0.86, 1.55),
+  skin: mat(1.5, 1.12, 0.9, 1.9), scarf: mat(2.0, 0.72, 0.52, 1.6), hat: mat(1.12, 1.15, 0.8, 1.55), hair: mat(1.35, 1.0, 0.75, 1.1) };   // v124: the survivor's kit in colour
 function drawPlayer() {
   const p = S.p, [bx, by0] = toScreen(p.x, p.y), by = by0 - (p.hopZ || 0) * Z;   // up off the ground mid-leap
   const a = S.aim, v = screenSpeed(p), moving = v > 8;
@@ -3080,7 +3109,7 @@ function drawPlayer() {
 
   let OUT = false;   // outline pass: everything drawn a little fatter in a faint light tone, then the body on top
   const RIM = 'rgba(239,239,234,0.2)';
-  const G = (v, near) => { v += near ? 7 : 0; return `rgb(${v},${v},${v - 2})`; };   // the near side of the body sits a shade lighter
+  const G = (v, near, m) => { v += near ? 7 : 0; return COLOUR && m ? KITC[m](v) : `rgb(${v},${v},${v - 2})`; };   // v124: in colour each part is its own material   // the near side of the body sits a shade lighter
   const line = (pts, w, col, cap = 'round') => {
     ctx.strokeStyle = OUT ? RIM : col; ctx.lineWidth = (w + (OUT ? 1.6 : 0)) * Z; ctx.lineCap = cap; ctx.lineJoin = 'round';
     ctx.beginPath(); pts.forEach((q, i) => { const [x, y] = P(...q); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
@@ -3096,28 +3125,28 @@ function drawPlayer() {
   // legs: cargo trousers with a knee pad, tall laced boots with a heavy sole
   const drawLeg = (lg, near) => {
     const ankle = [lg.foot[0] - 0.2, lg.foot[1], lg.foot[2] + 3.4];
-    line([lg.hip, lg.knee], near ? 5 : 4.8, G(34, near));                                  // thigh
-    line([lg.knee, ankle], near ? 4.3 : 4.1, G(31, near));                                 // shin
+    line([lg.hip, lg.knee], near ? 5 : 4.8, G(34, near, 'pants'));                                  // thigh
+    line([lg.knee, ankle], near ? 4.3 : 4.1, G(31, near, 'pants'));                                 // shin
     detail([mid(lg.hip, lg.knee, 0.35), mid(lg.hip, lg.knee, 0.62)], 2.2, G(26, near));    // the thigh pocket
-    detail([mid(lg.hip, lg.knee, 0.92), mid(lg.knee, ankle, 0.12)], 2.6, G(46, near));     // knee pad
-    line([ankle, [lg.foot[0] - 0.1, lg.foot[1], lg.foot[2] + 1]], 4.4, G(18, near));      // boot shaft
-    line([[lg.foot[0] - 1.2, lg.foot[1], lg.foot[2] + 0.9], [lg.foot[0] + 2.8, lg.foot[1], lg.foot[2] + 0.7]], 3.2, G(17, near));   // boot
-    detail([[lg.foot[0] - 1.6, lg.foot[1], lg.foot[2] - 0.2], [lg.foot[0] + 3.4, lg.foot[1], lg.foot[2] - 0.3]], 0.9, G(52, near));   // sole
+    detail([mid(lg.hip, lg.knee, 0.92), mid(lg.knee, ankle, 0.12)], 2.6, G(46, near, 'pad'));     // knee pad
+    line([ankle, [lg.foot[0] - 0.1, lg.foot[1], lg.foot[2] + 1]], 4.4, G(18, near, 'boot'));      // boot shaft
+    line([[lg.foot[0] - 1.2, lg.foot[1], lg.foot[2] + 0.9], [lg.foot[0] + 2.8, lg.foot[1], lg.foot[2] + 0.7]], 3.2, G(17, near, 'boot'));   // boot
+    detail([[lg.foot[0] - 1.6, lg.foot[1], lg.foot[2] - 0.2], [lg.foot[0] + 3.4, lg.foot[1], lg.foot[2] - 0.3]], 0.9, G(52, near, 'sole'));   // sole
     detail([[lg.foot[0] + 0.4, lg.foot[1], lg.foot[2] + 2.6], [lg.foot[0] + 0.9, lg.foot[1], lg.foot[2] + 1.6]], 0.5, G(60, near));   // laces
   };
   // arms: field-jacket sleeves, gloved hands
   const drawFreeArm = near => {
-    line([lSh, lEl], near ? 3.9 : 3.7, G(36, near)); line([lEl, lHa], near ? 3.5 : 3.3, G(33, near));
-    detail([mid(lEl, lHa, 0.78), mid(lEl, lHa, 0.86)], 3.8, G(44, near));                // cuff
-    if (!OUT) { const [x, y] = P(...lHa); ctx.fillStyle = G(16, near); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }   // glove
+    line([lSh, lEl], near ? 3.9 : 3.7, G(36, near, 'jacket')); line([lEl, lHa], near ? 3.5 : 3.3, G(33, near, 'jacket'));
+    detail([mid(lEl, lHa, 0.78), mid(lEl, lHa, 0.86)], 3.8, G(44, near, 'jacket'));                // cuff
+    if (!OUT) { const [x, y] = P(...lHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }   // glove
   };
   const drawTorchArm = near => {
-    line([rSh, rEl], near ? 3.9 : 3.7, G(36, near)); line([rEl, rHa], near ? 3.5 : 3.3, G(33, near));
-    detail([mid(rEl, rHa, 0.78), mid(rEl, rHa, 0.86)], 3.8, G(44, near));
+    line([rSh, rEl], near ? 3.9 : 3.7, G(36, near, 'jacket')); line([rEl, rHa], near ? 3.5 : 3.3, G(33, near, 'jacket'));
+    detail([mid(rEl, rHa, 0.78), mid(rEl, rHa, 0.86)], 3.8, G(44, near, 'jacket'));
     line([[rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL], 3.4, '#2f2f2d');                 // a dented service torch
     detail([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.3), mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.55)], 3.6, '#454542');   // grip
     line([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.85), tipL], 4.2, '#3a3a37', 'butt');   // head of the torch
-    if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
+    if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
     const [tx, ty] = P(...tipL);
     if (!OUT) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
     S.tip = AP ? P(...tip0) : [tx, ty];           // mid-blow the beam stays put; the torch itself goes where the swing takes it
@@ -3127,14 +3156,14 @@ function drawPlayer() {
   // rucksack on the back, a rolled bedroll strapped across the top
   const drawPack = () => {
     const f0 = lt - 2.6, f1 = lt - 7, h0 = hipH + 1.5, h1 = shH + 1.5;
-    slab([[f0, -4.3, h0], [f0, 4.3, h0], [f0 - 0.2, 4.5, h1], [f0 - 0.2, -4.5, h1]], G(30, false));
-    slab([[f1, -4, h0 + 0.5], [f1, 4, h0 + 0.5], [f1 + 0.3, 4.2, h1 - 0.5], [f1 + 0.3, -4.2, h1 - 0.5]], G(40, false));
-    slab([[f0, -4.4, h0], [f1, -4, h0 + 0.5], [f1 + 0.3, -4.2, h1 - 0.5], [f0 - 0.2, -4.5, h1]], G(26, false));
-    slab([[f0, 4.4, h0], [f1, 4, h0 + 0.5], [f1 + 0.3, 4.2, h1 - 0.5], [f0 - 0.2, 4.5, h1]], G(34, false));
-    slab([[f1 + 0.3, -3, h0 + 2], [f1 + 0.3, 3, h0 + 2], [f1 - 0.6, 3, h0 + 6], [f1 - 0.6, -3, h0 + 6]], G(48, false), false);   // outer pocket
-    detail([[f1 - 0.6, -2.4, h0 + 6.2], [f1 - 0.6, 2.4, h0 + 6.2]], 0.8, G(22, false));                                        // its flap
-    line([[f1 + 2, -5.6, h1 + 1.4], [f1 + 2, 5.6, h1 + 1.4]], 3.4, G(52, false), 'butt');                                         // bedroll
-    detail([[f1 + 2, -2.5, h1 + 1.4], [f1 + 2, -2.5, h1 + 1.5]], 3.8, G(28, false)); detail([[f1 + 2, 2.5, h1 + 1.4], [f1 + 2, 2.5, h1 + 1.5]], 3.8, G(28, false));
+    slab([[f0, -4.3, h0], [f0, 4.3, h0], [f0 - 0.2, 4.5, h1], [f0 - 0.2, -4.5, h1]], G(30, false, 'canvas'));
+    slab([[f1, -4, h0 + 0.5], [f1, 4, h0 + 0.5], [f1 + 0.3, 4.2, h1 - 0.5], [f1 + 0.3, -4.2, h1 - 0.5]], G(40, false, 'canvas'));
+    slab([[f0, -4.4, h0], [f1, -4, h0 + 0.5], [f1 + 0.3, -4.2, h1 - 0.5], [f0 - 0.2, -4.5, h1]], G(26, false, 'canvas'));
+    slab([[f0, 4.4, h0], [f1, 4, h0 + 0.5], [f1 + 0.3, 4.2, h1 - 0.5], [f0 - 0.2, 4.5, h1]], G(34, false, 'canvas'));
+    slab([[f1 + 0.3, -3, h0 + 2], [f1 + 0.3, 3, h0 + 2], [f1 - 0.6, 3, h0 + 6], [f1 - 0.6, -3, h0 + 6]], G(48, false, 'canvas'), false);   // outer pocket
+    detail([[f1 - 0.6, -2.4, h0 + 6.2], [f1 - 0.6, 2.4, h0 + 6.2]], 0.8, G(22, false, 'canvas'));                                        // its flap
+    line([[f1 + 2, -5.6, h1 + 1.4], [f1 + 2, 5.6, h1 + 1.4]], 3.4, G(52, false, 'roll'), 'butt');                                         // bedroll
+    detail([[f1 + 2, -2.5, h1 + 1.4], [f1 + 2, -2.5, h1 + 1.5]], 3.8, G(28, false, 'strap')); detail([[f1 + 2, 2.5, h1 + 1.4], [f1 + 2, 2.5, h1 + 1.5]], 3.8, G(28, false, 'strap'));
   };
 
   const farLeg = rightNear ? L : Rg, nearLeg = rightNear ? Rg : L;
@@ -3147,42 +3176,42 @@ function drawPlayer() {
   if (!facingUs) drawLeg(nearLeg, true);    // seen from behind, the near leg sits under the coat
 
   // torso: a field jacket (two crossed slabs for volume), a chest rig over it, a belt with pouches
-  slab([[twist * -0.5, -4.6, hipH - 2.5], [twist * 0.5, 4.6, hipH - 2.5], [lt + twist * 0.6, 6.4, shH], [lt, 4.4, shH + 1.8], [lt, -4.4, shH + 1.8], [lt - twist * 0.6, -6.4, shH]], G(30, false));
-  slab([[-3.1, 0, hipH - 2.5], [3.1, 0, hipH - 2.5], [lt + 3.4, 0, shH - 1], [lt + 2.4, 0, shH + 1.6], [lt - 2.8, 0, shH + 1.6], [lt - 3.6, 0, shH - 1]], G(33, false));
+  slab([[twist * -0.5, -4.6, hipH - 2.5], [twist * 0.5, 4.6, hipH - 2.5], [lt + twist * 0.6, 6.4, shH], [lt, 4.4, shH + 1.8], [lt, -4.4, shH + 1.8], [lt - twist * 0.6, -6.4, shH]], G(30, false, 'jacket'));
+  slab([[-3.1, 0, hipH - 2.5], [3.1, 0, hipH - 2.5], [lt + 3.4, 0, shH - 1], [lt + 2.4, 0, shH + 1.6], [lt - 2.8, 0, shH + 1.6], [lt - 3.6, 0, shH - 1]], G(33, false, 'jacket'));
   if (!OUT) {
     const fr = lt * 0.7 + 3.15;                        // the front of the chest
-    slab([[fr - 0.3, -3.8, hipH + 2.5], [fr - 0.3, 3.8, hipH + 2.5], [fr + 0.15, 3.6, shH - 0.5], [fr + 0.15, -3.6, shH - 0.5]], G(21, false));   // chest rig
+    slab([[fr - 0.3, -3.8, hipH + 2.5], [fr - 0.3, 3.8, hipH + 2.5], [fr + 0.15, 3.6, shH - 0.5], [fr + 0.15, -3.6, shH - 0.5]], G(21, false, 'rig'));   // chest rig
     for (const r of [-2.5, 0, 2.5]) slab([[fr + 0.1, r - 1.05, hipH + 3], [fr + 0.1, r + 1.05, hipH + 3], [fr + 0.25, r + 1.05, hipH + 7.6], [fr + 0.25, r - 1.05, hipH + 7.6]], G(38, false));   // mag pouches
-    for (const r of [-2.5, 0, 2.5]) line([[fr + 0.3, r - 1, hipH + 7.6], [fr + 0.3, r + 1, hipH + 7.6]], 0.7, G(50, false));                       // pouch flaps
-    for (const sd of [-1, 1]) line([[lt - 2.4, sd * 3.6, shH + 1.4], [fr, sd * 3.2, shH - 0.6], [fr - 0.2, sd * 3.4, hipH + 3]], 1.2, G(17, false));   // shoulder straps
-    line([[-3.2, -4.5, hipH - 1.2], [3.2, -4.5, hipH - 1.2], [3.4, 4.5, hipH - 1.2], [-3.2, 4.5, hipH - 1.2]], 1.5, G(46, false));                   // belt
-    slab([[0.5, 4.6, hipH - 1.6], [-2.5, 4.9, hipH - 1.6], [-2.5, 5.1, hipH - 5.2], [0.5, 4.8, hipH - 5.2]], G(26, false));                          // hip pouch
-    line([[lt + 2.2, -3.6, shH + 1.3], [lt + 3.2, 0, shH + 0.6], [lt + 2.2, 3.6, shH + 1.3]], 1.8, G(44, false));                                   // collar
+    for (const r of [-2.5, 0, 2.5]) line([[fr + 0.3, r - 1, hipH + 7.6], [fr + 0.3, r + 1, hipH + 7.6]], 0.7, G(50, false, 'rig'));                       // pouch flaps
+    for (const sd of [-1, 1]) line([[lt - 2.4, sd * 3.6, shH + 1.4], [fr, sd * 3.2, shH - 0.6], [fr - 0.2, sd * 3.4, hipH + 3]], 1.2, G(17, false, 'strap'));   // shoulder straps
+    line([[-3.2, -4.5, hipH - 1.2], [3.2, -4.5, hipH - 1.2], [3.4, 4.5, hipH - 1.2], [-3.2, 4.5, hipH - 1.2]], 1.5, G(46, false, 'strap'));                   // belt
+    slab([[0.5, 4.6, hipH - 1.6], [-2.5, 4.9, hipH - 1.6], [-2.5, 5.1, hipH - 5.2], [0.5, 4.8, hipH - 5.2]], G(26, false, 'rig'));                          // hip pouch
+    line([[lt + 2.2, -3.6, shH + 1.3], [lt + 3.2, 0, shH + 0.6], [lt + 2.2, 3.6, shH + 1.3]], 1.8, G(44, false, 'jacket'));                                   // collar
   }
   if (!packFirst) drawPack();
 
   // head: a scarf at the neck, a stubbled face on the side toward us, a battered boonie hat
-  line([[lt, 0, shH + 1], [lt + 0.4, 0, headH - 2.5]], 2.6, G(30, false));
-  line([[lt - 1.6, -2.4, shH + 1.6], [lt + 2.6, 0, shH + 1.3], [lt - 1.6, 2.4, shH + 1.6]], 2.8, G(56, false));        // scarf
+  line([[lt, 0, shH + 1], [lt + 0.4, 0, headH - 2.5]], 2.6, G(30, false, 'skin'));
+  line([[lt - 1.6, -2.4, shH + 1.6], [lt + 2.6, 0, shH + 1.3], [lt - 1.6, 2.4, shH + 1.6]], 2.8, G(56, false, 'scarf'));        // scarf
   const [hx, hy] = P(lt + 0.6, 0, headH);
   ctx.beginPath(); ctx.ellipse(hx, hy, 3.8 * Z, 4.2 * Z, 0, 0, 7);
-  if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = G(24, false); ctx.fill(); }
+  if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = G(24, false, 'hair'); ctx.fill(); }
   if (!OUT && (facingUs || Math.abs(Fx) > 0.6)) {
     const [fx2, fy2] = P(lt + 3.1, 0, headH - 0.4), fw = (1.2 + 1.8 * Math.max(0, Fy)) * Z;
-    ctx.fillStyle = '#56544f'; ctx.beginPath(); ctx.ellipse(fx2, fy2, fw, 2.1 * Z, 0, 0, 7); ctx.fill();           // face
+    ctx.fillStyle = COLOUR ? '#8a6650' : '#56544f'; ctx.beginPath(); ctx.ellipse(fx2, fy2, fw, 2.1 * Z, 0, 0, 7); ctx.fill();           // face
     ctx.fillStyle = 'rgba(25,25,23,0.75)'; ctx.beginPath(); ctx.ellipse(fx2, fy2 + 1.1 * Z, fw * 0.95, 1.1 * Z, 0, 0, Math.PI); ctx.fill();   // stubble and beard
     ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(fx2 - fw * 0.6, fy2 - 1.6 * Z, fw * 1.2, 0.9 * Z);                    // the shadow of the brim over the eyes
   }
   { // boonie hat: a soft brim (a flat ring, so it shows as an ellipse) and a crown with a band
     const [bx2, by2] = P(lt + 0.7, 0, headH + 1.6), droop = Math.sin(S.t * 0.9) * 0.2;
     ctx.beginPath(); ctx.ellipse(bx2, by2, 6.4 * Z, (3.2 + droop) * Z, 0, 0, 7);
-    if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = G(36, false); ctx.fill(); }
+    if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = G(36, false, 'hat'); ctx.fill(); }
     if (!OUT) {
-      ctx.strokeStyle = G(22, false); ctx.lineWidth = 0.5 * Z; ctx.beginPath(); ctx.ellipse(bx2, by2, 5.2 * Z, 2.6 * Z, 0, 0, Math.PI); ctx.stroke();   // stitching
+      ctx.strokeStyle = G(22, false, 'hat'); ctx.lineWidth = 0.5 * Z; ctx.beginPath(); ctx.ellipse(bx2, by2, 5.2 * Z, 2.6 * Z, 0, 0, Math.PI); ctx.stroke();   // stitching
       const [cx, cy] = P(lt + 0.6, 0, headH + 3.2);
-      ctx.fillStyle = G(32, false); ctx.beginPath(); ctx.ellipse(cx, cy, 3.9 * Z, 2.9 * Z, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = G(44, false); ctx.beginPath(); ctx.ellipse(cx - 0.6 * Z, cy - 0.9 * Z, 2.6 * Z, 1.5 * Z, 0, 0, 7); ctx.fill();   // light catching the top
-      ctx.strokeStyle = G(24, false); ctx.lineWidth = 0.8 * Z; ctx.beginPath(); ctx.ellipse(cx, cy + 0.6 * Z, 3.8 * Z, 1.9 * Z, 0, 0.15, Math.PI - 0.15); ctx.stroke();                        // hat band
+      ctx.fillStyle = G(32, false, 'hat'); ctx.beginPath(); ctx.ellipse(cx, cy, 3.9 * Z, 2.9 * Z, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = G(44, false, 'hat'); ctx.beginPath(); ctx.ellipse(cx - 0.6 * Z, cy - 0.9 * Z, 2.6 * Z, 1.5 * Z, 0, 0, 7); ctx.fill();   // light catching the top
+      ctx.strokeStyle = G(24, false, 'hat'); ctx.lineWidth = 0.8 * Z; ctx.beginPath(); ctx.ellipse(cx, cy + 0.6 * Z, 3.8 * Z, 1.9 * Z, 0, 0.15, Math.PI - 0.15); ctx.stroke();                        // hat band
     }
   }
 
@@ -3229,7 +3258,7 @@ function drawTorchWarmth() {
   const g = ctx.createRadialGradient(b.bx, b.by, 0, b.bx, b.by, b.br);
   g.addColorStop(0, 'rgba(255,196,120,1)'); g.addColorStop(0.6, 'rgba(255,196,120,0.7)'); g.addColorStop(1, 'rgba(255,196,120,0)');
   ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = 0.32 * Math.min(1, b.a); ctx.fillStyle = g;
+  ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'color'; ctx.globalAlpha = (COLOUR ? 0.45 : 0.32) * Math.min(1, b.a); ctx.fillStyle = g;   // v124: in colour the torch warms without washing hues out
   ctx.beginPath(); ctx.moveTo(b.bx, b.by);
   for (let t = -HALF - 0.12; t <= HALF + 0.121; t += HALF / 8) ctx.lineTo(b.bx + Math.cos(S.aim + t) * b.br, b.by + Math.sin(S.aim + t) * b.br);
   ctx.closePath(); ctx.fill();
@@ -3257,7 +3286,7 @@ function drawWarmth() {
   wTctx.globalCompositeOperation = 'source-over';
   const fl = 0.92 + Math.sin(S.t * 9.1) * 0.04 + Math.sin(S.t * 23.7) * 0.03 + (Math.random() - 0.5) * 0.03;
   ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.imageSmoothingEnabled = true;
-  ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = 0.8 * fl;           // tint the grey world orange, same brightness
+  ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = (COLOUR ? 0.5 : 0.8) * fl;           // tint the grey world orange, same brightness
   ctx.drawImage(wT, x0, y0, bw, bh, x0 * SH, y0 * SH, bw * SH, bh * SH);
   ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.55 * fl;     // and warm it up a little more near the flames
   ctx.drawImage(wT, x0, y0, bw, bh, x0 * SH, y0 * SH, bw * SH, bh * SH);
@@ -4990,10 +5019,13 @@ const EYES = { centi: '70,225,200', tall: '210,40,40', laser: '90,170,255', kami
 // Enemies are the same pale figure as the one you chase in Chase and Blink, sized by kind.
 // As they burn they glow hotter, from white through amber to ember red.
 const mixC = (c0, c1, k) => `rgb(${c0.map((v, i) => Math.round(v + (c1[i] - v) * k)).join(',')})`;
-function foePalette(burn) {
-  const k = Math.min(1, burn * 1.2), hot = [255, 150, 60];
-  return { far: mixC([158, 158, 152], [200, 90, 30], k), near: mixC([207, 207, 200], hot, k), body: mixC([218, 218, 211], hot, k),
-    head: mixC([228, 228, 222], [255, 175, 90], k), face: mixC([143, 143, 137], [120, 40, 10], k), edge: '#262624' };
+const FOE_TINT = { shade: [118, 128, 168], stalker: [150, 112, 176], brute: [150, 112, 84], tall: [200, 50, 50], bomber: [220, 60, 50], laser: [80, 150, 240], kamikaze: [240, 200, 60],
+  splitter: [240, 110, 190], splitling: [240, 110, 190], spear: [240, 140, 50], archer: [170, 230, 70], centi: [70, 210, 190],
+  woodcutter: [190, 55, 45], lamplighter: [215, 160, 70], huntsman: [80, 125, 70], warden: [100, 130, 80], dervish: [220, 180, 70], king: [200, 150, 70], mirage: [235, 225, 190] };   // v124: in colour, what they wear
+function foePalette(burn, kind) {
+  const k = Math.min(1, burn * 1.2), hot = [255, 150, 60], tc = COLOUR && FOE_TINT[kind], cl = (c, a) => tc ? c.map((v, i) => v + (tc[i] - v) * a) : c;
+  return { far: mixC(cl([158, 158, 152], 0.5), [200, 90, 30], k), near: mixC(cl([207, 207, 200], 0.45), hot, k), body: mixC(cl([218, 218, 211], 0.45), hot, k),
+    head: mixC(cl([228, 228, 222], 0.12), [255, 175, 90], k), face: mixC([143, 143, 137], [120, 40, 10], k), edge: '#262624' };
 }
 const foeScale = e => FOES[e.type].h / 38 * (SCR_FACE[e.type] && e.k ? e.k : 1);   // a plain shade is player-sized; the rest scale from it
 function foeDir(e) {                          // which way the figure faces: its aim if it has one, else at you
@@ -5010,7 +5042,7 @@ function drawShade(e) {
   const f = FOES[e.type], [sx0, sy] = toScreen(e.x, e.y);
   const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, fuse = e.type === 'kamikaze' && e.ai === 'fuse';
   const jx = (e.jit ? (Math.random() - 0.5) * 3 * Z * (0.4 + burn) : 0) + (Math.random() - 0.5) * Z * (4 * pain + (fuse ? 5 : 0)), sx = sx0 + jx;
-  const pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())));   // flickers hotter while it burns
+  const pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())), e.type);   // flickers hotter while it burns
   // walk like the player: face the way it's really moving (turning smoothly), and plant each step in time with the ground
   const gdt = Math.min(0.1, Math.max(0, S.t - (e.gT ?? S.t))); e.gT = S.t;
   const mdx = e.x - (e.gx ?? e.x), mdy = e.y - (e.gy ?? e.y); e.gx = e.x; e.gy = e.y;
@@ -5144,7 +5176,7 @@ function drawCentipede(e) {
   }
   if (e.out < CENTI_N * G) { const [x, y] = toScreen(e.hx, e.hy); centiHole(ctx, x, y, 9 * Z * kk); }
   if (e.ai === 'dive') { const [x, y] = toScreen(e.dx, e.dy); centiHole(ctx, x, y, 9 * Z * kk); }
-  const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())));
+  const burn = 1 - Math.max(0, e.hp) / e.maxHp, pain = e.pain || 0, pal = foePalette(Math.min(1, burn + pain * (0.1 + 0.15 * Math.random())), 'centi');
   ctx.lineCap = 'round';
   for (let i = CENTI_N - 1; i >= 0; i--) {
     if (!centiOut(e, i)) continue;
@@ -6955,7 +6987,7 @@ function drawBossFigure(b) {
   if (air) { const land = b.len - b.t; if (land > 0.3) return; b.x = b.mk.x; b.y = b.mk.y; yOff = -(land / 0.3) * 700; }
   const burn = Math.min(1, (1 - b.hp / B_HP) * 0.5 + b.flinch * 0.35 + b.lit * 0.3 + (b.st === 'dying' ? Math.min(1, b.t / 2) : 0));
   const vis = b.st === 'dying' ? 1 : 0.55 + 0.45 * Math.min(1, b.lit * 2);   // unlit he's a dim hulk; the beam shows him whole
-  const pl = foePalette(burn), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
+  const pl = foePalette(burn, 'warden'), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
   let alpha = 1;
   if (b.st === 'rise') alpha = Math.min(1, b.t / 1.2);
   if (b.st === 'dying') alpha = Math.max(0, 1 - Math.max(0, b.t - 2.4) / 0.8);
@@ -7787,7 +7819,7 @@ function drawMiniFigure(u) {
   const D = MK[u.kind], pose = miniPose(u);
   const burn = Math.min(1, (1 - u.hp / u.max) * 0.5 + u.flinch * 0.35 + u.lit * 0.3 + (u.st === 'dying' ? Math.min(1, u.t / 1.6) : 0));
   const vis = u.st === 'dying' ? 1 : 0.55 + 0.45 * Math.min(1, u.lit * 2);
-  const pl = foePalette(burn), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
+  const pl = foePalette(burn, u.kind), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
   let alpha = 1;
   if (u.st === 'rise') alpha = Math.min(1, u.t / 0.8);
   if (u.st === 'dying') alpha = Math.max(0, 1 - Math.max(0, u.t - 1.6) / 0.6);
@@ -8599,7 +8631,7 @@ function drawDuneFigure(m, u, clone) {
   const src = clone ? m.units[0] : u;
   const burn = clone ? 0.1 : Math.min(1, (1 - u.hp / u.max) * 0.5 + u.flinch * 0.35 + u.lit * 0.3 + (u.st === 'dying' ? Math.min(1, u.t / 1.6) : 0));
   const vis = u.st === 'dying' ? 1 : 0.55 + 0.45 * Math.min(1, (clone ? 0.5 : u.lit) * 2);
-  const pl = foePalette(burn), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
+  const pl = foePalette(burn, u.kind), pal = { far: shadeC(pl.far, vis), near: shadeC(pl.near, vis), body: shadeC(pl.body, vis), head: shadeC(pl.head, vis), face: pl.face, edge: '#141413' };
   let alpha = 1;
   if (!clone) {
     if (u.st === 'rise') alpha = Math.min(1, u.t / 0.9);
@@ -9958,6 +9990,13 @@ function renderCamp() {
   }));
   body.replaceChildren(head, list);
 }
+const colourBtn = document.getElementById('colourBtn');
+function colourLabel() { colourBtn.textContent = COLOUR ? 'Colour' : 'Black and white'; }
+colourBtn.addEventListener('click', () => {
+  COLOUR = !COLOUR; try { localStorage.setItem('behind-you-colour', COLOUR ? 'colour' : 'bw'); } catch (e) {}
+  colourLabel(); LEAF_K = COLOUR ? LEAF_COL : LEAF_BW; SPRITES = {}; floorPat = null; floorT = null;   // everything repaints in the new look
+});
+colourLabel();
 campBtn.addEventListener('click', openCamp);
 document.getElementById('campGo').addEventListener('click', closeCamp);
 document.getElementById('campWipe').addEventListener('click', () => {
