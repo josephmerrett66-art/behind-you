@@ -1690,7 +1690,6 @@ function drawGround() {
     const ox = (W / 2 - k * S.cam.x + k * S.cam.y) * DPR, oy = (H / 2 - k / 2 * S.cam.x - k / 2 * S.cam.y) * DPR;
     ft.pat.setTransform(new DOMMatrix().translate(Math.round(ox), Math.round(oy)));
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = ft.pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); }
-  drawPortalRing();
   // footprints
   for (const f of S.p.prints) {
     ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a);
@@ -2410,7 +2409,6 @@ function snowDecorAt(i, j) {
   else if (h < 0.1 + 0.08 * gk) dk = 'sBush';
   else if (h < 0.14) dk = 'dGrass';
   else if (h < 0.16) dk = 'sStone';
-  else if (h < 0.168 + 0.01 * gk) dk = 'sStump';
   else if (h < 0.172 + 0.008 * gk) dk = 'sLog';
   if (!dk) return null;
   return { kind: 'decor', dk, x, y, s: 0.8 + hash(j * 1.1, i * 0.9) * 0.5, v: (v * 97 | 0) % SNOW_KINDS[dk][0], seed: v };
@@ -2746,7 +2744,7 @@ function decorAt(i, j) {
     const x = i * T + 6 + hash(j - 3, i + 5) * (T - 12), y = j * T + 6 + hash(i + 9, j * 2) * (T - 12);
     if (!(S && S.mode === 'expedition' && (Math.hypot(x, y) < CAMP_R + 45 || nearPortal(x, y, 70)))) {
       const r = h / 0.27, v = hash(i * 3.3, j * 5.1);
-      const kind = r < 0.36 ? 'grass' : r < 0.52 ? 'fern' : r < 0.64 ? 'pebbles' : r < 0.76 ? 'bush' : r < 0.85 ? 'shrooms' : r < 0.93 ? 'stump' : 'log';
+      const kind = r < 0.36 ? 'grass' : r < 0.52 ? 'fern' : r < 0.64 ? 'pebbles' : r < 0.76 ? 'bush' : r < 0.85 ? 'shrooms' : 'log';
       d = { kind: 'decor', dk: kind, x, y, s: 1 + hash(j * 1.7, i) * 0.55, v: (v * 97 | 0) % SPRITE_KINDS[kind][0], seed: v };
     }
   }
@@ -5771,10 +5769,6 @@ const CAMP = [], CAMP_SOLID = [];
     const p = polar(a, CAMP_R + 30);
     CAMP.push({ camp: 'stakes', kind: 'stakes', x: p.x, y: p.y, a, s: 1, seed: hash(a * 7, 3) });
   }
-  for (const g of GATES) for (const sd of [-1, 1]) {   // braziers where each gate road crosses the portal ring
-    const p = polar(g + sd * 0.1, PRING);
-    CAMP.push({ camp: 'brazier', kind: 'brazier', x: p.x, y: p.y, s: 1, cast: { r: 3, len: 30 } });
-  }
   // the yard
   const put = (o, r) => { CAMP.push(Object.assign({ s: 1 }, o)); if (r) CAMP_SOLID.push({ x: o.x, y: o.y, r }); };
   for (const a of [0.35, 2.3, 4.2]) { const p = polar(a, 40); put({ camp: 'bench', kind: 'bench', x: p.x, y: p.y, a: a + Math.PI / 2 }); }
@@ -7430,7 +7424,6 @@ function exHoles(hole) {                     // light the orb puts out round its
   if (rg.carryDorb) hole(S.p.x, S.p.y, 70, 0.55, 0);
   if (XS.dorbs || XS.orbs >= 3) hole(TELE2.x, TELE2.y, 60 + 25 * (XS.dorbs || 0) + 70 * portal2Open(), 0.4 + 0.3 * portal2Open(), 0);
   for (const g of GATES) { const p = polar(g, CAMP_R + 8); if (Math.abs(p.x - S.cam.x) < 900 && Math.abs(p.y - S.cam.y) < 900) hole(p.x, p.y, 62 * (1 + 0.05 * Math.sin(S.t * 9 + g)), 0.55); }
-  for (const g of GATES) { const p = polar(g, PRING); if (Math.abs(p.x - S.cam.x) < 900 && Math.abs(p.y - S.cam.y) < 900) hole(p.x, p.y, 78 * (1 + 0.05 * Math.sin(S.t * 8 + g * 2)), 0.45); }   // the braziers light the crossing
   if (XS.orbField && XS.orb) hole(XS.orb.x, XS.orb.y, 95 * (1 + 0.05 * Math.sin(S.t * 2)), 0.8, 0);   // the orbs keep their green
   if (rg.carryOrb) hole(S.p.x, S.p.y, 70, 0.55, 0);
   for (const L of rg.loose) if (L.orb) hole(L.x, L.y, 70, 0.6, 0);
