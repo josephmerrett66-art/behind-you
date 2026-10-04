@@ -390,6 +390,10 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <button id="streakBtn" class="alt">Streak: full</button>
       <p class="small">Kill streaks: the numbers, bzings and tier names. Quiet keeps the counter and sound without the big words and glow. Off hides it all; streaks still pay.</p>
     </div>
+    <div class="audio"><h2>Trial</h2>
+      <button id="srchBtn" class="alt">Woods enemies: Searchers</button>
+      <p class="small">Searchers: the woods stay empty until a searcher's beam finds you, then the swarm comes until you're back inside the fence. Classic brings back the old hunters.</p>
+    </div>
     <div class="audio"><h2>Audio</h2>
       <label class="fov"><span>Music</span><input id="volMusic" type="range" min="0" max="100" step="5"><output id="volMusicOut"></output></label>
       <label class="fov"><span>Ambience</span><input id="volAmb" type="range" min="0" max="100" step="5"><output id="volAmbOut"></output></label>
@@ -1301,6 +1305,7 @@ const KIT = {
   splitling:{},
   spear:    { head: 'helmet', vest: 1 },
   archer:   { head: 'hood', coat: 1 },
+  searcher: { head: 'beanie', coat: 1, pack: 1 },
 };
 const shadeC = (col, k) => {                     // the same colour, darker by k ('rgb(...)' or '#rrggbb')
   const ch = col[0] === '#' ? [1, 3, 5].map(i => parseInt(col.slice(i, i + 2), 16)) : col.slice(col.indexOf('(') + 1, -1).split(',').map(Number);
@@ -1544,6 +1549,7 @@ function atkHit(D, a) {                          // everything in reach takes th
     spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.slam ? 14 : 9);
   }
   if (S.day) hits += dayHarvest(D, a, inReach, spark);   // v128: chop, break, gather, hunt
+  if (srchOn() && rg.srch) for (const s of rg.srch) if (!s.dead && !A.hit.has(s) && inReach(s, 12)) { A.hit.add(s); hits++; spark(s, 38, 9); srchDown(s); }   // v135 trial: one blow drops a searcher
   const b = S.mode === 'expedition' && bossLive();
   if (b && !A.hit.has(b) && ['walk', 'tell', 'act', 'recover', 'roar'].includes(b.st) && inReach(b, 12 * BS)) {
     A.hit.add(b); hits++;
@@ -3841,7 +3847,7 @@ function renderScene() {
   const lights = lightsNear(S.cam.x, S.cam.y, viewR() + 200);
   const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(decorInView(lights), lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : [], S.mode === 'expedition' && S.rg ? S.rg.enemies.concat(exItems()) : []).map(o => ({ o, k: o.x + o.y }));
   items.sort((a, b) => a.k - b.k);
-  for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : drawProp(it.o);
+  for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : it.o.kind === 'searcher' ? drawSearcher(it.o) : drawProp(it.o);
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
   airStep(); snowStep(frameDt); sparkFires(lights); drawMistLow(); drawMoths(); drawSnowfall();
@@ -4372,6 +4378,7 @@ const FOES = {
   centi:   { hp: 2.2,  sp: 78, lightSp: 1,    h: 14, w: 16 },   // the Dunes' burrowing centipede: moves itself (centiStep)
   spear:   { hp: 1.2,  sp: 74, lightSp: 0,    h: 36, w: 12 },   // the Dunes' spear thrower: runs in, stops, throws
   archer:  { hp: 1.0,  sp: 40, lightSp: 0,    h: 38, w: 11 },   // the Dunes' archer: keeps its distance and looses arrows
+  searcher:{ hp: 1,    sp: 44, lightSp: 0,    h: 38, w: 12 },   // v135 trial: the woods' torch-carrying searcher (moves itself, srchStep)
 };
 
 const rawLv = id => (S.rg && S.rg.up[id]) || 0;
@@ -5468,7 +5475,7 @@ function cutSurviveLights(bx, by, br) {
     if (e.type === 'kamikaze' && e.ai === 'fuse') hole(e.x, e.y, 45, 0.5 + 0.3 * Math.sin(S.t * 40));
   }
   for (const w of rg.wisps || []) hole(w.x, w.y, 30, 0.45 * Math.min(1, w.life / 1.5), 0);
-  if (S.mode === 'expedition') exHoles(hole);
+  if (S.mode === 'expedition') { exHoles(hole); srchHoles(hole); }   // v135 trial: the searchers' beams
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 function surviveLight(bx, by, br, casters, lx, ly) {
@@ -5496,7 +5503,7 @@ const EYES = { centi: '70,225,200', tall: '210,40,40', laser: '90,170,255', kami
 // As they burn they glow hotter, from white through amber to ember red.
 const mixC = (c0, c1, k) => `rgb(${c0.map((v, i) => Math.round(v + (c1[i] - v) * k)).join(',')})`;
 const FOE_TINT = { shade: [118, 128, 168], stalker: [150, 112, 176], brute: [150, 112, 84], tall: [200, 50, 50], bomber: [220, 60, 50], laser: [80, 150, 240], kamikaze: [240, 200, 60],
-  splitter: [240, 110, 190], splitling: [240, 110, 190], spear: [240, 140, 50], archer: [170, 230, 70], centi: [70, 210, 190],
+  splitter: [240, 110, 190], splitling: [240, 110, 190], spear: [240, 140, 50], archer: [170, 230, 70], centi: [70, 210, 190], searcher: [70, 185, 235],
   woodcutter: [190, 55, 45], lamplighter: [215, 160, 70], huntsman: [80, 125, 70], warden: [100, 130, 80], dervish: [220, 180, 70], king: [200, 150, 70], mirage: [235, 225, 190] };   // v124: in colour, what they wear
 function foePalette(burn, kind) {
   const k = Math.min(1, burn * 1.2), hot = [255, 150, 60], tc = COLOUR && FOE_TINT[kind], cl = (c, a) => tc ? c.map((v, i) => v + (tc[i] - v) * a) : c;
@@ -6588,7 +6595,7 @@ function drawCampFlames() {
 function exItems() {   // camp, chests and dropped packs, drawn in with the trees
   const rg = S.rg; if (!rg) return [];
   if (rg.beyond) return rg.next ? [] : dunePillars();
-  return CAMP.concat([TELE, TELE2], PLINTHS, exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones(), lairStones(), S.day ? dayItems() : []);
+  return CAMP.concat([TELE, TELE2], PLINTHS, exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones(), lairStones(), S.day ? dayItems() : [], srchOn() && rg.srch ? rg.srch.filter(s => !s.dead) : []);
 }
 
 // ---- personal stats: kills drop violet wisps, wisps buy small boosts that last for good (Nightfall and Expedition) ----
@@ -7690,7 +7697,7 @@ function exTakeOrb(at) {
   rg.echoes.push({ r: 0, x: src.x, y: src.y, max: 400, burst: true });
   for (const e of rg.enemies) e.reveal = 1;   // every eye out there turns toward you
   if (actx) { const t = actx.currentTime; boomAt(t, 140, 40, 1.4, 0.6, sfxGain); }
-  S.msg = { text: 'the orb', sub: 'Every eye turns toward you', t: 0 };
+  S.msg = { text: 'the orb', sub: srchOn() && !rg.alarm ? 'Get it home unseen' : 'Every eye turns toward you', t: 0 };
 }
 function exDeposit() {
   const rg = S.rg;
@@ -7705,6 +7712,11 @@ function exDeposit() {
 function exHome() {
   stkCash(true);                          // stepped inside the fence: bank the pack, heal up
   const rg = S.rg;
+  if (srchOn()) {                          // v135 trial: back inside the fence, the alarm drops and the swarm melts back into the dark
+    if (rg.alarm) exNote('they lose you at the fence');
+    rg.alarm = false; rg.srGr = 0;
+    for (const e of rg.enemies) if (!e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 10, 22); }
+  }
   if (S.day) { rg.oil = oilMax(); rg.wispCarry = 0; return; }   // Daylight: the fence keeps them out, but there's no food or healing in camp
   lifeAdd('home');
   if (rg.pack.length) {
@@ -7750,9 +7762,10 @@ function exStep(dt) {
   if (portalOpen() >= 1 && !rg.warp && dist2(p, TELE) < 16) warpStart('out');
   if (inCamp) {
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }   // the ranged ones melt back into the dark
+    srchStep(dt, inCamp, ring);
     return;                                  // nothing new comes while you're home
   }
-  if (rg.cleared > 0 && !bossLive() && (rg.cleared -= dt) <= 0) { rg.cleared = 0; rg.ringMsg = { text: 'the deep wakes', sub: 'Get the orb home', t: 0 }; playRingSting(); addShake(0.3); }
+  if (rg.cleared > 0 && !bossLive() && (rg.cleared -= dt) <= 0) { rg.cleared = 0; if (srchOn()) rg.alarm = true; rg.ringMsg = { text: 'the deep wakes', sub: 'Get the orb home', t: 0 }; playRingSting(); addShake(0.3); }
   if (ring > rg.ringMax) { rg.ringMax = ring; rg.ringMsg = { text: RING_NAMES[ring], t: 0 }; if (ring > 0) playRingSting(); }
   if ((rg.outT -= dt) <= 0) { rg.outT = 2; XS.out = { x: p.x, y: p.y, items: rg.pack.slice(), orb: rg.carryOrb, dorb: rg.carryDorb }; exSave(); }   // where your pack ends up if you quit out here
   for (const o of XS.outposts) o.n = Math.min(LAMP_MAX, (o.n || 0) + dt / 20);   // outposts lay a new lamp every 20 s you're out
@@ -7768,7 +7781,7 @@ function exStep(dt) {
   exOilStep(dt, !!outpost || !!bossLive() || !!miniLive() || !!S.day);   // Daylight: no torch, so the oil only feeds rolls   // the braziers keep your oil topped up while you fight him too  // an outpost's lamp tops the torch up, and so does a boss fight: the oil stays full
   if (outpost) {                             // safe in an outpost's light: nothing new comes, the ranged ones back off
     for (const e of rg.enemies) if ((e.type === 'bomber' || e.type === 'laser') && !e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 12, 24); }
-  } else if (!bossLive() && !miniLive() && !rg.cleared) {   // nothing else comes into the mist while the Woodwarden fights, nor on the walk home after he falls
+  } else if (!bossLive() && !miniLive() && !rg.cleared && (!srchOn() || rg.alarm)) {   // v135 trial: with Searchers on, nothing comes until one spots you   // nothing else comes into the mist while the Woodwarden fights, nor on the walk home after he falls
     rg.spawnT -= dt;
     const bait = rg.carryOrb || rg.carryDorb ? 5 : 0;         // a carried orb draws them in from all round
     const cap = Math.round((EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1) * (S.day ? 0.45 + 0.15 * S.day.n : 1));   // Horde: twice as many   // and so does a heavy pack
@@ -7777,7 +7790,7 @@ function exStep(dt) {
       if (rg.enemies.length < cap) { if (ring > 0 && Math.random() < 0.25 && cap - rg.enemies.length >= 3) exPack(ring, Math.min(cap - rg.enemies.length, 3 + (Math.random() < 0.5 ? 1 : 0))); else exSpawn(exPickFoe(ring)); }   // v123: sometimes a pack
     }
   }
-  if (ring === 3 && !bossLive() && !rg.cleared && !rg.enemies.some(e => e.type === 'tall') && (rg.tallCd -= dt) <= 0) {
+  if (ring === 3 && !bossLive() && !rg.cleared && (!srchOn() || rg.alarm) && !rg.enemies.some(e => e.type === 'tall') && (rg.tallCd -= dt) <= 0) {
     exSpawn('tall'); rg.tallCd = 45;
     if (!rg.tallSeen) { rg.tallSeen = true; rg.ringMsg = { text: 'something tall', sub: 'walks the deep', t: 0 }; }
   }
@@ -7785,9 +7798,190 @@ function exStep(dt) {
   for (const L of rg.loose) if (!L.taken && dist2(L, p) < 26) exTakeLoose(L);
   rg.loose = rg.loose.filter(L => !L.taken);
   bossStep(dt); miniStep(dt);
+  srchStep(dt, inCamp, ring);                 // v135 trial: the searchers
   if (XS.orbField && XS.orb && !rg.carryOrb && dist2(XS.orb, p) < 30 && (XS.orbs !== 2 || XS.wardenDead)) exTakeOrb();   // the last orb is caged until he falls
   if (rg.carryDorb && dist2(p, TELE2) < 46) exDepositD();                    // the second shrine, out past the wall
   if (portal2Open() >= 1 && !rg.warp && dist2(p, TELE2) < 16) warpStart('next');
+}
+
+// ---- v135 TRIAL (Joe): Searchers. The woods hold no hunters at all until a torch-carrying Searcher catches you in its beam.
+// Then it radios in and the old swarm comes from every side, with no way back to hiding until you're inside the fence again.
+// Searchers wander in short beats (look, sweep, walk a little, look again), each chosen fresh, so there's no route to learn.
+// Their beams are always drawn and only the drawn light can catch you. A hit from the dark drops one silently.
+// Settings > Trial > Woods enemies switches the whole thing off and brings back the classic hunters.
+let SRCH_ON = (() => { try { return localStorage.getItem('behind-you-searchers') !== 'off'; } catch (e) { return true; } })();
+const srchOn = () => SRCH_ON && S.mode === 'expedition' && !S.day && S.rg && !S.rg.beyond;
+const SR_LEN = 270, SR_HALF = 0.36, SR_SP = 44, SR_GRACE = 0.1;   // beam reach and half-width, walk speed, how long the very edge may clip you
+const SR_N = [7, 11, 15, 19], SR_R = 1500, SR_GUARD = 13, SR_GUARD_R = 620, SR_CAMP = PRING + 300;   // roamers kept round you per ring, guards round an orb, and how close to camp they come
+function srchOk(x, y, guard) {                    // somewhere a Searcher may stand
+  if (Math.hypot(x, y) < SR_CAMP) return false;
+  if (exSafeAt(x, y, SR_LEN + 20)) return false;
+  const c = bossArena(); if (c && Math.hypot(x - c.x, y - c.y) < AR + SR_LEN + 60) return false;
+  if (guard && Math.hypot(x - guard.x, y - guard.y) > SR_GUARD_R + 80) return false;
+  return true;
+}
+function srchMake(x, y, home) {
+  return { kind: 'searcher', type: 'searcher', x, y, face: Math.random() * Math.PI * 2, want: 0, st: 'look', t: 0.5 + Math.random() * 2, wd: 0, home, ph: Math.random() * 6, mv: 0, seed: Math.random() * 9 };
+}
+function srchBeat(s) {                            // the next beat, chosen fresh each time
+  const prev = s.st;
+  if (prev === 'look') {                          // turn and look somewhere else, sweeping the beam slowly across
+    s.st = 'turn'; s.want = s.face + (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.9); s.rate = 0.55 + Math.random() * 0.6;
+    if (s.home && Math.hypot(s.x - s.home.x, s.y - s.home.y) > SR_GUARD_R * 0.7 && Math.random() < 0.6) s.want = Math.atan2(s.home.y - s.y, s.home.x - s.x) + (Math.random() - 0.5) * 1.2;   // a guard drifts back toward the orb
+    if (!s.home && Math.hypot(s.x, s.y) < SR_CAMP + 200) s.want = Math.atan2(s.y, s.x) + (Math.random() - 0.5) * 1.4;   // and nobody walks up to the fence
+    return;
+  }
+  if (prev === 'turn' && Math.random() < 0.4) { s.st = 'look'; s.t = 0.7 + Math.random() * 1.8; return; }
+  if (prev === 'turn') {                          // walk a short way along the beam, if the way is open
+    const d = 50 + Math.random() * 170, tx = s.x + Math.cos(s.face) * d, ty = s.y + Math.sin(s.face) * d;
+    if (srchOk(tx + Math.cos(s.face) * SR_LEN * 0.4, ty + Math.sin(s.face) * SR_LEN * 0.4, s.home)) { s.st = 'walk'; s.wd = d; return; }
+    s.st = 'look'; s.t = 0.4 + Math.random() * 0.8; return;   // blocked: stop and look, then turn away next beat
+  }
+  s.st = 'look'; s.t = 0.8 + Math.random() * 2.2;  // after a walk: stop, look again
+}
+function srchSpawn(rg, n, nearX, nearY, r0, r1, home) {   // place up to n, off screen and well clear of your path
+  const p = S.p;
+  for (let k = 0; k < n * 4 && n > 0; k++) {
+    const a = Math.random() * Math.PI * 2, d = r0 + Math.sqrt(Math.random()) * (r1 - r0), x = nearX + Math.cos(a) * d, y = nearY + Math.sin(a) * d;
+    if (Math.hypot(x - p.x, y - p.y) < SR_LEN + 280 || seenAt(x, y) || !srchOk(x, y, home)) continue;
+    const s = srchMake(x, y, home);
+    const toYou = Math.atan2(p.y - y, p.x - x); if (Math.abs(angDiff(s.face, toYou)) < 0.8) s.face += Math.PI;   // never arrives looking straight at you
+    rg.srch.push(s); n--;
+  }
+}
+function srchSpot(s) {                            // caught: it calls it in, and the woods wake up
+  const rg = S.rg, p = S.p, ring = exRing(Math.hypot(p.x, p.y));
+  rg.alarm = true; rg.srGr = 0; lifeAdd('spotted');
+  if (s) { s.st = 'radio'; s.t = 1.6; s.face = Math.atan2(p.y - s.y, p.x - s.x); s.spot = 1; }
+  S.msg = { text: 'spotted', sub: 'It radios in. They are coming', t: 0 };
+  addShake(0.5); hitStop(0.12);
+  rg.blasts.push({ x: p.x, y: p.y, t: 0, life: 0.5, r: 120, col: 'white' });
+  rg.echoes.push({ r: 0, x: p.x, y: p.y, max: 600, burst: true });
+  srchRadio(1);
+  for (let i = 0; i < 3; i++) exPack(ring, 2 + ring);   // the first of them, from all round
+  rg.spawnT = 0.4;
+  for (const e of rg.enemies) e.reveal = 1;
+}
+function srchRadio(loud) {                        // a radio: squelch, two pips, a burst of garbled voice; loud is the call-in
+  if (!actx) return; const t = actx.currentTime, o = sfxGain, v = loud ? 1 : 0.18;
+  noiseAt(t, 3200, 1600, 0.12, 0.3 * v, o);
+  toneAt(t + 0.13, 1250, 0.09, 0.07 * v, 'square', o); toneAt(t + 0.27, 1250, 0.09, 0.07 * v, 'square', o);
+  for (let i = 0; i < (loud ? 9 : 4); i++) noiseAt(t + 0.42 + i * 0.09 + Math.random() * 0.03, 900 + Math.random() * 900, 500, 0.07, (0.16 + Math.random() * 0.1) * v, o);
+  noiseAt(t + 0.42 + (loud ? 0.9 : 0.4), 4200, 1800, 0.18, 0.28 * v, o);
+  if (loud) { boomAt(t, 85, 38, 1.1, 0.7, o); toneAt(t + 1.4, 196, 1.2, 0.08, 'sawtooth', o); toneAt(t + 1.4, 207.6, 1.2, 0.07, 'sawtooth', o); }   // and a sour low stab under it
+}
+function srchFar(d) {                             // a distant searcher's radio crackling, quieter the further off
+  if (!actx) return; const t = actx.currentTime, v = Math.max(0.04, 0.22 * (1 - d / 800));
+  noiseAt(t, 2800, 1400, 0.1, 0.25 * v, sfxGain);
+  for (let i = 0; i < 3; i++) noiseAt(t + 0.15 + i * 0.1 + Math.random() * 0.04, 800 + Math.random() * 700, 450, 0.07, 0.15 * v, sfxGain);
+}
+function srchDown(s) {                            // dropped: if it never saw you, no one hears
+  const rg = S.rg; s.dead = true;
+  rg.dying.push({ x: s.x, y: s.y, type: 'searcher', dir: scrAng(s.face), phase: s.ph, t: 0 });
+  ashBurst(s.x, s.y, 18, 30); addShake(0.12);
+  for (let i = 0; i < 14; i++) rg.embers.push({ x: s.x + Math.cos(s.face) * 8, y: s.y + Math.sin(s.face) * 8, z: 20, vz: 20 + Math.random() * 60, vx: (Math.random() - 0.5) * 70, vy: (Math.random() - 0.5) * 70, life: 0.4 + Math.random() * 0.6, ember: true });
+  if (actx) { const t = actx.currentTime; boomAt(t, 140, 60, 0.25, 0.45, sfxGain); noiseAt(t + 0.12, 5200, 2600, 0.1, 0.25, sfxGain); }   // the body, then the lamp hitting the ground
+  if (!rg.alarm && S.t > (rg.srNoteT || 0)) { exNote('taken down quietly'); rg.srNoteT = S.t + 4; }
+  lifeAdd('searchers');
+}
+function srchStep(dt, inCamp, ring) {
+  const rg = S.rg, p = S.p;
+  if (!srchOn()) { if (rg.srch && rg.srch.length) rg.srch = []; return; }
+  rg.srch = rg.srch || [];
+  if (bossLive() || miniLive() || rg.cleared) { rg.srch = []; rg.guardFor = null; return; }   // the mist clears them out with everything else
+  // keep the woods stocked round you: thin near camp, thicker further out
+  rg.srch = rg.srch.filter(s => !s.dead && (s.home ? Math.hypot(p.x - s.home.x, p.y - s.home.y) < 2600 : Math.hypot(s.x - p.x, s.y - p.y) < SR_R + 450 || seenAt(s.x, s.y)));
+  const roam = rg.srch.filter(s => !s.home).length, want = Math.round(SR_N[ring] * (pact('horde') ? 1.5 : 1));
+  if (!inCamp && roam < want) srchSpawn(rg, Math.min(4, want - roam), p.x, p.y, 650, SR_R, null);
+  // the orbs are the most heavily guarded places in the world: a wall of overlapping light
+  const o = XS.orbField && XS.orb && XS.orbs < 2 ? XS.orb : null;
+  if (rg.guardFor !== o) { rg.srch = rg.srch.filter(s => !s.home); rg.guardFor = o; }
+  if (o && Math.hypot(p.x - o.x, p.y - o.y) < 2300) {
+    const g = rg.srch.filter(s => s.home).length;
+    if (g < SR_GUARD) srchSpawn(rg, Math.min(4, SR_GUARD - g), o.x, o.y, 110, SR_GUARD_R, o);
+  }
+  for (const s of rg.srch) {
+    const x0 = s.x, y0 = s.y;
+    if (s.st === 'radio') { s.face += angDiff(Math.atan2(p.y - s.y, p.x - s.x), s.face) * Math.min(1, dt * 8); if ((s.t -= dt) <= 0) srchBeat(s); }
+    else if (s.st === 'look') { if ((s.t -= dt) <= 0) srchBeat(s); }
+    else if (s.st === 'turn') {
+      const dA = angDiff(s.want, s.face), stp = s.rate * dt;
+      if (Math.abs(dA) <= stp) { s.face = s.want; srchBeat(s); } else s.face += Math.sign(dA) * stp;
+    } else if (s.st === 'walk') {
+      const stp = Math.min(s.wd, SR_SP * dt); s.x += Math.cos(s.face) * stp; s.y += Math.sin(s.face) * stp; s.wd -= stp;
+      if (s.wd <= 0.01) srchBeat(s);
+    }
+    s.mv = Math.hypot(s.x - x0, s.y - y0) / Math.max(1e-4, dt); if (s.mv > 1) s.ph += 1.348 * s.mv / 7.5 * dt;
+    s.spot = Math.max(0, (s.spot || 0) - dt * 0.6);
+  }
+  if (inCamp || exSafeAt(p.x, p.y)) { rg.srGr = 0; return; }   // the fence and an outpost's light are safe ground
+  if (!rg.alarm) {                                 // step into a beam and you're caught; only its very edge gives you a few frames
+    let edge = false, near = 1e9;
+    for (const s of rg.srch) {
+      const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy); near = Math.min(near, d);
+      if (d > SR_LEN) continue;
+      const off = Math.abs(angDiff(Math.atan2(dy, dx), s.face));
+      if (off > SR_HALF) continue;
+      if (d < SR_LEN * 0.88 && off < SR_HALF * 0.75) return srchSpot(s);
+      edge = s;
+    }
+    if (edge) { if ((rg.srGr = (rg.srGr || 0) + dt) > SR_GRACE) return srchSpot(edge); } else rg.srGr = 0;
+    if (near < 800 && (rg.crackT = (rg.crackT ?? 3) - dt) <= 0) { rg.crackT = 4 + Math.random() * 6; srchFar(near); }   // somewhere out there a radio crackles
+  }
+}
+function drawSearcher(s) {                        // a searcher: a pale figure in its own colour, its lamp held out in front
+  const pal = foePalette(0, 'searcher'), a = scrAng(s.face);
+  drawQuarry({ x: s.x, y: s.y, dir: a, phase: s.ph, state: 'run', t: 0 }, ctx, false, { scale: 1, jx: 0, pal, kit: KIT.searcher, gait: Math.min(1.2, s.mv / WALK), stride: 7, reach: 0.4 });
+  const [hx, hy] = srchLamp(s);
+  ctx.fillStyle = '#1c1c1e'; ctx.fillRect(hx - 2.6 * Z, hy - 2.6 * Z, 5.2 * Z, 5.2 * Z);
+}
+function srchLamp(s) { const [x, y] = toScreen(s.x + Math.cos(s.face) * 9, s.y + Math.sin(s.face) * 9); return [x, y - 23 * Z]; }
+function srchCone(c, s, a, len = SR_LEN * 1.04) {   // the beam as a soft wedge, on a canvas already in world space
+  const g = c.createRadialGradient(s.x, s.y, 0, s.x, s.y, len);
+  g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.6, `rgba(0,0,0,${a * 0.85})`); g.addColorStop(0.93, `rgba(0,0,0,${a * 0.5})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.beginPath(); c.moveTo(s.x, s.y);
+  for (let k = -10; k <= 10; k++) { const t = s.face + SR_HALF * k / 10; c.lineTo(s.x + Math.cos(t) * len, s.y + Math.sin(t) * len); }
+  c.closePath(); c.fill();
+}
+function srchHoles(hole) {                        // their beams cut through the dark, warm like every lamp in the woods
+  const rg = S.rg; if (!rg.srch || !srchOn()) return;
+  const vr = viewR() + SR_LEN;
+  for (const s of rg.srch) {
+    if (s.dead || Math.abs(s.x - S.cam.x) > vr || Math.abs(s.y - S.cam.y) > vr) continue;
+    hole(s.x, s.y, 38, 0.7);                       // enough light round it to see who's holding the lamp
+    srchCone(dctx, s, 0.82);
+    const pts = [[s.x, s.y], ...[-1, 0, 1].map(k => [s.x + Math.cos(s.face + k * SR_HALF) * SR_LEN, s.y + Math.sin(s.face + k * SR_HALF) * SR_LEN])].map(([x, y]) => toScreen(x, y));
+    const x0 = Math.min(...pts.map(q => q[0])), x1 = Math.max(...pts.map(q => q[0])), y0 = Math.min(...pts.map(q => q[1])), y1 = Math.max(...pts.map(q => q[1]));
+    if (x1 < 0 || y1 < 0 || x0 > W || y0 > H) continue;
+    srchCone(wHctx, s, 0.82);
+    if (!warmHoles) warmHoleBox = [x0, y0, x1 - x0, y1 - y0];
+    else { const bx = Math.min(warmHoleBox[0], x0), by = Math.min(warmHoleBox[1], y0); warmHoleBox = [bx, by, Math.max(warmHoleBox[0] + warmHoleBox[2], x1) - bx, Math.max(warmHoleBox[1] + warmHoleBox[3], y1) - by]; }
+    warmHoles = true;
+  }
+}
+function drawSrchFx() {                           // over the dark: each beam's edges, the lamp's glare, and red once the alarm is up
+  const rg = S.rg; if (!rg.srch || !srchOn()) return;
+  const vr = viewR() + SR_LEN, al = rg.alarm;
+  ctx.save(); worldMatrix(ctx, DPR); ctx.globalCompositeOperation = 'lighter';
+  for (const s of rg.srch) {
+    if (s.dead || Math.abs(s.x - S.cam.x) > vr || Math.abs(s.y - S.cam.y) > vr) continue;
+    const fl = 0.9 + 0.1 * Math.sin(S.t * 13 + s.seed), sp = s.spot || 0, col = al ? '255,70,45' : '255,196,130';
+    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, SR_LEN);
+    g.addColorStop(0, `rgba(${col},${(al ? 0.2 : 0.1) * fl + 0.25 * sp})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(s.x, s.y);
+    for (let k = -10; k <= 10; k++) { const t = s.face + SR_HALF * k / 10; ctx.lineTo(s.x + Math.cos(t) * SR_LEN, s.y + Math.sin(t) * SR_LEN); }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = `rgba(${col},${0.22 * fl})`; ctx.lineWidth = 1.6;     // the edges, so you can always read where the light stops
+    for (const k of [-1, 1]) { const t = s.face + k * SR_HALF; ctx.beginPath(); ctx.moveTo(s.x + Math.cos(t) * 12, s.y + Math.sin(t) * 12); ctx.lineTo(s.x + Math.cos(t) * SR_LEN * 0.97, s.y + Math.sin(t) * SR_LEN * 0.97); ctx.stroke(); }
+  }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  for (const s of rg.srch) {
+    if (s.dead || Math.abs(s.x - S.cam.x) > vr || Math.abs(s.y - S.cam.y) > vr) continue;
+    const [hx, hy] = srchLamp(s), R = (16 + 30 * (s.spot || 0)) * Z, gg = ctx.createRadialGradient(hx, hy, 0, hx, hy, R);
+    gg.addColorStop(0, al ? 'rgba(255,200,180,0.95)' : 'rgba(255,236,200,0.95)'); gg.addColorStop(0.25, al ? 'rgba(255,80,50,0.45)' : 'rgba(255,190,110,0.4)'); gg.addColorStop(1, 'rgba(255,150,60,0)');
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(hx, hy, R, 0, 7); ctx.fill();
+  }
+  ctx.restore();
 }
 
 // ---- the forest boss: the Woodwarden keeps the last green orb in a ring of standing stones ----
@@ -10706,7 +10900,7 @@ function drawExFx() {
     drawDuneFx();                              // the orb's keeper, his marks on the sand, the wall of sand
     if (!duneHeld()) drawHomeArrow(gx, gy, BEYOND_GATE); drawWarpVeil(); return;
   }
-  drawCampFlames();
+  drawCampFlames(); drawSrchFx();
   const p = S.p, [px, py] = toScreen(p.x, p.y), alive = rg.phase === 'fight';
   // chests catch a glint of light now and then, so you can find them in the dark
   for (const c of exChestsNear(p.x, p.y, 440)) {
@@ -11155,6 +11349,14 @@ colourBtn.addEventListener('click', () => {
   colourLabel(); LEAF_K = COLOUR ? LEAF_COL : LEAF_BW; SPRITES = {}; floorPat = null; floorT = null;   // everything repaints in the new look
 });
 colourLabel();
+const srchBtn = document.getElementById('srchBtn');   // v135 trial switch: Searchers or the classic woods
+function srchLabel() { srchBtn.textContent = 'Woods enemies: ' + (SRCH_ON ? 'Searchers (trial)' : 'Classic'); }
+srchBtn.addEventListener('click', () => {
+  SRCH_ON = !SRCH_ON; try { localStorage.setItem('behind-you-searchers', SRCH_ON ? 'on' : 'off'); } catch (e) {}
+  if (S && S.rg) { S.rg.srch = []; S.rg.alarm = false; }
+  srchLabel();
+});
+srchLabel();
 const streakBtn = document.getElementById('streakBtn');
 function streakLabel() { streakBtn.textContent = 'Streak: ' + { full: 'full', quiet: 'quiet', off: 'off' }[STK_MODE]; }
 streakBtn.addEventListener('click', () => { STK_MODE = { full: 'quiet', quiet: 'off', off: 'full' }[STK_MODE] || 'full'; try { localStorage.setItem('behind-you-streak', STK_MODE); } catch (e) {} streakLabel(); });
