@@ -402,6 +402,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
+      <p class="small" id="verLbl">Version 139</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7922,7 +7923,7 @@ function srchStep(dt, inCamp, ring) {
     if (s.st === 'radio') { s.face += angDiff(Math.atan2(p.y - s.y, p.x - s.x), s.face) * Math.min(1, dt * 8); if ((s.t -= dt) <= 0) srchFlee(s, 0); }
     else if (s.st === 'flee') {                    // running for home: a beat to turn, then flat out away from you
       if (s.t > 0) { s.t -= dt; s.face += angDiff(s.want, s.face) * Math.min(1, dt * 10); }
-      else { s.face += angDiff(s.want, s.face) * Math.min(1, dt * 4); const v = 150 * dt; s.x += Math.cos(s.face) * v; s.y += Math.sin(s.face) * v; s.ft -= dt; }
+      else { s.bk = Math.max(0, (s.bk ?? 1) - dt * 3); s.face += angDiff(s.want, s.face) * Math.min(1, dt * 4); const v = 150 * dt; s.x += Math.cos(s.face) * v; s.y += Math.sin(s.face) * v; s.ft -= dt; }
     }
     else if (s.st === 'look') { if ((s.t -= dt) <= 0) srchBeat(s); }
     else if (s.st === 'turn') {
@@ -7984,11 +7985,12 @@ function srchHoles(hole) {                        // their beams cut through the
   for (const s of rg.srch) {
     if (s.dead || Math.abs(s.x - S.cam.x) > vr || Math.abs(s.y - S.cam.y) > vr) continue;
     hole(s.x, s.y, 38, 0.7);                       // enough light round it to see who's holding the lamp
-    srchCone(dctx, s, 0.82);
+    const bk = s.bk ?? 1; if (bk < 0.02) continue;  // v139: a fleeing searcher drops its beam (job done)
+    srchCone(dctx, s, 0.82 * bk);
     const pts = [[s.x, s.y], ...[-1, 0, 1].map(k => [s.x + Math.cos(s.face + k * SR_HALF) * SR_LEN, s.y + Math.sin(s.face + k * SR_HALF) * SR_LEN])].map(([x, y]) => toScreen(x, y));
     const x0 = Math.min(...pts.map(q => q[0])), x1 = Math.max(...pts.map(q => q[0])), y0 = Math.min(...pts.map(q => q[1])), y1 = Math.max(...pts.map(q => q[1]));
     if (x1 < 0 || y1 < 0 || x0 > W || y0 > H) continue;
-    srchCone(wHctx, s, 0.82);
+    srchCone(wHctx, s, 0.82 * bk);
     if (!warmHoles) warmHoleBox = [x0, y0, x1 - x0, y1 - y0];
     else { const bx = Math.min(warmHoleBox[0], x0), by = Math.min(warmHoleBox[1], y0); warmHoleBox = [bx, by, Math.max(warmHoleBox[0] + warmHoleBox[2], x1) - bx, Math.max(warmHoleBox[1] + warmHoleBox[3], y1) - by]; }
     warmHoles = true;
@@ -8000,9 +8002,10 @@ function drawSrchFx() {                           // over the dark: each beam's 
   ctx.save(); worldMatrix(ctx, DPR); ctx.globalCompositeOperation = 'lighter';
   for (const s of rg.srch) {
     if (s.dead || Math.abs(s.x - S.cam.x) > vr || Math.abs(s.y - S.cam.y) > vr) continue;
-    const fl = 0.9 + 0.1 * Math.sin(S.t * 13 + s.seed), sp = s.spot || 0, col = al ? '255,70,45' : '255,196,130';
+    const bk = s.bk ?? 1; if (bk < 0.02) continue;
+    const fl = (0.9 + 0.1 * Math.sin(S.t * 13 + s.seed)) * bk, sp = s.spot || 0, col = al ? '255,70,45' : '255,196,130';
     const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, SR_LEN);
-    g.addColorStop(0, `rgba(${col},${(al ? 0.2 : 0.1) * fl + 0.25 * sp})`); g.addColorStop(1, `rgba(${col},0)`);
+    g.addColorStop(0, `rgba(${col},${(al ? 0.2 : 0.1) * fl + 0.25 * sp * bk})`); g.addColorStop(1, `rgba(${col},0)`);
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(s.x, s.y);
     for (let k = -10; k <= 10; k++) { const t = s.face + SR_HALF * k / 10; ctx.lineTo(s.x + Math.cos(t) * SR_LEN, s.y + Math.sin(t) * SR_LEN); }
     ctx.closePath(); ctx.fill();
