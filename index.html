@@ -402,7 +402,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 139</p>
+      <p class="small" id="verLbl">Version 140</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7718,7 +7718,7 @@ function exHome() {
   const rg = S.rg;
   if (srchOn()) {                          // v135 trial: back inside the fence, the alarm drops and the swarm melts back into the dark
     if (rg.alarm) { rg.safeFx = { t: 0 }; rg.spotFx = null; }
-    rg.alarm = false; rg.srGr = 0;
+    rg.alarm = false; rg.srGr = 0; rg.susTop = 0; for (const s of rg.srch || []) { s.sus = 0; if (s.st === 'sus') { s.st = 'look'; s.t = 1; } }
     for (const e of rg.enemies) if (!e.dead) { e.dead = e.gone = true; ashBurst(e.x, e.y, 10, 22); }
   }
   if (S.day) { rg.oil = oilMax(); rg.wispCarry = 0; return; }   // Daylight: the fence keeps them out, but there's no food or healing in camp
@@ -7816,7 +7816,8 @@ function exStep(dt) {
 // Settings > Trial > Woods enemies switches the whole thing off and brings back the classic hunters.
 let SRCH_ON = (() => { try { return localStorage.getItem('behind-you-searchers') !== 'off'; } catch (e) { return true; } })();
 const srchOn = () => SRCH_ON && S.mode === 'expedition' && !S.day && S.rg && !S.rg.beyond;
-const SR_LEN = 420, SR_HALF = 0.2, SR_SP = 44, SR_GRACE = 0.1;   // v137 (Joe): longer, narrower beams   // beam reach and half-width, walk speed, how long the very edge may clip you
+const SR_LEN = 420, SR_HALF = 0.2, SR_SP = 44, SR_GRACE = 0.1;
+const SR_FILL = 1.4, SR_SUS = 0.45, SR_DRAIN = 0.5;   // v140: seconds to fill from the far edge (0.5 s close and centred), where it turns suspicious, how fast it forgets   // v137 (Joe): longer, narrower beams   // beam reach and half-width, walk speed, how long the very edge may clip you
 const SR_N = [7, 11, 15, 19], SR_R = 1500, SR_GUARD = 13, SR_GUARD_R = 620, SR_CAMP = PRING + 420;   // roamers kept round you per ring, guards round an orb, and how close to camp they come
 function srchOk(x, y, guard) {                    // somewhere a Searcher may stand
   if (Math.hypot(x, y) < SR_CAMP) return false;
@@ -7857,9 +7858,59 @@ function srchSpawn(rg, n, nearX, nearY, r0, r1, home) {   // place up to n, off 
 function srchFlee(s, wait) {                      // v138: turn tail and run back to base, away from you
   const p = S.p; s.st = 'flee'; s.t = wait; s.ft = 1.2; s.want = Math.atan2(s.y - p.y, s.x - p.x) + (Math.random() - 0.5) * 0.6;
 }
+function srchTick(k) {                            // v140: a rising tick while a meter fills
+  if (!actx) return; toneAt(actx.currentTime, 520 + 900 * k, 0.05, 0.05 + 0.05 * k, 'square', sfxGain);
+}
+function srchHuh(s) {                             // turned suspicious: two quick rising notes and a ? that pops
+  s.huh = 1; if (!actx) return; const t = actx.currentTime; toneAt(t, 660, 0.09, 0.09, 'square', sfxGain); toneAt(t + 0.08, 990, 0.14, 0.09, 'square', sfxGain);
+}
+function srchCalm(s) {                            // lost interest: a falling pair, and back to its rounds
+  s.calm = 1; if (!actx) return; const t = actx.currentTime; toneAt(t, 740, 0.1, 0.05, 'triangle', sfxGain); toneAt(t + 0.09, 494, 0.16, 0.05, 'triangle', sfxGain);
+}
+const susCol = k => k < SR_SUS ? [255, 255 - 30 * k / SR_SUS, 235 - 175 * k / SR_SUS].map(Math.round).join(',') : [255, Math.round(225 - 165 * (k - SR_SUS) / (1 - SR_SUS)), Math.round(60 - 20 * (k - SR_SUS) / (1 - SR_SUS))].join(',');   // white, to yellow, to red
+function susMeter(x, y, w, k, a) {                // a slanted arcade bar: dark rim, the fill, a bright leading edge
+  const h = 7, sk = 4;
+  const bar = (x0, x1) => { ctx.beginPath(); ctx.moveTo(x0 + sk, y - h / 2); ctx.lineTo(x1 + sk, y - h / 2); ctx.lineTo(x1 - sk, y + h / 2); ctx.lineTo(x0 - sk, y + h / 2); ctx.closePath(); };
+  ctx.save(); ctx.globalAlpha = a;
+  ctx.fillStyle = 'rgba(8,6,4,0.85)'; bar(x - w / 2 - 2, x + w / 2 + 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'; bar(x - w / 2, x + w / 2); ctx.fill();
+  if (k > 0.005) { const c = susCol(k); ctx.shadowColor = `rgba(${c},0.8)`; ctx.shadowBlur = 8; ctx.fillStyle = `rgb(${c})`; bar(x - w / 2, x - w / 2 + w * k); ctx.fill(); }
+  ctx.restore();
+}
+function drawSusFx() {                            // v140: the meters, over each searcher, at the screen's edge for ones out of sight, and the worst of them over you
+  const rg = S.rg; if (rg.alarm || !rg.srch) return;
+  const zk = Math.max(0.8, Math.min(1.3, Z));
+  for (const s of rg.srch) {
+    const k = s.sus || 0;
+    s.huh = Math.max(0, (s.huh || 0) - frameDt * 1.6); s.calm = Math.max(0, (s.calm || 0) - frameDt * 1.2);
+    if (s.dead || s.st === 'flee' || (k < 0.01 && !s.calm)) continue;
+    const [sx, sy0] = toScreen(s.x, s.y), sy = sy0 - 58 * Z;
+    if (sx > 20 && sx < W - 20 && sy > 20 && sy < H - 10) {
+      if (s.calm && k < 0.01) { stkText('?', sx, sy - 6, 22 * zk, '200,200,195', s.calm, { s: 0.8 + 0.2 * s.calm }); continue; }   // the ? greys and fades: nothing there
+      const sus = s.st === 'sus', pop = sus ? 1 + 0.6 * s.huh * s.huh : 1, c = susCol(k);
+      stkText(sus ? '?' : '·', sx, sy - 14 * zk, (sus ? 30 : 22) * zk, c, sus ? 1 : 0.85, { s: pop, glow: sus ? c : null, blur: 12 });
+      susMeter(sx, sy + 2, 34 * zk, k, 1);
+    } else if (k > 0.01) {                         // off screen: a chevron on the edge, pointing at it, filling the same way
+      const cx = Math.max(26, Math.min(W - 26, sx)), cy = Math.max(SAFE_TOP + 40, Math.min(H - 26, sy)), a = Math.atan2(sy - cy, sx - cx), c = susCol(k), r = (13 + 5 * k) * zk;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+      ctx.fillStyle = 'rgba(8,6,4,0.85)'; ctx.beginPath(); ctx.moveTo(r + 3, 0); ctx.lineTo(-r * 0.7 - 2, -r * 0.8 - 2); ctx.lineTo(-r * 0.3, 0); ctx.lineTo(-r * 0.7 - 2, r * 0.8 + 2); ctx.closePath(); ctx.fill();
+      ctx.shadowColor = `rgba(${c},0.8)`; ctx.shadowBlur = 10; ctx.fillStyle = `rgba(${c},${0.5 + 0.5 * k})`;
+      ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r * 0.7, -r * 0.8); ctx.lineTo(-r * 0.3, 0); ctx.lineTo(-r * 0.7, r * 0.8); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      stkText(s.st === 'sus' ? '?' : '', cx - Math.cos(a) * 22 * zk, cy - Math.sin(a) * 22 * zk, 18 * zk, c, 1);
+    }
+  }
+  const top = rg.susTop || 0;                      // over your head: how close you are to being caught, from whoever is closest to it
+  if (top > 0.01 && !rg.inCamp) {
+    const [px, py] = toScreen(S.p.x, S.p.y), hy = py - 50 * Z - 34, c = susCol(top), hot = top >= SR_SUS;
+    const sh = hot ? (Math.random() - 0.5) * 3 * top : 0;
+    stkText(hot ? 'SUSPICIOUS' : 'SEEN', px + sh, hy - 4, (hot ? 15 : 12) * zk, c, Math.min(1, top * 4), { glow: hot ? c : null, blur: 10, w: 700 });
+    susMeter(px + sh, hy + 12, 58 * zk, top, Math.min(1, top * 4));
+  }
+}
 function srchSpot(s) {                            // caught: it calls it in, and the woods wake up
   const rg = S.rg, p = S.p, ring = exRing(Math.hypot(p.x, p.y));
-  rg.alarm = true; rg.srGr = 0; lifeAdd('spotted');
+  rg.alarm = true; rg.srGr = 0; rg.susTop = 0; lifeAdd('spotted');
   if (s) { s.st = 'radio'; s.t = 0.8; s.face = Math.atan2(p.y - s.y, p.x - s.x); s.spot = 1; }
   for (const o of rg.srch) if (o !== s && !o.dead) srchFlee(o, 0.15 + Math.random() * 0.5);   // v138 (Joe): job done, every searcher runs for home
   rg.spotFx = { t: 0, s }; rg.safeFx = null;     // v137: the arcade "!" (drawSpotFx)
@@ -7925,6 +7976,11 @@ function srchStep(dt, inCamp, ring) {
       if (s.t > 0) { s.t -= dt; s.face += angDiff(s.want, s.face) * Math.min(1, dt * 10); }
       else { s.bk = Math.max(0, (s.bk ?? 1) - dt * 3); s.face += angDiff(s.want, s.face) * Math.min(1, dt * 4); const v = 150 * dt; s.x += Math.cos(s.face) * v; s.y += Math.sin(s.face) * v; s.ft -= dt; }
     }
+    else if (s.st === 'sus') {                     // v140: something's there; it turns its beam toward where it last saw you and creeps closer
+      const ta = Math.atan2(s.ly - s.y, s.lx - s.x), dA = angDiff(ta, s.face); s.face += Math.sign(dA) * Math.min(Math.abs(dA), 1.7 * dt);
+      const dd = Math.hypot(s.lx - s.x, s.ly - s.y); if (dd > 110 && Math.abs(dA) < 0.5) { const v = SR_SP * 0.6 * dt; s.x += Math.cos(s.face) * v; s.y += Math.sin(s.face) * v; }
+      if ((s.sus || 0) < 0.04) { s.st = 'look'; s.t = 0.8 + Math.random(); s.sus = 0; srchCalm(s); }   // must have been nothing
+    }
     else if (s.st === 'look') { if ((s.t -= dt) <= 0) srchBeat(s); }
     else if (s.st === 'turn') {
       const dA = angDiff(s.want, s.face), stp = s.rate * dt;
@@ -7936,22 +7992,30 @@ function srchStep(dt, inCamp, ring) {
     s.mv = Math.hypot(s.x - x0, s.y - y0) / Math.max(1e-4, dt); if (s.mv > 1) s.ph += 1.348 * s.mv / 7.5 * dt;
     s.spot = Math.max(0, (s.spot || 0) - dt * 0.6);
   }
-  if (inCamp || exSafeAt(p.x, p.y)) { rg.srGr = 0; return; }   // the fence and an outpost's light are safe ground
-  if (!rg.alarm) {                                 // step into a beam and you're caught; only its very edge gives you a few frames
-    let edge = false, near = 1e9;
+  const safe = inCamp || !!exSafeAt(p.x, p.y);     // the fence and an outpost's light are safe ground
+  if (!rg.alarm) {                                 // v140 (Joe, after Dishonored): being seen fills a meter over its head; fill it and you're spotted
+    let near = 1e9, top = 0;
     for (const s of rg.srch) {
+      if (s.dead || s.st === 'flee') continue;
       const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy); near = Math.min(near, d);
-      if (d > SR_LEN) continue;
-      const off = Math.abs(angDiff(Math.atan2(dy, dx), s.face));
-      if (off > SR_HALF) continue;
-      if (d < SR_LEN * 0.88 && off < SR_HALF * 0.75) return srchSpot(s);
-      edge = s;
+      let rate = 0;
+      if (!safe && d < SR_LEN) {
+        const off = Math.abs(angDiff(Math.atan2(dy, dx), s.face));
+        if (off < SR_HALF) { const k = 0.6 * (1 - d / SR_LEN) + 0.4 * (1 - off / SR_HALF); rate = 1 / (SR_FILL - 0.9 * k); }   // close and dead centre fills fastest
+      }
+      if (!safe && S.torchLvl > 0.6 && beamGeo && srchLit(s)) rate = Math.max(rate, 2.4);   // your torch shining on it gives you away fast
+      if (rate) {
+        if (!S.torchOn) rate *= 0.7;                // in the dark you're harder to make out
+        if (s.st === 'sus') rate *= 1.2;            // already looking for you
+        const was = s.sus || 0; s.sus = Math.min(1, was + rate * dt); s.seenT = 0; s.lx = p.x; s.ly = p.y;
+        if (was < SR_SUS && s.sus >= SR_SUS && s.st !== 'radio') { s.st = 'sus'; srchHuh(s); }
+        if (S.t > (s.tickT || 0)) { s.tickT = S.t + 0.13 - 0.06 * s.sus; srchTick(s.sus); }
+        if (s.sus >= 1) return srchSpot(s);
+      } else if ((s.seenT = (s.seenT || 0) + dt) > 0.7) s.sus = Math.max(0, (s.sus || 0) - SR_DRAIN * dt);
+      top = Math.max(top, s.sus || 0);
     }
-    if (edge) { if ((rg.srGr = (rg.srGr || 0) + dt) > SR_GRACE) return srchSpot(edge); } else rg.srGr = 0;
-    if (S.torchLvl > 0.6 && beamGeo) for (const s of rg.srch) {   // v136: shine your torch on one and it sees the light; switch it off to slip past
-      if (srchLit(s)) { if ((s.litT = (s.litT || 0) + dt) > 0.25) return srchSpot(s); } else s.litT = 0;
-    }
-    if (near < 800 && (rg.crackT = (rg.crackT ?? 3) - dt) <= 0) { rg.crackT = 4 + Math.random() * 6; srchFar(near); }   // somewhere out there a radio crackles
+    rg.susTop = top;
+    if (!safe && near < 800 && (rg.crackT = (rg.crackT ?? 3) - dt) <= 0) { rg.crackT = 4 + Math.random() * 6; srchFar(near); }   // somewhere out there a radio crackles
   }
 }
 function srchLit(s) {                            // is your beam on it, with no tree in the way?
@@ -8020,6 +8084,7 @@ function drawSrchFx() {                           // over the dark: each beam's 
     ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(hx, hy, R, 0, 7); ctx.fill();
   }
   ctx.restore();
+  drawSusFx();
   drawSpotFx();
 }
 const spotPop = t => t < 0.1 ? 0.2 + 1.3 * (t / 0.1) : t < 0.26 ? 1.5 - 0.5 * ((t - 0.1) / 0.16) : 1 + 0.05 * Math.sin(t * 22) * Math.max(0, 1 - (t - 0.26) * 1.5);   // slam in, overshoot, settle
