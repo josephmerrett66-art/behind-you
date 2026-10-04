@@ -114,7 +114,6 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
 #stats .pips i.f { background: rgb(185,130,255); }
 #stats .item.own .ic { border-color: rgb(185,130,255); color: rgb(215,185,255); }
 #stats .small { color: var(--ash); }
-#statsOpen { border-color: rgba(185,130,255,0.7); }
 .ic { display: inline-grid; place-items: center; flex: none; width: 2.6rem; height: 2.6rem; border: 1px solid rgba(138,138,138,0.4); color: var(--bone); background: rgba(5,5,5,0.5); }
 .ic svg { width: 1.45rem; height: 1.45rem; }
 .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.6rem; margin-top: 0.4rem; }
@@ -213,6 +212,17 @@ button.nav .ic { width: 2.3rem; height: 2.3rem; border-radius: 50%; } button.nav
 button.nav:hover, button.nav:focus-visible { color: var(--bone); outline: none; } button.nav:hover .ic, button.nav:focus-visible .ic { border-color: var(--bone); }
 button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.7); }
 .panel h2 { margin: 0; font: 400 1.6rem var(--display); }
+#lifeBody { margin-top: 0; }
+#lifeBody .grp:first-child { margin-top: 0; }
+#lifeBody .itemrow { cursor: default; }
+#lifeBody .item.can .itemrow { cursor: pointer; }
+#lifeBody .item.can .it .nm::after { content: ' ›'; color: var(--ash); }
+#lifeBody .item.open .it .nm::after { content: ' ⌄'; }
+.lifev { flex: none; font: 600 1.05rem var(--mono); color: var(--bone); font-variant-numeric: tabular-nums; text-align: right; }
+.lifev small { font-size: 0.7rem; color: var(--ash); font-weight: 400; margin-left: 0.2rem; }
+.lifegrid { display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 1rem; font-size: 0.82rem; color: var(--ash); font-variant-numeric: tabular-nums; }
+.lifegrid b { color: var(--bone); font-weight: 600; text-align: right; }
+.lifegrid i { display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.5rem; vertical-align: 0.05rem; background: var(--dot, rgba(239,239,234,0.6)); }
 .panel .audio h2 { font: 600 0.7rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); }
 .backbtn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; font: 600 0.7rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ash); justify-self: start; }
 .backbtn .ic { width: 1.8rem; height: 1.8rem; border: 0; background: none; } .backbtn:hover, .backbtn:focus-visible { color: var(--bone); outline: none; }
@@ -277,7 +287,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <button id="savesOpen" class="savechip" data-panel="pSaves"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></svg><span id="saveLbl">Saves</span></button>
     <nav class="menurow" aria-label="More">
       <button class="nav" data-panel="pExtras"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7"/><rect x="13.5" y="3.5" width="7" height="7"/><rect x="3.5" y="13.5" width="7" height="7"/><path d="M17 13.5v7M13.5 17h7"/></svg></span>Extras</button>
-      <button id="statsOpen" class="nav wisp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.6 0-6-2.6-6-5.8C6 11 12 3 12 3s6 8 6 12.2c0 3.2-2.4 5.8-6 5.8z"/><circle cx="12" cy="15.5" r="2"/></svg></span><span id="statsLbl">Stats</span></button>
+      <button id="statsOpen" class="nav" data-panel="pLife"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 20v-6M12 20V7M17 20v-10"/></svg></span><span id="statsLbl">Stats</span></button>
       <button class="nav" data-panel="pSettings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>Settings</button>
       <button class="nav" data-panel="pScores"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7"/></svg></span>Scores</button>
       <button class="nav" data-panel="pHelp"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17" r=".5"/></svg></span>How to play</button>
@@ -303,6 +313,13 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <button id="start2" class="mode"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span><span class="mt"><span class="nm">Blink</span><span class="best" id="bestBlink"></span></span></button>
       <button id="start3" class="mode"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-5 7h3l-4 6h12l-4-6h3z"/><path d="M12 16v5"/></svg></span><span class="mt"><span class="nm">Free roam</span></span></button>
     </div>
+  </section>
+  <section class="card panel" id="pLife" hidden>
+    <button class="backbtn" data-back><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>Back</button>
+    <h2>Stats</h2>
+    <p class="small" id="lifeSave"></p>
+    <div id="lifeBody" class="items"></div>
+    <p class="small" id="lifeSince"></p>
   </section>
   <section class="card panel" id="pSettings" hidden>
     <button class="backbtn" data-back><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>Back</button>
@@ -355,7 +372,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <h2>How to play</h2>
     <div class="howto">
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-8 17h16z"/><path d="M12 3v17M9 20l3-6 3 6"/></svg></span>Expedition<span class="sh">Loot, camp, orbs</span></summary><p>Live in a walled camp and head out for loot. Carry it home to bank it and buy upgrades that last. Your torch burns oil and loot weighs you down. The further out, the worse it gets. Three green orbs wait in the deep; bring them home to the shrine. Die out there and you lose what you carried.</p></details>
-      <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.6 0-6-2.6-6-5.8C6 11 12 3 12 3s6 8 6 12.2c0 3.2-2.4 5.8-6 5.8z"/><circle cx="12" cy="15.5" r="2"/></svg></span>Stats<span class="sh">Wisps, for good</span></summary><p>Everything you burn in Nightfall and Expedition leaves a violet wisp. Grab it before it fades and spend wisps on stats that last. In Expedition, wisps only count once you carry them home.</p></details>
+      <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.6 0-6-2.6-6-5.8C6 11 12 3 12 3s6 8 6 12.2c0 3.2-2.4 5.8-6 5.8z"/><circle cx="12" cy="15.5" r="2"/></svg></span>Wisps<span class="sh">Spent at the camp shop</span></summary><p>Everything you burn in Nightfall and Expedition leaves a violet wisp. Grab it before it fades, then spend wisps at the shop by the camp fire on upgrades that last. In Expedition, wisps only count once you carry them home. Stats on the title menu keeps your record: distance walked, enemies burned, bosses felled and more.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/><circle cx="16.5" cy="6" r=".6"/><circle cx="19.5" cy="9.5" r=".5"/></svg></span>Nightfall<span class="sh">Waves, upgrades</span></summary><p>Shades only move in the dark and freeze in your light. Hold the beam on them and they burn. Burn every shade to reach dawn, then pick an upgrade. Each wave brings more, and new kinds.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16c-1.6 0-2.6-1.4-2.4-3.2C4.9 10.6 6 9 7.3 9.3c1.3.3 1.5 2.3 1.2 4-.2 1.6-.6 2.7-1.5 2.7zM16 10c-1.6 0-2.6-1.4-2.4-3.2.3-2.2 1.4-3.8 2.7-3.5 1.3.3 1.5 2.3 1.2 4-.2 1.6-.6 2.7-1.5 2.7z"/><path d="M5.5 18.5h3M14.5 12.5h3"/></svg></span>Chase<span class="sh">Search, then run</span></summary><p>Stop to search with a fading torch, then run blind for eight seconds while they flee. Two red trails show where they went. Miss them once and they're gone.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span>Blink<span class="sh">No running</span></summary><p>Two seconds of dark, then the torch comes on somewhere new with them hidden nearby. Find them before the light fades.</p></details>
@@ -1380,7 +1397,7 @@ function dodge() {
   if (mv > 15) a = Math.atan2(p.vy, p.vx);
   else { const [wx, wy] = screenDirToWorld(-Math.cos(S.aim), -Math.sin(S.aim)); a = Math.atan2(wy, wx); }   // backstep
   p.atk = null;                                   // a roll cancels a swing, like Hades' dash
-  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollBack = mv <= 15; p.ghosts = [];
+  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollBack = mv <= 15; p.ghosts = []; lifeAdd('rolls');
   if (isEx()) {
     if (burn) { if (!S.rg.inCamp) S.rg.oil -= DODGE_OIL; p.oilPuff = S.t; for (let i = 0; i < 8; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 6, vx: (Math.random() - 0.5) * 70, vy: (Math.random() - 0.5) * 70, vz: 30 + Math.random() * 40, life: 0.5 + Math.random() * 0.3, t: 0 }); }
     else p.dch -= 1;
@@ -1418,6 +1435,7 @@ function startSwing() {
   else if (prev && S.t - prev.end < ATK_CHAIN && prev.i < 2) i = prev.i + 1;
   const D = ATK[i], a = S.aimW !== undefined ? S.aimW : 0;
   if (i === 3) p.roll = 0;                        // the roll turns into the thrust
+  lifeAdd('swings');
   const side = i === 1 ? -1 : 1;
   p.atk = { i, t: 0, dur: D.dur, a, side, hit: new Set(), done: false, queued: false };
   rg.atkHist = (rg.atkHist || []).filter(h => S.t - h.t < 1.6).concat([{ i, side, t: S.t }]);   // v120: a false Mirage you strike throws your own combo back
@@ -1580,6 +1598,7 @@ function update(dt) {
   if (isRg() && S.rg) { atkStep(dt); slashStep(dt); }
   const ox = p.x, oy = p.y;
   p.x += p.vx * dt; p.y += p.vy * dt;
+  if (isRg() && S.rg && S.rg.phase === 'fight') { lifeAdd('walk', Math.hypot(p.vx, p.vy) * dt); lifeAdd('time', dt); }   // the record: metres walked, time out
   { const sk = stormK(); if (sk > 0.01 && S.rg.phase === 'fight') { const [wx, wy] = windVec(), m = sk * (Math.hypot(p.vx, p.vy) > 5 ? 15 : 8); p.x += wx * m * dt; p.y += wy * m * dt; } }   // the storm leans on you
   if (S.mode === 'expedition' && !inBeyond()) exWall(p, ox, oy);
 
@@ -4023,7 +4042,7 @@ function showPanel(id) {
   overlay.scrollTop = 0; menuBests();
   const f = id ? overlay.querySelector('#' + id + ' .backbtn') : null; if (f) f.focus({ preventScroll: true });
 }
-overlay.querySelectorAll('[data-panel]').forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
+overlay.querySelectorAll('[data-panel]').forEach(b => b.addEventListener('click', () => { if (b.dataset.panel === 'pLife') { lifeOpen = null; renderLife(); } showPanel(b.dataset.panel); }));
 overlay.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => showPanel(null)));
 function menuBests() {
   const put = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
@@ -4042,7 +4061,7 @@ function saveInfo(id) {                      // a one-line summary of what a sav
   return `${x.orbs || 0} of 3 orbs · ${x.embers || 0} embers · ${(st && st.w) || 0} wisps${when ? ' · ' + when : ''}`;
 }
 function useSave(id) {                        // make this the save everything reads and writes
-  SV.active = id; svSave(); ST = stRead(); XS = null; statsLabel(); menuBests();
+  lifeFlush(); SV.active = id; svSave(); ST = stRead(); XS = null; statsLabel(); menuBests();
 }
 function renderSaves() {
   const box = document.getElementById('saveList'), busy = S.mode === 'expedition';
@@ -4301,7 +4320,7 @@ function hurt(e) {
   if (S.mode === 'expedition' && rg.recall) { rg.recall = null; exNote('the flare went out'); }   // a hit snuffs a recall flare
   if (S.p.rollSafe > 0) {                  // rolled right through it
     rg.inv = 0.35; hitStop(0.05); addShake(0.1);
-    rg.dodged = { t: 0 }; sfx(2.2, 0.35, 'highpass', 3000, 0.15);
+    rg.dodged = { t: 0 }; sfx(2.2, 0.35, 'highpass', 3000, 0.15); lifeAdd('dodged');
     if (lv('close')) { S.p.rollCool = 0; if (isEx()) S.p.dch = dodgeMax(); dodgeBtn.dataset.cool = '0'; rg.rushT = 1.5 + 1.5 * lv('close'); if (isEx() && lv('close') > 1) rg.adren = 2; }   // Close Call 2: a burst of speed too
     return;
   }
@@ -4315,7 +4334,7 @@ function hurt(e) {
   const dune = inBeyond() && !(Math.random() < 0.25 * sr('sandward'));   // Sandward: sometimes it only grazes
   // out in the Dunes every hit is two hearts, and they come quicker after each other
   if (rg.steel > 0) {                      // Armour: a steel heart takes it (two in the Dunes)
-    rg.steel = Math.max(0, rg.steel - (dune ? DUNE_HIT : 1)); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = 0.6;
+    lifeAdd('hearts', Math.min(rg.steel, dune ? DUNE_HIT : 1)); rg.steel = Math.max(0, rg.steel - (dune ? DUNE_HIT : 1)); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = 0.6;
     rg.pop = { t: 0, steelLost: rg.steel };
     addShake(0.55); hitStop(0.08);
     { const dx = S.p.x - e.x, dy = S.p.y - e.y, dd = Math.hypot(dx, dy) || 1; S.p.x += dx / dd * 14; S.p.y += dy / dd * 14; }
@@ -4323,7 +4342,7 @@ function hurt(e) {
     return;
   }
   const dmgH = (isEx() && e && e.type === 'shade' ? 0.5 : 1) * (pact('half') ? 0.5 : 1) * (dune ? DUNE_HIT : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
-  rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
+  lifeAdd('hearts', Math.min(rg.hp, dmgH)); rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
   rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };   // a heart cracked in half, or the one that just went
   if (lv('coat')) { lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white'); if (isEx() && lv('coat') > 2) for (const o of rg.enemies) if (dist2(o, S.p) < 150 + 20 * lv('coat')) o.frozen = 2.5; }   // Thick Coat 3: the flash freezes
   addShake(0.75); hitStop(0.11);
@@ -4361,7 +4380,7 @@ function killFoe(e) {
   if (lv('embers')) rg.fires.push({ x: e.x, y: e.y, r: 28 + 8 * lv('embers'), life: 2 + 1.5 * lv('embers'), max: 2 + 1.5 * lv('embers'), seed: Math.random() * 9, freeze: isEx() && rawLv('smoulder') > 2 });
   if (lv('nova') && rg.nova < 12) { rg.nova++; if (rg.nova === 12) sfx(2.5, 0.4, 'bandpass', 2200, 0.3); }
   if (e.type === 'splitter') splitApart(e);
-  e.dead = true; rg.kills++; rg.waveKills++;
+  e.dead = true; rg.kills++; rg.waveKills++; lifeAdd('kills'); lifeTally('kt', e.type);
   rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0, segs: e.type === 'centi' ? centiSegs(e).filter((q, i) => centiOut(e, i)) : null, hz: e.hz, k: e.k });
   if (e.guard) { rg.guardDone = true; addShake(0.6); hitStop(0.1); }   // the orb's keeper is dead: it stays dead this trip
   if (e.type === 'centi') for (const q of centiSegs(e)) ashBurst(q.x, q.y, 3, 8);   // it drops to its knees and crumbles
@@ -4727,6 +4746,7 @@ function endWave() {
 }
 function nightOver() {
   const rg = S.rg;
+  lifeAdd('deaths');
   if (S.mode === 'expedition') return exDeath();
   rg.phase = 'dead'; rg.deadT = 0;
   submitScore('survive', rg.wave - 1);
@@ -6060,6 +6080,16 @@ let ST = stRead();
   for (const id of ['searing', 'reach', 'wide']) { for (let i = 0; i < (ST.r[id] || 0); i++) back += STAT_COST[i]; delete ST.r[id]; }
   if (back) { ST.w += back; try { localStorage.setItem(stKey(), JSON.stringify(ST)); } catch (e) {} } }
 function sr(id) { return ST.r[id] || 0; }
+// ---- v121 personal stats: a lifetime record per save (ST.life), counted from this version on. Playtests count nothing ----
+let lifeDirty = false;
+function life() { return ST.life || (ST.life = { since: Date.now(), kt: {}, bt: {} }); }
+function lifeAdd(k, n = 1) { if (EX_TEST || !n) return; const L = life(); L[k] = (L[k] || 0) + n; lifeDirty = true; }
+function lifeMax(k, v) { if (EX_TEST) return; const L = life(); if (v > (L[k] || 0)) { L[k] = v; lifeDirty = true; } }
+function lifeTally(map, k, n = 1) { if (EX_TEST) return; const L = life(), M = L[map] || (L[map] = {}); M[k] = (M[k] || 0) + n; lifeDirty = true; }
+function lifeFlush() { if (lifeDirty) { lifeDirty = false; stSave(); } }
+setInterval(lifeFlush, 4000);
+addEventListener('pagehide', lifeFlush);
+document.addEventListener('visibilitychange', () => { if (document.hidden) lifeFlush(); });
 const statCost = (s, have) => (s.cost || STAT_COST)[have];
 const baseHearts = () => 3 + sr('hardy') + sr('heartwood');
 function dropWisps(e) {                      // a soul lifts out of the ash
@@ -6088,7 +6118,7 @@ function wispStep(dt) {
 function gainWisps(n) {
   const rg = S.rg;
   if (S.mode === 'expedition') rg.wispCarry = (rg.wispCarry || 0) + n;   // only counts once you carry it home
-  else { ST.w += n; rg.wispRun = (rg.wispRun || 0) + n; stSave(); }
+  else { ST.w += n; rg.wispRun = (rg.wispRun || 0) + n; lifeAdd('wisps', n); stSave(); }
   const P = rg.wispPop;
   rg.wispPop = { t: 0, n: (P && P.t < 1.4 ? P.n : 0) + n };
   wispChime(1 + Math.random() * 0.25);
@@ -6167,7 +6197,7 @@ function resetStats() {
   ST.w += back; ST.r = {}; stSave(); statApply(); statCat = null; statOpen = null; renderStats();
 }
 let statCat = null, statOpen = null, statsFrom = null;
-function statsLabel() { const b = document.getElementById('statsLbl'); if (b) b.textContent = ST.w ? `Stats · ${ST.w}` : 'Stats'; }
+function statsLabel() { const b = document.getElementById('statsLbl'); if (b) b.textContent = 'Stats'; }   // v121: wisps are spent at the camp shop now; this button is your record
 function openStats(from) {
   statsFrom = from; statCat = null; statOpen = null;
   if (from === 'camp') campEl.hidden = true;
@@ -6218,6 +6248,76 @@ function renderStats() {
     return wrap;
   }));
   body.replaceChildren(head, list);
+}
+
+// ---- v121: the Stats page on the title menu is now your record, not a shop. Rows with a breakdown open with a tap ----
+const LIFE_FOES = [['shade', 'Shades'], ['stalker', 'Stalkers'], ['brute', 'Brutes'], ['tall', 'Tall ones'], ['bomber', 'Bombers', '#e0503c'], ['laser', 'Lasers', '#4c8cff'],
+  ['kamikaze', 'Kamikazes', '#f0d040'], ['splitter', 'Splitters', '#f070b0'], ['splitling', 'Splitlings', '#f070b0'], ['centi', 'Centipedes'], ['spear', 'Spear throwers', '#ff9030'], ['archer', 'Archers', '#b8e040']];
+const LIFE_BOSSES = [['woodcutter', 'The Woodcutter'], ['lamplighter', 'The Lamplighter'], ['twins', 'The Twins'], ['huntsman', 'The Huntsman'], ['warden', 'The Woodwarden'],
+  ['dervish', 'The Dervish'], ['king', 'The Buried King'], ['mirage', 'The Mirage']];
+let lifeOpen = null;
+const lifeNum = n => Math.round(n || 0).toLocaleString();
+const lifeDist = m => (m = m || 0) >= 1000 ? [(m / 1000).toFixed(m < 10000 ? 2 : 1), 'km'] : [String(Math.round(m)), 'm'];
+const lifeTime = t => { t = Math.round(t || 0); const h = Math.floor(t / 3600), mn = Math.floor(t / 60) % 60; return h ? [`${h}h ${mn}`, 'm'] : mn ? [String(mn), 'min'] : [String(t), 's']; };
+function lifeUps() {                             // upgrades owned right now, read straight from the save, so these include everything bought before v121
+  const x = XS || exRead(), sum = o => Object.values(o || {}).reduce((a, v) => a + (+v || 0), 0);
+  const ember = x ? [['Torch', sum(x.torch)], ['Armour', sum(x.arm)], ['Power-ups', sum(x.own)], ['Gear', ['bag', 'tank', 'frame', 'slot'].reduce((a, k) => a + (x[k] || 0), 0)], ['Pacts', Object.keys((x.pacts && x.pacts.own) || {}).length]] : [];
+  const wisp = STAT_GROUPS.map(g => [g.id, STATS.filter(t => t.g === g.id).reduce((a, t) => a + sr(t.id), 0)]);
+  return { x, ember, wisp };
+}
+function renderLife() {
+  const L = life(), U = lifeUps(), x = U.x || {}, kt = L.kt || {}, bt = L.bt || {};
+  const grid = rows => { const g = el('div', 'lifegrid'); for (const [nm, v, dot] of rows) { const a = el('span'), d = el('i'); if (dot) d.style.setProperty('--dot', dot); a.append(d, nm); g.append(a, el('b', '', lifeNum(v))); } return g; };
+  const total = rows => rows.reduce((a, r) => a + r[1], 0);
+  const foes = LIFE_FOES.filter(([k]) => kt[k]).map(([k, nm, c]) => [nm, kt[k], c]).sort((a, b) => b[1] - a[1]);
+  const bosses = LIFE_BOSSES.filter(([k]) => bt[k]).map(([k, nm]) => [nm, bt[k]]);
+  const D = (v, u) => [v, u];
+  const groups = [
+    ['Journey', [
+      ['l_walk', 'Walked', 'Every step, in every mode', lifeDist(L.walk)],
+      ['l_far', 'Furthest out', 'From the camp fire, in the woods', D(lifeNum(L.far), 'm')],
+      ['l_trip', 'Trips out', 'Times you left the camp', D(lifeNum(L.trips))],
+      ['l_home', 'Made it home', 'Times you got back to the fire', D(lifeNum(L.home))],
+      ['l_death', 'Taken by the dark', 'Deaths, Nightfall too', D(lifeNum(L.deaths))],
+      ['steady', 'Time played', 'In every mode', lifeTime(L.time)],
+    ]],
+    ['Fighting', [
+      ['l_kill', 'Enemies burned', foes.length ? `Most: ${foes[0][0].toLowerCase()}` : 'Tap to see each kind', D(lifeNum(L.kills)), foes.length ? grid(foes) : el('p', 'lv', 'Nothing burned yet.')],
+      ['l_boss', 'Bosses felled', bosses.length ? `${bosses.length} of ${LIFE_BOSSES.length} different` : 'Tap to see which', D(lifeNum(L.bosses)), bosses.length ? grid(bosses) : el('p', 'lv', 'None yet.')],
+      ['might', 'Swings', 'Torch attacks', D(lifeNum(L.swings))],
+      ['nimble', 'Rolls', 'Dodges', D(lifeNum(L.rolls))],
+      ['l_dodge', 'Close calls', 'Rolled right through a hit', D(lifeNum(L.dodged))],
+      ['half', 'Hearts lost', 'Steel hearts too', D(lifeNum(L.hearts))],
+    ]],
+    ['Loot', [
+      ['l_chest', 'Chests opened', '', D(lifeNum(L.chests))],
+      ['embers', 'Embers banked', 'Loot and boss chests', D(lifeNum(L.embers))],
+      ['wisp', 'Wisps gathered', 'Brought home or kept', D(lifeNum(L.wisps))],
+      ['l_lost', 'Lost to the dark', 'Carried when you died', D(lifeNum(L.lost), 'embers'), L.lostW ? el('p', 'lv', `And ${lifeNum(L.lostW)} wisps.`) : null],
+      ['l_orb', 'Green orbs home', '', D(`${x.orbs || 0}`, 'of 3')],
+      ['l_tealorb', 'Teal orbs home', '', D(`${x.dorbs || 0}`, 'of 3')],
+    ]],
+    ['Upgrades', [
+      ['power', 'Ember upgrades', 'Bought at the camp shop', D(lifeNum(total(U.ember))), grid(U.ember)],
+      ['hardy', 'Wisp upgrades', 'Bought at the camp shop', D(lifeNum(total(U.wisp))), grid(U.wisp)],
+    ]],
+  ];
+  const body = document.getElementById('lifeBody');
+  body.replaceChildren(...groups.flatMap(([g, rows]) => [el('p', 'grp', g), ...rows.map(([ic, nm, sh, [v, u], more]) => {
+    const open = more && lifeOpen === nm, wrap = el('div', 'item' + (more ? ' can' : '') + (open ? ' open' : ''));
+    const row = el('button', 'itemrow'); row.type = 'button';
+    const t = el('span', 'it'); t.append(el('span', 'nm', nm)); if (sh) t.append(el('span', 'sh', sh));
+    const val = el('span', 'lifev', v); if (u) val.append(el('small', '', u));
+    row.append(svgIcon(ic), t, val);
+    if (more) { row.setAttribute('aria-expanded', open ? 'true' : 'false'); row.addEventListener('click', () => { lifeOpen = open ? null : nm; renderLife(); }); }
+    else row.tabIndex = -1;
+    wrap.append(row);
+    if (open) { const m = el('div', 'more'); m.append(more); wrap.append(m); }
+    return wrap;
+  })]));
+  document.getElementById('lifeSave').textContent = `${svName(SV.active)} · your life in the dark`;
+  const since = new Date(L.since || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  document.getElementById('lifeSince').textContent = `Counting since ${since}. Orbs and upgrades include everything before that; the rest starts from then.`;
 }
 
 // ---- a trip ----
@@ -6272,6 +6372,7 @@ function exDeath() {
   rg.lost = { embers: rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1), wisps: rg.wispCarry || 0, orb: rg.carryOrb ? 'a green orb' : rg.carryDorb ? 'a teal orb' : '',
     where: rg.next ? 'the Frost' : rg.beyond ? 'the Dunes' : RING_NAMES[exRing(Math.hypot(S.p.x, S.p.y))], far: Math.round(Math.hypot(S.p.x, S.p.y) / 10) * 10, burned: rg.kills || 0 };
   exDropPack({ x: S.p.x, y: S.p.y, items: rg.pack, orb: rg.carryOrb, dorb: rg.carryDorb });
+  lifeAdd('lost', rg.lost.embers); lifeAdd('lostW', rg.lost.wisps);
   XS.out = null; exSave();
   S.msg = { text: 'The dark took you', sub: had ? 'Everything you carried is gone' : 'You wake by the fire', t: 0 };
 }
@@ -6342,6 +6443,7 @@ function exGot(x, y, took) {
 function exOpen(c) {
   const rg = S.rg, left = rg.left.get(c.key) || c.items.slice(), took = exTake(left);
   if (!took.length) return exFull();
+  if (!rg.left.has(c.key)) lifeAdd('chests');
   if (left.length) rg.left.set(c.key, left); else { rg.left.delete(c.key); rg.looted.add(c.key); }
   const best = took.includes('r') ? 3 : took.includes('c') ? 2 : 1;
   (rg.chestFx = rg.chestFx || []).push({ x: c.x, y: c.y, t: 0, best }); playChestOpen(best); addShake(0.08 + 0.04 * best);
@@ -6377,15 +6479,16 @@ function exDeposit() {
 }
 function exHome() {                          // stepped inside the fence: bank the pack, heal up
   const rg = S.rg;
+  lifeAdd('home');
   if (rg.pack.length) {
     const v = rg.pack.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // Short Wick: banked loot is worth double
-    XS.embers += v; rg.pack = []; rg.fullFx = 0;
+    XS.embers += v; rg.pack = []; rg.fullFx = 0; lifeAdd('embers', v);
     rg.bankFx = { v, t: 0 };                   // a big warm count-up over your head
     { const k = Math.min(1, v / 80); sfx(0.9, 0.6, 'bandpass', 700, 0.6); sfx(1.8, 0.35, 'bandpass', 2400 + 1600 * k, 0.4); if (actx) setTimeout(() => sfx(1.4, 0.4, 'bandpass', 3200 + 2000 * k, 0.3), 160); }
     for (let i = 0; i < 30; i++) rg.embers.push({ x: (Math.random() - 0.5) * 16, y: (Math.random() - 0.5) * 16, z: 6, vz: 50 + Math.random() * 80, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.8 + Math.random() * 0.8, ember: true });
   }
   if (rg.wispCarry) {
-    ST.w += rg.wispCarry; stSave(); exNote(`+${rg.wispCarry} wisps`, true); rg.wispCarry = 0; wispChime(0.75);
+    lifeAdd('wisps', rg.wispCarry); ST.w += rg.wispCarry; stSave(); exNote(`+${rg.wispCarry} wisps`, true); rg.wispCarry = 0; wispChime(0.75);
   }
   if (rg.hp < tripHp(rg.maxHp) || (rg.steel || 0) < steelMax()) { rg.pop = { t: 0, refill: rg.hp }; rg.hp = Math.max(rg.hp, tripHp(rg.maxHp)); }
   rg.steel = steelMax(); rg.shield = lv('wind'); rg.looted.clear(); rg.left.clear(); rg.cleared = false;   // home again: the woods fill back up
@@ -6396,6 +6499,7 @@ function exLeave() {
   const rg = S.rg;
   rg.ringMax = 0; rg.ringMsg = { text: RING_NAMES[0], t: 0 }; rg.tallCd = 10; rg.outT = 0;
   XS.trip = (XS.trip || 0) + 1;              // trips counted, so a beaten lair can fill again
+  lifeAdd('trips');
   if (actx) { const t = actx.currentTime; noiseAt(t, 900, 200, 0.5, 0.25, sfxGain); }   // the gate creaks shut behind you
 }
 function exStep(dt) {
@@ -6407,6 +6511,7 @@ function exStep(dt) {
   if (rg.ringMsg && !(S.msg && S.msg.t < 2.2)) { rg.ringMsg.t += dt; if (rg.ringMsg.t > 2.8) rg.ringMsg = null; }   // waits for any big banner to clear
   rg.fullFx = Math.max(0, (rg.fullFx || 0) - dt * 1.5);
   if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
+  if (!rg.beyond) lifeMax('far', Math.round(d0));
   tipStep(rg, inCamp, d0);
   campBtn.hidden = !inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns;
@@ -6783,7 +6888,7 @@ function bossDie(b, dt) {                        // he falls to his knees, burns
       rg.blasts.push({ x: b.x, y: b.y, t: 0, life: 1.2, r: 320, col: 'white' }); rg.echoes.push({ r: 0, x: b.x, y: b.y, max: 600, burst: true });
       for (let i = 0; i < 6; i++) ashBurst(b.x + (Math.random() - 0.5) * 50, b.y + (Math.random() - 0.5) * 50, 12, 180);
       const c = bossArena(); if (c) { ashBurst(c.x, c.y, 16, 40); rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.7, r: 160, col: 'green' }); }
-      XS.wardenDead = true; XS.embers += 60; exSave();
+      XS.wardenDead = true; XS.embers += 60; lifeAdd('embers', 60); lifeAdd('bosses'); lifeTally('bt', 'warden'); exSave();
       rg.cleared = 25; for (const e of rg.enemies) e.dead = e.gone = true; rg.enemies = [];   // v112: the woods fall quiet for a breath (was: until you're home), then the deep wakes
       S.msg = { text: 'warden felled', sub: '+60 embers banked · the woods are quiet, for now · take the orb home', t: 0 };
       if (actx) { const t = actx.currentTime; boomAt(t, 45, 20, 3, 1, sfxGain); noiseAt(t, 3000, 100, 2.5, 0.5, sfxGain); }
@@ -7584,7 +7689,7 @@ function miniWin(m) {                            // the last of them goes to ash
   const W0 = rg.wisps || (rg.wisps = []), per = Math.max(1, Math.round(B.wisps / 10));   // a burst of wisps rising out of the ash, streaming to you
   for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; W0.push({ x: u.x + Math.cos(a) * 26, y: u.y + Math.sin(a) * 26, z: 30, t: 0, n: per * (pact('hunted') ? 2 : 1), life: 30, seed: Math.random() * 9, v: 0, fly: true }); }
   const chest = B.loot.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // v111: his chest is banked on the spot (it never fit a pack, and the Dunes ones couldn't be picked up)
-  XS.embers += chest; rg.bankFx = { v: chest, t: 0 };
+  XS.embers += chest; rg.bankFx = { v: chest, t: 0 }; lifeAdd('embers', chest); lifeAdd('bosses'); lifeTally('bt', B.id);
   m.L.beat = true; exSave();
   const next = lairCur();
   S.msg = { text: B.title + ' felled', sub: `His chest is banked · his wisps are yours${next ? ' · a new fire burns somewhere out there' : ''}`, t: 0 };
@@ -9577,6 +9682,18 @@ function buyGear(g) {
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 // the shop is sorted into categories; each opens into a short list of items you tap to read more
 const ICONS = {
+  l_walk: '<path d="M8 3.5c1.6 0 2.4 1.6 2.2 3.6-.2 2-1 3.4-2.4 3.4S5.6 9 5.8 7.1C6 5.1 6.6 3.5 8 3.5z"/><path d="M6.4 12.6h3.2v1.6a1.6 1.6 0 0 1-3.2 0z"/><path d="M16 9.5c1.4 0 2 1.6 1.8 3.6-.2 2-1 3.4-2.2 3.4s-2-1.4-2-3.4.9-3.6 2.4-3.6z"/><path d="M14.2 18.6h3.2v1.4a1.6 1.6 0 0 1-3.2 0z"/>',
+  l_far: '<circle cx="5" cy="18" r="2"/><path d="M7 16.5 17 7"/><path d="M13 6h5v5"/><path d="M4 21h4"/>',
+  l_trip: '<path d="M4 20V9l8-5 8 5v11"/><path d="M10 20v-6h4v6"/><path d="M20 14h3M21.5 12.5 23 14l-1.5 1.5"/>',
+  l_home: '<path d="M12 20c-3 0-5-2-5-4.6C7 12 12 6 12 6s5 6 5 9.4C17 18 15 20 12 20z"/><path d="M4 21h16"/><path d="M8 21l2-3M16 21l-2-3"/>',
+  l_death: '<path d="M12 3a7 7 0 0 0-7 7c0 2.6 1.4 4.3 3 5.3V19h8v-3.7c1.6-1 3-2.7 3-5.3a7 7 0 0 0-7-7z"/><circle cx="9.3" cy="10.5" r="1.4"/><circle cx="14.7" cy="10.5" r="1.4"/><path d="M10.5 19v2M13.5 19v2"/>',
+  l_kill: '<path d="M12 22c-4.2 0-7.2-3.4-6-7.4 1 1 3 1 3-1.2 0-4.2 3-7 6-8.9-1 4 4.3 6 4.3 10.4A7.2 7.2 0 0 1 12 22z"/><path d="M9.5 17.5l5-5M14.5 17.5l-5-5"/>',
+  l_boss: '<path d="M4 18l1.5-10 4.5 5 2-7 2 7 4.5-5L20 18z"/><path d="M4 21h16"/>',
+  l_dodge: '<path d="M4 16a8 8 0 0 1 15-4"/><path d="M19.5 7v5h-5"/><path d="M14 18l3 3M17 18l-3 3"/>',
+  l_chest: '<rect x="3.5" y="9" width="17" height="11"/><path d="M3.5 9c0-3 2-5 8.5-5s8.5 2 8.5 5"/><path d="M3.5 13h17"/><rect x="10.5" y="11.5" width="3" height="3.5"/>',
+  l_lost: '<path d="M6 8h12l-1.2 12H7.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M9.5 12.5l5 5M14.5 12.5l-5 5"/>',
+  l_orb: '<circle cx="12" cy="11" r="6"/><circle cx="10" cy="9" r="1.5"/><path d="M8 20h8M10 17l-1 3M14 17l1 3"/>',
+  l_tealorb: '<circle cx="12" cy="11" r="6"/><path d="M9 11a3 3 0 0 1 3-3"/><path d="M8 20h8M10 17l-1 3M14 17l1 3"/>',
   might: '<path d="M5 19l9-9"/><path d="M14 10l3-6 3 3-6 3"/><path d="M4 14l6 6"/>',
   kindle: '<path d="M12 3c3 4 5 6 5 10a5 5 0 0 1-10 0c0-2 1-4 2-5 0 2 1 3 2 3 0-3 0-5 1-8z"/>',
   heartwood: '<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/><path d="M12 9v8M9 12l3 2 3-2"/>',
@@ -9725,7 +9842,7 @@ function renderCamp() {
     };
     w.append(
       tile('ember', 'embers', 'ember upgrades', `${XS.embers} embers`, 'Torch, kit and gear', () => { campCat = 'embers'; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); }),
-      tile('wisp', 'wisp', 'wisp upgrades', `${ST.w} wisps`, 'Your personal stats', () => openStats('camp')));
+      tile('wisp', 'wisp', 'wisp upgrades', `${ST.w} wisps`, 'Hearts, speed and power', () => openStats('camp')));
     body.replaceChildren(w);
     return;
   }
@@ -9791,7 +9908,6 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape' && !campEl.hidden) closeCamp();
 });
 const statsEl = document.getElementById('stats');
-document.getElementById('statsOpen').addEventListener('click', () => openStats('menu'));
 document.getElementById('statsGo').addEventListener('click', closeStats);
 document.getElementById('statsReset').addEventListener('click', resetStats);
 addEventListener('keydown', e => { if (e.key === 'Escape' && !statsEl.hidden) closeStats(); });
