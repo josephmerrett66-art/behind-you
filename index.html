@@ -94,7 +94,8 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
 @media (max-height: 520px) {   /* a phone on its side: one row across, above the aiming corner */
   body.ex #autorun { right: 202px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
   #attack { right: 16px; bottom: calc(220px + env(safe-area-inset-bottom, 0px)); } #dodge, #campBtn { right: 112px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #torch { right: 196px; bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } #autorun { right: 282px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
-  #recallBtn { right: 356px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 424px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); } #flaskBtn { right: 492px; bottom: calc(234px + env(safe-area-inset-bottom, 0px)); }
+  /* v125 (Joe: the flask button sat in the middle of the screen): the extra buttons stack in a second row just above dodge and auto run, at the right edge */
+  #flaskBtn { right: 120px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } #recallBtn { right: 204px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } #lampBtn { right: 272px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); }
 }
 #camp, #stats { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding-inline: 16px; padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); background: rgba(5,5,5,0.95); }
 #camp h3, #stats h3 { margin: 0.4rem 0 0; font: 600 0.72rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); display: flex; justify-content: space-between; gap: 1rem; }
