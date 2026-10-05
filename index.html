@@ -419,7 +419,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 149</p>
+      <p class="small" id="verLbl">Version 150</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -4137,7 +4137,7 @@ function trSetDef(T, def) {
   T.lb = T.start[T.K];
 }
 function mkTrack(def) {
-  const T = { g: null, on: false, gen: 0, pos: 0, t0: 0, nextK: 0, nextAt: 0, busy: false, bufs: {}, srcs: [], offAt: 0 };
+  const T = { g: null, on: false, gen: 0, pos: 0, t0: 0, nextK: 0, nextAt: 0, busy: false, srcs: [], offAt: 0 };
   trSetDef(T, def); return T;
 }
 let plLast = -1;
@@ -4153,11 +4153,9 @@ function plShuffle() {                         // the playlist: every song once 
 const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop)
 TRACKS[0].shuffle = true;
 const mus = { gain: null, on: false, cur: 0 };
-const musRaw = {};                             // v148: the music lives as separate files next to the game; each is fetched once, then kept
-function musLoad(url) {
-  const got = musRaw[url] ? Promise.resolve(musRaw[url]) : fetch(url).then(r => { if (!r.ok) throw new Error(url); return r.arrayBuffer(); }).then(b => (musRaw[url] = b));
-  return got.then(b => new Promise((ok, no) => {
-    const p = actx.decodeAudioData(b.slice(0), ok, no);   // decoding takes the buffer, so hand it a copy
+function musLoad(url) {                        // v148: the music lives as separate files next to the game (the browser caches them)
+  return fetch(url).then(r => { if (!r.ok) throw new Error(url); return r.arrayBuffer(); }).then(b => new Promise((ok, no) => {
+    const p = actx.decodeAudioData(b, ok, no);
     if (p && p.catch) p.catch(no);
   }));
 }
@@ -4178,8 +4176,8 @@ function musPlace(T, k, at, buf) {             // play piece k of track T so its
   g.gain.setValueAtTime(0, from); g.gain.linearRampToValueAtTime(1, from + fadeIn);
   g.gain.setValueAtTime(1, end - MUS_XF); g.gain.linearRampToValueAtTime(0, end + MUS_XF);
   src.start(from, T.pad + (from - at)); src.stop(end + MUS_XF);
-  const url = T.def.parts[k], rec = { src, g, url }; T.srcs.push(rec);
-  src.onended = () => { T.srcs = T.srcs.filter(r => r !== rec); if (!T.srcs.some(r => r.url === url) && T.def.parts[T.nextK] !== url) delete T.bufs[url]; };
+  const rec = { src, g }; T.srcs.push(rec);
+  src.onended = () => { T.srcs = T.srcs.filter(r => r !== rec); };
 }
 function trFade(T, to, dur) {
   const now = actx.currentTime, g = T.g.gain;
@@ -4209,11 +4207,15 @@ function trTick(T) {
   const now = actx.currentTime;
   if (T.offAt && now >= T.offAt) { trStop(T); return; }
   if (!T.busy && T.nextAt - now < 12 && !(T.failAt && now - T.failAt < 5)) {   // decode the next piece a little ahead and line it up (after a failed load, wait a bit)
-    const k = T.nextK, at = T.nextAt, gen = T.gen, url = T.def.parts[k];
+    while (T.nextAt + T.len[T.nextK] < now + 1) {   // v150: fell behind (the page was asleep while the clock ran on): skip straight to now instead of
+      T.nextAt += T.len[T.nextK]; T.nextK = (T.nextK + 1) % T.K;   // decoding every missed piece one after another, which could stall a phone
+      if (T.nextK === 0 && T.shuffle) { trSetDef(T, plShuffle()); T.t0 = T.nextAt; }
+    }
+    const k = T.nextK, at = T.nextAt, gen = T.gen;
     T.busy = true;
-    (T.bufs[url] ? Promise.resolve(T.bufs[url]) : musLoad(url)).then(buf => {
+    musLoad(T.def.parts[k]).then(buf => {
       if (gen !== T.gen) return;
-      T.bufs[url] = buf; T.busy = false;
+      T.busy = false;
       musPlace(T, k, at, buf);
       T.nextK = (k + 1) % T.K; T.nextAt = at + T.len[k];
       if (T.nextK === 0 && T.shuffle) { trSetDef(T, plShuffle()); T.t0 = T.nextAt; }   // played every song: deal a fresh order
