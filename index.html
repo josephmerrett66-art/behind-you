@@ -118,6 +118,12 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #hotbar .dur, #craft .slot .dur { position: absolute; left: 14%; right: 14%; bottom: 4px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, #9fd27a calc(var(--f) * 100%), rgba(0,0,0,0.55) 0); }
 #hotbar .dur.low, #craft .slot .dur.low { background: linear-gradient(90deg, #e2843c calc(var(--f) * 100%), rgba(0,0,0,0.55) 0); }
 @media (max-width: 560px) and (min-height: 521px) { #hotbar { left: 10px; transform: none; gap: 4px; padding: 4px; } #hotbar .hot { width: 42px; height: 42px; } #hotbar .hot svg { width: 27px; height: 27px; } }   /* a phone held upright: the bar sits left, clear of your aiming thumb */
+#buildbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(74px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 4px; padding: 4px; border-radius: 11px; background: rgba(5,5,5,0.5); border: 1px solid rgba(239,239,234,0.14); touch-action: manipulation; z-index: 3; }
+#buildbar .bp { width: 54px; padding: 5px 2px 4px; border-radius: 9px; display: grid; justify-items: center; gap: 1px; color: var(--ash); background: rgba(239,239,234,0.06); border: 1px solid rgba(239,239,234,0.2); font: 600 0.48rem var(--mono); letter-spacing: 0.05em; text-transform: uppercase; }
+#buildbar .bp svg { width: 26px; height: 26px; }
+#buildbar .bp.sel { border: 2px solid #ffcf8a; background: rgba(255,190,120,0.2); color: var(--bone); }
+#buildbar .bp.short { opacity: 0.42; }
+@media (max-width: 560px) and (min-height: 521px) { #buildbar { left: 10px; transform: none; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); gap: 3px; padding: 3px; } #buildbar .bp { width: 45px; padding: 4px 1px 3px; } #buildbar .bp svg { width: 22px; height: 22px; } }
 #craft .pk { margin-block: auto; width: 100%; max-width: 34rem; display: grid; gap: 0.8rem; padding-bottom: 16rem; }
 #craft .pkhead { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
 #craft .pkhead h2 { margin: 0; font: 400 clamp(1.7rem, 7vw, 2.3rem) var(--display); }
@@ -373,6 +379,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <button id="craftBtn" hidden>Pack</button>
 <button id="useBtn" class="exuse" hidden>Take</button>
 <div id="hotbar" hidden></div>
+<div id="buildbar" hidden></div>
 <button id="menu" hidden>Menu</button>
 <div id="picker" hidden>
   <div class="pick">
@@ -478,7 +485,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 151</p>
+      <p class="small" id="verLbl">Version 152</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -3185,7 +3192,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   const col = x => mask ? maskCol : cm ? hexMat(x, cm) : x;   // v124: camp timber and standing stones take their material in colour
   const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
   if (sx < -110 * s || sx > W + 110 * s || sy < -20 * s || sy - 200 * s > H) return;   // off screen
-  if (o.kind === 'dnode' || o.kind === 'beast' || o.kind === 'dday' || o.kind === 'dbuild' || o.kind === 'dghost') { if (!mask) dayDraw(o, c, sx, sy); return; }   // v128, v151
+  if (o.kind === 'dnode' || o.kind === 'beast' || o.kind === 'dday' || o.kind === 'dbuild' || o.kind === 'dghost' || o.kind === 'dst' || o.kind === 'dstg') { if (!mask) dayDraw(o, c, sx, sy); return; }   // v128, v151, v152
   if (o.kind === 'tree') {
     drawTree(o, c, mask, sx, sy, s);
   } else if (o.kind === 'felled') { drawFelled(o, c, mask);
@@ -7205,6 +7212,7 @@ function exBegin() {
 // your back decides how many slots you have), tools and weapons that wear out, stacks with their own sizes, chests and the camp box.
 // Crafting is a recipe book that grows as you find things (a recipe shows once you've held everything it needs), made by hand, at a
 // campfire or at a workbench. Stations, walls, traps and chests are items too: hold one and the attack button places it.
+// v152 stage 2: a hammer, and a base you raise yourself on a grid. See the v152 block below for the builder.
 const DAY_LEN = 100, FOOD_MAX = 100, FOOD_RATE = 0.5, WATER_RATE = 0.65, STARVE_T = 5, DAY_KEY = 'behind-you-day-best';
 const STA_MAX = 100, STA_SWING = 10, STA_SLAM = 18, STA_ROLL = 20, STA_CHOP = 4, STA_REGEN = 34, STA_WAIT = 0.6;
 const HOTN = 6, BASE_SLOTS = 10, BOX_SLOTS = 30, CHEST_SLOTS = 18, SKIN_SIPS = 4;
@@ -7243,7 +7251,8 @@ const DIT = {
   campfire: { n: 'Campfire', c: '#ff9a3c', st: 4, k: 'place', build: 'fire', b: 'Cook, and rest by it' },
   bench: { n: 'Workbench', c: '#b08a58', st: 2, k: 'place', build: 'bench', b: 'Better tools, gear and planks' },
   chest: { n: 'Storage chest', c: '#8a6440', st: 4, k: 'place', build: 'chest', b: `${CHEST_SLOTS} slots of storage` },
-  wall: { n: 'Log wall', c: '#7a5232', st: 6, k: 'place', build: 'wall', b: 'Four logs across their path' },
+  wall: { n: 'Stake fence', c: '#7a5232', st: 6, k: 'place', build: 'wall', b: 'A quick barricade · drops anywhere' },
+  hammer: { n: 'Hammer', c: '#8a6a44', st: 1, k: 'tool', tool: 'build', dmg: 0.85, r: 4, dur: 240, b: 'Lay out buildings and raise them' },
   spikes: { n: 'Spike trap', c: '#8a6a44', st: 6, k: 'place', build: 'spikes', b: 'Hurts whatever walks in' },
 };
 const FOODS = Object.keys(DIT).filter(k => DIT[k].k === 'food');
@@ -7272,6 +7281,7 @@ const DREC = [
   { id: 'campfire', g: 'stn', out: 'campfire', at: 'hand', cost: { sticks: 6, stones: 5 } },
   { id: 'bench', g: 'stn', out: 'bench', at: 'hand', cost: { logs: 4, stones: 4, rope: 2 } },
   { id: 'chest', g: 'stn', out: 'chest', at: 'bench', cost: { planks: 6, rope: 1 } },
+  { id: 'hammer', g: 'tool', out: 'hammer', at: 'hand', cost: { sticks: 2, stones: 3, fibre: 2 } },
   { id: 'wall', g: 'build', out: 'wall', at: 'hand', cost: { logs: 3 } },
   { id: 'spikes', g: 'build', out: 'spikes', at: 'hand', cost: { sticks: 4, flint: 2 } },
 ];
@@ -7292,7 +7302,8 @@ function dayBegin() {
   S.day = { t: 0, n: 1, food: FOOD_MAX, water: FOOD_MAX, st: STA_MAX, stT: 9, sick: 0, starve: 0, warn: {}, raidDue: false,
     hot: 0, inv: Array(BASE_SLOTS).fill(null), gear: { head: null, body: null, legs: null, back: null }, box: Array(BOX_SLOTS).fill(null),
     seen: new Set(), known: new Set(), fresh: new Set(), armT: 0, steelSeen: 0,
-    cut: new Map(), felled: new Set(), builds: [], chips: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {} };
+    cut: new Map(), felled: new Set(), builds: [], chips: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {},
+    bld: new Map(), bed: null, piece: 'wallT' };   // v152: what you've built on the grid, and where your bed is
   S.rg = exNewRun(); exPlaceHome(); wpInit(); S.day.baseHp = S.rg.maxHp;
   S.msg = { text: 'daylight', sub: 'Gather sticks, stones and fibre · your pack shows what they make', t: 0 };
   dayChanged();
@@ -7358,7 +7369,7 @@ function dayGive(k, n, x, y, quiet, extra) {   // into the pack; what doesn't fi
   if (left > 0) { dayDrop(x ?? S.p.x, y ?? S.p.y, k, left, extra); dayNote('full', 'pack full', 3); }
   dayChanged(); return take;
 }
-function dayDrop(x, y, k, n, extra) { S.day.drops.push({ x: x + (Math.random() - 0.5) * 16, y: y + (Math.random() - 0.5) * 16, kind: 'dday', it: k, n, ex: extra, t: 0, seed: Math.random() * 9, r: 0, s: 1 }); }
+function dayDrop(x, y, k, n, extra) { const f = { x: x + (Math.random() - 0.5) * 16, y: y + (Math.random() - 0.5) * 16, kind: 'dday', it: k, n, ex: extra, t: 0, seed: Math.random() * 9, r: 0, s: 1 }; S.day.drops.push(f); return f; }
 // ---- what's in reach for crafting: your pack, and any chest or the camp box close by ----
 const CONT_R = 120, CAMP_BOX = { x: 66, y: 110 }, CAMP_BARREL = { x: 40, y: 130 };   // the big crate in the camp yard is your box; the barrel by it holds water
 function dayConts(R = CONT_R) {                 // [{ name, inv, x, y }], nearest first
@@ -7429,8 +7440,9 @@ function dayStep(dt, inCamp) {
       if (rg.hp <= 0) { D.cause = D.food <= 0 ? 'starved' : 'thirst'; nightOver(); return; }
     }
   } else D.starve = 0;
-  for (const f of D.drops) { f.t += dt; if (f.t > 240 && !DIT[f.it].dur) f.gone = true; }   // things rot away in the end; a tool you dropped waits for you
+  for (const f of D.drops) { f.t += dt; if (f.t > 240 && !DIT[f.it].dur && !f.keep) f.gone = true; }   // things rot away in the end; a tool you dropped waits for you
   D.drops = D.drops.filter(f => !f.gone);
+  if (D.died && !D.drops.some(f => f.keep)) D.died = null;   // v152: your things are back in your hands
   for (const o of dayNodesNear(p.x, p.y, 900)) if (o.t === 'bush' && !o.ber && (o.berT -= dt) <= 0) o.ber = true;   // berries grow back
   // trees going over, then the logs
   for (const g of D.logs) {
@@ -7444,9 +7456,10 @@ function dayStep(dt, inCamp) {
   D.logs = D.logs.filter(g => !g.done);
   for (const c of D.chips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; }
   D.chips = D.chips.filter(c => c.life > 0);
-  beastStep(dt); buildStep(dt);
+  beastStep(dt); buildStep(dt); stStep(dt);
   { const o = dayUseTarget(), lab = o ? useLabel(o) : 'Take'; if (useBtn.textContent !== lab) useBtn.textContent = lab; }
   { const v = dayVerb(); if (attackBtn.textContent !== v) attackBtn.textContent = v; }
+  { const on = dayTool() === 'build'; if (on !== !!D.barOn) { D.barOn = on; renderBuildBar(); layoutBtns(); if (on) dayNote('bhint', 'pick a piece, lay it out, then hammer it up', 999); } }
   if (!D.told.packHint && D.known.size >= 2) { D.told.packHint = 1; }
 }
 function pickSnd() { sfx(1.5, 0.15, 'bandpass', 1600, 0.15); }
@@ -7478,11 +7491,21 @@ function dayFill() {                             // every waterskin you carry, f
 // ---- the button you press: on what's in your hand ----
 function dayVerb() {
   const T = heldIt(); if (!T) return 'Attack';
+  if (T.tool === 'build') { const o = stAimed(); return !o ? 'Lay out' : o.done ? (o.hp < o.max ? 'Mend' : 'Built') : 'Build'; }
   return T.k === 'food' ? 'Eat' : T.k === 'drink' ? 'Drink' : T.k === 'place' ? 'Place' : T.k === 'gear' ? 'Wear' : T.tool === 'axe' ? 'Chop' : T.tool === 'pick' ? 'Mine' : 'Attack';
 }
 function dayPrimary() {                          // true when what you hold is used, not swung
   const D = S.day, T = heldIt(); if (!T) return false;
   if (S.p.act && (T.k === 'food' || T.k === 'drink')) return true;   // one mouthful at a time
+  if (T.tool === 'build') {                       // the hammer: lay out a blueprint, work a material into one, or mend what's standing
+    if (S.p.act) return true;
+    const o = stAimed();
+    if (!o) { stPlace(); return true; }
+    if (!dayStam(STA_CHOP)) return true;
+    dayAct(10, 0.5); S.p.vx *= 0.4; S.p.vy *= 0.4;
+    if (stHammer(o)) dayWear();
+    return true;
+  }
   if (T.k === 'food') { dayEat(D.inv, D.hot); return true; }
   if (T.k === 'drink') { dayDrink(D.inv, D.hot); return true; }
   if (T.k === 'place') { dayPlaceHeld(); return true; }
@@ -7676,9 +7699,24 @@ function dayRaid() {
   for (let i = 0; i < n; i++) exSpawn(exPickFoe(ring));
   rg.ringMsg = { text: `day ${D.n}`, sub: `A raid · ${n} of them`, t: 0 }; playRingSting(); addShake(0.35);
 }
+function dayWake() {                             // v152 (Joe's plan): with a bed built, death is a setback, not the end:
+  const D = S.day, rg = S.rg, p = S.p;          // you come round on your bed, and every last thing you carried lies where you fell
+  let n = 0;
+  for (let i = 0; i < D.inv.length; i++) { const s = D.inv[i]; if (!s) continue; const f = dayDrop(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 30, s.id, s.n, s.d ?? s.w); f.keep = 1; D.inv[i] = null; n++; }
+  D.died = n ? { x: Math.round(p.x), y: Math.round(p.y) } : null;
+  D.deaths = (D.deaths || 0) + 1; lifeAdd('deaths');
+  rg.enemies.length = 0; rg.hp = Math.max(1, Math.ceil(rg.maxHp / 2)); rg.steel = 0; D.steelSeen = 0; D.armT = 0;
+  D.food = Math.min(D.food, 40); D.water = Math.min(D.water, 40); D.st = STA_MAX; D.sick = 0; D.starve = 0; D.warn = {};
+  p.x = D.bed.x; p.y = D.bed.y + 26; p.vx = p.vy = 0; p.act = null; p.atk = null; S.cam.x = p.x; S.cam.y = p.y;
+  rg.inCamp = Math.hypot(p.x, p.y) < CAMP_R; if (!rg.inCamp) rg.ringMax = exRing(Math.hypot(p.x, p.y));
+  S.msg = { text: 'you wake at your bed', sub: n ? `Everything you carried lies where you fell · ${n} to fetch back` : 'You were carrying nothing', t: 0 };
+  addShake(0.3); daySave(); dayChanged();
+  return true;
+}
 function dayDeath() {
   const rg = S.rg, D = S.day;
-  rg.phase = 'dead'; rg.deadT = 0; craftBtn.hidden = true; document.getElementById('hotbar').hidden = true;
+  if (D.bed && rg.phase === 'fight') return dayWake();
+  rg.phase = 'dead'; rg.deadT = 0; craftBtn.hidden = true; document.getElementById('hotbar').hidden = true; document.getElementById('buildbar').hidden = true;
   dayClearSave();
   const b = dayBest(); D.best = D.t > b.t;
   if (D.best) try { localStorage.setItem(DAY_KEY, JSON.stringify({ days: D.n, t: Math.round(D.t) })); } catch (e) {}
@@ -7694,8 +7732,9 @@ function dayCard() {
 function dayItems() {                          // drawn in with the trees
   const D = S.day; if (!D) return [];
   const R = viewR(), cx = S.cam.x, cy = S.cam.y, near = o => Math.abs(o.x - cx) < R && Math.abs(o.y - cy) < R;
-  const out = dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts));
+  const out = dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts), [...D.bld.values()].filter(near));
   const g = dayGhost(); if (g) out.push(g);
+  const sg = stGhost(); if (sg) out.push(sg);
   return out;
 }
 // ---- item icons: one small picture per item, used in the pack, on the hotbar and for things lying on the ground ----
@@ -7733,6 +7772,7 @@ const ICON = (() => {
     bench: '<path d="M2.5 8h19v3.5h-19z" fill="#b08a58"/><path d="M5 11.5v9M19 11.5v9M5 16.5h14" stroke="#7a5232" stroke-width="2.2"/><path d="M13.5 8V4.8l3.2-1.3" stroke="#9a9a94" stroke-width="1.7" fill="none" stroke-linecap="round"/><rect x="5" y="6" width="5" height="2" fill="#8d8b85"/>',
     chest: '<rect x="3" y="9.5" width="18" height="11" rx="1.2" fill="#8a6440"/><path d="M3 9.5c0-3.2 2.2-5.4 9-5.4s9 2.2 9 5.4z" fill="#a07850"/><path d="M3 14.5h18" stroke="#5a3e28" stroke-width="1"/><rect x="10.5" y="9" width="3" height="4.2" rx=".5" fill="#d8c070"/><path d="M6.5 9.5v11M17.5 9.5v11" stroke="#5a3e28" stroke-width="1.2"/>',
     wall: '<g fill="#7a5232"><path d="M3.5 20.5V7.5l2.3-2.6 2.3 2.6v13z"/><path d="M9.7 20.5V5.5L12 2.9l2.3 2.6v15z"/><path d="M15.9 20.5V7.5l2.3-2.6 2.3 2.6v13z"/></g><path d="M3 11h18M3 16.5h18" stroke="#3a2a1a" stroke-width="1.3"/>',
+    hammer: '<path d="M7 21.5l6.5-9.5" stroke="#7a5a3a" stroke-width="2.4" stroke-linecap="round"/><path d="M10.5 7.2l4.6-3.2 5.4 7.6-4.6 3.2z" fill="#9a9893"/><path d="M12.8 10.4l2.4 3.4" stroke="#a8b86a" stroke-width="1.5"/><path d="M15.1 4l5.4 7.6" stroke="#c2c0b8" stroke-width=".9" opacity=".7"/>',
     spikes: '<g fill="#8a6a44"><path d="M3 20.5l3.6-14.5 2.2 14.5z"/><path d="M9.2 20.5l3.6-16 2.2 16z"/><path d="M15.4 20.5l3.6-14.5 2.2 14.5z"/></g><path d="M2 18h20" stroke="#4a3a2a" stroke-width="2"/>',
     tonic: '<path d="M9.5 3h5v4.5c3 1.2 4.5 3.6 4.5 6.5a7 7 0 0 1-14 0c0-2.9 1.5-5.3 4.5-6.5z" fill="#c23a4a"/><rect x="9" y="2" width="6" height="2.4" rx=".8" fill="#7a5232"/><ellipse cx="9.5" cy="13" rx="1.4" ry="2.4" fill="#fff" opacity=".35"/>',
     hand: '<path d="M8 13.5V6.2a1.6 1.6 0 0 1 3.2 0V12M11.2 11.4V5a1.6 1.6 0 0 1 3.2 0v6.4M14.4 11.4V6.6a1.6 1.6 0 0 1 3.2 0V14c0 4.3-2.7 7.6-6.4 7.6S5.2 19 4.6 16.2L3.2 12.4a1.6 1.6 0 0 1 2.8-1.6L8 13.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
@@ -7799,6 +7839,8 @@ function dayGhost() {                          // what you'd put down, shown whe
   return { kind: 'dghost', build: T.build, x: sp.x, y: sp.y, a: sp.a, ok: sp.ok, r: 0, s: 1 };
 }
 function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
+  if (o.kind === 'dst') return stDraw(o, c, sx, sy, false);
+  if (o.kind === 'dstg') return stDraw(o, c, sx, sy, true);
   const z = Z, C = (col, grey) => COLOUR ? col : grey;
   if (o.kind === 'dbuild') { dayDrawBuild(o, c, sx, sy); return; }
   if (o.kind === 'dghost') {
@@ -7958,7 +8000,7 @@ function dayMakeBuild(t, cx, cy, a, fake) {
 }
 const dayFireNear = (x, y) => S.day && S.day.builds.some(B => B.t === 'fire' && Math.hypot(B.x - x, B.y - y) < FIRE_R);
 const dayBenchNear = (x, y) => S.day && S.day.builds.some(B => B.t === 'bench' && Math.hypot(B.x - x, B.y - y) < BENCH_R);
-function daySolidsNear(x, y, R) { const out = []; if (!S.day) return out; for (const B of S.day.builds) if (B.t !== 'spikes' && Math.abs(B.x - x) < R + 50 && Math.abs(B.y - y) < R + 50) for (const o of B.parts) out.push(o); return out; }
+function daySolidsNear(x, y, R) { const out = []; if (!S.day) return out; for (const B of S.day.builds) if (B.t !== 'spikes' && Math.abs(B.x - x) < R + 50 && Math.abs(B.y - y) < R + 50) for (const o of B.parts) out.push(o); for (const o of stNear(x, y, R)) for (const q of stSolids(o)) out.push(q); return out; }
 function buildStep(dt) {
   const D = S.day, rg = S.rg;
   for (const B of D.builds) {
@@ -7978,9 +8020,14 @@ function buildStep(dt) {
   }
   D.builds = D.builds.filter(B => !B.gone);
 }
-function drawDayFires() {                       // flames on your campfires
+function drawDayFires() {                       // flames on your campfires, and the light standing over where you died
   const D = S.day; if (!D) return;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  if (D.died) {
+    const [x, y] = toScreen(D.died.x, D.died.y), g = ctx.createLinearGradient(x, y - 150 * Z, x, y);
+    g.addColorStop(0, 'rgba(255,220,170,0)'); g.addColorStop(1, `rgba(255,220,170,${0.16 + 0.05 * Math.sin(S.t * 2.5)})`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - 9 * Z, y); ctx.lineTo(x - 3 * Z, y - 150 * Z); ctx.lineTo(x + 3 * Z, y - 150 * Z); ctx.lineTo(x + 9 * Z, y); ctx.closePath(); ctx.fill();
+  }
   for (const B of D.builds) if (B.t === 'fire') {
     const [x, y] = toScreen(B.x, B.y); if (x < -60 || x > W + 60 || y < -60 || y > H + 60) continue;
     for (let i = 0; i < 4; i++) {
@@ -8016,7 +8063,7 @@ function renderHotbar() {
     return b;
   }));
 }
-function dayChanged() { if (!S || !S.day) return; renderHotbar(); if (!craftEl.hidden) renderPack(); }
+function dayChanged() { if (!S || !S.day) return; renderHotbar(); renderBuildBar(); if (!craftEl.hidden) renderPack(); }
 // ---- the pack screen: Pack (your slots, your gear, a chest or the box beside you) and Craft (the recipe book) ----
 const craftEl = document.getElementById('craft'), craftBtn = document.getElementById('craftBtn'), useBtn = document.getElementById('useBtn');
 const PK = { tab: 'pack', sel: null, cat: null, open: null, cont: null, flash: null };
@@ -8246,12 +8293,13 @@ function dayReadSave() { try { const v = JSON.parse(localStorage.getItem(dayKey(
 function dayClearSave() { try { localStorage.removeItem(dayKey()); } catch (e) {} }
 function daySave() {
   const D = S && S.day, rg = S && S.rg; if (!D || !rg || rg.phase !== 'fight' || S.mode !== 'expedition') return;
-  const keep = ['t', 'n', 'food', 'water', 'st', 'sick', 'warn', 'raidDue', 'hot', 'inv', 'box', 'gear', 'told', 'baseHp'];
+  const keep = ['t', 'n', 'food', 'water', 'st', 'sick', 'warn', 'raidDue', 'hot', 'inv', 'box', 'gear', 'told', 'baseHp', 'bed', 'piece', 'died', 'deaths'];
   const d = {}; for (const k of keep) d[k] = D[k];
   d.seen = [...D.seen]; d.known = [...D.known]; d.fresh = [...D.fresh];
   d.felled = [...D.felled]; d.cut = [...D.cut]; d.bchunks = [...D.bchunks];
   d.nodes = [...D.nodes].map(([k, L]) => [k, L.filter(o => !o.gone).map(o => ({ t: o.t, x: Math.round(o.x), y: Math.round(o.y), n: o.n, ber: o.ber, berT: o.berT, seed: o.seed }))]);
-  d.drops = D.drops.map(f => ({ it: f.it, n: f.n, ex: f.ex, x: Math.round(f.x), y: Math.round(f.y), t: f.t }));
+  d.drops = D.drops.map(f => ({ it: f.it, n: f.n, ex: f.ex, x: Math.round(f.x), y: Math.round(f.y), t: f.t, keep: f.keep }));
+  d.bld = [...D.bld.values()].map(o => ({ id: o.id, i: o.i, j: o.j, s: o.s, a: o.a, hp: Math.round(o.hp * 10) / 10, need: o.need, done: o.done }));
   d.logs = D.logs.flatMap(g => [['logs', g.give.logs], ['sticks', g.give.sticks]].filter(([, n]) => n).map(([it, n]) => ({ it, n, x: Math.round(g.bx + g.ux * g.len / 2), y: Math.round(g.by + g.uy * g.len / 2), t: 0 })));   // a tree still falling is saved as its logs
   d.beasts = D.beasts.filter(b => !b.dead).map(b => ({ k: b.k, x: Math.round(b.x), y: Math.round(b.y), hp: b.hp, stag: b.stag, chunk: b.chunk }));
   d.builds = D.builds.map(B => ({ t: B.t, x: B.x, y: B.y, a: B.a, hp: B.hp, uses: B.uses, inv: B.inv }));
@@ -8266,18 +8314,19 @@ function dayFromV1(d) {                         // a run saved before the overha
   const tools = [d.axe ? 'axe' + d.axe : null, d.pick ? 'pick' + d.pick : null, { club: 'club', spear: 'spear2', bone: 'bonec' }[d.wpn], d.skin ? 'skin' : null].filter(Boolean);
   for (const t of tools) if (addTo(inv, t, 1, t === 'skin' ? d.sips || 0 : undefined, order(t))) addTo(box, t, 1, t === 'skin' ? d.sips || 0 : undefined);
   const seen = new Set([...Object.keys(d.inv || {}), ...Object.keys(d.box || {}), ...tools, 'sticks', 'stones', 'fibre', 'logs', 'flint', 'hide', 'bone', 'berries', 'meat'].filter(k => DIT[k]));   // they've played: the woods' basics are already in the book
-  return Object.assign({}, d, { inv, box, gear, hot: 0, seen: [...seen], known: [], fresh: [] });
+  return Object.assign({}, d, { inv, box, gear, hot: 0, seen: [...seen], known: [], fresh: [], bld: [], bed: null, piece: 'wallT' });
 }
 function dayLoad(sv) {                          // pick a saved run back up where you left it
   dayBegin();
   const D = S.day, d = sv.v === 1 ? dayFromV1(sv.d) : sv.d, rg = S.rg;
   XS = sv.xs || XS;
-  Object.assign(D, d, { felled: new Set(d.felled), cut: new Map(d.cut), bchunks: new Map(d.bchunks), builds: [], logs: [], beasts: [],
+  Object.assign(D, d, { felled: new Set(d.felled), cut: new Map(d.cut), bchunks: new Map(d.bchunks), builds: [], logs: [], beasts: [], bld: new Map(), piece: d.piece || 'wallT',
     seen: new Set(), known: new Set(d.known || []), fresh: new Set(d.fresh || []),
     nodes: new Map(d.nodes.map(([k, L]) => [k, L.map(o => ({ kind: 'dnode', r: 0, s: 1, ...o }))])),
     drops: d.drops.concat(d.logs || []).filter(f => DIT[f.it]).map(f => ({ kind: 'dday', r: 0, s: 1, seed: Math.random() * 9, ...f })) });
   D.baseHp = D.baseHp || rg.maxHp;
   D.beasts = d.beasts.map(b => ({ kind: 'beast', r: 0, s: 1, st: 'graze', t: Math.random() * 3, dir: Math.random() * 7, sp: 0, ph: Math.random() * 9, flash: 0, ...b }));
+  for (const sv of d.bld || []) stMake(sv);
   for (const B of d.builds) { const nb = dayMakeBuild(B.t, B.x, B.y, B.a || 0); if (B.hp !== undefined) nb.hp = B.hp; if (B.uses !== undefined) nb.uses = B.uses; if (B.inv) nb.inv = B.inv; }
   rg.hp = sv.rg.hp; rg.flask = sv.rg.flask; rg.kills = sv.rg.kills; rg.looted = new Set(sv.rg.looted);
   dayGearFx(); rg.hp = Math.min(sv.rg.hp, rg.maxHp); rg.steel = Math.min(sv.rg.steel || 0, steelMax()); D.steelSeen = rg.steel;
@@ -8289,6 +8338,265 @@ function dayLoad(sv) {                          // pick a saved run back up wher
 }
 addEventListener('pagehide', () => daySave());
 document.addEventListener('visibilitychange', () => { if (document.hidden) daySave(); });
+// ---- v152 stage 2 (Joe): the base builder. Hold the hammer and pieces snap to a grid: floors in a cell, walls, doorways and
+// windows on a cell's edge. What you put down is a blueprint, and every swing of the hammer works one more material into it until it
+// stands, the way The Forest builds a shelter. Three tiers of wall, each far tougher. Raiders come for your walls and doors.
+// A bed makes the place yours: die with one built and you wake there, with everything you carried left in a bag where you fell.
+const GRID = 56, STK_R = 11;
+const PIECES = [
+  { id: 'floorW', k: 'floor', s: 'Floor', n: 'Wood floor', b: 'A clean floor to build on', cost: { planks: 3 }, hp: 30, tier: 1 },
+  { id: 'wallT', k: 'wall', s: 'Thatch', n: 'Thatch wall', b: 'Quick cover · goes down fast', cost: { fibre: 4, sticks: 2 }, hp: 14, tier: 0 },
+  { id: 'wallW', k: 'wall', s: 'Log', n: 'Log wall', b: 'Holds against a raid', cost: { logs: 4 }, hp: 48, tier: 1 },
+  { id: 'wallS', k: 'wall', s: 'Stone', n: 'Stone wall', b: 'They batter it all night and fail', cost: { stones: 5, planks: 2 }, hp: 140, tier: 2 },
+  { id: 'door', k: 'door', s: 'Door', n: 'Doorway', b: 'Swings open for you, not for them', cost: { planks: 4, rope: 1 }, hp: 44, tier: 1 },
+  { id: 'window', k: 'window', s: 'Window', n: 'Window', b: 'See out · a spear reaches over it', cost: { planks: 3 }, hp: 30, tier: 1 },
+  { id: 'bed', k: 'bed', s: 'Bed', n: 'Bed', b: 'Die with one and you wake here', cost: { planks: 4, hide: 4, fibre: 4 }, hp: 20, tier: 1 },
+];
+const PC = id => PIECES.find(p => p.id === id);
+const bKey = p => p.k === 'floor' || p.k === 'bed' ? `c${p.i},${p.j}` : `e${p.i},${p.j},${p.s}`;
+const edgePos = (i, j, s) => s ? { x: (i + 0.5) * GRID, y: (j + 1) * GRID, a: 0 } : { x: (i + 1) * GRID, y: (j + 0.5) * GRID, a: Math.PI / 2 };
+const cellPos = (i, j) => ({ x: (i + 0.5) * GRID, y: (j + 0.5) * GRID, a: 0 });
+function stAt(D, k) { return D.bld.get(k); }
+function stSnap(t, x, y, aim) {                  // the slot nearest the point you're aiming at
+  const i = Math.floor(x / GRID), j = Math.floor(y / GRID);
+  if (t === 'floor' || t === 'bed') { const p = cellPos(i, j); return { i, j, s: -1, x: p.x, y: p.y, a: Math.round((aim || 0) / (Math.PI / 2)) * (Math.PI / 2) }; }
+  let best = null, bd = 1e9;
+  for (const [ii, jj, s] of [[i, j, 0], [i - 1, j, 0], [i, j, 1], [i, j - 1, 1]]) {
+    const p = edgePos(ii, jj, s), d = Math.hypot(p.x - x, p.y - y);
+    if (d < bd) { bd = d; best = { i: ii, j: jj, s, x: p.x, y: p.y, a: p.a }; }
+  }
+  return best;
+}
+function stSolids(o) {                           // the bump circles a standing piece puts in your way
+  if (!o.done || o.k === 'floor' || o.k === 'bed' || (o.k === 'door' && o.open > 0.5)) return [];
+  const ux = Math.cos(o.a), uy = Math.sin(o.a), out = [];
+  for (let k = -2; k <= 2; k++) out.push({ x: o.x + ux * k * 13, y: o.y + uy * k * 13, r: STK_R, s: 1, st: o });
+  return out;
+}
+function stNear(x, y, R) { const D = S.day, out = []; if (!D) return out; for (const o of D.bld.values()) if (Math.abs(o.x - x) < R + GRID && Math.abs(o.y - y) < R + GRID) out.push(o); return out; }
+function stCanPlace(t, sp) {
+  const D = S.day;
+  if (D.bld.has(bKey({ k: t, i: sp.i, j: sp.j, s: sp.s }))) return 'already something there';
+  const d = Math.hypot(sp.x, sp.y);
+  if (d < CAMP_R + 60) return 'not against the old camp';
+  if (inPlaza(sp.x, sp.y) || [TELE, TELE2].some(o => dist2(o, sp) < 90)) return 'not on the shrines';
+  for (const o of propsNear(sp.x, sp.y, 60)) if ((o.kind === 'tree' || o.kind === 'rock') && dist2(o, sp) < (o.r || 8) * (o.s || 1) + (t === 'floor' || t === 'bed' ? 22 : 16)) return t === 'floor' ? 'a tree is in the way' : 'a tree is in the way';
+  for (const B of D.builds) if (B.parts.some(q => dist2(q, sp) < (t === 'floor' || t === 'bed' ? 30 : 22))) return 'something is in the way';
+  if (t !== 'floor' && dist2(sp, S.p) < 16) return 'step back';
+  return true;
+}
+function stPlace() {                             // put down the blueprint you're holding the hammer for
+  const D = S.day, P = PC(D.piece), p = S.p, a = S.aimW || 0;
+  const sp = stSnap(P.k, p.x + Math.cos(a) * 42, p.y + Math.sin(a) * 42, a), why = stCanPlace(P.k, sp);
+  if (why !== true) { dayNote('nost', why, 1.2); if (actx) noiseAt(actx.currentTime, 600, 300, 0.1, 0.25, sfxGain); return; }
+  const o = { kind: 'dst', id: P.id, k: P.k, tier: P.tier, i: sp.i, j: sp.j, s: sp.s, x: sp.x, y: sp.y, a: sp.a, r: 10,
+    need: Object.assign({}, P.cost), hp: P.hp, max: P.hp, done: false, open: 0, put: 0, seed: Math.random() * 9 };
+  D.bld.set(bKey(o), o);
+  dayAct(10, 0.7); ashBurst(sp.x, sp.y, 6, 6);
+  exNote(`blueprint · ${P.n.toLowerCase()}`, true); dayNote('bphint', 'swing the hammer at it to build it', 30);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 900, 400, 0.12, 0.25, sfxGain); }
+  dayChanged();
+}
+const stNeedLeft = o => Object.values(o.need).reduce((a, n) => a + n, 0);
+function stHammer(o) {                           // one swing: a material worked in, or a repair
+  const D = S.day, P = PC(o.id);
+  if (!o.done) {
+    const k = Object.keys(o.need).find(k => o.need[k] > 0);
+    if (!k) return stFinish(o);
+    if (!takeFrom(D.inv, k, 1, [...Array(D.inv.length).keys()].reverse())) {
+      for (const c of dayConts()) if (takeFrom(c.inv, k, 1)) { o.need[k]--; break; }
+      if (o.need[k] === P.cost[k]) { dayNote('needmat', `you need ${DIT[k].n.toLowerCase()}`, 2); return false; }
+    } else o.need[k]--;
+    o.put++; o.shakeT = S.t; dayChips(o.x, o.y, 14, k === 'stones' ? 'stone' : k === 'fibre' ? 'leaf' : 'wood', 6);
+    if (actx) { const t = actx.currentTime; boomAt(t, 220, 110, 0.1, 0.4, sfxGain); noiseAt(t, 1800, 600, 0.09, 0.3, sfxGain); }
+    addShake(0.1);
+    if (stNeedLeft(o) <= 0) stFinish(o); else exNote(`${stNeedLeft(o)} more`);
+    dayChanged(); return true;
+  }
+  if (o.hp < o.max) {                            // mending what the night knocked about
+    const k = Object.keys(P.cost)[0];
+    if (!takeFrom(D.inv, k, 1, [...Array(D.inv.length).keys()].reverse())) { dayNote('needmat', `you need ${DIT[k].n.toLowerCase()}`, 2); return false; }
+    o.hp = Math.min(o.max, o.hp + o.max / 3); o.shakeT = S.t; dayChips(o.x, o.y, 14, 'wood', 5);
+    exNote(o.hp >= o.max ? 'mended' : 'mending'); sfx(1.1, 0.3, 'bandpass', 900, 0.25); dayChanged(); return true;
+  }
+  dayNote('whole', 'it\'s sound', 1.5); return false;
+}
+function stFinish(o) {
+  o.done = true; o.hp = o.max; o.rise = 0;
+  addShake(0.3); hitStop(0.05); ashBurst(o.x, o.y, 10, 22);
+  if (o.k === 'bed') { S.day.bed = { x: o.x, y: o.y }; exNote('a bed · this place is yours now', true); }
+  else exNote(`built · ${PC(o.id).n.toLowerCase()}`, true);
+  if (actx) { const t = actx.currentTime; boomAt(t, 150, 70, 0.3, 0.5, sfxGain); setTimeout(() => sfx(1.6, 0.35, 'bandpass', 1600, 0.3), 90); }
+}
+function stRemove(o) {                           // pull it down: half the materials come back
+  const D = S.day, P = PC(o.id);
+  for (const [k, n] of Object.entries(P.cost)) { const back = o.done ? Math.floor(n / 2) : n - (o.need[k] || 0); if (back > 0) dayGive(k, back, o.x, o.y, true); }
+  D.bld.delete(bKey(o)); if (o.k === 'bed' && D.bed && D.bed.x === o.x) D.bed = null;
+  ashBurst(o.x, o.y, 8, 20); addShake(0.2); dayChips(o.x, o.y, 14, 'wood', 8); exNote('pulled down');
+  if (actx) { const t = actx.currentTime; noiseAt(t, 700, 200, 0.3, 0.35, sfxGain); }
+  dayChanged();
+}
+function stMake(sv) {                             // a piece read back out of a saved run
+  const P = PC(sv.id); if (!P) return null;
+  const s = sv.s === undefined ? -1 : sv.s, pos = s < 0 ? cellPos(sv.i, sv.j) : edgePos(sv.i, sv.j, s);
+  const o = { kind: 'dst', id: sv.id, k: P.k, tier: P.tier, i: sv.i, j: sv.j, s, x: pos.x, y: pos.y, a: sv.a !== undefined ? sv.a : pos.a, r: 10,
+    need: Object.assign({}, P.cost, sv.need || {}), hp: sv.hp !== undefined ? sv.hp : P.hp, max: P.hp, done: !!sv.done, open: 0, put: 0, seed: Math.random() * 9, rise: 1 };
+  S.day.bld.set(bKey(o), o);
+  if (o.done && o.k === 'bed') S.day.bed = { x: o.x, y: o.y };
+  return o;
+}
+function stAimed() {                             // the piece your hammer would land on
+  const p = S.p, a = S.aimW || 0, tx = p.x + Math.cos(a) * 34, ty = p.y + Math.sin(a) * 34;
+  let best = null, bd = 44;
+  for (const o of stNear(tx, ty, 60)) { const d = Math.min(dist2(o, { x: tx, y: ty }), dist2(o, p) - 12); if (d < bd) { bd = d; best = o; } }
+  return best;
+}
+function stGhost() {
+  const D = S.day; if (!D || dayTool() !== 'build' || !S.running || S.rg.phase !== 'fight') return null;
+  if (stAimed()) return null;                    // aiming at something you've already put down: no ghost, the swing works on it
+  const P = PC(D.piece), a = S.aimW || 0, sp = stSnap(P.k, S.p.x + Math.cos(a) * 42, S.p.y + Math.sin(a) * 42, a);
+  const why = stCanPlace(P.k, sp);
+  return { kind: 'dstg', id: P.id, k: P.k, tier: P.tier, x: sp.x, y: sp.y, a: sp.a, ok: why === true, why: why === true ? '' : why, r: 0, s: 1, need: PC(P.id).cost, done: false, open: 0 };
+}
+function stStep(dt) {
+  const D = S.day, rg = S.rg, p = S.p;
+  for (const o of D.bld.values()) {
+    if (o.rise !== undefined && o.rise < 1) o.rise = Math.min(1, o.rise + dt * 3);
+    if (o.k === 'door') {                         // the door swings for you, and for nothing else
+      const want = o.done && dist2(o, p) < 46 ? 1 : 0;
+      if (want !== (o.want || 0)) { o.want = want; if (actx && monNear(o, 500) > 0) noiseAt(actx.currentTime, want ? 500 : 300, 180, 0.3, 0.2 * monNear(o, 500), sfxGain); }
+      o.open += ((o.want || 0) - o.open) * Math.min(1, dt * 7);
+    }
+    if (!o.done) continue;
+    o.hitT = Math.max(0, (o.hitT || 0) - dt);
+    for (const e of rg.enemies) {                 // raiders batter whatever stands between them and you
+      if (e.dead || dist2(e, o) > 30) continue;
+      if (dist2(p, o) < dist2(p, e) - 8 || o.k === 'door') {
+        o.hp -= dt * (e.type === 'brute' || e.type === 'tall' ? 3.5 : 1.3) * (o.tier === 0 ? 2 : 1);
+        o.hitT = 0.15; e.wallT = 0.3;
+        if (Math.random() < dt * 5) { dayChips(o.x, o.y, 16, o.tier === 2 ? 'stone' : o.tier === 0 ? 'leaf' : 'wood', 2); if (actx && monNear(o, 600) > 0) boomAt(actx.currentTime, 140, 70, 0.08, 0.25 * monNear(o, 600), sfxGain); }
+      }
+    }
+    if (o.hp <= 0) {
+      D.bld.delete(bKey(o)); if (o.k === 'bed' && D.bed && D.bed.x === o.x) D.bed = null;
+      for (let i = 0; i < 3; i++) ashBurst(o.x + (Math.random() - 0.5) * 40, o.y + (Math.random() - 0.5) * 40, 6, 22);
+      addShake(0.3 * monNear(o, 600)); exNote(`they broke through your ${PC(o.id).n.toLowerCase()}`, true);
+      if (actx) boomAt(actx.currentTime, 90, 40, 0.4, 0.5 * monNear(o, 600), sfxGain);
+    }
+  }
+}
+// ---- the build bar: the pieces, shown above the hotbar whenever the hammer is in your hand ----
+function stPick(id) { const D = S.day; if (!D || D.piece === id) return; D.piece = id; exNote(PC(id).n.toLowerCase()); sfx(1.6, 0.12, 'bandpass', 2200, 0.12); renderBuildBar(); }
+const stKnown = p => { const D = S.day; return Object.keys(p.cost).every(k => D.seen.has(k)); };
+function renderBuildBar() {
+  const bar = document.getElementById('buildbar'), D = S && S.day;
+  const on = !!D && dayTool() === 'build' && S.running && S.rg && S.rg.phase === 'fight';
+  bar.hidden = !on; if (!on) return;
+  const list = PIECES.filter(stKnown);
+  if (!list.some(p => p.id === D.piece)) D.piece = (list[0] || PIECES[1]).id;
+  bar.replaceChildren(...list.map(P => {
+    const b = document.createElement('button'), can = Object.entries(P.cost).every(([k, n]) => dayHave(k) >= 1);
+    b.className = 'bp' + (D.piece === P.id ? ' sel' : '') + (can ? '' : ' short');
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${BPIC[P.k]}</svg><span>${P.s}</span>`;
+    b.title = P.n + ' · ' + P.b;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); stPick(P.id); });
+    return b;
+  }));
+}
+const BPIC = {
+  floor: '<path d="M12 4l9 5-9 5-9-5z" fill="#b08a58"/><path d="M3 9v6l9 5 9-5V9" fill="none" stroke="#7a5232" stroke-width="1.4"/><path d="M7.5 6.5l9 5M16.5 6.5l-9 5" stroke="#8a6a44" stroke-width=".9"/>',
+  wall: '<g fill="#7a5232"><path d="M3.5 20V8l2.3-2.4L8.1 8v12z"/><path d="M9.6 20V6.5l2.4-2.4 2.4 2.4V20z"/><path d="M15.9 20V8l2.3-2.4L20.5 8v12z"/></g><path d="M3 12h18M3 16.5h18" stroke="#3a2a1a" stroke-width="1.2"/>',
+  door: '<path d="M3.5 20V7l3-2.5V20zM17.5 20V4.5l3 2.5v13z" fill="#7a5232"/><path d="M7.5 20V6h9v14z" fill="#a07850"/><circle cx="14.5" cy="13.5" r="1.1" fill="#3a2a1a"/>',
+  window: '<path d="M3 20V7l3-2.5V20zM18 20V4.5L21 7v13z" fill="#7a5232"/><path d="M6 20v-5h12v5z" fill="#a07850"/><path d="M6 6.5h12v6H6z" fill="none" stroke="#a07850" stroke-width="1.6"/><path d="M12 6.5v6M6 9.5h12" stroke="#a07850" stroke-width="1.1"/>',
+  bed: '<rect x="2.5" y="11" width="19" height="7" rx="1.5" fill="#8a6440"/><path d="M2.5 13h8v-2a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 21.5 11v2" fill="#b0784a"/><rect x="3.5" y="9.5" width="7" height="3.5" rx="1.5" fill="#efe6d2"/><path d="M4 18v2.5M20 18v2.5" stroke="#5a3e28" stroke-width="1.6"/>',
+};
+// ---- drawing: a piece standing, or the frame of one still going up ----
+function stDraw(o, c, sx, sy, ghost) {
+  const C = (col, grey) => COLOUR ? col : grey, P = PC(o.id), done = o.done;
+  const rise = done ? (o.rise === undefined ? 1 : 0.6 + 0.4 * o.rise) : 1;
+  const tone = o.tier === 0 ? [C('#b5a86a', '#8e8e88'), C('#8e8248', '#6e6e68'), C('#6d6336', '#585852')]
+    : o.tier === 2 ? [C('#8e8c86', '#8a8a86'), C('#6e6c67', '#676762'), C('#54524e', '#4c4c48')]
+    : [C('#a07a4c', '#7e7e78'), C('#7a5232', '#62625d', 1), C('#5a3a20', '#4a4a46')];
+  const hurt = o.hitT > 0 ? 0.5 : 0, sh = o.shakeT !== undefined && S.t - o.shakeT < 0.3 ? Math.sin((S.t - o.shakeT) * 60) * (1 - (S.t - o.shakeT) / 0.3) * 2.5 * Z : 0;
+  c.save(); if (sh) c.translate(sh, 0);
+  if (!ghost && o.k !== 'floor' && o.k !== 'bed' && o.y > S.p.y + 10 && Math.abs(o.x - S.p.x) < 95 && o.y - S.p.y < 130) c.globalAlpha *= 0.4;   // a wall between you and the camera turns to glass, so you can see yourself indoors
+  if (ghost) { c.globalAlpha *= 0.4; }
+  else if (!done) { c.globalAlpha *= 0.3 + 0.5 * (1 - stNeedLeft(o) / Object.values(P.cost).reduce((a, n) => a + n, 0)); }
+  const faceA = hurt ? '#efe0d4' : tone[0], faceB = hurt ? '#d8cabc' : tone[1];
+  if (o.k === 'floor') {
+    const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => toScreen(o.x + i * GRID / 2, o.y + j * GRID / 2));
+    c.fillStyle = faceB; c.beginPath(); q.forEach(([x, y], k) => k ? c.lineTo(x, y + 3 * Z) : c.moveTo(x, y + 3 * Z)); c.closePath(); c.fill();
+    c.fillStyle = faceA; c.beginPath(); q.forEach(([x, y], k) => k ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill();
+    c.strokeStyle = tone[2]; c.lineWidth = 1 * Z; c.beginPath();
+    for (let k = 1; k < 5; k++) { const f = k / 5, [x0, y0] = toScreen(o.x - GRID / 2 + f * GRID, o.y - GRID / 2), [x1, y1] = toScreen(o.x - GRID / 2 + f * GRID, o.y + GRID / 2); c.moveTo(x0, y0); c.lineTo(x1, y1); }
+    c.stroke();
+  } else if (o.k === 'bed') {
+    const a = o.a;
+    isoBox(c, o.x, o.y, a, 40, 24, 5, faceB, tone[1], tone[2]);
+    const t = isoBox(c, o.x + Math.cos(a) * 3, o.y + Math.sin(a) * 3, a, 34, 20, 4, C('#8a5a4a', '#7a7a74'), C('#6e4438', '#5e5e58'), C('#55342a', '#4a4a46'), 5);
+    const mid = (p, q, f) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+    const [px, py] = mid(mid(t[0], t[1], 0.16), mid(t[3], t[2], 0.16), 0.5);
+    c.fillStyle = C('#efe6d2', '#dcdcd6'); c.beginPath(); c.ellipse(px, py, 8 * Z, 4.5 * Z, 0, 0, 7); c.fill();
+  } else {
+    const ux = Math.cos(o.a), uy = Math.sin(o.a), H = (o.k === 'window' ? 16 : 36) * rise;
+    if (o.k === 'door') {
+      for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 25, o.y + uy * k * 25, o.a, 8, 8, 42 * rise, faceA, faceB, tone[2]);   // the posts
+      isoBox(c, o.x, o.y, o.a, GRID - 8, 7, 6 * rise, faceA, faceB, tone[2], 39 * rise);                                        // the lintel
+      const sw = o.open, hx = o.x + ux * 21, hy = o.y + uy * 21, aa = o.a + sw * 1.5;   // the leaf swings in on its hinge
+      const lx = hx - Math.cos(aa) * 19, ly = hy - Math.sin(aa) * 19;
+      isoBox(c, lx, ly, aa, 38, 5, 36 * rise, C('#9a7448', '#7a7a74'), C('#7a5232', '#62625d'), tone[2]);
+      if (!COLOUR || true) { const [kx, ky] = toScreen(lx - Math.cos(aa) * 13, ly - Math.sin(aa) * 13); c.fillStyle = tone[2]; c.beginPath(); c.ellipse(kx, ky - 20 * rise * Z, 1.8 * Z, 1.8 * Z, 0, 0, 7); c.fill(); }   // the latch
+    } else if (o.k === 'window') {
+      for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 25, o.y + uy * k * 25, o.a, 8, 8, 42 * rise, faceA, faceB, tone[2]);
+      isoBox(c, o.x, o.y, o.a, GRID - 8, 7, H, faceA, faceB, tone[2]);
+      isoBox(c, o.x, o.y, o.a, GRID - 8, 7, 6 * rise, faceA, faceB, tone[2], 39 * rise);
+    } else if (o.tier === 0) {                     // thatch: bundles lashed to a frame
+      for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 24, o.y + uy * k * 24, o.a, 6, 6, 36 * rise, faceB, tone[1], tone[2]);
+      c.strokeStyle = faceA; c.lineWidth = 2.4 * Z; c.lineCap = 'round'; c.beginPath();
+      for (let k = -4; k <= 4; k++) { const [x, y] = toScreen(o.x + ux * k * 6, o.y + uy * k * 6); c.moveTo(x, y); c.lineTo(x + Math.sin(k * 1.7 + o.seed) * 2.5 * Z, y - 35 * rise * Z); }
+      c.stroke();
+      c.strokeStyle = tone[2]; c.lineWidth = 1.4 * Z; c.beginPath();
+      for (const h of [11, 26]) { const [x0, y0] = toScreen(o.x - ux * 25, o.y - uy * 25), [x1, y1] = toScreen(o.x + ux * 25, o.y + uy * 25); c.moveTo(x0, y0 - h * rise * Z); c.lineTo(x1, y1 - h * rise * Z); }
+      c.stroke();
+    } else {
+      isoBox(c, o.x, o.y, o.a, GRID - 2, 8, H, faceA, faceB, tone[2]);
+      c.strokeStyle = tone[2]; c.lineWidth = 1.1 * Z; c.beginPath();   // the courses, and a few pegs
+      for (const h of [12, 26]) { const [x0, y0] = toScreen(o.x - ux * 26, o.y - uy * 26), [x1, y1] = toScreen(o.x + ux * 26, o.y + uy * 26); c.moveTo(x0, y0 - h * rise * Z); c.lineTo(x1, y1 - h * rise * Z); }
+      c.stroke();
+      if (o.tier === 2) { c.fillStyle = tone[1]; for (let k = -2; k <= 2; k++) { const [x, y] = toScreen(o.x + ux * k * 11, o.y + uy * k * 11); c.beginPath(); c.ellipse(x, y - (8 + 12 * ((k + 2) % 2)) * rise * Z, 3.6 * Z, 2.3 * Z, 0, 0, 7); c.fill(); } }
+    }
+  }
+  c.restore();
+  if (!done && !ghost) {                          // a blueprint: its outline, and what it still wants
+    const left = Object.entries(o.need).filter(([, n]) => n > 0);
+    c.save(); c.strokeStyle = `rgba(255,207,138,${0.5 + 0.2 * Math.sin(S.t * 4)})`; c.lineWidth = 1.6; c.setLineDash([5, 4]);
+    const R = (o.k === 'floor' || o.k === 'bed' ? 30 : 28) * K();
+    c.beginPath(); c.ellipse(sx, sy, R, R / 2, 0, 0, 7); c.stroke(); c.setLineDash([]); c.restore();
+    if (left.length) {
+      const tx = `${left[0][1]} ${DIT[left[0][0]].n.toLowerCase()}`;
+      c.font = `600 ${Math.round(10 * Math.min(1.4, Z))}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.textBaseline = 'bottom';
+      const w = c.measureText(tx).width + 10; c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(sx - w / 2, sy - 50 * Z - 13, w, 14);
+      c.fillStyle = dayHave(left[0][0]) ? 'rgba(255,215,160,0.95)' : 'rgba(240,150,130,0.95)'; c.fillText(tx, sx, sy - 50 * Z);
+    }
+  }
+  if (done && o.hp < o.max) {                     // a battered piece shows how much is left in it
+    const f = o.hp / o.max, w = 28 * Math.min(1.6, Z);
+    c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(sx - w / 2 - 1, sy - 46 * Z - 1, w + 2, 5);
+    c.fillStyle = f < 0.35 ? '#e2543c' : '#c8b07a'; c.fillRect(sx - w / 2, sy - 46 * Z, w * f, 3);
+  }
+  if (ghost) {
+    const R = (o.k === 'floor' || o.k === 'bed' ? 32 : 30) * K(), pulse = 0.65 + 0.35 * Math.sin(S.t * 6);
+    c.fillStyle = o.ok ? `rgba(150,230,140,${0.1 + 0.05 * Math.sin(S.t * 6)})` : 'rgba(230,90,70,0.12)';
+    c.beginPath(); c.ellipse(sx, sy, R, R / 2, 0, 0, 7); c.fill();
+    c.strokeStyle = o.ok ? `rgba(160,235,150,${pulse})` : `rgba(235,95,75,${pulse})`; c.lineWidth = 2.5 * Math.min(2, Z);
+    c.setLineDash([6 * Z, 5 * Z]); c.lineDashOffset = -S.t * 18; c.beginPath(); c.ellipse(sx, sy, R, R / 2, 0, 0, 7); c.stroke(); c.setLineDash([]); c.lineDashOffset = 0;
+    if (!o.ok) {
+      c.font = `600 ${Math.round(9 * Math.min(1.4, Z))}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.textBaseline = 'bottom';
+      const w = c.measureText(o.why).width + 10; c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(sx - w / 2, sy - 30 * Z - 13, w, 14);
+      c.fillStyle = 'rgba(240,150,130,0.95)'; c.fillText(o.why, sx, sy - 30 * Z);
+    }
+  }
+}
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
 // crafting and building each have a short body animation. Struck trees, rocks and bushes shake and throw chips.
@@ -8366,6 +8674,14 @@ function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the t
   } else if (T.wpn) {
     const bone = T.wpn === 'bone', col = bone ? C('#e6dfcc', '#d8d8d2') : C('#6e5235', '#5a5a56'); seg(-1, 5, 1.8, col); seg(4, 11, bone ? 3.2 : 3.6, col);
     if (!OUT && bone) { ctx.fillStyle = col; for (const k of [6.5, 9.5]) { const [x, y] = at(k); ctx.beginPath(); ctx.arc(x, y, 2.2 * Z, 0, 7); ctx.fill(); } }
+  } else if (T.tool === 'build') {              // the hammer: a stone head lashed to a short handle
+    seg(-1.5, 10, 1.7, C('#7a5a3a', '#6a6a66'));
+    if (OUT) return;
+    const [ex, ey] = at(10), [dx, dy] = sdir(0, 10), px = -dy, py = dx, k = Z;
+    ctx.strokeStyle = head; ctx.lineWidth = 3.6 * Z; ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(ex - px * 3.4 * k, ey - py * 3.4 * k); ctx.lineTo(ex + px * 3.4 * k, ey + py * 3.4 * k); ctx.stroke();
+    ctx.strokeStyle = C('#a8b86a', '#888'); ctx.lineWidth = 1.2 * Z;
+    const [lx, ly] = at(8.2); ctx.beginPath(); ctx.moveTo(lx - px * 1.4 * k, ly - py * 1.4 * k); ctx.lineTo(lx + px * 1.4 * k, ly + py * 1.4 * k); ctx.stroke();
   } else if (!OUT && T.k !== 'mat') {           // anything else you carry in your hand: a little bundle of it
     const im = iconImg(s.id), sz = 9 * Z; if (im.complete && im.naturalWidth) { if (!COLOUR) ctx.filter = 'grayscale(1)'; ctx.drawImage(im, hx - sz / 2, hy - sz * 0.8, sz, sz); ctx.filter = 'none'; }
   }
@@ -13724,7 +14040,7 @@ streakLabel();
 campBtn.addEventListener('click', openCamp);
 craftBtn.addEventListener('click', () => openCraft());
 menuBtn.addEventListener('pointerdown', () => daySave(), true);   // v132: opening the menu saves the run
-const hotbarEl = document.getElementById('hotbar');
+const hotbarEl = document.getElementById('hotbar'), buildbarEl = document.getElementById('buildbar');
 addEventListener('wheel', e => { if (!S || !S.day || !S.running) return; daySelect((S.day.hot + (e.deltaY > 0 ? 1 : -1) + HOTN) % HOTN); }, { passive: true });
 useBtn.addEventListener('pointerdown', e => { e.preventDefault(); dayUse(); });
 document.getElementById('craftGo').addEventListener('click', closeCraft);
@@ -13906,6 +14222,7 @@ function frame(now) {
   if (RB) { S.aimR = S.aim; S.aim = RB.ang; S.rollK = RB; }
   try { render(); } finally { if (RB) { S.aim = S.aimR; S.aimR = null; S.rollK = null; } }
   hotbarEl.hidden = !(S && S.day && S.running && S.rg && S.rg.phase === 'fight');   // v131: the hotbar only while you play
+  buildbarEl.hidden = hotbarEl.hidden || !(S.day && dayTool() === 'build') || !craftEl.hidden;   // v152: the pieces, only with the hammer in hand
   if (titleLive()) drawTitleEyes();
   requestAnimationFrame(frame);
 }
