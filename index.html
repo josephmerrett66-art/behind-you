@@ -210,6 +210,17 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #craft .chip.at { border-style: dashed; color: var(--ash); }
 #craft .chip.at.no { color: #f0a090; }
 #craft .rgo { display: flex; gap: 0.4rem; }
+#craft .jdl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 14px; }
+#craft .jdl dt { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: rgba(239,239,234,.45); align-self: center; }
+#craft .jdl dd { margin: 0; font-size: 13px; color: rgba(239,239,234,.9); text-align: right; }
+#craft .jdl dd.good { color: #a8d88a; }
+#craft .jdl dd.bad { color: #e2906a; }
+#craft h3 svg { width: 16px; height: 16px; opacity: .7; margin-right: 7px; vertical-align: -3px; }
+#craft h3 em { font-style: normal; }
+#craft .jlog { display: grid; gap: 5px; margin-bottom: 10px; }
+#craft .jlog p { margin: 0; font-size: 12.5px; color: rgba(239,239,234,.72); }
+#craft .jlog b { display: inline-block; min-width: 52px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: rgba(239,239,234,.38); font-weight: 600; }
+#craft h3 em { margin-right: auto; }
 #useBtn { right: 112px; bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
 @media (max-height: 520px) { #useBtn { right: 204px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } }
 @media (max-height: 520px) {   /* v141: the weapon special sits on the top row over the dodge; the rest of that row steps left */
@@ -401,7 +412,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
   <div class="pk">
     <div class="pkhead"><div><p class="eyebrow">Daylight · <span id="pkDay"></span></p><h2>Pack</h2></div><button id="craftGo" class="alt">Close</button></div>
     <div class="pkneeds" id="pkNeeds"></div>
-    <div class="pktabs"><button class="pktab" data-tab="pack" aria-pressed="true">Pack</button><button class="pktab" data-tab="craft" aria-pressed="false">Craft<span></span></button></div>
+    <div class="pktabs"><button class="pktab" data-tab="pack" aria-pressed="true">Pack</button><button class="pktab" data-tab="craft" aria-pressed="false">Craft<span></span></button><button class="pktab" data-tab="log" aria-pressed="false">Journal</button></div>
     <div id="pkBody" class="pkbody"></div>
   </div>
   <div id="pkCard" hidden></div>
@@ -485,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 154</p>
+      <p class="small" id="verLbl">Version 155</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -744,7 +755,7 @@ function fliesOf(L) {
 const propCache = new Map();
 let propCacheFree = null;
 function propAt(i, j) {
-  const free = S ? (S.mode === 'free' ? 1 : S.mode === 'expedition' ? 2 : 0) : 0;   // free roam and Expedition clear space for their lights, so each has its own set
+  const free = S ? (S.mode === 'free' ? 1 : S.mode === 'expedition' ? (S.day ? 3 : 2) : 0) : 0;   // v155: Daylight clears its raider camps, so it keeps its own set   // free roam and Expedition clear space for their lights, so each has its own set
   if (free !== propCacheFree || propCache.size > 200000) { propCache.clear(); propCacheFree = free; }
   const key = i * 2097152 + j;
   let p = propCache.get(key);
@@ -756,6 +767,7 @@ function makeProp(i, j) {
   if (Math.abs(i) < 2 && Math.abs(j) < 2) return null; // clear spawn
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2, j * T + T / 2) < CAMP_R + 60) return null;   // the camp clearing
   if (S && S.mode === 'expedition' && inPlaza(i * T + T / 2, j * T + T / 2)) return null;   // and the ring of portals round it
+  if (S && S.day && dayCampClear(i * T + T / 2, j * T + T / 2)) return null;   // v155: the raiders keep their camps clear
   if (S && S.mode === 'expedition' && XS && XS.lairs && XS.lairs.some(L => Math.hypot(i * T + T / 2 - L.x, j * T + T / 2 - L.y) < MRC + 40)) return null;   // and the mini-bosses' clearings
   if (S && S.mode === 'expedition' && XS && XS.orbs === 2 && XS.orb && Math.hypot(i * T + T / 2 - XS.orb.x, j * T + T / 2 - XS.orb.y) < RC + 60) return null;   // and the boss's field
   const cx = i * T + T / 2, cy = j * T + T / 2;
@@ -3192,7 +3204,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   const col = x => mask ? maskCol : cm ? hexMat(x, cm) : x;   // v124: camp timber and standing stones take their material in colour
   const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
   if (sx < -110 * s || sx > W + 110 * s || sy < -20 * s || sy - 200 * s > H) return;   // off screen
-  if (o.kind === 'dnode' || o.kind === 'beast' || o.kind === 'dday' || o.kind === 'dbuild' || o.kind === 'dghost' || o.kind === 'dst' || o.kind === 'dstg' || o.kind === 'dlake') { if (!mask) dayDraw(o, c, sx, sy); return; }   // v128, v151, v152, v153
+  if (o.kind === 'dnode' || o.kind === 'beast' || o.kind === 'dday' || o.kind === 'dbuild' || o.kind === 'dghost' || o.kind === 'dst' || o.kind === 'dstg' || o.kind === 'dlake' || o.kind === 'dcamp') { if (!mask) dayDraw(o, c, sx, sy); return; }   // v128, v151, v152, v153, v155
   if (o.kind === 'tree') {
     drawTree(o, c, mask, sx, sy, s);
   } else if (o.kind === 'felled') { drawFelled(o, c, mask);
@@ -7272,6 +7284,13 @@ const DIT = {
   wall: { n: 'Stake fence', c: '#7a5232', st: 6, k: 'place', build: 'wall', b: 'A quick barricade · drops anywhere' },
   hammer: { n: 'Hammer', c: '#8a6a44', st: 1, k: 'tool', tool: 'build', dmg: 0.85, r: 4, dur: 240, b: 'Lay out buildings and raise them' },
   spikes: { n: 'Spike trap', c: '#8a6a44', st: 6, k: 'place', build: 'spikes', b: 'Hurts whatever walks in' },
+  tpost: { n: 'Torch post', c: '#ffb45a', st: 3, k: 'place', build: 'tpost', b: 'Burns whatever comes into its light · feed it sticks' },
+  effigy: { n: 'Effigy', c: '#cfc8b4', st: 2, k: 'place', build: 'effigy', b: 'Animals keep well away from it' },
+  signal: { n: 'Signal fire', c: '#ff7a2a', st: 1, k: 'place', build: 'signal', b: 'Light it and hold out · it is the way out of here' },
+  rhorn: { n: "Hunter's horn", c: '#d8c088', st: 1, k: 'relic', b: 'Taken from a raider camp · the signal fire needs all four' },
+  rbell: { n: 'Iron bell', c: '#9aa4ae', st: 1, k: 'relic', b: 'Taken from a raider camp · the signal fire needs all four' },
+  rskull: { n: 'Antlered skull', c: '#e6dfcc', st: 1, k: 'relic', b: 'Taken from a raider camp · the signal fire needs all four' },
+  rcrown: { n: 'Ash crown', c: '#b8a07a', st: 1, k: 'relic', b: 'Taken from a raider camp · the signal fire needs all four' },
 };
 const FOODS = Object.keys(DIT).filter(k => DIT[k].k === 'food');
 // ---- the recipe book. at: 'hand' anywhere, 'fire' by a campfire (or in camp), 'bench' by a workbench ----
@@ -7318,6 +7337,10 @@ const DREC = [
   { id: 'hammer', g: 'tool', out: 'hammer', at: 'hand', cost: { sticks: 2, stones: 3, fibre: 2 } },
   { id: 'wall', g: 'build', out: 'wall', at: 'hand', cost: { logs: 3 } },
   { id: 'spikes', g: 'build', out: 'spikes', at: 'hand', cost: { sticks: 4, flint: 2 } },
+  { id: 'tpost', g: 'build', out: 'tpost', at: 'hand', cost: { logs: 1, sticks: 4, fibre: 3 } },
+  { id: 'effigy', g: 'build', out: 'effigy', at: 'bench', cost: { bone: 4, hide: 2, sticks: 4 } },
+  { id: 'signal', g: 'build', out: 'signal', at: 'bench', name: 'Signal fire', sh: 'All four relics · light it to get out',
+    cost: { rhorn: 1, rbell: 1, rskull: 1, rcrown: 1, logs: 8, planks: 6, rope: 3 } },
 ];
 const DCATS = [{ id: 'tool', n: 'Tools', icon: 'pick1' }, { id: 'wpn', n: 'Weapons', icon: 'spear2' }, { id: 'gear', n: 'Gear', icon: 'vest' },
   { id: 'food', n: 'Food', icon: 'cooked' }, { id: 'stn', n: 'Stations', icon: 'bench' }, { id: 'build', n: 'Build', icon: 'wall' }, { id: 'mat', n: 'Materials', icon: 'rope' }];
@@ -7340,7 +7363,8 @@ function dayBegin() {
     seen: new Set(), known: new Set(), fresh: new Set(), armT: 0, steelSeen: 0,
     cut: new Map(), felled: new Set(), builds: [], chips: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {},
     bld: new Map(), bed: null, piece: 'wallT',
-    warm: WARM_MAX, bleed: 0, bleedT: 0, froze: 0, fish: null, ph: 'day' };   // v153: the cold, your wounds and the night   // v152: what you've built on the grid, and where your bed is
+    warm: WARM_MAX, bleed: 0, bleedT: 0, froze: 0, fish: null, ph: 'day',
+    camps: new Map(), heat: 0, raids: 0, caught: 0, away: 0, jlog: [], bag: {}, siege: null, won: 0, scout: null, scoutT: 55 };   // v155: the raider camps, the heat and the journal   // v153: the cold, your wounds and the night   // v152: what you've built on the grid, and where your bed is
   S.rg = exNewRun(); exPlaceHome(); wpInit(); S.day.baseHp = S.rg.maxHp;
   S.msg = { text: 'daylight', sub: 'Gather sticks, stones and fibre · your pack shows what they make', t: 0 };
   dayChanged();
@@ -7456,8 +7480,14 @@ function dayStep(dt, inCamp) {
   if (n > D.n) { D.n = n; rg.ringMsg = { text: `day ${n}`, sub: 'A new morning', t: 0 }; }
   { const ph = dayNight() ? 'night' : 'day';   // v153: they come with the dark
     if (ph !== D.ph) { D.ph = ph;
-      if (ph === 'night') { if (inCamp) { D.raidDue = true; rg.ringMsg = { text: 'night', sub: 'They wait outside the fence', t: 0 }; } else { rg.ringMsg = { text: 'night', sub: 'Keep to the firelight', t: 0 }; playRingSting(); dayRaid(); } }
-      else exNote('the sun comes up', true);
+      if (ph === 'night') {
+        for (const B of D.builds) if (B.t === 'tpost' && !(B.fuel > 0)) B.fuel = DAY_LEN * 0.5;   // v155: your posts take light at dusk
+        if (inCamp) { D.raidDue = true; rg.ringMsg = { text: 'night', sub: (D.heat || 0) > 1 ? `They are ${HEAT_NAME[Math.min(4, D.heat)]} · about ${dayRaidSize()} coming` : 'They wait outside the fence', t: 0 }; }
+        else { rg.ringMsg = { text: 'night', sub: 'Keep to the firelight', t: 0 }; playRingSting(); dayRaid(); }
+      } else {
+        exNote('the sun comes up', true);
+        if (D.raidSeen) { D.raidSeen = 0; D.raids = (D.raids || 0) + 1; dayJLog(`lived through the night · raid ${D.raids}`); }
+      }
     } }
   if (D.raidDue && !inCamp) { D.raidDue = false; dayRaid(); }
   // stamina comes back once you stop spending it; slower hungry, thirsty or sick
@@ -7498,7 +7528,7 @@ function dayStep(dt, inCamp) {
   D.logs = D.logs.filter(g => !g.done);
   for (const c of D.chips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; }
   D.chips = D.chips.filter(c => c.life > 0);
-  beastStep(dt); buildStep(dt); stStep(dt);
+  beastStep(dt); buildStep(dt); stStep(dt); dayCampStep(dt); dayHeatStep(dt); dayPostStep(dt); daySiegeStep(dt);
   dayWarmStep(dt); dayBleedStep(dt); dayFishStep(dt); dayTorchStep(dt); dayPlotStep(dt);
   { const o = dayUseTarget(), lab = o ? useLabel(o) : 'Take'; if (useBtn.textContent !== lab) useBtn.textContent = lab; }
   { const v = dayVerb(); if (attackBtn.textContent !== v) attackBtn.textContent = v; }
@@ -7584,7 +7614,8 @@ function dayUseTarget() {                        // the nearest thing in reach y
   for (const f of D.drops) { const d = dist2(f, p); if (d < bd) { bd = d; best = f; } }
   for (const o of dayNodesNear(p.x, p.y, 60)) if ((o.t === 'sticks' || o.t === 'stones' || o.t === 'shroom') && !o.gone) { const d = dist2(o, p); if (d < bd) { bd = d; best = o; } }
   for (const c of exChestsNear(p.x, p.y, 60)) if (!S.rg.looted.has(c.key)) { const d = dist2(c, p) - 8; if (d < bd) { bd = d; best = c; } }
-  for (const B of D.builds) if (B.t === 'chest' || B.t === 'plot') { const d = dist2(B, p) - (B.t === 'plot' ? 22 : 12); if (d < bd) { bd = d; best = B; } }
+  for (const B of D.builds) if (B.t === 'chest' || B.t === 'plot' || B.t === 'signal' || B.t === 'tpost') { const d = dist2(B, p) - (B.t === 'plot' ? 22 : B.t === 'signal' ? 24 : 12); if (d < bd) { bd = d; best = B; } }
+  for (const o of dayCampsNear(p.x, p.y, 70)) if (o.sub === 'relic') { const d = dist2(o, p) - 12; if (d < bd) { bd = d; best = o; } }   // v155: the relic on its cairn
   { const P = lakeAt(p.x, p.y, 30); if (P && (D.water < FOOD_MAX - 2 || D.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS))) { const d = Math.max(0, Math.hypot(P.x - p.x, P.y - p.y) - P.rad); if (d < bd) { bd = d; best = P; } } }
   if (S.rg.inCamp) {
     { const d = dist2(CAMP_BOX, p) - 14; if (d < bd) { bd = d; best = CAMP_BOX; } }
@@ -7592,7 +7623,7 @@ function dayUseTarget() {                        // the nearest thing in reach y
   }
   return best;
 }
-const useLabel = o => o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
+const useLabel = o => o.kind === 'dcamp' ? (dayCampLive(o.ci) ? 'Guarded' : 'Take') : o.t === 'signal' ? (S.day.siege ? 'Burning' : 'Light it') : o.t === 'tpost' ? 'Feed' : o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
 function dayUse() {
   const D = S.day, rg = S.rg; if (!D || !rg || rg.phase !== 'fight' || !S.running) return;
   if (dayTameTry()) return;                     // v154: meat in your hand and a wolf in front of you
@@ -7600,6 +7631,9 @@ function dayUse() {
   if (o === CAMP_BARREL) { dayDrink(); return; }
   if (o.kind === 'dlake') { dayPondFill(); return; }
   if (o.t === 'plot') { dayPlotPlant(o); return; }
+  if (o.kind === 'dcamp') { dayRelicTake(o); return; }
+  if (o.t === 'signal') { if (!S.day.siege) daySignalLight(o); else dayNote('burning', 'it is already burning', 2); return; }
+  if (o.t === 'tpost') { dayPostFeed(o); return; }
   if (o === CAMP_BOX || o.t === 'chest') { openCraft(o); return; }
   dayAct(7, 0.42); S.p.vx *= 0.3; S.p.vy *= 0.3;
   if (o.kind === 'dday') { const got = dayGive(o.it, o.n, o.x, o.y, true, o.ex); if (got) { exNote(`+${got} ${DIT[o.it].n.toLowerCase()}`); pickSnd(); } o.n -= got; if (o.n <= 0) o.gone = true; D.drops = D.drops.filter(f => !f.gone); }
@@ -7731,13 +7765,17 @@ function beastStep(dt) {
   D.beasts = D.beasts.filter(b => !(b.dead && b.dieT > 1.2) && Math.hypot(b.x - p.x, b.y - p.y) < 2600);
 }
 function beastScare(b) {
+  if (dayEffigyNear(b.x, b.y) && !b.tame) {        // v155: nothing wild comes near the effigy
+    if (b.st !== 'flee') { b.st = 'flee'; b.t = 3 + Math.random() * 2; }
+    return;
+  }
   if (BEAST[b.k].pack) { beastCall(b); return; }
   if (BEAST[b.k].angry) { if (b.st === 'graze' || b.st === 'flee') { b.st = 'wind'; b.t = 0.6; if (actx && monNear(b, 600) > 0) noiseAt(actx.currentTime, 300, 120, 0.35, 0.45 * monNear(b, 600), sfxGain); } return; }
   if (b.st !== 'flee') { b.st = 'flee'; b.t = 3 + Math.random() * 2; if (actx && monNear(b, 600) > 0) noiseAt(actx.currentTime, b.k === 'deer' ? 1800 : 3500, 900, 0.18, 0.3 * monNear(b, 600), sfxGain); }
   for (const o of S.day.beasts) if (o !== b && o.chunk === b.chunk && o.k === b.k && !o.dead && o.st === 'graze' && dist2(o, b) < 260) { o.st = 'flee'; o.t = 3 + Math.random() * 2; }   // the herd goes with it
 }
 function beastDie(b) {
-  b.dead = true; b.dieT = 0; addShake(0.2); hitStop(0.06); ashBurst(b.x, b.y, 6, BEAST[b.k].h * 0.6);
+  b.dead = true; b.dieT = 0; addShake(0.2); hitStop(0.06); ashBurst(b.x, b.y, 6, BEAST[b.k].h * 0.6); dayKillLog(b.k);
   for (const [k, n] of Object.entries(BEAST[b.k].drop)) dayDrop(b.x, b.y, k, n);
   exNote(`a ${b.k} · ${Object.entries(BEAST[b.k].drop).map(([k, n]) => `${n} ${DIT[k].n.toLowerCase()}`).join(' · ')}`, true);
 }
@@ -7753,9 +7791,11 @@ function dayChest(c) {                         // a cache: food and a few useful
   if (rg.flask < FLASK_MAX && Math.random() < 0.25) { rg.flask++; exNote('+1 flask', true); }
 }
 function dayRaid() {
-  const rg = S.rg, D = S.day, ring = Math.min(3, exRing(Math.hypot(S.p.x, S.p.y)) + (D.n > 3 ? 1 : 0)), n = Math.min(16, 3 + 2 * D.n);
+  const rg = S.rg, D = S.day, ring = Math.min(3, exRing(Math.hypot(S.p.x, S.p.y)) + (D.n > 3 ? 1 : 0) + ((D.heat || 0) > 2 ? 1 : 0)), n = dayRaidSize();
   for (let i = 0; i < n; i++) exSpawn(exPickFoe(ring));
-  rg.ringMsg = { text: `day ${D.n}`, sub: `A raid · ${n} of them`, t: 0 }; playRingSting(); addShake(0.35);
+  if ((D.heat || 0) >= 2) { const e = rg.enemies[rg.enemies.length - 1]; if (e) { e.cap = 1; e.hp = e.maxHp = e.maxHp * 1.4; } }   // v155: once they are hunting you, one of them leads
+  D.raidSeen = 1;
+  rg.ringMsg = { text: `day ${D.n}`, sub: `A raid · ${n} of them${(D.heat || 0) > 1 ? ' · they are ' + HEAT_NAME[Math.min(4, D.heat)] : ''}`, t: 0 }; playRingSting(); addShake(0.35);
 }
 function dayWake() {                             // v152 (Joe's plan): with a bed built, death is a setback, not the end:
   const D = S.day, rg = S.rg, p = S.p;          // you come round on your bed, and every last thing you carried lies where you fell
@@ -7782,7 +7822,8 @@ function dayDeath() {
 }
 function dayCard() {
   const rg = S.rg, D = S.day, b = dayBest();
-  const rows = [['Lasted', `Day ${D.n} · ${dayClock(D.t)}${D.best ? ' · new best' : ''}`], ['Killed', `${rg.kills || 0}`], ['Recipes', `${D.known.size} of ${DREC.length} found`], ['Fell to', D.cause === 'starved' ? 'Hunger' : D.cause === 'thirst' ? 'Thirst' : 'The woods'], ['Best', `Day ${b.days} · ${dayClock(b.t)}`]];
+  const rows = [['Lasted', `Day ${D.n} · ${dayClock(D.t)}${D.best ? ' · new best' : ''}`], ['Killed', `${rg.kills || 0}`], ['Relics', `${dayRelics()} of 4`], ['Recipes', `${D.known.size} of ${DREC.length} found`],
+    D.won ? ['Got out', 'You held the signal fire to the end'] : ['Fell to', D.cause === 'starved' ? 'Hunger' : D.cause === 'thirst' ? 'Thirst' : 'The woods'], ['Best', `Day ${b.days} · ${dayClock(b.t)}`]];
   document.getElementById('dcList').replaceChildren(...rows.flatMap(([k, v]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; return [dt, dd]; }));
   deathCard.hidden = false; menuBtn.hidden = true;
   document.getElementById('dcGo').focus({ preventScroll: true });
@@ -7792,6 +7833,7 @@ function dayItems() {                          // drawn in with the trees
   const R = viewR(), cx = S.cam.x, cy = S.cam.y, near = o => Math.abs(o.x - cx) < R && Math.abs(o.y - cy) < R;
   const out = dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts), [...D.bld.values()].filter(near));
   for (const P of lakesNear(cx, cy, R)) out.push(P);
+  for (const o of dayCampsNear(cx, cy, R)) out.push(o);   // v155: the raider camps
   const g = dayGhost(); if (g) out.push(g);
   const sg = stGhost(); if (sg) out.push(sg);
   return out;
@@ -7853,6 +7895,13 @@ const ICON = (() => {
     body: '<path d="M8 3.5l-4.2 3.2v13.8h6.4V9.5h3.6v11h6.4V6.7L16 3.5c0 2-1.6 3.2-4 3.2S8 5.5 8 3.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>',
     legsE: '<path d="M5.8 3.5h12.4l1.2 17h-5.2l-2.2-10.5-2.2 10.5H4.6z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>',
     back: '<rect x="5" y="6.5" width="14" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/><path d="M8 6.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" stroke-width="1.2" fill="none"/>',
+    tpost: '<path d="M11 21.5V10h2v11.5z" fill="#7a5232"/><path d="M6.5 21.5h11" stroke="#5a3a20" stroke-width="1.8"/><path d="M7.5 9.5h9l-1.2 2.5h-6.6z" fill="#3a2c1c"/><path d="M12 1.5c2.6 2.8 3.5 4.6 3.5 6.4a3.5 3.5 0 0 1-7 0c0-1.3.8-2.6 2-3.8 0 1.6.8 1.6 1.6 1.6-.8-1.6-.8-2.9-.1-4.2z" fill="#ffb45a"/><path d="M12 5.4c.9 1 1.3 1.7 1.3 2.4a1.3 1.3 0 0 1-2.6 0c0-.6.4-1.2 1.3-2.4z" fill="#fff3cc"/>',
+    effigy: '<path d="M11 21.5V7h2v14.5z" fill="#6e5232"/><path d="M4.5 9h15v2h-15z" fill="#6e5232"/><ellipse cx="12" cy="4.6" rx="3.2" ry="3" fill="#ded7c4"/><g fill="#20201c"><ellipse cx="10.8" cy="4.3" rx=".8" ry="1"/><ellipse cx="13.2" cy="4.3" rx=".8" ry="1"/></g><path d="M10.6 7h2.8v1.4h-2.8z" fill="#ded7c4"/><g stroke="#cfc8b4" stroke-width="1.1"><path d="M6.5 11v4M17.5 11v3.4"/></g><path d="M9 11.5h6l-1 5h-4z" fill="#8a6a48"/>',
+    signal: '<g fill="#7a5232"><path d="M3.5 20.5h17v2h-17z"/><path d="M5 17h14v2.2H5z"/><path d="M7 13.8h10V16H7z"/></g><g stroke="#5a3a20" stroke-width="1.6"><path d="M5.5 20.5L7 13.5M18.5 20.5L17 13.5"/></g><path d="M12 1c3 3.4 4.2 5.6 4.2 7.8a4.2 4.2 0 0 1-8.4 0c0-1.6 1-3.2 2.4-4.6 0 2 1 2 1.8 2-1-2-1-3.6 0-5.2z" fill="#ff7a2a"/><path d="M12 5.6c1.2 1.3 1.7 2.2 1.7 3.1a1.7 1.7 0 0 1-3.4 0c0-.8.5-1.6 1.7-3.1z" fill="#ffe6a0"/>',
+    rhorn: '<path d="M4 17.5c0-6.5 5-11 12-11 2.5 0 4 .6 4 1.6s-1.3 1.4-3 1.9c-4.6 1.3-7.4 3.6-8.6 7.5-.4 1.3-1.2 2-2.2 2s-2.2-.8-2.2-2z" fill="#d8c088"/><path d="M6.6 15.5c1-3.2 3.4-5.4 7-6.6" stroke="#a89058" stroke-width="1.2" fill="none"/><path d="M15.5 6.8c1.8-.2 3.3.2 4.3 1" stroke="#a89058" stroke-width="1.1" fill="none"/><path d="M8 17.5c0 1.6-1 2.6-2.4 2.6S3 19 3 17.5z" fill="#b8a070"/>',
+    rbell: '<path d="M12 3.2c-3.6 0-6 3.4-6 8.3 0 2-.6 3.3-1.6 4.3h15.2c-1-1-1.6-2.3-1.6-4.3 0-4.9-2.4-8.3-6-8.3z" fill="#9aa4ae"/><rect x="10.8" y="1.2" width="2.4" height="2.4" rx="1.2" fill="#6e7883"/><path d="M4 15.8h16v1.8H4z" fill="#79838e"/><circle cx="12" cy="19.6" r="1.8" fill="#6e7883"/><path d="M8.6 11c0-3.2 1.2-5.4 3-6.2" stroke="#c6ced6" stroke-width="1.1" fill="none"/>',
+    rskull: '<path d="M4.5 9.5c0-3.6 3.4-6 7.5-6s7.5 2.4 7.5 6c0 2.6-1.3 4.2-2.8 5.3l-.5 3.2h-8.4l-.5-3.2C5.8 13.7 4.5 12.1 4.5 9.5z" fill="#e6dfcc"/><g fill="#20201c"><ellipse cx="9.3" cy="9.6" rx="1.8" ry="2.1"/><ellipse cx="14.7" cy="9.6" rx="1.8" ry="2.1"/><path d="M11.2 13.4h1.6l-.8 2z"/></g><g stroke="#cfc8b4" stroke-width="1.8" fill="none" stroke-linecap="round"><path d="M6.5 5.5C4.6 3.8 3.6 2.8 2.5 1.5M17.5 5.5c1.9-1.7 2.9-2.7 4-4"/></g><path d="M9.5 18h5v2.5h-5z" fill="#d6cfb8"/>',
+    rcrown: '<path d="M3.5 18.5l-1-11 5 4 4.5-7.5 4.5 7.5 5-4-1 11z" fill="#b8a07a"/><path d="M3.5 18.5h17v2.6h-17z" fill="#9a8460"/><g fill="#efe6d2"><circle cx="7.5" cy="12.5" r="1.3"/><circle cx="12" cy="11.5" r="1.5"/><circle cx="16.5" cy="12.5" r="1.3"/></g><path d="M4 14.5c4.5 1.4 11.5 1.4 16 0" stroke="#8a7458" stroke-width="1" fill="none"/>',
   };
 })();
 const iconSvg = id => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id] || ''}</svg>`;
@@ -7879,6 +7928,7 @@ function isoBox(c, cx, cy, a, w, d, h, top, sideA, sideB, z0 = 0) {   // a box s
 function dayDrawBuild(o, c, sx, sy) {          // a workbench, a chest, and v154's furnace, drying rack and plot
   const C = (col, grey) => COLOUR ? col : grey, B = o.build, a = B.a || 0;
   if (o.sub === 'furnace' || o.sub === 'rack' || o.sub === 'plot') return dayDrawDeep(o, c, sx, sy);
+  if (o.sub === 'tpost' || o.sub === 'effigy' || o.sub === 'signal') return dayDrawWar(o, c, sx, sy);
   if (o.sub === 'bench') {
     const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
     for (const [i, j] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {   // four legs
@@ -7914,6 +7964,7 @@ function dayGhost() {                          // what you'd put down, shown whe
 }
 function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
   if (o.kind === 'dlake') return lakeDraw(o, c);
+  if (o.kind === 'dcamp') return dayDrawCamp(o, c, sx, sy);
   if (o.kind === 'dst') return stDraw(o, c, sx, sy, false);
   if (o.kind === 'dstg') return stDraw(o, c, sx, sy, true);
   const z = Z, C = (col, grey) => COLOUR ? col : grey;
@@ -8027,7 +8078,7 @@ function drawDay() {                           // the sun: a warm wash from the 
   ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * Math.max(0.25, lt); ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
   drawNight();
-  drawDayFires(); drawDayChips(); drawFloat();
+  drawDayFires(); drawDayChips(); drawFloat(); drawSiege();
 }
 function dayBar(px, py) {                      // stamina, food and water over your head
   const D = S.day, tw = 46, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
@@ -8084,6 +8135,12 @@ function dayMakeBuild(t, cx, cy, a, fake) {
     B.parts.push({ kind: 'dbuild', sub: 'chest', x: cx, y: cy, r: 11, s: 1, build: B });
   } else if (t === 'furnace' || t === 'rack') {
     B.parts.push({ kind: 'dbuild', sub: t, x: cx, y: cy, r: t === 'furnace' ? 15 : 17, s: 1, build: B });
+  } else if (t === 'tpost' || t === 'effigy') {
+    if (t === 'tpost') B.fuel = DAY_LEN * 0.5;
+    B.parts.push({ kind: 'dbuild', sub: t, x: cx, y: cy, r: 7, s: 1, build: B });
+  } else if (t === 'signal') {
+    B.lit = 0;
+    B.parts.push({ kind: 'dbuild', sub: 'signal', x: cx, y: cy, r: 24, s: 1, build: B });
   } else if (t === 'plot') {
     B.crop = null; B.sown = 0; B.grown = false;
     B.parts.push({ kind: 'dbuild', sub: 'plot', x: cx, y: cy, r: 0, s: 1, build: B, flat: true });
@@ -8341,6 +8398,8 @@ function renderPack() {
       if (D.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS)) { const f = el('button', 'act', 'Fill waterskins'); f.addEventListener('click', dayFill); r.append(f); }
       out.push(r);
     }
+  } else if (PK.tab === 'log') {
+    out.push(...dayJournalHtml());
   } else {
     const known = DREC.filter(r => D.known.has(r.id));
     const cats = el('div', 'pkcats'), ready = c => known.filter(r => r.g === c && canCraft(r) === true).length;
@@ -8393,16 +8452,18 @@ function dayReadSave() { try { const v = JSON.parse(localStorage.getItem(dayKey(
 function dayClearSave() { try { localStorage.removeItem(dayKey()); } catch (e) {} }
 function daySave() {
   const D = S && S.day, rg = S && S.rg; if (!D || !rg || rg.phase !== 'fight' || S.mode !== 'expedition') return;
-  const keep = ['t', 'n', 'food', 'water', 'st', 'sick', 'warn', 'raidDue', 'hot', 'inv', 'box', 'gear', 'told', 'baseHp', 'bed', 'piece', 'died', 'deaths', 'warm', 'bleed', 'ph'];
+  const keep = ['t', 'n', 'food', 'water', 'st', 'sick', 'warn', 'raidDue', 'hot', 'inv', 'box', 'gear', 'told', 'baseHp', 'bed', 'piece', 'died', 'deaths', 'warm', 'bleed', 'ph',
+    'heat', 'raids', 'caught', 'away', 'jlog', 'bag', 'siege', 'won', 'raidSeen', 'scoutT'];   // v155
   const d = {}; for (const k of keep) d[k] = D[k];
   d.seen = [...D.seen]; d.known = [...D.known]; d.fresh = [...D.fresh];
   d.felled = [...D.felled]; d.cut = [...D.cut]; d.bchunks = [...D.bchunks];
   d.nodes = [...D.nodes].map(([k, L]) => [k, L.filter(o => !o.gone).map(o => ({ t: o.t, x: Math.round(o.x), y: Math.round(o.y), n: o.n, ber: o.ber, berT: o.berT, seed: o.seed }))]);
   d.drops = D.drops.map(f => ({ it: f.it, n: f.n, ex: f.ex, x: Math.round(f.x), y: Math.round(f.y), t: f.t, keep: f.keep }));
+  d.camps = [...D.camps].map(([i, c]) => [i, { seen: c.seen, took: c.took }]);
   d.bld = [...D.bld.values()].map(o => ({ id: o.id, i: o.i, j: o.j, s: o.s, a: o.a, hp: Math.round(o.hp * 10) / 10, need: o.need, done: o.done }));
   d.logs = D.logs.flatMap(g => [['logs', g.give.logs], ['sticks', g.give.sticks]].filter(([, n]) => n).map(([it, n]) => ({ it, n, x: Math.round(g.bx + g.ux * g.len / 2), y: Math.round(g.by + g.uy * g.len / 2), t: 0 })));   // a tree still falling is saved as its logs
   d.beasts = D.beasts.filter(b => !b.dead).map(b => ({ k: b.k, x: Math.round(b.x), y: Math.round(b.y), hp: b.hp, stag: b.stag, chunk: b.chunk, tame: b.tame, fed: b.fed }));
-  d.builds = D.builds.map(B => ({ t: B.t, x: B.x, y: B.y, a: B.a, hp: B.hp, uses: B.uses, inv: B.inv, crop: B.crop, sown: B.sown, grown: B.grown }));
+  d.builds = D.builds.map(B => ({ t: B.t, x: B.x, y: B.y, a: B.a, hp: B.hp, uses: B.uses, inv: B.inv, crop: B.crop, sown: B.sown, grown: B.grown, fuel: B.fuel, lit: B.lit }));
   const out = { v: 2, at: Date.now(), d, p: { x: Math.round(S.p.x), y: Math.round(S.p.y) }, rg: { hp: rg.hp, steel: rg.steel || 0, flask: rg.flask, kills: rg.kills || 0, looted: [...rg.looted] }, xs: XS };
   try { localStorage.setItem(dayKey(), JSON.stringify(out)); } catch (e) {}
 }
@@ -8414,20 +8475,20 @@ function dayFromV1(d) {                         // a run saved before the overha
   const tools = [d.axe ? 'axe' + d.axe : null, d.pick ? 'pick' + d.pick : null, { club: 'club', spear: 'spear2', bone: 'bonec' }[d.wpn], d.skin ? 'skin' : null].filter(Boolean);
   for (const t of tools) if (addTo(inv, t, 1, t === 'skin' ? d.sips || 0 : undefined, order(t))) addTo(box, t, 1, t === 'skin' ? d.sips || 0 : undefined);
   const seen = new Set([...Object.keys(d.inv || {}), ...Object.keys(d.box || {}), ...tools, 'sticks', 'stones', 'fibre', 'logs', 'flint', 'hide', 'bone', 'berries', 'meat'].filter(k => DIT[k]));   // they've played: the woods' basics are already in the book
-  return Object.assign({}, d, { inv, box, gear, hot: 0, seen: [...seen], known: [], fresh: [], bld: [], bed: null, piece: 'wallT', warm: WARM_MAX, bleed: 0, ph: 'day' });
+  return Object.assign({}, d, { inv, box, gear, hot: 0, seen: [...seen], known: [], fresh: [], bld: [], bed: null, piece: 'wallT', warm: WARM_MAX, bleed: 0, ph: 'day', camps: [], heat: 0, jlog: [], bag: {} });
 }
 function dayLoad(sv) {                          // pick a saved run back up where you left it
   dayBegin();
   const D = S.day, d = sv.v === 1 ? dayFromV1(sv.d) : sv.d, rg = S.rg;
   XS = sv.xs || XS;
-  Object.assign(D, d, { felled: new Set(d.felled), cut: new Map(d.cut), bchunks: new Map(d.bchunks), builds: [], logs: [], beasts: [], bld: new Map(), piece: d.piece || 'wallT',
+  Object.assign(D, d, { felled: new Set(d.felled), cut: new Map(d.cut), bchunks: new Map(d.bchunks), builds: [], logs: [], beasts: [], bld: new Map(), piece: d.piece || 'wallT', camps: new Map(d.camps || []), jlog: d.jlog || [], bag: d.bag || {},
     seen: new Set(), known: new Set(d.known || []), fresh: new Set(d.fresh || []), fish: null, warm: d.warm === undefined ? WARM_MAX : d.warm, bleed: d.bleed || 0,
     nodes: new Map(d.nodes.map(([k, L]) => [k, L.map(o => ({ kind: 'dnode', r: 0, s: 1, ...o }))])),
     drops: d.drops.concat(d.logs || []).filter(f => DIT[f.it]).map(f => ({ kind: 'dday', r: 0, s: 1, seed: Math.random() * 9, ...f })) });
   D.baseHp = D.baseHp || rg.maxHp;
   D.beasts = d.beasts.map(b => ({ kind: 'beast', r: 0, s: 1, st: 'graze', t: Math.random() * 3, dir: Math.random() * 7, sp: 0, ph: Math.random() * 9, flash: 0, ...b }));
   for (const sv of d.bld || []) stMake(sv);
-  for (const B of d.builds) { const nb = dayMakeBuild(B.t, B.x, B.y, B.a || 0); if (B.hp !== undefined) nb.hp = B.hp; if (B.uses !== undefined) nb.uses = B.uses; if (B.inv) nb.inv = B.inv; if (B.crop) { nb.crop = B.crop; nb.sown = B.sown; nb.grown = !!B.grown; } }
+  for (const B of d.builds) { const nb = dayMakeBuild(B.t, B.x, B.y, B.a || 0); if (B.hp !== undefined) nb.hp = B.hp; if (B.uses !== undefined) nb.uses = B.uses; if (B.inv) nb.inv = B.inv; if (B.crop) { nb.crop = B.crop; nb.sown = B.sown; nb.grown = !!B.grown; } if (B.fuel !== undefined) nb.fuel = B.fuel; if (B.lit) nb.lit = 1; }
   rg.hp = sv.rg.hp; rg.flask = sv.rg.flask; rg.kills = sv.rg.kills; rg.looted = new Set(sv.rg.looted);
   dayGearFx(); rg.hp = Math.min(sv.rg.hp, rg.maxHp); rg.steel = Math.min(sv.rg.steel || 0, steelMax()); D.steelSeen = rg.steel;
   for (const k of d.seen || []) daySee(k, true);   // the book fills back in, quietly
@@ -9007,6 +9068,325 @@ function dayDrawDeep(o, c, sx, sy) {
       }
     }
   }
+}
+// ---- v155 stage 5 (Joe): the raiders, and the way out. The woods are not empty: there are four raider camps out there, each
+// with something old and heavy on a post in the middle of it, and men around it who would rather you did not have it. Take all
+// four, build the signal fire at your camp, and light it: everything in the woods comes at once, and if you are still standing
+// when it burns out, you walk out of here. Until then they learn where you live, and they come with the dark.
+const CAMPS = [
+  { i: 0, d: 1500, a: 0.7,  n: 3, relic: 'rhorn',  cap: 'brute', nm: 'A hunting camp' },
+  { i: 1, d: 2500, a: 2.6,  n: 4, relic: 'rbell',  cap: 'brute', nm: 'A bell post' },
+  { i: 2, d: 3500, a: 4.3,  n: 5, relic: 'rskull', cap: 'tall',  nm: 'A bone shrine' },
+  { i: 3, d: 4800, a: 5.6,  n: 6, relic: 'rcrown', cap: 'tall',  nm: 'The ash court' },
+];
+const CAMP_RAD = 96, CAMP_WAKE = 420, CAMP_SLEEP = 1100, CAMP_NEAR = 900;
+const SIEGE_T = 150, SIEGE_R = 420, POST_R = 150, EFFIGY_R = 340, SCOUT_T = 34, HEAT_NAME = ['quiet', 'watchful', 'hunting', 'swarming', 'swarming'];
+// the camps sit where they sit: fixed by the numbers above, the same in every run, so nothing about them needs saving but what you took
+let campCache = null;
+function dayCampList() {
+  if (campCache) return campCache;
+  campCache = CAMPS.map(C => {
+    const d = C.d * (0.94 + hash(C.i + 11, 5) * 0.12), a = C.a + (hash(C.i + 3, 9) - 0.5) * 0.5;
+    const x = Math.cos(a) * d, y = Math.sin(a) * d, parts = [];
+    const put = (sub, ox, oy, extra) => parts.push(Object.assign({ kind: 'dcamp', sub, x: x + ox, y: y + oy, r: 0, s: 1, ci: C.i, seed: hash(C.i * 7 + parts.length, parts.length + 2) }, extra));
+    put('relic', 0, 0, { r: 10 });
+    put('fire', 44, 28, { flat: true });
+    for (const [tx, ty, ta] of [[-58, 22, 0.5], [40, -34, 2.3]]) put('tent', tx, ty, { a: ta, r: 16 });
+    for (let k = 0; k < 16; k++) {                 // a ring of stakes with the gate left open towards your camp
+      const t = k / 16 * Math.PI * 2;
+      if (Math.cos(t - a - Math.PI) > 0.8) continue;
+      put('stake', Math.cos(t) * CAMP_RAD, Math.sin(t) * CAMP_RAD * 0.68, { skull: hash(C.i * 5 + k, k + 1) < 0.3 });
+    }
+    for (let k = 0; k < 7; k++) { const t = hash(C.i + k * 3, k * 5) * 6.3, r = 26 + hash(k, C.i) * 60; put('dirt', Math.cos(t) * r, Math.sin(t) * r * 0.7); }
+    for (let k = 0; k < 5; k++) { const t = hash(C.i + k * 9, k * 2) * 6.3, r = 34 + hash(k + 2, C.i) * 56; put('bones', Math.cos(t) * r, Math.sin(t) * r * 0.7); }
+    return Object.assign({}, C, { x, y, parts });
+  });
+  return campCache;
+}
+const dayCampAt = i => dayCampList()[i];
+function dayCampClear(x, y) { for (const C of dayCampList()) if (Math.hypot(x - C.x, y - C.y) < CAMP_RAD + 55) return true; return false; }   // props keep out of a camp's ground
+function dayCampState(i) { const D = S.day; let s = D.camps.get(i); if (!s) { s = { seen: 0, took: 0, up: 0 }; D.camps.set(i, s); } return s; }
+const dayRelics = () => dayCampList().filter(C => dayCampState(C.i).took).length;
+const dayCampLive = i => S.rg.enemies.some(e => !e.dead && e.ci === i);
+function dayCampsNear(x, y, R) { const out = []; for (const C of dayCampList()) if (Math.abs(C.x - x) < R + CAMP_RAD + 60 && Math.abs(C.y - y) < R + CAMP_RAD + 60) for (const o of C.parts) if (!(o.sub === 'relic' && dayCampState(C.i).took) && Math.abs(o.x - x) < R && Math.abs(o.y - y) < R) out.push(o); return out; }
+function dayCampStep(dt) {
+  const D = S.day, p = S.p;
+  for (const C of dayCampList()) {
+    const st = dayCampState(C.i), d = Math.hypot(C.x - p.x, C.y - p.y);
+    if (!st.seen && d < CAMP_NEAR) { st.seen = 1; exNote(C.nm, true); dayJLog(`found ${C.nm.toLowerCase()}`); sfx(0.8, 0.5, 'bandpass', 420, 0.25); }
+    if (st.took) continue;
+    if (d < CAMP_WAKE && !st.up && !dayCampLive(C.i)) {   // the watch gets up
+      st.up = 1;
+      for (let k = 0; k < C.n; k++) { const t = Math.random() * 6.3, r = 40 + Math.random() * CAMP_RAD;
+        spawnFoe(k ? exPickFoe(Math.min(2, exRing(C.d))) : C.cap, { x: C.x + Math.cos(t) * r, y: C.y + Math.sin(t) * r * 0.7, d: 400 });
+        const e = S.rg.enemies[S.rg.enemies.length - 1]; e.ci = C.i;
+        if (!k) { e.cap = 1; e.hp = e.maxHp = e.maxHp * 1.5; }
+      }
+      S.rg.ringMsg = { text: C.nm.replace(/^(A|The) /, ''), sub: `They have seen you · ${C.n} of them`, t: 0 }; playRingSting(); addShake(0.3);
+    } else if (d > CAMP_SLEEP && st.up) {            // walk away and the camp settles again
+      st.up = 0;
+      for (const e of S.rg.enemies) if (e.ci === C.i && !e.dead) e.gone = true;
+      S.rg.enemies = S.rg.enemies.filter(e => !e.gone);
+    }
+  }
+}
+function dayRelicTake(o) {
+  const D = S.day, C = dayCampAt(o.ci), st = dayCampState(o.ci);
+  if (dayCampLive(o.ci)) { dayNote('guard', 'the watch is still standing', 1.4); return; }
+  if (dayRoom(C.relic) <= 0) { dayNote('full', 'pack full', 1); return; }
+  st.took = 1; dayGive(C.relic, 1); dayAct(7, 0.6);
+  ashBurst(o.x, o.y, 14, 34); addShake(0.4); hitStop(0.07); playRingSting();
+  const n = dayRelics();
+  S.rg.ringMsg = { text: DIT[C.relic].n.toLowerCase(), sub: n < 4 ? `${n} of 4 · the signal fire needs all four` : 'All four · build the signal fire', t: 0 };
+  dayJLog(`took the ${DIT[C.relic].n.toLowerCase()}`); lifeAdd('relics'); dayChanged();
+}
+// ---- the heat: they learn where you live. Scouts come by day, and what gets away tells the rest ----
+function dayHeatStep(dt) {
+  const D = S.day, p = S.p, rg = S.rg;
+  if (dayNight() || rg.phase !== 'fight' || D.siege) { D.scout = null; return; }
+  if (D.scout) {
+    const e = D.scout;
+    if (e.dead || !rg.enemies.includes(e)) { D.scout = null; D.caught = (D.caught || 0) + 1; exNote('you caught the scout', true); dayJLog('caught a scout'); return; }
+    if ((e.scoutT -= dt) <= 0) {                    // it has seen enough and slips away
+      e.gone = true; rg.enemies = rg.enemies.filter(q => !q.gone); D.scout = null;
+      D.heat = Math.min(4, (D.heat || 0) + 1); D.away = (D.away || 0) + 1;
+      exNote('a scout got away', true); dayJLog('a scout got away · they will come heavier');
+      S.rg.ringMsg = { text: 'seen', sub: 'A scout got away · the next raid comes heavier', t: 0 }; playRingSting();
+      return;
+    }
+  } else if ((D.scoutT = (D.scoutT || 45) - dt) <= 0) {
+    D.scoutT = 70 + Math.random() * 40;
+    if (Math.hypot(p.x, p.y) < 200 || rg.enemies.length > 4) return;
+    exSpawn('stalker');
+    const e = rg.enemies[rg.enemies.length - 1]; if (!e) return;
+    e.scoutT = SCOUT_T; D.scout = e;
+    exNote('someone is watching the trees'); sfx(0.6, 0.6, 'bandpass', 300, 0.18);
+  }
+}
+function dayRaidSize() { const D = S.day; return Math.min(22, 3 + 2 * D.n + 2 * (D.heat || 0)); }
+// ---- the signal fire: four relics, a pyre at your camp, and one long night to live through ----
+function daySignalLight(B) {
+  const D = S.day;
+  if (D.siege) return;
+  B.lit = 1; D.siege = { t: 0, next: 3, n: 0 };
+  S.rg.ringMsg = { text: 'the fire is lit', sub: 'Everything is coming · stay by the fire until it burns out', t: 0 };
+  playRingSting(); addShake(0.6); hitStop(0.1);
+  if (actx) { const t = actx.currentTime; boomAt(t, 120, 50, 1.4, 0.6, sfxGain); noiseAt(t, 1800, 400, 1.2, 0.3, sfxGain); }
+  dayJLog('lit the signal fire'); daySave();
+}
+function daySiegeStep(dt) {
+  const D = S.day, G = D.siege, rg = S.rg; if (!G || rg.phase !== 'fight') return;
+  const fire = D.builds.find(B => B.t === 'signal' && B.lit);
+  G.far = fire ? Math.hypot(S.p.x - fire.x, S.p.y - fire.y) > SIEGE_R : false;
+  if (G.far) {                                    // leave the fire and it burns alone: the clock waits for you
+    if ((G.nag = (G.nag || 0) - dt) <= 0) { G.nag = 4; dayNote('backtofire', 'get back to the fire', 3); }
+    return;
+  }
+  G.t += dt;
+  if ((G.next -= dt) <= 0) {
+    const ring = Math.min(3, exRing(Math.hypot(S.p.x, S.p.y)) + 2), k = 2 + Math.floor(G.t / 45);   // they come heavier the longer it burns
+    for (let i = 0; i < k; i++) exSpawn(exPickFoe(ring));
+    G.n += k; G.next = Math.max(4, 10 - G.t / 18);
+    if (G.t > 10) exNote('more of them', true);
+  }
+  if (G.t >= SIEGE_T) dayWon();
+  else if (!G.half && G.t > SIEGE_T / 2) { G.half = 1; S.rg.ringMsg = { text: 'halfway', sub: 'The fire is seen for miles · keep standing', t: 0 }; playRingSting(); }
+}
+function dayWon() {
+  const D = S.day, rg = S.rg;
+  D.won = 1; D.siege = null; rg.phase = 'dead'; rg.deadT = 0;
+  craftBtn.hidden = true; hotbarEl.hidden = true; buildbarEl.hidden = true;
+  for (const e of rg.enemies) if (!e.dead) { e.dead = true; e.dieT = 0; ashBurst(e.x, e.y, 8, 30); }
+  dayClearSave(); lifeAdd('escaped');
+  const b = dayBest(); if (D.t > b.t) { D.best = 1; try { localStorage.setItem(DAY_KEY, JSON.stringify({ days: D.n, t: Math.round(D.t) })); } catch (e) {} }
+  addShake(0.8); if (actx) { const t = actx.currentTime; boomAt(t, 90, 40, 2.4, 0.7, sfxGain); }
+  S.msg = { text: 'You walked out', sub: `Day ${D.n} · ${dayClock(D.t)}`, t: 0 };
+}
+// ---- what you build against them: a torch post that burns whatever comes into its light, and an effigy the animals keep away from ----
+const dayPostsNear = (x, y, R = POST_R) => S.day ? S.day.builds.filter(B => B.t === 'tpost' && B.fuel > 0 && Math.hypot(B.x - x, B.y - y) < R) : [];
+const dayEffigyNear = (x, y) => S.day && S.day.builds.some(B => B.t === 'effigy' && Math.hypot(B.x - x, B.y - y) < EFFIGY_R);
+function dayPostStep(dt) {
+  const D = S.day;
+  for (const B of D.builds) {
+    if (B.t !== 'tpost') continue;
+    if (dayNight()) B.fuel = Math.max(0, B.fuel - dt);     // it only burns through the night it is lit
+    if (B.fuel <= 0) continue;
+    for (const e of S.rg.enemies) {
+      if (e.dead || Math.hypot(e.x - B.x, e.y - B.y) > POST_R) continue;
+      e.hp -= dt * 0.55; e.lit = true; e.flash = Math.max(e.flash || 0, 0.5);
+      if (Math.random() < dt * 3) ashBurst(e.x, e.y, 1, 24);
+      if (e.hp <= 0 && !e.dead) { e.dead = true; e.dieT = 0; S.rg.kills = (S.rg.kills || 0) + 1; ashBurst(e.x, e.y, 7, 28); }
+    }
+  }
+}
+function dayPostFeed(B) {                          // feed it sticks and it burns another night
+  const D = S.day, s = heldSlot();
+  if (!s || s.id !== 'sticks') { dayNote('fuel', 'sticks in your hand to feed it', 1.6); return; }
+  s.n--; if (!s.n) D.inv[D.hot] = null;
+  B.fuel = Math.min(DAY_LEN * 1.5, (B.fuel || 0) + DAY_LEN * 0.5); dayAct(7, 0.5);
+  ashBurst(B.x, B.y, 6, 40); sfx(1.1, 0.3, 'bandpass', 700, 0.25); exNote('the post burns brighter'); dayChanged();
+}
+// ---- the journal: everything the run has told you, in one place ----
+function dayJLog(text) { const D = S.day; if (!D.jlog) D.jlog = []; D.jlog.push({ d: D.n, t: Math.round(D.t % DAY_LEN), text }); if (D.jlog.length > 40) D.jlog.shift(); }
+function dayKillLog(k) { const D = S && S.day; if (!D) return; D.bag = D.bag || {}; D.bag[k] = (D.bag[k] || 0) + 1; }
+const dayBearing = (x, y) => ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(((Math.atan2(y, x) + Math.PI * 2.5) % (Math.PI * 2)) / (Math.PI / 4)) % 8];
+function dayJournal() {                            // [{ n, icon, rows: [[key, value, cls]] }]
+  const D = S.day, rg = S.rg, out = [];
+  const relics = dayCampList().map(C => {
+    const st = dayCampState(C.i), has = st.took;
+    return [DIT[C.relic].n, has ? 'in your pack or your chest' : st.seen ? `${C.nm.toLowerCase()} · ${Math.round(Math.hypot(C.x, C.y))} paces ${dayBearing(C.x, C.y)}` : `somewhere ${dayBearing(C.x, C.y)} · about ${Math.round(Math.hypot(C.x, C.y) / 100) * 100} paces out`, has ? 'good' : ''];
+  });
+  const sig = D.builds.some(B => B.t === 'signal');
+  out.push({ n: 'The way out', icon: 'signal', blurb: 'Four relics, a signal fire, and one night to live through.', rows: relics.concat([
+    ['Relics', `${dayRelics()} of 4`, dayRelics() === 4 ? 'good' : ''],
+    ['Signal fire', D.won ? 'lit · you walked out' : D.siege ? `burning · ${Math.max(0, Math.ceil(SIEGE_T - D.siege.t))}s to hold` : sig ? 'built · light it when you are ready' : dayRelics() === 4 ? 'you have all four · build it at a workbench' : 'needs all four relics'],
+  ]) });
+  out.push({ n: 'The run', icon: 'campfire', blurb: '', rows: [
+    ['Day', `${D.n} · ${dayClock(D.t)}`], ['Nights lived through', `${Math.max(0, D.n - 1)}`],
+    ['Deaths', `${D.deaths || 0}${D.bed ? '' : ' · no bed yet, so the next one ends it'}`],
+    ['Best run', (b => b.days ? `day ${b.days} · ${dayClock(b.t)}` : 'none yet')(dayBest())],
+  ] });
+  out.push({ n: 'The raiders', icon: 'spear2', blurb: 'They come with the dark, and a scout that gets away brings more.', rows: [
+    ['They are', HEAT_NAME[Math.min(4, D.heat || 0)], (D.heat || 0) > 1 ? 'bad' : ''],
+    ['Next raid', `about ${dayRaidSize()} of them`], ['Raids lived through', `${D.raids || 0}`],
+    ['Scouts', `${D.caught || 0} caught · ${D.away || 0} got away`, (D.away || 0) > (D.caught || 0) ? 'bad' : ''],
+    ['Killed', `${rg.kills || 0}`],
+  ] });
+  const bag = D.bag || {}, beasts = ['rabbit', 'deer', 'boar', 'wolf', 'bear'].filter(k => bag[k]);
+  out.push({ n: 'Creatures', icon: 'meat', blurb: beasts.length ? '' : 'Nothing hunted yet.', rows: beasts.map(k => [k[0].toUpperCase() + k.slice(1), `${bag[k]} taken · ${Object.entries(BEAST[k].drop).map(([i, n]) => `${n} ${DIT[i].n.toLowerCase()}`).join(', ')}`]).concat(D.beasts.some(b => b.tame && !b.dead) ? [['At your heel', 'a wolf of your own', 'good']] : []) });
+  out.push({ n: 'Found', icon: 'rope', blurb: '', rows: [
+    ['Recipes', `${D.known.size} of ${DREC.length}`], ['Things handled', `${D.seen.size} of ${Object.keys(DIT).length}`],
+    ['Built', `${D.builds.length} station${D.builds.length === 1 ? '' : 's'} · ${D.bld.size} piece${D.bld.size === 1 ? '' : 's'} of base`],
+  ] });
+  return out;
+}
+function dayJournalHtml() {
+  const D = S.day, el = pkEl, out = [], secs = dayJournal();
+  for (const sec of secs) {
+    const h = el('h3', '', sec.n); h.innerHTML = iconSvg(sec.icon) + `<em>${sec.n}</em>`; out.push(h);
+    if (sec.blurb) out.push(el('p', 'small none', sec.blurb));
+    const dl = document.createElement('dl'); dl.className = 'jdl';
+    for (const [k, v, c] of sec.rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; if (c) dd.className = c; dl.append(dt, dd); }
+    out.push(dl);
+  }
+  if ((D.jlog || []).length) {
+    out.push(el('h3', '', 'Lately'));
+    const ul = el('div', 'jlog');
+    for (const L of D.jlog.slice(-8).reverse()) { const r = el('p', '', L.text); r.prepend(el('b', '', `Day ${L.d}`)); ul.append(r); }
+    out.push(ul);
+  }
+  return out;
+}
+// ---- drawing the camps, the pyre, the posts and the effigy ----
+function dayDrawCamp(o, c, sx, sy) {
+  const C = (col, grey) => COLOUR ? col : grey;
+  if (o.sub === 'stake') {
+    isoBox(c, o.x, o.y, 0.3, 5, 5, 34 + o.seed * 10, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'));
+    if (o.skull) {
+      const [x, y] = toScreen(o.x, o.y), h = (34 + o.seed * 10) * Z;
+      c.fillStyle = C('#ded7c4', '#d2d2cc'); c.beginPath(); c.ellipse(x, y - h - 4 * Z, 5 * Z, 4.4 * Z, 0, 0, 7); c.fill();
+      c.fillStyle = '#20201c'; for (const d of [-1.9, 1.9]) { c.beginPath(); c.ellipse(x + d * Z, y - h - 4.6 * Z, 1.2 * Z, 1.5 * Z, 0, 0, 7); c.fill(); }
+      c.fillStyle = C('#ded7c4', '#d2d2cc'); c.fillRect(x - 2 * Z, y - h - 1.6 * Z, 4 * Z, 2.6 * Z);
+    }
+  } else if (o.sub === 'dirt') {                    // ground walked bare
+    const [x, y] = toScreen(o.x, o.y);
+    c.fillStyle = COLOUR ? 'rgba(58,46,32,0.5)' : 'rgba(52,52,48,0.5)';
+    c.beginPath(); c.ellipse(x, y, (14 + o.seed * 14) * Z, (8 + o.seed * 7) * Z, 0, 0, 7); c.fill();
+  } else if (o.sub === 'bones') {
+    const [x, y] = toScreen(o.x, o.y);
+    c.strokeStyle = C('#cfc8b4', '#c6c6c0'); c.lineWidth = 2 * Z; c.lineCap = 'round';
+    for (let k = 0; k < 3; k++) { const a = o.seed * 6 + k * 2.1; c.beginPath(); c.moveTo(x + Math.cos(a) * 6 * Z, y + Math.sin(a) * 3 * Z); c.lineTo(x - Math.cos(a) * 6 * Z, y - Math.sin(a) * 3 * Z); c.stroke(); }
+  } else if (o.sub === 'fire') {                    // long cold, just ash and black stones
+    const [x, y] = toScreen(o.x, o.y);
+    c.fillStyle = C('#3a352e', '#38383a'); c.beginPath(); c.ellipse(x, y, 16 * Z, 9 * Z, 0, 0, 7); c.fill();
+    c.fillStyle = C('#2a251f', '#2c2c2e'); for (let k = 0; k < 7; k++) { const a = k * 0.9 + o.seed; c.beginPath(); c.ellipse(x + Math.cos(a) * 14 * Z, y + Math.sin(a) * 8 * Z, 3.4 * Z, 2.4 * Z, 0, 0, 7); c.fill(); }
+  } else if (o.sub === 'tent') {                    // a hide stretched over two poles
+    const a = o.a, ux = Math.cos(a), uy = Math.sin(a);
+    isoBox(c, o.x - ux * 15, o.y - uy * 15, a, 4, 4, 30, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'));
+    isoBox(c, o.x + ux * 15, o.y + uy * 15, a, 4, 4, 30, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'));
+    const [bx, by] = toScreen(o.x - ux * 17, o.y - uy * 17), [tx, ty] = toScreen(o.x + ux * 17, o.y + uy * 17);
+    const [lx, ly] = toScreen(o.x - uy * 17, o.y + ux * 17), [rx, ry] = toScreen(o.x + uy * 17, o.y - ux * 17);
+    c.fillStyle = C('#7a6246', '#6e6e68'); c.beginPath(); c.moveTo(bx, by - 30 * Z); c.lineTo(tx, ty - 30 * Z); c.lineTo(rx, ry); c.closePath(); c.fill();
+    c.fillStyle = C('#5e4a34', '#565650'); c.beginPath(); c.moveTo(bx, by - 30 * Z); c.lineTo(tx, ty - 30 * Z); c.lineTo(lx, ly); c.closePath(); c.fill();
+  } else if (o.sub === 'relic') {                   // a cairn, a pole, and the thing itself held up where everyone can see it
+    isoBox(c, o.x, o.y, 0.4, 30, 26, 9, C('#6e6c67', '#67675f'), C('#54524e', '#4c4c48'), C('#403e3a', '#3a3a36'));
+    isoBox(c, o.x, o.y, 0.4, 20, 18, 13, C('#8e8c86', '#8a8a86'), C('#6e6c67', '#67675f'), C('#54524e', '#4c4c48'), 9);
+    isoBox(c, o.x, o.y, 0.2, 6, 6, 52, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'), 20);
+    const [x, y] = toScreen(o.x, o.y), bob = Math.sin(S.t * 1.6) * 1.6 * Z, R = dayCampAt(o.ci).relic, hy = y - 82 * Z + bob;
+    c.fillStyle = C('#7a6246', '#6e6e68');          // a hide hung off the pole, so it reads from a long way off
+    c.beginPath(); c.moveTo(x - 9 * Z, y - 62 * Z); c.lineTo(x + 9 * Z, y - 62 * Z); c.lineTo(x + 6 * Z, y - 40 * Z); c.lineTo(x - 6 * Z, y - 40 * Z); c.closePath(); c.fill();
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const g = c.createRadialGradient(x, hy, 0, x, hy, 46 * Z);
+    g.addColorStop(0, 'rgba(255,205,130,0.42)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(x, hy, 46 * Z, 0, 7); c.fill();
+    for (let i = 0; i < 3; i++) { const t = (S.t * 0.5 + i / 3) % 1; c.fillStyle = `rgba(255,210,140,${(1 - t) * 0.3})`; c.beginPath(); c.arc(x + Math.sin(t * 6 + i) * 6 * Z, hy - t * 40 * Z, (1.6 + t * 2) * Z, 0, 7); c.fill(); }
+    c.restore();
+    const img = iconImg(R);
+    if (img) c.drawImage(img, x - 13 * Z, hy - 13 * Z, 26 * Z, 26 * Z);
+    else { c.fillStyle = C(DIT[R].c, '#cfcfc8'); c.beginPath(); c.arc(x, hy, 8 * Z, 0, 7); c.fill(); }
+  }
+}
+function dayDrawWar(o, c, sx, sy) {
+  const C = (col, grey) => COLOUR ? col : grey, B = o.build;
+  if (o.sub === 'tpost') {
+    isoBox(c, o.x, o.y, 0.3, 6, 6, 46, C('#7a5232', '#6e6e67'), C('#5a3a20', '#56564f'), C('#40281a', '#3e3e3a'));
+    const [x, y] = toScreen(o.x, o.y), lit = B && B.fuel > 0;
+    c.fillStyle = C('#3a2c1c', '#3a3a36'); c.beginPath(); c.ellipse(x, y - 47 * Z, 7 * Z, 4 * Z, 0, 0, 7); c.fill();   // the basket
+    if (!lit) return;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) { const h = (13 + 6 * Math.sin(S.t * 7 + i * 2)) * Z;
+      c.fillStyle = ['rgba(255,120,40,0.7)', 'rgba(255,190,80,0.65)', 'rgba(255,245,200,0.6)'][i];
+      c.beginPath(); c.ellipse(x, y - (52 + i) * Z, (6 - i * 1.6) * Z, h * 0.5, 0, 0, 7); c.fill(); }
+    c.restore();
+  } else if (o.sub === 'effigy') {                  // a man of sticks and hide, hung with bones
+    isoBox(c, o.x, o.y, 0.2, 5, 5, 40, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'));
+    isoBox(c, o.x, o.y, Math.PI / 2 + 0.0001, 30, 4, 4, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'), 30);
+    const [x, y] = toScreen(o.x, o.y);
+    c.fillStyle = C('#8a6a48', '#76766f'); c.beginPath(); c.moveTo(x - 7 * Z, y - 40 * Z); c.lineTo(x + 7 * Z, y - 40 * Z); c.lineTo(x + 4 * Z, y - 22 * Z); c.lineTo(x - 4 * Z, y - 22 * Z); c.closePath(); c.fill();
+    c.fillStyle = C('#ded7c4', '#d2d2cc'); c.beginPath(); c.ellipse(x, y - 45 * Z, 5 * Z, 4.6 * Z, 0, 0, 7); c.fill();
+    c.fillStyle = '#20201c'; for (const d of [-1.9, 1.9]) { c.beginPath(); c.ellipse(x + d * Z, y - 45.6 * Z, 1.1 * Z, 1.4 * Z, 0, 0, 7); c.fill(); }
+    c.strokeStyle = C('#cfc8b4', '#c6c6c0'); c.lineWidth = 1.4 * Z;
+    for (const d of [-11, 11]) { const sw = Math.sin(S.t * 1.3 + d) * 1.6 * Z; c.beginPath(); c.moveTo(x + d * Z, y - 30 * Z); c.lineTo(x + d * Z + sw, y - 21 * Z); c.stroke(); }
+  } else if (o.sub === 'signal') {                  // a great pyre: logs stacked high, waiting for a flame
+    const lit = B && B.lit;
+    for (let k = 0; k < 5; k++) {                   // a great stack of logs, crossed layer on layer
+      const h = k * 11, w = 66 - k * 10;
+      isoBox(c, o.x, o.y, k % 2 ? 0.0001 : Math.PI / 2 + 0.0001, w, 11, 10, C(k % 2 ? '#7a5232' : '#8a6440', '#76766f'), C('#5a3a20', '#5e5e58'), C('#40281a', '#4a4a46'), h);
+    }
+    for (const [dx, dy] of [[-28, -22], [28, -22], [-28, 22], [28, 22]]) isoBox(c, o.x + dx, o.y + dy, 0.4, 6, 6, 62, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'));
+    const [x, y] = toScreen(o.x, o.y);
+    if (!lit) {
+      c.fillStyle = C('#4a3a26', '#44443f'); c.beginPath(); c.ellipse(x, y - 56 * Z, 20 * Z, 8 * Z, 0, 0, 7); c.fill();   // kindling on top, waiting
+      return;
+    }
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const G = S.day.siege, grow = G ? Math.min(1, 0.5 + G.t / SIEGE_T) : 1;
+    const gl = c.createRadialGradient(x, y - 70 * Z, 0, x, y - 70 * Z, 170 * Z);
+    gl.addColorStop(0, 'rgba(255,170,80,0.45)'); gl.addColorStop(1, 'rgba(255,140,60,0)');
+    c.fillStyle = gl; c.beginPath(); c.arc(x, y - 70 * Z, 170 * Z, 0, 7); c.fill();
+    for (let i = 0; i < 4; i++) { const h = (110 + 50 * Math.sin(S.t * 5 + i * 1.7)) * grow * Z;
+      c.fillStyle = ['rgba(255,90,30,0.62)', 'rgba(255,150,50,0.6)', 'rgba(255,210,110,0.55)', 'rgba(255,250,220,0.5)'][i];
+      c.beginPath(); c.ellipse(x, y - (56 + h * 0.42) * Z, (26 - i * 5.4) * grow * Z, h * 0.5, 0, 0, 7); c.fill(); }
+    for (let i = 0; i < 9; i++) { const t = (S.t * 0.22 + i / 9) % 1; c.fillStyle = `rgba(230,140,70,${(1 - t) * 0.22})`; c.beginPath(); c.arc(x + Math.sin(t * 5 + i) * 20 * Z, y - (150 + t * 220) * Z, (14 + t * 34) * Z, 0, 7); c.fill(); }
+    for (let i = 0; i < 10; i++) { const t = (S.t * 0.8 + i / 10) % 1, a = i * 1.7 + S.t * 0.4;   // sparks going up
+      c.fillStyle = `rgba(255,${160 + 60 * (1 - t)},90,${(1 - t) * 0.7})`; c.beginPath(); c.arc(x + Math.sin(a) * (10 + t * 34) * Z, y - (60 + t * 190) * Z, (1.4 - t) * 1.6 * Z, 0, 7); c.fill(); }
+    c.restore();
+  }
+}
+function drawSiege() {                             // while the signal fire burns: how long you still have to stand
+  const D = S && S.day, G = D && D.siege; if (!G || !S.rg || S.rg.phase !== 'fight') return;
+  const left = Math.max(0, SIEGE_T - G.t), f = 1 - left / SIEGE_T;
+  const w = Math.min(300, W * 0.6) * DPR, x = W * DPR / 2 - w / 2, y = (SAFE_TOP + 96) * DPR, h = 5 * DPR;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x - DPR, y - DPR, w + 2 * DPR, h + 2 * DPR);
+  ctx.fillStyle = 'rgba(239,239,234,0.16)'; ctx.fillRect(x, y, w, h);
+  const g = ctx.createLinearGradient(x, y, x + w, y);
+  g.addColorStop(0, 'rgba(255,138,60,0.95)'); g.addColorStop(1, 'rgba(255,230,160,0.95)');
+  ctx.fillStyle = g; ctx.fillRect(x, y, Math.max(2 * DPR, w * f), h);
+  ctx.font = `600 ${11 * DPR}px "IBM Plex Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = G.far ? `rgba(240,160,110,${0.6 + 0.4 * Math.sin(S.t * 7)})` : `rgba(239,239,234,${0.75 + 0.25 * Math.sin(S.t * 4)})`;
+  ctx.fillText(G.far ? 'BACK TO THE FIRE' : `HOLD OUT · ${Math.ceil(left)}S`, W * DPR / 2, y + h + 6 * DPR);
+  ctx.restore();
 }
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
@@ -10555,7 +10935,7 @@ function exDeath() {
 const deathCard = document.getElementById('deathCard');
 function showDeathCard() {                    // what the dark took, and how far you got, before you wake by the fire
   const rg = S.rg, L = rg.lost || {}; rg.cardShown = true; S.msg = null;
-  deathCard.querySelector('.eyebrow').textContent = S.day ? 'Daylight' : 'Expedition'; deathCard.querySelector('h2').textContent = S.day ? (S.day.cause === 'starved' ? 'You starved' : 'The woods took you') : 'The dark took you'; document.getElementById('dcGo').textContent = S.day ? 'Try again' : 'Back to the fire';
+  deathCard.querySelector('.eyebrow').textContent = S.day ? 'Daylight' : 'Expedition'; deathCard.querySelector('h2').textContent = S.day ? (S.day.won ? 'You walked out of the woods' : S.day.cause === 'starved' ? 'You starved' : 'The woods took you') : 'The dark took you'; document.getElementById('dcGo').textContent = S.day ? (S.day.won ? 'Again' : 'Try again') : 'Back to the fire';
   if (S.day) return dayCard();
   const rows = [];
   const lostBits = [L.embers ? `${L.embers} embers of loot` : '', L.wisps ? `${L.wisps} wisp${L.wisps > 1 ? 's' : ''}` : '', L.orb].filter(Boolean);
