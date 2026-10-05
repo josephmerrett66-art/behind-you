@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 162</p>
+      <p class="small" id="verLbl">Version 163</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7621,7 +7621,7 @@ function dayUseTarget() {                        // the nearest thing in reach y
   for (const f of D.drops) { const d = dist2(f, p); if (d < bd) { bd = d; best = f; } }
   for (const o of dayNodesNear(p.x, p.y, 60)) if ((o.t === 'sticks' || o.t === 'stones' || o.t === 'shroom') && !o.gone) { const d = dist2(o, p); if (d < bd) { bd = d; best = o; } }
   for (const c of exChestsNear(p.x, p.y, 60)) if (!S.rg.looted.has(c.key)) { const d = dist2(c, p) - 8; if (d < bd) { bd = d; best = c; } }
-  for (const B of D.builds) if (B.t === 'chest' || B.t === 'plot' || B.t === 'signal' || B.t === 'tpost') { const d = dist2(B, p) - (B.t === 'plot' ? 22 : B.t === 'signal' ? 24 : 12); if (d < bd) { bd = d; best = B; } }
+  for (const B of D.builds) if (B.t === 'chest' || B.t === 'plot' || B.t === 'signal' || B.t === 'tpost' || STN_N[B.t]) { const d = dist2(B, p) - (B.t === 'plot' ? 22 : B.t === 'signal' ? 24 : STN_N[B.t] ? 16 : 12); if (d < bd) { bd = d; best = B; } }   // v163: stations too
   for (const o of dayCampsNear(p.x, p.y, 70)) if (o.sub === 'relic') { const d = dist2(o, p) - 12; if (d < bd) { bd = d; best = o; } }   // v155: the relic on its cairn
   { const P = lakeAt(p.x, p.y, 30); if (P && (D.water < FOOD_MAX - 2 || D.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS))) { const d = Math.max(0, Math.hypot(P.x - p.x, P.y - p.y) - P.rad); if (d < bd) { bd = d; best = P; } } }
   if (S.rg.inCamp) {
@@ -7630,7 +7630,14 @@ function dayUseTarget() {                        // the nearest thing in reach y
   }
   return best;
 }
-const useLabel = o => o.kind === 'dcamp' ? (dayCampLive(o.ci) ? 'Guarded' : 'Take') : o.t === 'signal' ? (S.day.siege ? 'Burning' : 'Light it') : o.t === 'tpost' ? 'Feed' : o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
+const STN_N = { bench: 'Workbench', furnace: 'Furnace', rack: 'Drying rack', fire: 'Fire' };   // v163: walk up to a station and Use opens its recipes
+const useLabel = o => STN_N[o.t] ? 'Use' : o.kind === 'dcamp' ? (dayCampLive(o.ci) ? 'Guarded' : 'Take') : o.t === 'signal' ? (S.day.siege ? 'Burning' : 'Light it') : o.t === 'tpost' ? 'Feed' : o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
+function openStation(t) {                         // v163: the craft tab, opened on what this station makes (ready ones first)
+  const D = S.day, at = t === 'fire' ? 'fire' : t, known = DREC.filter(r => D.known.has(r.id) && r.at === at);
+  const pick = known.find(r => canCraft(r) === true) || known[0];
+  PK.tab = 'craft'; PK.open = null; if (pick) PK.cat = pick.g;
+  openCraft();
+}
 function dayUse() {
   const D = S.day, rg = S.rg; if (!D || !rg || rg.phase !== 'fight' || !S.running) return;
   if (dayTameTry()) return;                     // v154: meat in your hand and a wolf in front of you
@@ -7642,6 +7649,7 @@ function dayUse() {
   if (o.t === 'signal') { if (!S.day.siege) daySignalLight(o); else dayNote('burning', 'it is already burning', 2); return; }
   if (o.t === 'tpost') { dayPostFeed(o); return; }
   if (o === CAMP_BOX || o.t === 'chest') { openCraft(o); return; }
+  if (STN_N[o.t]) { openStation(o.t); return; }   // v163
   dayAct(7, 0.42); S.p.vx *= 0.3; S.p.vy *= 0.3;
   if (o.kind === 'dday') { const got = dayGive(o.it, o.n, o.x, o.y, true, o.ex); if (got) { exNote(`+${got} ${DIT[o.it].n.toLowerCase()}`); pickSnd(); } o.n -= got; if (o.n <= 0) o.gone = true; D.drops = D.drops.filter(f => !f.gone); }
   else if (o.kind === 'dnode') { const it = o.t === 'shroom' ? 'mushroom' : o.t; if (dayRoom(it) <= 0) return dayNote('full', 'pack full', 1); o.gone = true; dayGive(it, o.n); pickSnd(); }
@@ -8059,7 +8067,7 @@ function dayBar(px, py) {                      // stamina, food and water over y
   if (D.warm < 92 || dayNight()) bar(x0, y0 + 6, tw, D.warm / WARM_MAX, 'rgba(150,200,215,0.9)', D.warm < 30);
   const say = D.bleed > 0 ? 'BLEEDING' : D.warm <= 0 ? 'FREEZING' : D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.warm < 30 ? 'COLD' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : '';
   drawPickHints(px, py);   // v156
-  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); } }
+  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (STN_N[o.t] ? ' ' + STN_N[o.t].toUpperCase() : o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); } }
   { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
   if (say) { ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)'; ctx.fillText(say, px, y0 - 9); }
 }
