@@ -419,7 +419,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 142</p>
+      <p class="small" id="verLbl">Version 143</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1497,7 +1497,7 @@ function dodge() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall) return;
   const p = S.p; if ((p.roll || 0) > 0) return;
   if (S.rg.drink) return;                        // v123: mid-drink you're committed
-  if (p.atk && ATK[p.atk.i].slam) { p.atk.rollQ = true; return; }   // v123: once you leap for the slam you land it; the roll comes out after
+  if (p.atk && !p.atk.wd && ATK[p.atk.i].slam) { p.atk.rollQ = true; return; }   // v123: once you leap for the slam you land it; the roll comes out after
   let burn = false;
   if (S.day && !dayStam(STA_ROLL)) return;   // v128: Daylight rolls cost stamina, not charges
   if (isEx() && !S.day) {
@@ -1520,6 +1520,7 @@ function dodge() {
   if (lv('nova') && S.rg.nova >= 12) { S.rg.nova = 0; lightBurst(p.x, p.y, 230, 0.85, 'white'); hitStop(0.06); }
   for (let i = 0; i < 6; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: -Math.cos(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vy: -Math.sin(a) * (30 + Math.random() * 40) + (Math.random() - 0.5) * 40, vz: 20 + Math.random() * 30, life: 0.4 + Math.random() * 0.3 });
   if (actx && noiseBuf) { const t = actx.currentTime; noiseAt(t, 3500, 500, 0.28, 0.4, sfxGain); }
+  if (wpOn() && curW() === 'lance') wpDecoy();   // v143: the Mirror Lance leaves a copy of you where you rolled from
   dodgeBtn.dataset.cool = '1';
 }
 // ---- attacks: swing the torch like a blade, Hades-style. Two leaping slashes, then a jump into the air and a slam that sends out a shockwave;
@@ -1535,9 +1536,11 @@ function attack() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight') return;
   if (S.rg.drink) return;                      // v123: drinking
   if (wpOn() && S.rg.wax) { wpRecall(); return; }   // v141: the axe is out: attack calls it back
+  if (wpOn() && S.rg.worb) { wpOrbitEnd(); return; }   // v143: the glaive is circling: attack catches it
+  if (wpOn() && S.rg.wgrab) return;
   if (S.p.wact && S.p.wact.fn && !S.p.wact.done) return;
   const p = S.p, A = p.atk;
-  if (A && A.t < A.dur) { A.queued = true; return; }   // mid-swing: buffer it, the next one comes out the moment this one ends
+  if (A && A.t < A.dur) { A.queued = true; if (A.wd && ARMS[A.w] && ARMS[A.w].beat) A.onBeat = (A.dur - A.t) / (A.sp || 1) < 0.14; return; }   // v143: the Dervish's dance: pressed right as the step ends is on the beat   // mid-swing: buffer it, the next one comes out the moment this one ends
   if (S.day && S.day.st < STA_SWING) { dayStam(STA_SWING); return; }   // v128: spent
   startSwing();
 }
@@ -1552,7 +1555,7 @@ function startSwing() {
   if ((p.roll || 0) > 0 || (p.rollEnd || 0) > 0) i = 3;   // out of a roll: the dash strike
   else if (prev && S.t - prev.end < ATK_CHAIN && prev.i < 2) i = prev.i + 1;
   const tov = S.day && TOOL_SWING[S.day.sel] && i !== 3 ? TOOL_SWING[S.day.sel] : null; if (tov) i = 0;   // v133: a tool swings its own way, one stroke at a time
-  const WA = !tov && wpOn() && curW() !== 'torch' ? ARMS[curW()].atk : null; if (WA) return wpSwing(i, WA[i]);   // v141: a boss weapon swings its own way
+  if (!tov && wpOn() && curW() !== 'torch') return wpStart(i === 3);   // v141: a boss weapon swings its own way
   const D = ATK[i], a = S.aimW !== undefined ? S.aimW : 0;
   if (S.day) { S.day.st = Math.max(0, S.day.st - (D.slam ? STA_SLAM : STA_SWING)); S.day.stT = 0; }
   if (i === 3) p.roll = 0;                        // the roll turns into the thrust
@@ -3239,7 +3242,11 @@ function atkPose(p) {                              // the pose to draw, and how 
 const KITC = { jacket: mat(0.95, 1.2, 0.72, 1.7), pants: mat(1.3, 1.18, 0.88, 1.7), pad: mat(1, 1, 0.95, 1.2), boot: mat(1.45, 1.0, 0.68, 1.6), sole: mat(1.1, 1, 0.9),
   glove: mat(1.3, 1.05, 0.8, 1.4), canvas: mat(1.32, 1.16, 0.82, 1.6), roll: mat(1.9, 0.8, 0.62, 1.5), strap: mat(1.2, 1.05, 0.85, 1.25), rig: mat(1.35, 1.17, 0.86, 1.55),
   skin: mat(1.5, 1.12, 0.9, 1.9), scarf: mat(2.0, 0.72, 0.52, 1.6), hat: mat(1.12, 1.15, 0.8, 1.55), hair: mat(1.35, 1.0, 0.75, 1.1) };   // v124: the survivor's kit in colour
-function drawPlayer() {
+function drawPlayer() {                           // v143: hidden under the sand, or a shimmer while vanished
+  const v = wpVeil(); if (v <= 0) return; if (v >= 1) return drawPlayer0();
+  ctx.save(); ctx.globalAlpha *= v; drawPlayer0(); ctx.restore();
+}
+function drawPlayer0() {
   const p = S.p, [bx, by0] = toScreen(p.x, p.y), by = by0 - (p.hopZ || 0) * Z;   // up off the ground mid-leap
   const RU = S.rollGU ?? rollU(), AIM = S.aimR ?? S.aim;   // v142: mid-roll (or an after-image of one)
   let RL = null;
@@ -3295,7 +3302,7 @@ function drawPlayer() {
   let rEl = [rSh[0] + 4, 5.2, shH - 6.5 + sway], rHa = [rSh[0] + 9.5, 3.6, shH - 7.5 + sway];
   let tipL = [rHa[0] + 6, 3.4, rHa[2] - 1.2];
   const tip0 = tipL;                               // where the lens sits at rest: the beam keeps coming from there
-  if (wpHand() === 'axe') { rHa = [rSh[0] + 3, 4.2, shH - 5]; rEl = [rSh[0] + 1.5, 6.4, shH - 9.5]; tipL = [rHa[0] - 4, rHa[1] + 0.6, rHa[2] + 5]; }   // v141: the axe rides on the shoulder
+  { const wh0 = wpHand(); if (wh0 && WREST[wh0]) { [rHa, rEl, tipL] = WREST[wh0](rSh[0], shH); if (wh0 === 'fists') { lHa = [lSh[0] + 7, -2.8, shH - 4]; lEl = [lSh[0] + 2, -6, shH - 9]; } } }   // v141: each weapon sits its own way between blows
   if (AP) {                                        // the torch hand swings round the body on its arc; the elbow follows, bent out
     const add = (q, d) => [q[0] + d[0], q[1] + d[1], q[2] + d[2]], mix3 = (q0, q1, f) => [q0[0] + (q1[0] - q0[0]) * f, q0[1] + (q1[1] - q0[1]) * f, q0[2] + (q1[2] - q0[2]) * f];
     const hand = add(rSh, [Math.cos(AP.a) * AP.R, Math.sin(AP.a) * AP.R - 1.8, AP.h]);
@@ -3341,22 +3348,23 @@ function drawPlayer() {
   const drawFreeArm = near => {
     line([lSh, lEl], near ? 3.9 : 3.7, G(36, near, 'jacket')); line([lEl, lHa], near ? 3.5 : 3.3, G(33, near, 'jacket'));
     detail([mid(lEl, lHa, 0.78), mid(lEl, lHa, 0.86)], 3.8, G(44, near, 'jacket'));                // cuff
-    if (!OUT) { const [x, y] = P(...lHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }   // glove
+    if (wpHand() === 'fists') { const [x, y] = P(...lHa); wpFist(x, y, a, OUT); }   // v143: the other gauntlet
+    else if (!OUT) { const [x, y] = P(...lHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }   // glove
   };
   const drawTorchArm = near => {
     line([rSh, rEl], near ? 3.9 : 3.7, G(36, near, 'jacket')); line([rEl, rHa], near ? 3.5 : 3.3, G(33, near, 'jacket'));
     detail([mid(rEl, rHa, 0.78), mid(rEl, rHa, 0.86)], 3.8, G(44, near, 'jacket'));
     const wh = wpHand();
-    if (S.day) dayHeld(P, rHa, tipL, near, OUT); else if (wh === 'axe') wpHeldAxe(P, rHa, tipL, near, OUT); else if (!wh) {   // v133: in Daylight you hold a tool, not the torch; v141: or a boss weapon
+    if (S.day) dayHeld(P, rHa, tipL, near, OUT); else if (wh && wh !== 'none') wpHeld(wh, P, rHa, tipL, near, OUT, lHa); else if (!wh) {   // v133: in Daylight you hold a tool, not the torch; v141: or a boss weapon
     line([[rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL], 3.4, '#2f2f2d');                 // a dented service torch
     detail([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.3), mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.55)], 3.6, '#454542');   // grip
     line([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.85), tipL], 4.2, '#3a3a37', 'butt');   // head of the torch
     }
-    if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
+    if (!OUT && wh !== 'fists') { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
     const [tx, ty] = P(...tipL);
     if (!OUT && !S.day && !wh) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
     S.tip = AP && !RL ? P(...tip0) : [tx, ty];   // v142: mid-roll the light comes from the torch wherever it is           // mid-blow the beam stays put; the torch itself goes where the swing takes it
-    S.tipNow = wh === 'axe' && S.wpHead ? S.wpHead : [tx, ty];
+    S.tipNow = wh && wh !== 'none' && S.wpHead ? S.wpHead : [tx, ty];
   };
   const lt = lean * 0.5;
   // rucksack on the back, a rolled bedroll strapped across the top
@@ -3441,7 +3449,7 @@ function drawPlayer() {
       for (let i = 1; i < T.length; i++) {
         const k = 1 - (S.t - T[i][2]) / 0.16;
         if (S.day) { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = `rgba(250,248,240,${0.32 * k})`; ctx.lineWidth = (1 + 4 * k) * Z; ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke(); continue; }   // v133: a plain swish in daylight, no torch glow
-        if (wpHand() === 'axe') { if (Math.hypot(T[i][0] - T[i - 1][0], T[i][1] - T[i - 1][1]) < 1) continue; ctx.strokeStyle = `rgba(190,205,230,${0.5 * k})`; ctx.lineWidth = (2 + 10 * k) * Z; ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke(); ctx.strokeStyle = `rgba(255,255,255,${0.75 * k})`; ctx.lineWidth = (0.6 + 2 * k) * Z; ctx.stroke(); continue; }   // v141: a steel streak
+        if (wpHand() && wpHand() !== 'none') { const TC = ARMS[curW()].trail || ['190,205,230', '255,255,255']; if (Math.hypot(T[i][0] - T[i - 1][0], T[i][1] - T[i - 1][1]) < 1) continue; ctx.strokeStyle = `rgba(${TC[0]},${0.5 * k})`; ctx.lineWidth = (2 + 10 * k) * Z; ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke(); ctx.strokeStyle = `rgba(${TC[1]},${0.75 * k})`; ctx.lineWidth = (0.6 + 2 * k) * Z; ctx.stroke(); continue; }   // v141: a steel streak
         ctx.strokeStyle = `rgba(255,190,120,${0.7 * k})`; ctx.lineWidth = (1.5 + 6 * k) * Z;
         ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke();
         ctx.strokeStyle = `rgba(255,250,240,${0.7 * k})`; ctx.lineWidth = (0.5 + 1.6 * k) * Z; ctx.stroke();
@@ -4608,7 +4616,7 @@ function hurt(e) {
     shove(e, 90); playClang();
     return;
   }
-  const dmgH = (isEx() && e && (e.type === 'half' || (e.type === 'shade' && !exDeep())) ? 0.5 : 1) * (pact('half') ? 0.5 : 1) * (dune ? DUNE_HIT : 1);   // Half Life halves every hit   // Expedition's basic shades take half a heart
+  const dmgH = (isEx() && e && (e.type === 'half' || (e.type === 'shade' && !exDeep())) ? 0.5 : 1) * (pact('half') ? 0.5 : 1) * (dune ? DUNE_HIT : 1) * (S.mode === 'expedition' ? wpGuard() : 1);   // v143: in your lamp's light every hit is halved   // Half Life halves every hit   // Expedition's basic shades take half a heart
   lifeAdd('hearts', Math.min(rg.hp, dmgH)); rg.hp = Math.max(0, rg.hp - dmgH); rg.inv = (1.2 + 0.15 * sr('steady')) * (dune ? DUNE_INV : 1) * (exDeep() ? EX_INV : 1); rg.hurtFx = dmgH < 1 ? 0.6 : 1;
   rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };   // a heart cracked in half, or the one that just went
   if (lv('coat')) { lightBurst(S.p.x, S.p.y, 150 + 20 * lv('coat'), 0.5, 'white'); if (isEx() && lv('coat') > 2) for (const o of rg.enemies) if (dist2(o, S.p) < 150 + 20 * lv('coat')) o.frozen = 2.5; }   // Thick Coat 3: the flash freezes
@@ -4684,7 +4692,7 @@ const STK_PTS = { shade: 10, stalker: 10, kamikaze: 5, splitling: 5, splitter: 2
 const STK_COL = { shade: '236,226,210', stalker: '196,160,235', brute: '226,170,120', bomber: '255,90,70' };   // what each kind's points look like: its own colour (the rest: their eyes)
 const stkCol = t => STK_COL[t] || EYES[t] || '236,226,210';
 const STK_HIT_T = 0.35, STK_BOSS_WIN = 4, STK_WISP = 150, STK_BLOW = 15;
-const STK_BONUS = { cleave: ['CLEAVE', 25], timber: ['TIMBER', 40], bulldoze: ['BULLDOZE', 25], boomerang: ['BOOMERANG', 30], double: ['DOUBLE', 20], triple: ['TRIPLE', 60], multi: ['MULTI', 150], slam: ['SLAM', 25], skewer: ['SKEWER', 25], burnout: ['BURNOUT', 10],
+const STK_BONUS = { yank: ['YANKED', 30], swingby: ['SWING BY', 25], volley: ['VOLLEY', 25], vault: ['VAULT', 25], backstab: ['BACKSTAB', 60], blink: ['BLINK', 25], flurry: ['FLURRY', 25], homerun: ['HOME RUN', 35], roots: ['ROOTED', 30], whirlwind: ['WHIRLWIND', 30], orbit: ['ORBIT', 30], spin: ['SPIN', 20], uppercut: ['UPPERCUT', 30], erupt: ['ERUPT', 30], hurl: ['HURLED', 40], lunge: ['PIERCE', 25], ricochet: ['RICOCHET', 40], echo: ['ECHO', 30], cleave: ['CLEAVE', 25], timber: ['TIMBER', 40], bulldoze: ['BULLDOZE', 25], boomerang: ['BOOMERANG', 30], double: ['DOUBLE', 20], triple: ['TRIPLE', 60], multi: ['MULTI', 150], slam: ['SLAM', 25], skewer: ['SKEWER', 25], burnout: ['BURNOUT', 10],
   near: ['NEAR MISS', 40], revenge: ['REVENGE', 50], pack: ['PACK DOWN', 100], ff: ['FRIENDLY FIRE', 60], last: ['LAST LIGHT', 0], untouched: ['UNTOUCHED', 300],
   punish: ['PUNISH', 100], nohit: ['NO HIT', 2000], boss: ['BOSS DOWN', 0] };
 let STK_MODE = 'full'; try { STK_MODE = localStorage.getItem('behind-you-streak') || 'full'; } catch (e) {} if (!['full', 'quiet', 'off'].includes(STK_MODE)) STK_MODE = 'full';   // Settings > Look: full, quiet or off
@@ -4735,7 +4743,7 @@ function stkKill(e) {                             // called from killFoe: every 
   const k = rg.stk, src = e.kHitT !== undefined && S.t - e.kHitT < 0.5 ? e.kHit : 'beam';
   if (!k.burst || S.t - k.burst.t0 > 0.2) k.burst = { t0: S.t, n: 1 };
   else { k.burst.n++; const n = k.burst.n; if (n === 2) stkWord('double'); else if (n === 3) stkWord('triple', 40); else if (n === 4) stkWord('multi', 90); }
-  if (src === 'slam') stkWord('slam'); else if (src === 'dash') stkWord('skewer'); else if (src === 'ff') stkWord('ff'); else if (['cleave', 'timber', 'bulldoze', 'boomerang'].includes(src)) stkWord(src);
+  if (src === 'slam') stkWord('slam'); else if (src === 'dash') stkWord('skewer'); else if (src === 'ff') stkWord('ff'); else if (['cleave', 'timber', 'bulldoze', 'boomerang', 'yank', 'swingby', 'volley', 'vault', 'backstab', 'blink', 'flurry', 'homerun', 'roots', 'whirlwind', 'orbit', 'spin', 'uppercut', 'erupt', 'hurl', 'lunge', 'ricochet', 'echo'].includes(src)) stkWord(src);
   else if (src === 'beam' && !e.swung) stkWord('burnout');
   if (S.t - k.near < 1) { k.near = -9; stkWord('near'); }
   if (k.foe === e && S.t - k.foeT < 3) { k.foe = null; stkWord('revenge'); }
@@ -5433,7 +5441,7 @@ function updateSurvive(dt) {
     if (rg.fires.some(fi => fi.freeze && Math.abs(fi.x - e.x) < 60 && dist2(fi, e) < fi.r + f.w * 0.4)) e.frozen = Math.max(e.frozen || 0, 2);
     e.frozen = Math.max(0, (e.frozen || 0) - dt);
     const safe = S.mode === 'expedition' ? exSafeAt(e.x, e.y, 30) : null, campLit = !!safe;   // camp and outposts freeze and burn anything at their edge
-    const exLit = S.mode === 'expedition' && ((rg.recall && d < 60 + 50 * Math.min(1, rg.recall.t)) || rg.lamps.some(l => Math.abs(l.x - e.x) < 42 && dist2(l, e) < 42));
+    const exLit = S.mode === 'expedition' && ((rg.recall && d < 60 + 50 * Math.min(1, rg.recall.t)) || rg.lamps.some(l => Math.abs(l.x - e.x) < 42 && dist2(l, e) < 42) || (rg.wlamps && rg.wlamps.some(l => dist2(l, e) < 60)));
     const worldLit = campLit || exLit || (hr && d < hr) || e.flare || inFire || e.frozen > 0 || rg.candles.some(c => dist2(c, e) < 55);
     e.lit = e.beam > 0 || !!worldLit;
     let dmg = 0;
@@ -5474,8 +5482,10 @@ function updateSurvive(dt) {
     if (S.mode === 'expedition' && !inBeyond()) { const k = EX_PACE[exRing(Math.hypot(S.p.x, S.p.y))]; sp = e.type === 'kamikaze' ? sp * k : Math.min(sp * k, Math.max(sp, EX_PACE_MAX)); }   // v122: deeper woods, quicker hunters (never quite your sprint)
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
+    const LU = S.mode === 'expedition' && wpLure(e), px0 = p.x, py0 = p.y; if (LU) { p.x = LU.x; p.y = LU.y; }   // v143: drawn off you to a lamp, a decoy, or where you vanished
     if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
     else chase(e, sp, d, dt);
+    if (LU) { p.x = px0; p.y = py0; }
     for (const o of propsNear(e.x, e.y, 40).concat(daySolidsNear(e.x, e.y, 40))) {
       const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy), min = o.r * o.s + f.w * 0.5;
       if (od < min && od > 0) { e.x = o.x + ox / od * min; e.y = o.y + oy / od * min; }
@@ -5546,7 +5556,7 @@ function cutSurviveLights(bx, by, br) {
     if (e.type === 'kamikaze' && e.ai === 'fuse') hole(e.x, e.y, 45, 0.5 + 0.3 * Math.sin(S.t * 40));
   }
   for (const w of rg.wisps || []) hole(w.x, w.y, 30, 0.45 * Math.min(1, w.life / 1.5), 0);
-  if (S.mode === 'expedition') { exHoles(hole); srchHoles(hole); }   // v135 trial: the searchers' beams
+  if (S.mode === 'expedition') { exHoles(hole); srchHoles(hole); wpHoles(hole); }   // v135 trial: the searchers' beams
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 function surviveLight(bx, by, br, casters, lx, ly) {
@@ -7641,36 +7651,12 @@ function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the t
 }
 // ---- v141 TRIAL (Joe, after Hades): boss weapons. Beat a boss and take its weapon; each one fights its own way, with its own
 // combo, dash strike, special, body animation, sound and feel. You carry two and swap between them (the swap is a move too).
-// Settings > Trial > Weapons turns it off, and then you fight with the torch exactly as before. Step 1: the system, and the
-// Woodcutter's Felling Axe: slow, huge chops, a whirl into an overhead cleave, a shoulder charge, and a throw that fells trees.
+// Settings > Trial > Weapons turns it off, and then you fight with the torch exactly as before. v141: the system and the Felling Axe.
+// v143: the other seven. Each steals its boss's signature rule: the Lamplighter's lamps, the Twins' two ranges, the Huntsman's
+// vanishing, the Woodwarden's roots, the Dervish's dance, the Buried King's sand and grip, the Mirage's copies.
 let WP_ON = true; try { WP_ON = localStorage.getItem('behind-you-weapons') !== 'off'; } catch (e) {}
 const wpOn = () => WP_ON && !!S && S.mode === 'expedition' && !S.day && !!XS && !!S.rg;
 const AXP = POSES.length;                         // the weapons' poses go on the end of the table
-const ARMS = {
-  torch: { name: 'Torch', col: '255,200,130', spName: 'Flare', spCool: 7, short: 'Quick cuts, a leaping slam · Flare',
-    desc: 'Your old torch. Two quick cuts, then a leap and a slam that hits all round. Out of a roll, a lunging thrust. Special: Flare, a blinding flash down the beam that freezes everything in it.' },
-  axe: { name: 'Felling Axe', col: '255,150,90', boss: 'woodcutter', bossName: 'Woodcutter', spName: 'Throw', spCool: 3.2, short: 'Huge slow chops · throw it to fell trees',
-    desc: 'The Woodcutter\'s axe. Two heavy chops that knock them flat, then a whirl that ends in an overhead cleave. Out of a roll, a shoulder charge that sends them flying. Special: Throw. It cuts on the way out and back, and if it bites a tree, the tree comes down on whatever is beyond it. Attack while it\'s out to call it back.',
-    atk: [
-      { reach: 78, arc: 1.9, lunge: 30, moveT: [0.16, 0.27], hop: 0, dur: 0.46, hitAt: 0.25, dmg: 1.0, boss: 1.7, knock: 36, shake: 0.32, stop: 0.09, kick: 12, pose: AXP, crack: 1 },
-      { reach: 82, arc: 2.4, lunge: 34, moveT: [0.15, 0.26], hop: 0, dur: 0.46, hitAt: 0.24, dmg: 1.0, boss: 1.7, knock: 44, shake: 0.3, stop: 0.09, kick: 12, pose: AXP + 1 },
-      { dur: 0.82, pose: AXP + 2, lunge: 70, moveT: [0.33, 0.44], hopT: [0.33, 0.44], hop: 26, hits: [
-        { at: 0.25, reach: 88, arc: 7, round: 1, dmg: 0.9, boss: 1.4, knock: 48, shake: 0.24, stop: 0.05, kick: 5 },
-        { at: 0.44, reach: 150, arc: 0.62, dmg: 2.3, boss: 3.6, knock: 72, shake: 0.7, stop: 0.15, kick: 18, kh: 'cleave', cleave: 1 }] },
-      { dur: 0.36, pose: AXP + 3, charge: 1, lunge: 175, moveT: [0.03, 0.26], reach: 30, arc: 7, round: 1, dmg: 0.8, boss: 1.3, knock: 95, shake: 0.35, stop: 0.07, kick: 14, kh: 'bulldoze' },
-    ] },
-};
-const wpOwn = id => id === 'torch' || (!!ARMS[id] && !!XS && !!XS.lairs && XS.lairs.some(L => L.id === ARMS[id].boss && L.beat));
-const curW = () => wpOn() ? (XS.wsel && XS.wsel[XS.wcur | 0]) || 'torch' : 'torch';
-const wpHand = () => { if (!wpOn()) return null; const w = curW(); return w === 'torch' ? null : S.rg.wax ? 'none' : w; };   // what's in the torch hand instead of the torch
-function wpInit() {                               // every trip: the loadout is sound, and a weapon won earlier shows up on your back
-  if (!XS) return;
-  if (!Array.isArray(XS.wsel)) XS.wsel = ['torch', null];
-  XS.wsel = XS.wsel.map(id => id && wpOwn(id) ? id : null); if (!XS.wsel[0]) XS.wsel[0] = 'torch';
-  if (!XS.wsel[1]) { const n = Object.keys(ARMS).find(id => id !== 'torch' && wpOwn(id) && !XS.wsel.includes(id)); if (n) XS.wsel[1] = n; }
-  if (!XS.wsel[XS.wcur | 0]) XS.wcur = 0;
-  if (WP_ON && !S.day && S.rg && XS.wsel[1] && !XS.wnew) { XS.wnew = 1; S.rg.wcard = { id: XS.wsel[1], t: -2.2, rack: true }; }
-}
 // the body: each key as in POSES, plus sp (how far round the whole body has spun, in turns). The rest pose carries the axe on the shoulder.
 const AK = (u, o, e) => Object.assign({ ph: 0, ln: 0, cr: 0, st: 1, tk: 0, a: 0.2, R: 3, h: -5, ta: 3.0, tp: 0.9, la: -1.6, lR: 6, lh: -7, sp: 0 }, o, { u, e });
 POSES.push(
@@ -7704,7 +7690,212 @@ POSES.push(
     AK(0.7, { ph: 0.3, cr: 2, st: 3, a: 1.6, R: 13, h: -2, ta: 1.6, tp: 0.1, sp: 1 }, 'io'), AK(1, { sp: 1 }, 'io')],
   [AK(0, { a: -0.19, R: 9.7, h: -7.5, ta: 0, tp: -0.2 }), AK(0.3, { ph: 0.7, ln: 5, cr: 2.5, st: 6, a: -0.05, R: 16, h: 2, ta: 0, tp: 0.15, la: -2.4, lR: 7, lh: -3 }, 'o'),   // flare: the torch thrust out high
     AK(0.7, { ph: 0.65, ln: 4.5, cr: 2.3, st: 6, a: -0.05, R: 15.5, h: 1.5, ta: 0, tp: 0.12, la: -2.4, lR: 7, lh: -3 }, 'io'), AK(1, { a: -0.19, R: 9.7, h: -7.5, ta: 0, tp: -0.2 }, 'io')]);
-// ---- the axe, drawn: a bearded head on a long haft, the edge catching the light ----
+// v143: the other weapons' bodies, by name. Every one moves its own way, so you know the weapon from the silhouette alone.
+const WPP = {};
+const wpPose = (name, ...keys) => { WPP[name] = POSES.length; POSES.push(keys); };
+// Lamp Hook: a long pole worked in both hands; it reaches out, bites, and hauls back
+const HK0 = { ph: 0.1, ln: 1, cr: 1.5, st: 3, a: 0.6, R: 8, h: -4, ta: 0.3, tp: 0.35, la: null };
+wpPose('hook0', AK(0, HK0), AK(0.34, { ph: -0.85, ln: 0, cr: 2.5, st: 4, a: 1.5, R: 9, h: -1, ta: 1.2, tp: 0.2, la: null }, 'io'),
+  AK(0.52, { ph: 0.85, ln: 4.5, cr: 3, st: 6, a: -0.5, R: 15, h: -3, ta: -0.6, tp: 0.05, la: null }, 'o'),
+  AK(0.78, { ph: 0.95, ln: 1, cr: 2.5, st: 4, a: -0.9, R: 9, h: -4, ta: -1.2, tp: 0.15, la: null }, 'o'), AK(1, { ph: 0.6, ln: 1, cr: 2, st: 4, a: -0.6, R: 9, h: -4, ta: -0.8, tp: 0.25, la: null }, 'io'));
+wpPose('hook1', AK(0, { ph: 0.6, ln: 1, cr: 2, st: 4, a: -0.6, R: 9, h: -4, ta: -0.8, tp: 0.25, la: null }),
+  AK(0.32, { ph: 1.05, ln: 0, cr: 3, st: -3, a: -1.6, R: 9, h: -2, ta: -1.6, tp: 0.2, la: null }, 'io'),
+  AK(0.5, { ph: -0.9, ln: 4.5, cr: 3, st: -6, a: 0.8, R: 15, h: -3, ta: 0.9, tp: 0.05, la: null }, 'o'),
+  AK(0.78, { ph: -1.0, ln: 1, cr: 2.5, st: -4, a: 1.2, R: 9, h: -3, ta: 1.4, tp: 0.15, la: null }, 'o'), AK(1, { ph: -0.5, ln: 1, cr: 2, st: -3, a: 0.9, R: 8, h: -3, ta: 0.8, tp: 0.3, la: null }, 'io'));
+wpPose('hook2', AK(0, { ph: -0.5, ln: 1, cr: 2, st: -3, a: 0.9, R: 8, h: -3, ta: 0.8, tp: 0.3, la: null }),
+  AK(0.28, { ph: -0.55, ln: -1.5, cr: 3, st: 4, a: 0.5, R: 5, h: 1, ta: 0.1, tp: 0.35, la: null }, 'io'),                       // drawn back, hook high
+  AK(0.42, { ph: 0.6, ln: 8, cr: 4.5, st: 8.5, a: 0, R: 18, h: -1, ta: 0, tp: 0.02, la: null }, 'o'),                             // flung out to full length
+  AK(0.6, { ph: 0.6, ln: 7.5, cr: 4.3, st: 8.5, a: 0, R: 17.5, h: -1.5, ta: 0, tp: 0.02, la: null }, 'io'),
+  AK(0.76, { ph: -1.0, ln: -4, cr: 4, st: -5, a: 1.0, R: 7, h: -2, ta: 0.4, tp: 0.3, la: null }, 'o'),                            // and HAULED back, leaning away
+  AK(1, HK0, 'io'));
+wpPose('hookD', AK(0, HK0), AK(0.14, { ph: -1.0, ln: 7, cr: 4.5, st: 6, a: 1.4, R: 15, h: 1, ta: 1.4, tp: 0.15, la: null }, 'o'),   // swinging round the planted pole
+  AK(0.75, { ph: -0.6, ln: 5, cr: 3.5, st: 5, tk: 3, a: 1.4, R: 15, h: 1, ta: 1.4, tp: 0.15, la: null, sp: 1 }, 'io'), AK(1, Object.assign({}, HK0, { sp: 1 }), 'io'));
+wpPose('hookS', AK(0, HK0), AK(0.35, { ph: 0.3, ln: 4, cr: 5, st: 5, a: 0.25, R: 14, h: -11, ta: 0.1, tp: -1.25, la: -1.2, lR: 6, lh: -4 }, 'o'),   // the hook drives a lamp-post into the ground
+  AK(0.7, { ph: 0.25, ln: 3.5, cr: 4.5, st: 5, a: 0.25, R: 13, h: -11, ta: 0.1, tp: -1.25, la: -1.2, lR: 6, lh: -4 }, 'io'), AK(1, HK0, 'io'));
+// Twin Spear: quick straight jabs from a crouch, almost no wind-up
+const SP0 = { ph: -0.35, ln: 2, cr: 3, st: 5, a: 0.35, R: 6, h: -4, ta: 0, tp: 0.03, la: 0.25, lR: 6, lh: -4 };
+const spJab = (R, h, a) => [AK(0, SP0), AK(0.22, { ph: -0.55, ln: 1, cr: 3.2, st: 5, a: 0.45, R: 3.5, h: h - 0.5, ta: 0, tp: 0.03, la: 0.3, lR: 5, lh: -4 }, 'io'),
+  AK(0.42, { ph: 0.55, ln: 6, cr: 3.5, st: 7.5, a, R, h, ta: 0, tp: 0, la: -0.8, lR: 6, lh: -5 }, 'o'), AK(0.72, { ph: 0.5, ln: 5.5, cr: 3.4, st: 7.5, a, R: R - 1, h, ta: 0, tp: 0, la: -0.8, lR: 6, lh: -5 }, 'io'), AK(1, SP0, 'io')];
+wpPose('jab0', ...spJab(16, -3, 0.05)); wpPose('jab1', ...spJab(16.5, -1, -0.08));
+wpPose('jab2', AK(0, SP0), AK(0.4, { ph: -0.9, ln: -1, cr: 4.5, st: 5, a: 0.6, R: 2, h: -5, ta: 0, tp: 0.05, la: 0.3, lR: 5, lh: -4 }, 'io'),   // SKEWER: coiled all the way back
+  AK(0.54, { ph: 0.7, ln: 9, cr: 5, st: 9.5, a: 0, R: 19, h: -3, ta: 0, tp: 0, la: -1.3, lR: 8, lh: -2 }, 'o'), AK(0.84, { ph: 0.7, ln: 8.5, cr: 4.8, st: 9.5, a: 0, R: 18.5, h: -3, ta: 0, tp: 0, la: -1.3, lR: 8, lh: -2 }, 'io'), AK(1, SP0, 'io'));
+// Twin Bow: drawn on the run, the string hand pulled to the cheek
+const BW0 = { ph: -0.9, ln: 1, cr: 1, st: 3, a: 0.05, R: 11, h: 0, ta: 0, tp: 0.05, la: 0.05, lR: 5, lh: 0 };
+wpPose('bow0', AK(0, BW0), AK(0.4, { ph: -1.25, ln: -0.5, cr: 1.5, st: 3.5, a: 0.02, R: 13, h: 1, ta: 0, tp: 0.08, la: -0.35, lR: 1.5, lh: 2 }, 'io'),
+  AK(0.48, { ph: -1.1, ln: 1.5, cr: 1.2, st: 3.5, a: 0.02, R: 13, h: 1, ta: 0, tp: 0.06, la: -2.2, lR: 6, lh: 0 }, 'o'), AK(1, BW0, 'io'));
+wpPose('bow2', AK(0, BW0), AK(0.45, { ph: -1.3, ln: -1.5, cr: 3, st: 4.5, a: 0.02, R: 13, h: 3, ta: 0, tp: 0.25, la: -0.35, lR: 1.5, lh: 4.5 }, 'io'),   // VOLLEY: leaning back, the bow canted up
+  AK(0.52, { ph: -1.0, ln: 2.5, cr: 2.5, st: 4.5, a: 0.02, R: 13.5, h: 2, ta: 0, tp: 0.18, la: -2.4, lR: 7, lh: 1 }, 'o'), AK(1, BW0, 'io'));
+wpPose('vault', AK(0, SP0), AK(0.14, { ph: 0, ln: 6, cr: 4, st: 5, a: 0.1, R: 13, h: -12, ta: 0, tp: -1.15, la: null }, 'o'),   // spear planted ahead...
+  AK(0.48, { ph: 0, ln: -2, cr: -1.5, st: 1, tk: 8, a: 0, R: 5, h: -15, ta: 0, tp: -1.45, la: null }, 'io'),                     // ...up and over it, knees tucked...
+  AK(0.82, { ph: 0.6, ln: 7, cr: 4.5, st: 8, tk: 0, a: 0, R: 16, h: -4, ta: 0, tp: -0.08, la: -1, lR: 7, lh: -3 }, 'o'), AK(1, SP0, 'io'));   // ...and down into a jab
+wpPose('turn', AK(0, SP0), AK(0.2, { ph: -0.9, cr: 2.5, st: 3, a: 1.6, R: 12, h: 3, ta: 1.6, tp: 0.7, la: -1.6, lR: 7, lh: 0 }, 'io'),   // the twins' turn: the spear whipped round and changed hands
+  AK(0.72, { ph: 0.4, cr: 3, st: 4, a: 1.6, R: 12, h: 3, ta: 1.6, tp: 0.7, la: -1.6, lR: 7, lh: 0, sp: 1 }, 'io'), AK(1, Object.assign({}, SP0, { sp: 1 }), 'io'));
+// Huntsman's Knife: low, twitchy, reverse grip, the free hand up as a guard
+const KN0 = { ph: -0.3, ln: 4, cr: 4.5, st: 5, a: 0.5, R: 7, h: -8, ta: 0.5, tp: -0.25, la: 0.1, lR: 7, lh: -3 };
+const knCut = (a0, a1, t0, t1, ext) => [AK(0, KN0), AK(0.25, { ph: -0.6 * Math.sign(a0), ln: 3.5, cr: 4.8, st: 5, a: a0, R: 7, h: -7, ta: t0, tp: -0.2, la: 0.1, lR: 7, lh: -3 }, 'io'),
+  AK(0.55, Object.assign({ ph: 0.7 * Math.sign(a0), ln: 6, cr: 5, st: 6.5, a: a1, R: 12.5, h: -7, ta: t1, tp: -0.1, la: 0.2, lR: 6, lh: -2 }, ext || {}), 'o'), AK(1, KN0, 'io')];
+wpPose('kn0', ...knCut(1.0, -0.6, 1.2, -0.9)); wpPose('kn1', ...knCut(-1.0, 0.7, -1.3, 1.0)); wpPose('kn2', ...knCut(0.3, 0, 0.1, 0, { R: 14, h: -4, tp: 0.25, ln: 7 }));
+wpPose('kn3', ...knCut(1.2, -0.4, 1.5, -0.6, { h: -10, cr: 6 }));
+wpPose('kn4', AK(0, KN0), AK(0.2, { ph: -1, ln: 3, cr: 6.5, st: 5, a: 1.3, R: 8, h: -9, ta: 1.6, tp: -0.2, la: 0.1, lR: 7, lh: -3 }, 'io'),   // FLURRY: the last cut is a low spin
+  AK(0.62, { ph: 0.4, ln: 7, cr: 7, st: 7, a: 1.5, R: 14, h: -9, ta: 1.7, tp: -0.1, la: -1.4, lR: 8, lh: -4, sp: 1 }, 'o'), AK(1, Object.assign({}, KN0, { sp: 1 }), 'io'));
+wpPose('blink', AK(0, { ph: -0.4, ln: 8, cr: 6, st: 7, a: 0.3, R: 9, h: -9, ta: 0.4, tp: -0.2, la: 0.4, lR: 8, lh: -6 }),
+  AK(0.3, { ph: 0.8, ln: 7, cr: 5.5, st: 7, a: -0.8, R: 13, h: -7, ta: -1.1, tp: -0.1, la: 0.5, lR: 7, lh: -4 }, 'o'), AK(1, KN0, 'io'));
+wpPose('vanish', AK(0, KN0), AK(0.4, { ph: 0.2, ln: -1, cr: 6.5, st: 2, a: 0.6, R: 5, h: -10, ta: 0.4, tp: -0.4, la: -0.2, lR: 3.5, lh: 3 }, 'io'),   // pulled in low, arm across the face
+  AK(1, Object.assign({}, KN0, { cr: 5.5 }), 'io'));
+// Warden Club: huge, low, wide sweeps carried by the hips
+const CL0 = { ph: 0.1, ln: 2, cr: 2.5, st: 4, a: 1.2, R: 6, h: -6, ta: 2.4, tp: 0.6, la: null };
+const clSweep = (s, big) => [AK(0, CL0), AK(big ? 0.44 : 0.38, { ph: -1.15 * s - (big ? 0.2 * s : 0), ln: -1.5, cr: big ? 4.5 : 3.5, st: 4 * s, a: 2.1 * s, R: 9, h: 2, ta: 2.5 * s, tp: big ? 0.45 : 0.3, la: null }, 'io'),
+  AK(big ? 0.58 : 0.54, { ph: 1.05 * s + (big ? 0.15 * s : 0), ln: big ? 7 : 5, cr: big ? 5 : 4, st: 7.5 * s, a: -1.1 * s, R: big ? 17 : 15, h: -3, ta: -1.4 * s, tp: big ? 0.35 : -0.05, la: null, sp: big ? 0.12 : 0 }, 'o'),
+  AK(0.85, { ph: 1.1 * s, ln: big ? 6 : 4, cr: 4, st: 7 * s, a: -1.3 * s, R: 14, h: -4, ta: -1.6 * s, tp: big ? 0.3 : -0.05, la: null, sp: big ? 0.12 : 0 }, 'io'), AK(1, Object.assign({}, CL0, { sp: big ? 0.12 : 0 }), 'io')];
+wpPose('cl0', ...clSweep(1)); wpPose('cl1', ...clSweep(-1)); wpPose('cl2', ...clSweep(1, true));
+wpPose('pound', AK(0, CL0), AK(0.32, { ph: 0, ln: -2.5, cr: -1.5, st: 1, tk: 7, a: 0.05, R: 2, h: 13, ta: 0, tp: 1.8, la: null }, 'io'),   // up over the head, in the air
+  AK(0.46, { ph: 0, ln: 9, cr: 8.5, st: 5, tk: 0, a: 0, R: 16, h: -13, ta: 0, tp: -1.2, la: null }, 'o'), AK(0.85, { ph: 0, ln: 8.5, cr: 8, st: 5, a: 0, R: 15.5, h: -13.5, ta: 0, tp: -1.2, la: null }, 'io'), AK(1, CL0, 'io'));
+wpPose('rootS', AK(0, CL0), AK(0.4, { ph: 0, ln: -3, cr: 1, st: 3, a: 0.05, R: 2, h: 13, ta: 0, tp: 1.85, la: null }, 'io'),
+  AK(0.5, { ph: 0, ln: 10, cr: 9, st: 5, a: 0, R: 15, h: -14, ta: 0, tp: -1.35, la: null }, 'o'), AK(0.86, { ph: 0, ln: 9.5, cr: 8.5, st: 5, a: 0, R: 14.5, h: -14, ta: 0, tp: -1.35, la: null }, 'io'), AK(1, CL0, 'io'));
+// Dervish Glaive: a dance; the whole body turns with every cut, the free arm flung out for balance
+const GL0 = { ph: -0.2, ln: 1.5, cr: 2, st: 4, a: 0.9, R: 9, h: -3, ta: 1.0, tp: 0.4, la: -1.3, lR: 8, lh: -2 };
+wpPose('gl0', AK(0, GL0), AK(0.28, { ph: -1.0, ln: 0.5, cr: 2.5, st: 4, a: 1.8, R: 12, h: -1, ta: 2.1, tp: 0.15, la: -0.4, lR: 9, lh: 0 }, 'io'),
+  AK(0.52, { ph: 1.0, ln: 4, cr: 3, st: 6, a: -1.2, R: 17, h: -2, ta: -1.6, tp: 0.05, la: -2.4, lR: 9, lh: 1, sp: 0.15 }, 'o'), AK(1, Object.assign({}, GL0, { ph: 0.6, a: -0.5, ta: -0.8, sp: 0.15 }), 'io'));
+wpPose('gl1', AK(0, Object.assign({}, GL0, { ph: 0.6, a: -0.5, ta: -0.8 })), AK(0.62, { ph: 0, ln: 3, cr: 3.5, st: 3, a: 1.6, R: 18, h: -2, ta: 1.6, tp: 0.05, la: -1.6, lR: 10, lh: 1, sp: -1 }, 'io'),   // a full turn the other way, blade at arm's length
+  AK(1, Object.assign({}, GL0, { sp: -1 }), 'io'));
+wpPose('gl2', AK(0, GL0), AK(0.3, { ph: -0.7, ln: 2, cr: 5.5, st: 5, a: 1.2, R: 13, h: -9, ta: 1.0, tp: -0.7, la: -1.2, lR: 8, lh: -6 }, 'io'),   // low...
+  AK(0.55, { ph: 0.8, ln: -1, cr: -1, st: 4, tk: 3, a: -0.3, R: 15, h: 9, ta: -0.2, tp: 1.2, la: -2.2, lR: 9, lh: 6 }, 'o'), AK(1, GL0, 'io'));   // ...ripped up into the air
+wpPose('gl3', AK(0, GL0), AK(0.15, { ph: -0.8, ln: 2, cr: 4, st: 4, a: 1.6, R: 16, h: -3, ta: 1.6, tp: 0.05, la: -1.6, lR: 10, lh: 0 }, 'io'),   // WHIRLWIND: two full turns
+  AK(0.78, { ph: 0, ln: 4, cr: 4.5, st: 3, tk: 2, a: 1.6, R: 18, h: -3, ta: 1.6, tp: 0.05, la: -1.6, lR: 10, lh: 0, sp: 2 }, 'io'), AK(1, Object.assign({}, GL0, { sp: 2 }), 'io'));
+wpPose('glD', AK(0, GL0), AK(0.85, { ph: 0, ln: 7, cr: 4, st: 3, tk: 4, a: 1.6, R: 16, h: -3, ta: 1.6, tp: 0.05, la: -1.6, lR: 10, lh: 0, sp: 2 }, 'io'), AK(1, Object.assign({}, GL0, { sp: 2 }), 'io'));
+// King's Gauntlets: a boxer. Fists up, punches thrown from the hips
+const GU0 = { ph: -0.35, ln: 2.5, cr: 3, st: 5, a: 0.55, R: 7, h: -2, ta: 0, tp: 0.2, la: 0.45, lR: 7, lh: -2 };
+wpPose('pu0', AK(0, GU0), AK(0.18, { ph: -0.5, ln: 2, cr: 3, st: 5, a: 0.6, R: 5, h: -2, ta: 0, tp: 0.2, la: 0.45, lR: 7, lh: -2 }, 'io'),
+  AK(0.38, { ph: 0.6, ln: 6, cr: 3.5, st: 7, a: 0.02, R: 15, h: -1, ta: 0, tp: 0, la: 0.6, lR: 5, lh: -2 }, 'o'), AK(1, GU0, 'io'));
+wpPose('pu1', AK(0, GU0), AK(0.18, { ph: 0.4, ln: 2, cr: 3, st: 5, a: 0.7, R: 5, h: -2, ta: 0, tp: 0.2, la: 0.5, lR: 6, lh: -2 }, 'io'),   // the cross: the other fist
+  AK(0.38, { ph: -0.7, ln: 6.5, cr: 3.5, st: -6, a: 0.8, R: 5, h: -3, ta: 0, tp: 0.2, la: -0.05, lR: 15, lh: -1 }, 'o'), AK(1, GU0, 'io'));
+wpPose('pu2', AK(0, GU0), AK(0.4, { ph: -0.8, ln: 3, cr: 7, st: 5, a: 0.9, R: 5, h: -10, ta: 0, tp: 0.3, la: 0.45, lR: 6, lh: -3 }, 'io'),   // UPPERCUT: sunk low...
+  AK(0.52, { ph: 0.6, ln: -1.5, cr: -2, st: 4, tk: 3, a: 0.15, R: 9, h: 11, ta: 0, tp: 1.3, la: 0.6, lR: 5, lh: -3 }, 'o'), AK(0.8, { ph: 0.55, ln: -1, cr: -1.5, st: 4, a: 0.15, R: 8.5, h: 10, ta: 0, tp: 1.3, la: 0.6, lR: 5, lh: -3 }, 'io'), AK(1, GU0, 'io'));
+wpPose('dive', AK(0, GU0), AK(0.25, { ph: 0, ln: 10, cr: 8, st: 6, tk: 4, a: 0.05, R: 13, h: -9, ta: 0, tp: -0.4, la: -0.05, lR: 13, lh: -9 }, 'o'),   // diving in, fists first
+  AK(0.62, { ph: 0, ln: 10, cr: 8, st: 6, tk: 4, a: 0.05, R: 13, h: -9, ta: 0, tp: -0.4, la: -0.05, lR: 13, lh: -9 }),
+  AK(0.75, { ph: 0, ln: -1, cr: -2, st: 3, tk: 2, a: 0.3, R: 7, h: 12, ta: 0, tp: 1.4, la: -0.3, lR: 7, lh: 12 }, 'o'), AK(1, GU0, 'io'));   // and up out of the sand, both fists high
+wpPose('grab', AK(0, GU0), AK(0.16, { ph: 0, ln: 6, cr: 3.5, st: 7, a: 0.15, R: 14, h: -2, ta: 0, tp: 0, la: -0.15, lR: 14, lh: -2 }, 'o'),   // both hands out: GRAB
+  AK(0.4, { ph: -1.3, ln: -2.5, cr: 4, st: 3, a: 1.9, R: 10, h: 5, ta: 0, tp: 0.4, la: 1.3, lR: 6, lh: 5 }, 'io'),                    // hauled round behind...
+  AK(0.52, { ph: 1.1, ln: 7, cr: 4, st: 8, a: -0.25, R: 16, h: 2, ta: 0, tp: 0.2, la: -0.4, lR: 15, lh: 2 }, 'o'), AK(1, GU0, 'io'));   // ...and HURLED
+// Mirror Lance: long, level, straight; a fencer's lunge
+const LN0 = { ph: -0.45, ln: 1.5, cr: 2.5, st: 5, a: 0.4, R: 6, h: -4, ta: 0, tp: 0.02, la: -1.2, lR: 6, lh: -1 };
+const lnThrust = (R, h, big) => [AK(0, LN0), AK(big ? 0.4 : 0.3, { ph: -0.8, ln: -1, cr: big ? 4 : 3, st: 5, a: 0.5, R: 2, h, ta: 0, tp: 0.02, la: -1.6, lR: 7, lh: 1 }, 'io'),
+  AK(big ? 0.52 : 0.44, { ph: 0.65, ln: big ? 10 : 7, cr: big ? 5.5 : 4, st: big ? 10 : 8.5, a: 0, R, h, ta: 0, tp: 0, la: -2.6, lR: 8, lh: -2 }, 'o'),
+  AK(0.82, { ph: 0.62, ln: big ? 9.5 : 6.5, cr: big ? 5.3 : 3.8, st: big ? 10 : 8.5, a: 0, R: R - 0.5, h, ta: 0, tp: 0, la: -2.6, lR: 8, lh: -2 }, 'io'), AK(1, LN0, 'io')];
+wpPose('ln0', ...lnThrust(17, -3)); wpPose('ln1', ...lnThrust(17, 0)); wpPose('ln2', ...lnThrust(19.5, -2, true));
+wpPose('lnS', AK(0, LN0), AK(0.35, { ph: -1.0, ln: -2, cr: 2, st: 4, a: 1.6, R: 8, h: 6, ta: 0.2, tp: 0.35, la: 0.1, lR: 10, lh: 1 }, 'io'),   // the light lance: drawn back past the ear...
+  AK(0.48, { ph: 1.0, ln: 7, cr: 3.5, st: 8, a: -0.1, R: 17, h: 2, ta: 0, tp: 0.05, la: -2.5, lR: 8, lh: -6 }, 'o'), AK(1, LN0, 'io'));   // ...and loosed
+// every weapon: its name, colour, boss, special, the combo (attack button), the dash strike (attack out of a roll), the colours of
+// its trails, how it sits in the hand, and its own sound and impact
+const STEEL = ['90,100,120', '195,205,222', '250,252,255'];
+const ARMS = {
+  torch: { name: 'Torch', col: '255,200,130', spName: 'Flare', spCool: 7, short: 'Quick cuts, a leaping slam · Flare', hint: 'Q swap · K flare',
+    desc: 'Your old torch. Two quick cuts, then a leap and a slam that hits all round. Out of a roll, a lunging thrust. Special: Flare, a blinding flash down the beam that freezes everything in it.' },
+  axe: { name: 'Felling Axe', col: '255,150,90', boss: 'woodcutter', bossName: 'Woodcutter', spName: 'Throw', spCool: 3.2, short: 'Huge slow chops · throw it to fell trees', hint: 'Q swap · K throw · attack while it flies calls it back', phone: 'Swap to switch · Throw it at a tree',
+    desc: 'The Woodcutter\'s axe. Two heavy chops that knock them flat, then a whirl that ends in an overhead cleave. Out of a roll, a shoulder charge that sends them flying. Special: Throw. It cuts on the way out and back, and if it bites a tree, the tree comes down on whatever is beyond it. Attack while it\'s out to call it back.',
+    trail: ['190,205,230', '255,255,255'], tint: STEEL, held: [-4, 20],
+    atk: [
+      { reach: 78, arc: 1.9, lunge: 30, moveT: [0.16, 0.27], hop: 0, dur: 0.46, hitAt: 0.25, dmg: 1.0, boss: 1.7, knock: 36, shake: 0.32, stop: 0.09, kick: 12, pose: AXP, crack: 1 },
+      { reach: 82, arc: 2.4, lunge: 34, moveT: [0.15, 0.26], hop: 0, dur: 0.46, hitAt: 0.24, dmg: 1.0, boss: 1.7, knock: 44, shake: 0.3, stop: 0.09, kick: 12, pose: AXP + 1 },
+      { dur: 0.82, pose: AXP + 2, lunge: 70, moveT: [0.33, 0.44], hopT: [0.33, 0.44], hop: 26, hits: [
+        { at: 0.25, reach: 88, arc: 7, round: 1, dmg: 0.9, boss: 1.4, knock: 48, shake: 0.24, stop: 0.05, kick: 5 },
+        { at: 0.44, reach: 150, arc: 0.62, dmg: 2.3, boss: 3.6, knock: 72, shake: 0.7, stop: 0.15, kick: 18, kh: 'cleave', cleave: 1 }] }],
+    dash: { dur: 0.36, pose: AXP + 3, charge: 1, lunge: 175, moveT: [0.03, 0.26], reach: 30, arc: 7, round: 1, dmg: 0.8, boss: 1.3, knock: 95, shake: 0.35, stop: 0.07, kick: 14, kh: 'bulldoze' } },
+  hook: { name: 'Lamp Hook', col: '255,170,70', boss: 'lamplighter', bossName: 'Lamplighter', spName: 'Lamp', spCool: 2.4, short: 'Hook and haul them in · plant lamps that guard you', hint: 'Q swap · K plant a lamp (up to 3)', phone: 'Lamp plants a light that halves every hit',
+    desc: 'The Lamplighter\'s hook. Two long sweeps that drag them toward you, then a throw of the hook that bites one and YANKS it to your feet. Out of a roll, you swing round the pole and through them. Special: Lamp. Plant a lamp (up to three); standing in a lamp\'s light, every hit on you is halved. They hate it, and come to stamp it out.',
+    trail: ['255,150,60', '255,230,170'], tint: ['120,60,20', '255,160,70', '255,235,190'], held: [-12, 30],
+    atk: [
+      { reach: 96, arc: 1.7, lunge: 14, moveT: [0.12, 0.2], dur: 0.38, hitAt: 0.2, dmg: 0.8, boss: 1.3, knock: 0, pull: 26, shake: 0.14, stop: 0.04, kick: 4, pose: 'hook0', kh: 'hooked' },
+      { reach: 100, arc: 1.8, lunge: 14, moveT: [0.11, 0.19], dur: 0.38, hitAt: 0.19, dmg: 0.8, boss: 1.3, knock: 0, pull: 26, shake: 0.14, stop: 0.04, kick: 4, pose: 'hook1', side: -1, kh: 'hooked' },
+      { reach: 175, arc: 0.42, lunge: 22, moveT: [0.17, 0.26], dur: 0.66, hitAt: 0.28, dmg: 1.6, boss: 2.4, knock: 0, yank: 1, shake: 0.42, stop: 0.1, kick: 10, pose: 'hook2', kh: 'yank', fin: 'YANK' }],
+    dash: { dur: 0.42, pose: 'hookD', charge: 1, lunge: 150, moveT: [0.02, 0.3], reach: 40, arc: 7, round: 1, dmg: 0.9, boss: 1.4, knock: 60, shake: 0.28, stop: 0.05, kick: 10, kh: 'swingby' } },
+  twin: { name: 'Twin Spear and Bow', col: '200,230,90', boss: 'twins', bossName: 'Twins', spName: 'Turn', spCool: 3, short: 'Stand still: spear jabs · on the move: the bow', hint: 'Q swap · K twin turn: your next hit lands three times as hard', phone: 'Turn makes your next hit triple',
+    desc: 'The Twins\' weapons, one in each stance. Stand still and attack: four quick spear jabs, the last one a lunging skewer. Attack on the move: you shoot the bow, every third shot a volley of three. Out of a roll, you vault on the spear and land on them. Special: Turn. A spin that swaps hands, and the first hit after it lands three times as hard.',
+    trail: ['200,230,110', '250,255,220'], tint: ['70,90,20', '200,230,110', '250,255,225'], held: [-12, 30],
+    stance: () => wpStance(),
+    atk: () => wpStance() === 'bow' ? ARMS.twin.bow : ARMS.twin.spear,
+    bow: [
+      { dur: 0.3, pose: 'bow0', hitAt: 0.14, proj: 1, n: 1, dmg: 0.75, boss: 1.1, kick: 2, kh: 'arrow' },
+      { dur: 0.3, pose: 'bow0', hitAt: 0.14, proj: 1, n: 1, dmg: 0.75, boss: 1.1, kick: 2, kh: 'arrow' },
+      { dur: 0.42, pose: 'bow2', hitAt: 0.22, proj: 1, n: 3, spread: 0.13, dmg: 0.7, boss: 1.0, kick: 4, kh: 'volley', fin: 'VOLLEY' }],
+    spear: [
+      { reach: 92, arc: 0.5, lunge: 10, moveT: [0.05, 0.1], dur: 0.21, hitAt: 0.09, dmg: 0.55, boss: 0.9, knock: 10, shake: 0.06, stop: 0.012, kick: 3, pose: 'jab0', thrust: 1, kh: 'jab' },
+      { reach: 94, arc: 0.5, lunge: 10, moveT: [0.05, 0.1], dur: 0.21, hitAt: 0.09, dmg: 0.55, boss: 0.9, knock: 10, shake: 0.06, stop: 0.012, kick: 3, pose: 'jab1', thrust: 1, kh: 'jab' },
+      { reach: 92, arc: 0.5, lunge: 10, moveT: [0.05, 0.1], dur: 0.21, hitAt: 0.09, dmg: 0.55, boss: 0.9, knock: 10, shake: 0.06, stop: 0.012, kick: 3, pose: 'jab0', thrust: 1, kh: 'jab' },
+      { reach: 135, arc: 0.4, lunge: 46, moveT: [0.19, 0.27], dur: 0.46, hitAt: 0.25, dmg: 1.4, boss: 2.2, knock: 46, shake: 0.32, stop: 0.07, kick: 10, pose: 'jab2', thrust: 1, kh: 'skewer', fin: 'SKEWER' }],
+    dash: { dur: 0.52, pose: 'vault', lunge: 135, moveT: [0.05, 0.42], hopT: [0.06, 0.42], hop: 32, hitAt: 0.43, reach: 90, arc: 0.6, dmg: 1.3, boss: 2.0, knock: 40, shake: 0.3, stop: 0.06, kick: 9, thrust: 1, kh: 'vault', land: 1 } },
+  knife: { name: 'Huntsman\'s Knife', col: '150,200,130', boss: 'huntsman', bossName: 'Huntsman', spName: 'Vanish', spCool: 6, short: 'Five lightning cuts · vanish, then backstab', hint: 'Q swap · K vanish: they lose you, and your next hit kills', phone: 'Vanish, then strike: a backstab kills',
+    desc: 'The Huntsman\'s knife. Five very fast, short cuts, the last a spinning flurry. Out of a roll, you blink a short way straight through them, cutting everything you pass. Special: Vanish. For two seconds they lose you and go hunting where you were; your next hit is a backstab that kills any normal enemy outright.',
+    trail: ['170,220,150', '240,255,235'], tint: ['40,60,40', '170,215,150', '245,255,240'], held: [-2, 10],
+    atk: [
+      { reach: 52, arc: 1.7, lunge: 12, moveT: [0.03, 0.09], dur: 0.17, hitAt: 0.09, dmg: 0.45, boss: 0.75, knock: 6, shake: 0.05, stop: 0.018, kick: 2, pose: 'kn0', kh: 'cut' },
+      { reach: 52, arc: 1.7, lunge: 12, moveT: [0.03, 0.09], dur: 0.17, hitAt: 0.09, dmg: 0.45, boss: 0.75, knock: 6, shake: 0.05, stop: 0.018, kick: 2, pose: 'kn1', side: -1, kh: 'cut' },
+      { reach: 56, arc: 1.0, lunge: 14, moveT: [0.03, 0.09], dur: 0.17, hitAt: 0.09, dmg: 0.45, boss: 0.75, knock: 6, shake: 0.05, stop: 0.018, kick: 2, pose: 'kn2', kh: 'cut', thrust: 1 },
+      { reach: 52, arc: 1.7, lunge: 12, moveT: [0.03, 0.09], dur: 0.17, hitAt: 0.09, dmg: 0.45, boss: 0.75, knock: 6, shake: 0.05, stop: 0.018, kick: 2, pose: 'kn3', kh: 'cut' },
+      { reach: 62, arc: 7, round: 1, lunge: 26, moveT: [0.08, 0.2], dur: 0.4, hitAt: 0.24, dmg: 1.2, boss: 1.8, knock: 30, shake: 0.26, stop: 0.06, kick: 6, pose: 'kn4', kh: 'flurry', fin: 'FLURRY' }],
+    dash: { dur: 0.3, pose: 'blink', blink: 125, blinkAt: 0.05, lunge: 0, reach: 20, arc: 7, dmg: 1.1, boss: 1.6, knock: 8, shake: 0.18, stop: 0.04, kick: 6, kh: 'blink' } },
+  club: { name: 'Warden Club', col: '150,200,110', boss: 'warden', bossName: 'Woodwarden', spName: 'Roots', spCool: 3.5, short: 'Wide sweeps that send them flying · roots', hint: 'Q swap · K roots: each use chips the club shorter and quicker', phone: 'Roots burst out ahead; each one chips the club',
+    desc: 'The Woodwarden\'s club. Three wide, slow sweeps that knock them flying, the last a home run. Out of a roll, a leap into a ground pound. Special: Roots. Smash the ground and roots burst out in a line, catching and holding everything they hit. Every time, the club chips shorter but swings quicker, until it grows back at camp.',
+    trail: ['140,190,100', '230,255,210'], tint: ['40,60,20', '150,200,110', '235,255,215'], held: [-5, 24],
+    atk: [
+      { reach: 96, arc: 2.9, lunge: 22, moveT: [0.2, 0.3], dur: 0.56, hitAt: 0.3, dmg: 1.2, boss: 1.9, knock: 20, fly: 520, shake: 0.32, stop: 0.08, kick: 10, pose: 'cl0', kh: 'sweep' },
+      { reach: 96, arc: 2.9, lunge: 22, moveT: [0.2, 0.3], dur: 0.56, hitAt: 0.3, dmg: 1.2, boss: 1.9, knock: 20, fly: 520, shake: 0.32, stop: 0.08, kick: 10, pose: 'cl1', side: -1, kh: 'sweep' },
+      { reach: 104, arc: 3.2, lunge: 34, moveT: [0.36, 0.48], dur: 0.9, hitAt: 0.5, dmg: 2.4, boss: 3.4, knock: 30, fly: 950, shake: 0.65, stop: 0.14, kick: 18, pose: 'cl2', kh: 'homerun', fin: 'HOME RUN' }],
+    dash: { dur: 0.62, pose: 'pound', lunge: 80, moveT: [0.04, 0.27], hopT: [0.04, 0.28], hop: 36, hitAt: 0.29, slam: 1, reach: 92, arc: 7, dmg: 1.6, boss: 2.4, knock: 60, shake: 0.6, stop: 0.12, kick: 6, kh: 'slam' } },
+  glaive: { name: 'Dervish Glaive', col: '255,205,80', boss: 'dervish', bossName: 'Dervish', dune: 0, spName: 'Orbit', spCool: 6, short: 'A spinning dance: hit on the beat · orbit', hint: 'Q swap · K orbit · attack on the drum beat to keep the dance going', phone: 'Tap on the beat: each one hits harder',
+    desc: 'The Dervish\'s glaive. A four-step spinning dance that loops. Attack again right on the drum beat (as each step ends) and the dance builds: every beat in a row hits harder, up to double. Miss it and it starts again. Out of a roll, you spin straight through them. Special: Orbit. Let the glaive go and it circles you for four seconds, cutting anything close. Attack to catch it early.',
+    trail: ['255,200,80', '255,250,215'], tint: ['120,80,10', '255,200,80', '255,250,220'], held: [-14, 22], beat: 1, loop: 1,
+    atk: [
+      { reach: 92, arc: 2.6, lunge: 20, moveT: [0.1, 0.22], dur: 0.42, hitAt: 0.22, dmg: 0.75, boss: 1.2, knock: 20, shake: 0.14, stop: 0.04, kick: 5, pose: 'gl0', kh: 'dance' },
+      { reach: 96, arc: 7, round: 1, lunge: 18, moveT: [0.08, 0.26], dur: 0.42, hitAt: 0.24, dmg: 0.8, boss: 1.2, knock: 24, shake: 0.16, stop: 0.04, kick: 4, pose: 'gl1', kh: 'dance' },
+      { reach: 90, arc: 1.8, lunge: 18, moveT: [0.08, 0.22], dur: 0.42, hitAt: 0.23, dmg: 0.85, boss: 1.3, knock: 28, shake: 0.18, stop: 0.05, kick: 6, pose: 'gl2', kh: 'dance' },
+      { dur: 0.62, pose: 'gl3', lunge: 34, moveT: [0.08, 0.46], hits: [
+        { at: 0.24, reach: 100, arc: 7, round: 1, dmg: 0.8, boss: 1.2, knock: 20, shake: 0.2, stop: 0.04, kick: 4 },
+        { at: 0.46, reach: 108, arc: 7, round: 1, dmg: 1.1, boss: 1.6, knock: 40, shake: 0.42, stop: 0.09, kick: 8, fin: 'WHIRLWIND' }], kh: 'whirlwind' }],
+    dash: { dur: 0.4, pose: 'glD', charge: 1, lunge: 170, moveT: [0.02, 0.3], reach: 46, arc: 7, round: 1, dmg: 0.9, boss: 1.4, knock: 50, shake: 0.26, stop: 0.05, kick: 8, kh: 'spin' } },
+  fists: { name: 'King\'s Gauntlets', col: '230,160,70', boss: 'king', bossName: 'Buried King', dune: 1, spName: 'Grab', spCool: 3.5, short: 'Punch, punch, uppercut · grab and hurl', hint: 'Q swap · K grab one and hurl it into the rest', phone: 'Grab seizes the nearest one and hurls it',
+    desc: 'The Buried King\'s gauntlets. A jab, a cross and a rising uppercut, close in and fast. Out of a roll, you dive under the ground and burst up beneath them. Special: Grab. Seize the nearest one in front of you and hurl it into the others; it bowls over everything it hits.',
+    trail: ['230,160,70', '255,235,200'], tint: ['110,60,20', '230,160,70', '255,235,200'], held: [0, 0],
+    atk: [
+      { reach: 54, arc: 1.2, lunge: 22, moveT: [0.05, 0.1], dur: 0.22, hitAt: 0.09, dmg: 0.6, boss: 1.0, knock: 16, shake: 0.12, stop: 0.035, kick: 6, pose: 'pu0', kh: 'punch', thrust: 1 },
+      { reach: 56, arc: 1.2, lunge: 22, moveT: [0.05, 0.1], dur: 0.22, hitAt: 0.09, dmg: 0.6, boss: 1.0, knock: 16, shake: 0.12, stop: 0.035, kick: 6, pose: 'pu1', kh: 'punch', thrust: 1, left: 1 },
+      { reach: 62, arc: 1.6, lunge: 18, moveT: [0.17, 0.25], dur: 0.54, hitAt: 0.27, dmg: 1.8, boss: 2.8, knock: 26, shake: 0.5, stop: 0.13, kick: 8, pose: 'pu2', kh: 'uppercut', fin: 'UPPERCUT', upper: 1 }],
+    dash: { dur: 0.56, pose: 'dive', dive: 1, diveT: 0.32, lunge: 0, hitAt: 0.34, reach: 66, arc: 7, round: 1, dmg: 1.5, boss: 2.2, knock: 46, shake: 0.5, stop: 0.09, kick: 6, kh: 'erupt' } },
+  lance: { name: 'Mirror Lance', col: '255,240,190', boss: 'mirage', bossName: 'Mirage', dune: 2, spName: 'Light', spCool: 3.2, short: 'Long piercing thrusts · decoys and a light lance', hint: 'Q swap · K a lance of light that bounces off trees · every roll leaves a decoy', phone: 'Every roll leaves a decoy that copies you',
+    desc: 'The Mirage\'s lance. Long, straight thrusts that pierce everything in a line, the third a full lunge. Every roll leaves a shining copy of you where you rolled from; they go for it instead, and it copies your thrusts. Out of a roll, a lunging thrust. Special: Light. Fire a lance of light that pierces and bounces off trees and rocks.',
+    trail: ['255,245,210', '255,255,255'], tint: ['120,110,80', '255,240,200', '255,255,250'], held: [-16, 36],
+    atk: [
+      { reach: 150, arc: 0.3, lunge: 16, moveT: [0.11, 0.17], dur: 0.36, hitAt: 0.16, dmg: 0.9, boss: 1.4, knock: 14, shake: 0.14, stop: 0.04, kick: 6, pose: 'ln0', thrust: 1, kh: 'pierce' },
+      { reach: 150, arc: 0.3, lunge: 16, moveT: [0.11, 0.17], dur: 0.36, hitAt: 0.16, dmg: 0.9, boss: 1.4, knock: 14, shake: 0.14, stop: 0.04, kick: 6, pose: 'ln1', thrust: 1, kh: 'pierce' },
+      { reach: 215, arc: 0.24, lunge: 50, moveT: [0.24, 0.33], dur: 0.62, hitAt: 0.32, dmg: 2.0, boss: 3.0, knock: 34, shake: 0.42, stop: 0.1, kick: 12, pose: 'ln2', thrust: 1, kh: 'lunge', fin: 'PIERCE' }],
+    dash: { dur: 0.36, pose: 'ln0', lunge: 120, moveT: [0.02, 0.18], hitAt: 0.16, reach: 160, arc: 0.3, dmg: 1.2, boss: 1.8, knock: 30, shake: 0.24, stop: 0.05, kick: 9, thrust: 1, kh: 'lunge' } },
+};
+for (const id in ARMS) for (const D of [].concat(Array.isArray(ARMS[id].atk) ? ARMS[id].atk : [], ARMS[id].spear || [], ARMS[id].bow || [], ARMS[id].dash || [])) if (typeof D.pose === 'string') D.pose = WPP[D.pose];
+const WP_DUNE = ['dervish', 'king', 'mirage'];
+function wpOwn(id) {                              // the torch is yours; a boss weapon is yours once its boss has fallen (beaten saves get it at the rack)
+  const A = ARMS[id]; if (id === 'torch') return true; if (!A || !XS) return false;
+  if (XS.wgot && XS.wgot[id]) return true;
+  if (A.boss === 'warden') return !!XS.wardenDead || (XS.orbs || 0) >= 3;
+  if (A.dune !== undefined) return (XS.dorbs || 0) > A.dune || (XS.dbBeat ?? -1) >= A.dune;
+  return !!XS.lairs && XS.lairs.some(L => L.id === A.boss && L.beat);
+}
+const curW = () => wpOn() ? (XS.wsel && XS.wsel[XS.wcur | 0]) || 'torch' : 'torch';
+let wpStanceOv = null;
+function wpStance() { return wpStanceOv || (S.rg && S.rg.wst) || 'spear'; }   // the Twins: still is the spear, moving is the bow
+function wpHand() {                               // what's in the torch hand instead of the torch
+  if (!wpOn()) return null; const w = curW(); if (w === 'torch') return null;
+  if (S.rg.wax || S.rg.worb) return 'none';       // thrown: the hand is empty
+  return w === 'twin' && wpStance() === 'bow' ? 'bow' : w;
+}
+function wpInit() {                               // every trip: the loadout is sound, and a weapon won earlier shows up on your back
+  if (!XS) return;
+  if (!Array.isArray(XS.wsel)) XS.wsel = ['torch', null];
+  XS.wsel = XS.wsel.map(id => id && wpOwn(id) ? id : null); if (!XS.wsel[0]) XS.wsel[0] = 'torch';
+  if (!XS.wsel[1]) { const n = Object.keys(ARMS).find(id => id !== 'torch' && wpOwn(id) && !XS.wsel.includes(id)); if (n) XS.wsel[1] = n; }
+  if (!XS.wsel[XS.wcur | 0]) XS.wcur = 0;
+  if (WP_ON && !S.day && S.rg && XS.wsel[1] && !XS.wnew) { XS.wnew = 1; S.rg.wcard = { id: XS.wsel[1], t: -2.2, rack: true }; }
+}
+// ---- the weapons, drawn: each a shape between two points on screen (the butt and the head) ----
 function wpAxeShape(c, bx, by, hx, hy, side, sc, OUT) {   // haft from (bx,by) to (hx,hy) on screen; the head at the far end, its blade to one side
   const C = (col, grey) => COLOUR ? col : grey, dx = hx - bx, dy = hy - by, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy * side, ny = ux * side;
   const at = (a, n) => [hx + ux * a * sc + nx * n * sc, hy + uy * a * sc + ny * n * sc];
@@ -7718,75 +7909,297 @@ function wpAxeShape(c, bx, by, hx, hy, side, sc, OUT) {   // haft from (bx,by) t
   const g0 = L * 0.18 / sc, g1 = L * 0.38 / sc;   // a red leather grip wrap near the end of the haft
   c.strokeStyle = C('#8a2f22', '#3a3a38'); c.lineWidth = 2.9 * sc; c.beginPath(); c.moveTo(bx + ux * g0 * sc, by + uy * g0 * sc); c.lineTo(bx + ux * g1 * sc, by + uy * g1 * sc); c.stroke();
 }
-function wpHeldAxe(P, hand, tip, near, OUT) {     // in the hand: from the grip along the haft to the head
-  const d = [tip[0] - hand[0], tip[1] - hand[1], tip[2] - hand[2]], dl = Math.hypot(...d) || 1, u = d.map(v => v / dl);
+function wpShape(id, c, bx, by, hx, hy, side, sc, OUT) {   // v143: every weapon's shape; the axe keeps its own
+  if (id === 'axe') return wpAxeShape(c, bx, by, hx, hy, side, sc, OUT);
+  const C = (col, grey) => COLOUR ? col : grey, dx = hx - bx, dy = hy - by, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy * side, ny = ux * side;
+  const at = (a, n) => [hx + ux * a * sc + nx * n * sc, hy + uy * a * sc + ny * n * sc];
+  const RIM = 'rgba(239,239,234,0.2)', poly = (pts, fill) => { c.beginPath(); pts.forEach((q, i) => i ? c.lineTo(...q) : c.moveTo(...q)); c.closePath(); if (OUT) { c.strokeStyle = RIM; c.lineWidth = 1.6 * sc; c.lineJoin = 'round'; c.stroke(); } else { c.fillStyle = fill; c.fill(); } };
+  const shaft = (w, col, x0 = bx, y0 = by, x1 = hx, y1 = hy) => { c.lineCap = 'round'; c.strokeStyle = OUT ? RIM : col; c.lineWidth = (w + (OUT ? 1.6 : 0)) * sc; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
+  const glow = (x, y, r, rgb, a) => { if (OUT) return; c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.restore(); };
+  if (id === 'hook') {                            // a long dark pole, an iron crook at the top, a little lantern swinging from it
+    shaft(1.9, C('#3d2f24', '#4a4a47'));
+    c.lineCap = 'round'; c.strokeStyle = OUT ? RIM : C('#2b2c30', '#3a3a38'); c.lineWidth = (1.8 + (OUT ? 1.6 : 0)) * sc;
+    c.beginPath(); c.moveTo(hx, hy); c.quadraticCurveTo(...at(6, 0), ...at(5, 4.5)); c.quadraticCurveTo(...at(3.5, 7), ...at(0.8, 5.5)); c.stroke();
+    if (OUT) return;
+    const sw = Math.sin(S.t * 2.6) * 1.6, [lx, ly] = at(1.5, 5.8); const ly2 = ly + 5 * sc, lx2 = lx + sw * sc;
+    c.strokeStyle = '#1a1a19'; c.lineWidth = 0.6 * sc; c.beginPath(); c.moveTo(lx, ly); c.lineTo(lx2, ly2); c.stroke();
+    c.fillStyle = C('#2a2620', '#333331'); c.fillRect(lx2 - 2.2 * sc, ly2, 4.4 * sc, 5.5 * sc);
+    c.fillStyle = 'rgba(255,190,110,0.95)'; c.fillRect(lx2 - 1.4 * sc, ly2 + 1 * sc, 2.8 * sc, 3.5 * sc);
+    glow(lx2, ly2 + 2.7 * sc, 12 * sc, '255,170,80', 0.55);
+    return;
+  }
+  if (id === 'twin' || id === 'spear') {          // the spear: a pale shaft, a long leaf blade, a lime binding
+    shaft(2.1, C('#a08a62', '#77776f'));
+    poly([at(-1, 0), at(3.5, 1.8), at(11, 0), at(3.5, -1.8)], C('#c9ccd0', '#bdbdb8'));
+    if (!OUT) { shaft(2.4, C('#9fc04a', '#6a6a66'), ...at(-3.5, 0), ...at(-1, 0)); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 0.5 * sc; c.beginPath(); c.moveTo(...at(0, 0)); c.lineTo(...at(10, 0)); c.stroke(); }
+    return;
+  }
+  if (id === 'bow') {                             // the bow: drawn by drawBow (it needs the string hand), here only on the rack and the card
+    c.lineCap = 'round'; c.strokeStyle = OUT ? RIM : C('#6a4b2a', '#555552'); c.lineWidth = (1.8 + (OUT ? 1.6 : 0)) * sc;
+    const [mx, my] = [(bx + hx) / 2, (by + hy) / 2];
+    c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(mx + nx * 9 * sc, my + ny * 9 * sc, hx, hy); c.stroke();
+    if (!OUT) { c.strokeStyle = 'rgba(230,230,220,0.7)'; c.lineWidth = 0.5 * sc; c.beginPath(); c.moveTo(bx, by); c.lineTo(hx, hy); c.stroke(); }
+    return;
+  }
+  if (id === 'knife') {                           // a short skinning knife: dark grip, a hooked steel blade
+    shaft(2.1, C('#2a2a26', '#30302e'), bx, by, ...at(-L / sc + 4, 0));
+    poly([at(-L / sc + 4, -1), at(-L / sc + 4, 1.3), at(-2, 1.5), at(1.2, -0.6), at(-1, -1.2)], C('#cfd3d8', '#c4c4c0'));
+    if (!OUT) { c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 0.45 * sc; c.beginPath(); c.moveTo(...at(-L / sc + 5, 1.2)); c.lineTo(...at(-1.5, 1.4)); c.stroke(); }
+    return;
+  }
+  if (id === 'club') {                            // a root-wood club: thin at the grip, swelling to a knotted head, with green moss
+    const k = 1 - 0.16 * Math.min(3, (S.rg && S.rg.wclub) || 0), tip = at(-(1 - k) * L / sc, 0);
+    poly([at(-L / sc, -1.2), at(-L / sc, 1.2), [tip[0] + nx * 4.2 * sc - ux * 6 * sc, tip[1] + ny * 4.2 * sc - uy * 6 * sc], [tip[0] + nx * 3 * sc, tip[1] + ny * 3 * sc], [tip[0] - nx * 3 * sc, tip[1] - ny * 3 * sc], [tip[0] - nx * 4 * sc - ux * 7 * sc, tip[1] - ny * 4 * sc - uy * 7 * sc]], C('#4c3a26', '#4c4c49'));
+    if (!OUT) {
+      c.fillStyle = C('#5f7a3a', '#6a6a66'); for (const [a, n] of [[-5, 2.5], [-9, -3], [-2, -2]]) { c.beginPath(); c.arc(tip[0] + ux * a * sc + nx * n * sc, tip[1] + uy * a * sc + ny * n * sc, 1.4 * sc, 0, 7); c.fill(); }
+      c.strokeStyle = C('#2c2016', '#2e2e2c'); c.lineWidth = 0.7 * sc; c.beginPath(); c.moveTo(tip[0] - ux * 3 * sc + nx * 2 * sc, tip[1] - uy * 3 * sc + ny * 2 * sc); c.lineTo(tip[0] - ux * 9 * sc - nx * sc, tip[1] - uy * 9 * sc - ny * sc); c.stroke();
+    }
+    return;
+  }
+  if (id === 'glaive') {                          // a long haft and a curved gold-edged blade
+    shaft(1.6, C('#5a4026', '#4c4c49'));
+    poly([at(0, 0), at(3, 4.6), at(12, 3.6), at(10, 0.2)], C('#b8933e', '#b4b4ae'));
+    if (!OUT) { c.strokeStyle = C('#ffe9a6', '#e6e6e0'); c.lineWidth = 0.8 * sc; c.beginPath(); c.moveTo(...at(3, 4.6)); c.quadraticCurveTo(...at(8, 5.2), ...at(12, 3.6)); c.stroke(); c.fillStyle = C('#4fd0c0', '#9a9a96'); c.beginPath(); c.arc(...at(0.5, 0.6), 1.2 * sc, 0, 7); c.fill(); }
+    return;
+  }
+  if (id === 'fists') {                           // a gauntlet on its own (rack, card): a heavy ochre fist
+    const [x, y] = [(bx + hx) / 2, (by + hy) / 2];
+    c.beginPath(); c.ellipse(x, y, 5.5 * sc, 4.4 * sc, Math.atan2(uy, ux), 0, 7);
+    if (OUT) { c.strokeStyle = RIM; c.lineWidth = 1.6 * sc; c.stroke(); } else { c.fillStyle = C('#a8742c', '#7a7a76'); c.fill(); c.strokeStyle = C('#e2b45a', '#bdbdb8'); c.lineWidth = 0.8 * sc; c.beginPath(); c.ellipse(x, y, 5.5 * sc, 4.4 * sc, Math.atan2(uy, ux), -1.2, 0.6); c.stroke(); }
+    return;
+  }
+  if (id === 'lance') {                           // a long white lance, a diamond head, a glint that runs along it
+    shaft(1.5, C('#d9d2bd', '#c8c8c2'));
+    poly([at(-1.5, 0), at(3, 2), at(9, 0), at(3, -2)], C('#fff3c8', '#f0f0ea'));
+    if (!OUT) { const g = (S.t * 0.8) % 1, [gx, gy] = [bx + dx * g, by + dy * g]; glow(gx, gy, 5 * sc, '255,250,225', 0.7); glow(...at(3, 0), 8 * sc, '255,240,190', 0.35); }
+  }
+}
+const WREST = {                                   // how each weapon sits in the hand between blows: hand, elbow, and where the weapon points
+  axe: (r, h) => { const H = [r + 3, 4.2, h - 5]; return [H, [r + 1.5, 6.4, h - 9.5], [H[0] - 4, H[1] + 0.6, H[2] + 5]]; },   // on the shoulder
+  hook: (r, h) => { const H = [r + 4.5, 6, h - 11]; return [H, [r + 1, 7, h - 6], [H[0] + 1.6, 6.2, H[2] + 7]]; },          // the pole held upright like a staff
+  twin: (r, h) => { const H = [r + 4.5, 6, h - 11]; return [H, [r + 1, 7, h - 6], [H[0] + 0.8, 6, H[2] + 7]]; },
+  bow: (r, h) => { const H = [r + 8.5, 4.2, h - 8]; return [H, [r + 4, 6.4, h - 7.5], [H[0] + 7, 4.2, H[2] + 0.4]]; },
+  knife: (r, h) => { const H = [r + 6.5, 4.4, h - 13]; return [H, [r + 2, 6.4, h - 7.5], [H[0] + 5, 4.4, H[2] - 2]]; },      // low, ready
+  club: (r, h) => { const H = [r + 3, 4.2, h - 5]; return [H, [r + 1.5, 6.4, h - 9.5], [H[0] - 5, H[1] + 0.8, H[2] + 4]]; },
+  glaive: (r, h) => { const H = [r + 6, 5, h - 9]; return [H, [r + 2.5, 6.8, h - 6], [H[0] + 3, 5.4, H[2] + 6.5]]; },
+  fists: (r, h) => { const H = [r + 7, 2.8, h - 4]; return [H, [r + 2, 6, h - 9], [H[0] + 2, 2.8, H[2]]]; },                // guard up
+  lance: (r, h) => { const H = [r + 6, 4.4, h - 10]; return [H, [r + 2, 6.4, h - 7], [H[0] + 7, 4.2, H[2] + 0.5]]; },       // level, pointed at them
+};
+function wpHeld(wh, P, hand, tip, near, OUT, lHa) {   // in the hand: from the grip along the weapon to its head
+  const A = ARMS[wh === 'bow' ? 'twin' : wh], d = [tip[0] - hand[0], tip[1] - hand[1], tip[2] - hand[2]], dl = Math.hypot(...d) || 1, u = d.map(v => v / dl);
   const at = k => P(hand[0] + u[0] * k, hand[1] + u[1] * k, hand[2] + u[2] * k);
-  const [bx, by] = at(-4), [hx, hy] = at(20), [fx, fy] = toScreen(S.p.x + Math.cos(S.aimW || 0) * 20, S.p.y + Math.sin(S.aimW || 0) * 20), [px, py] = toScreen(S.p.x, S.p.y);
-  const side = ((-(hy - by)) * (fx - px) + (hx - bx) * (fy - py)) >= 0 ? 1 : -1;   // the blade faces the way you're aiming
-  wpAxeShape(ctx, bx, by, hx, hy, side, Z * 0.74, OUT);
+  const [fx, fy] = toScreen(S.p.x + Math.cos(S.aimW || 0) * 20, S.p.y + Math.sin(S.aimW || 0) * 20), [px, py] = toScreen(S.p.x, S.p.y);
+  if (wh === 'fists') {                           // the gauntlet on the torch hand (the other one is drawn on the free hand)
+    const [x, y] = P(...hand); wpFist(x, y, Math.atan2(fy - py, fx - px), OUT); if (!OUT) S.wpHead = [x, y]; return;
+  }
+  if (wh === 'bow') {                             // the bow: a curve through the hand, the string drawn back to the other hand
+    const [x, y] = P(...hand), [tx, ty] = at(8), ax = tx - x, ay = ty - y, al = Math.hypot(ax, ay) || 1, nx = -ay / al, ny = ax / al, R = 11 * Z;
+    const e0 = [x + nx * R - ax / al * 3 * Z, y + ny * R - ay / al * 3 * Z - 3 * Z], e1 = [x - nx * R - ax / al * 3 * Z, y - ny * R - ay / al * 3 * Z + 3 * Z];
+    ctx.lineCap = 'round'; ctx.strokeStyle = OUT ? 'rgba(239,239,234,0.2)' : (COLOUR ? '#9a7040' : '#77776f'); ctx.lineWidth = (2.5 + (OUT ? 1.6 : 0)) * Z;
+    ctx.beginPath(); ctx.moveTo(...e0); ctx.quadraticCurveTo(x + ax / al * 5 * Z, y + ay / al * 5 * Z, ...e1); ctx.stroke();
+    if (!OUT) { const [sx, sy] = lHa ? P(...lHa) : [x - ax / al * 3 * Z, y - ay / al * 3 * Z]; ctx.strokeStyle = 'rgba(230,230,220,0.75)'; ctx.lineWidth = 0.5 * Z; ctx.beginPath(); ctx.moveTo(...e0); ctx.lineTo(sx, sy); ctx.lineTo(...e1); ctx.stroke(); S.wpHead = [tx, ty];
+      const A0 = S.p.atk; if (A0 && A0.wd && A0.wd.proj && !A0.done) { ctx.strokeStyle = 'rgba(220,240,180,0.9)'; ctx.lineWidth = 0.8 * Z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tx + ax / al * 4 * Z, ty + ay / al * 4 * Z); ctx.stroke(); } }   // an arrow nocked
+    return;
+  }
+  const [b0, f0] = A.held, [bx, by] = at(b0), [hx, hy] = at(f0);
+  const side = ((-(hy - by)) * (fx - px) + (hx - bx) * (fy - py)) >= 0 ? 1 : -1;   // a blade faces the way you're aiming
+  wpShape(wh, ctx, bx, by, hx, hy, side, Z * 0.74, OUT);
   if (!OUT) S.wpHead = [hx, hy];
+}
+function wpFist(x, y, a, OUT) {                   // a heavy ochre gauntlet, knuckles toward the target
+  ctx.beginPath(); ctx.ellipse(x, y, 3.6 * Z, 3 * Z, a, 0, 7);
+  if (OUT) { ctx.strokeStyle = 'rgba(239,239,234,0.2)'; ctx.lineWidth = 1.6 * Z; ctx.stroke(); return; }
+  ctx.fillStyle = COLOUR ? '#9a6a28' : '#6e6e6a'; ctx.fill();
+  ctx.strokeStyle = COLOUR ? '#e8bc62' : '#c8c8c2'; ctx.lineWidth = 0.9 * Z; ctx.beginPath(); ctx.ellipse(x, y, 3.6 * Z, 3 * Z, a, -0.9, 0.9); ctx.stroke();
 }
 function wpLampAt(bx, by0, sf, run) {             // with a weapon in your hand the torch rides clipped to the chest rig: the beam comes from there
   const ca = Math.cos(S.aim), sa = Math.sin(S.aim), f = (sf * 1.4 + run * 2) * 0.35 + 3.6, r = -2.2, h = 27;
   return [bx + (f * ca + r * -sa) * Z, by0 + (f * sa + r * ca * 0.5 - h) * Z];
 }
-// ---- swings ----
-function wpSwing(i, D) {
-  const p = S.p, rg = S.rg, a = S.aimW !== undefined ? S.aimW : 0;
-  if (i === 3) p.roll = 0;                        // the roll turns into the charge
-  lifeAdd('swings');
-  p.atk = { i, t: 0, dur: D.dur, a, side: i === 1 ? -1 : 1, hit: new Set(), done: false, queued: false, pose: D.pose, wd: D, hi: 0 };
-  rg.atkHist = (rg.atkHist || []).filter(h => S.t - h.t < 1.6).concat([{ i, side: p.atk.side, t: S.t }]);
-  camKick(a, D.charge ? 6 : -3); addShake(D.charge ? 0.12 : 0.04);   // heavy: the wind-up pulls you back before it throws you forward
-  if (actx && noiseBuf) {
-    const t = actx.currentTime, h = D.hits ? D.hits[0].at : D.hitAt || 0;
-    if (D.charge) { noiseAt(t, 900, 200, 0.3, 0.42, sfxGain); boomAt(t, 70, 45, 0.18, 0.3, sfxGain); }
-    else { noiseAt(t + Math.max(0, h - 0.13), 1100, 260, 0.16, 0.38, sfxGain); noiseAt(t + Math.max(0, h - 0.06), 2600, 700, 0.08, 0.22, sfxGain); }   // the heavy whoosh just before it lands
-    if (D.hits) noiseAt(t + D.hits[1].at - 0.1, 1400, 300, 0.12, 0.42, sfxGain);
+function wpVeil() {                               // how much of you shows: gone under the sand mid-dive, a shimmer while vanished
+  if (!wpOn()) return 1; const p = S.p, A = p.atk;
+  if (A && A.wd && A.wd.dive && A.t < A.wd.diveT && A.t > 0.06) return 0;
+  return S.rg.wvan ? 0.22 + 0.08 * Math.sin(S.t * 20) : 1;
+}
+// ---- swings: the combo, the dash strike, the rhythm ----
+function wpStart(dash) {
+  const p = S.p, rg = S.rg, w = curW(), W = ARMS[w], prev = p.atkLast, combo = typeof W.atk === 'function' ? W.atk() : W.atk, key = w + (W.stance ? W.stance() : '');
+  let i = 0, D;
+  const chain = prev && prev.w === key && prev.i >= 0 && S.t - prev.end < ATK_CHAIN;
+  if (dash) { D = W.dash; i = -1; }
+  else { if (chain) i = prev.i + 1 < combo.length ? prev.i + 1 : W.loop ? 0 : 0; D = combo[i]; }
+  let k = 1;
+  if (W.beat) {                                   // the Dervish's dance: pressed on the beat, the next step hits harder
+    const on = !dash && (rg.wbeatQ || (chain && S.t - prev.end < 0.11));
+    rg.wbeat = on ? Math.min(4, (rg.wbeat || 0) + 1) : 0; k = 1 + 0.25 * rg.wbeat;
+    if (on) wpDrum(rg.wbeat);
   }
+  rg.wbeatQ = false;
+  wpSwing(i, D, dash, k, key);
+}
+function wpSwing(i, D, dash, k = 1, key) {
+  const p = S.p, rg = S.rg, a = S.aimW !== undefined ? S.aimW : 0, w = curW(), W = ARMS[w];
+  if (dash) p.roll = 0;                           // the roll turns into the dash strike
+  lifeAdd('swings');
+  const sp = w === 'club' ? 1 / (1 - 0.1 * Math.min(3, rg.wclub || 0)) : 1;   // a chipped club swings quicker
+  p.atk = { i, t: 0, dur: D.dur, a, side: D.side || (i % 2 ? -1 : 1), hit: new Set(), done: false, queued: false, pose: D.pose, wd: D, hi: 0, w, key: key || w, k, sp };
+  rg.atkHist = (rg.atkHist || []).filter(h => S.t - h.t < 1.6).concat([{ i: dash ? 3 : Math.min(2, i), side: p.atk.side, t: S.t }]);
+  camKick(a, D.charge ? 6 : D.thrust ? 2 : -3); addShake(D.charge ? 0.12 : 0.04);   // heavy: the wind-up pulls you back before it throws you forward
+  (WSND[w] || WSND.axe)(D);
+  if (w === 'lance' && !dash) wpEcho(D, a);       // the decoys copy your thrusts
+}
+const WSND = {                                    // each weapon's swing: its own whoosh, timed to land just before the blow
+  axe(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime, h = D.hits ? D.hits[0].at : D.hitAt || 0;
+    if (D.charge) { noiseAt(t, 900, 200, 0.3, 0.42, sfxGain); boomAt(t, 70, 45, 0.18, 0.3, sfxGain); }
+    else { noiseAt(t + Math.max(0, h - 0.13), 1100, 260, 0.16, 0.38, sfxGain); noiseAt(t + Math.max(0, h - 0.06), 2600, 700, 0.08, 0.22, sfxGain); }
+    if (D.hits) noiseAt(t + D.hits[1].at - 0.1, 1400, 300, 0.12, 0.42, sfxGain); },
+  hook(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime, h = D.hitAt || 0.1;   // a pole whistling round, and the chain on the lantern
+    noiseAt(t + Math.max(0, h - 0.12), 1600, 500, 0.16, 0.3, sfxGain); toneAt(t + 0.02, 2900, 0.05, 0.02, 'square', sfxGain); toneAt(t + 0.07, 3400, 0.05, 0.015, 'square', sfxGain);
+    if (D.yank) noiseAt(t + h - 0.04, 3500, 1200, 0.1, 0.3, sfxGain); },
+  twin(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime;
+    if (D.proj) { noiseAt(t, 600, 300, 0.12, 0.12, sfxGain); }                        // the creak of the draw (the twang comes with the shot)
+    else if (D.hop) { noiseAt(t, 1200, 300, 0.25, 0.28, sfxGain); noiseAt(t + 0.38, 3200, 900, 0.08, 0.3, sfxGain); }
+    else noiseAt(t + Math.max(0, (D.hitAt || 0.08) - 0.05), 4200, 1600, 0.06, D.fin ? 0.4 : 0.24, sfxGain); },   // quick, sharp hisses
+  knife(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime;
+    if (D.blink) { noiseAt(t, 7000, 1200, 0.16, 0.35, sfxGain); toneAt(t, 1600, 0.12, 0.03, 'sine', sfxGain); }
+    else noiseAt(t + Math.max(0, (D.hitAt || 0.08) - 0.04), 6500, 2600, 0.05, D.fin ? 0.38 : 0.22, sfxGain); },
+  club(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime, h = D.hitAt || 0.2;   // a deep, slow WHUM
+    noiseAt(t + Math.max(0, h - 0.18), 500, 140, 0.24, D.fin ? 0.55 : 0.42, sfxGain); boomAt(t + Math.max(0, h - 0.12), 60, 40, 0.14, 0.2, sfxGain); },
+  glaive(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime;   // a ringing shing as it spins
+    noiseAt(t + 0.06, 5200, 1800, 0.18, 0.26, sfxGain); toneAt(t + 0.1, 2200 + Math.random() * 200, 0.22, 0.02, 'triangle', sfxGain); },
+  fists(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime;
+    if (D.dive) { noiseAt(t, 300, 80, 0.32, 0.4, sfxGain); boomAt(t, 60, 30, 0.3, 0.3, sfxGain); }
+    else noiseAt(t + Math.max(0, (D.hitAt || 0.08) - 0.06), 1500, 500, 0.08, D.fin ? 0.4 : 0.26, sfxGain); },
+  lance(D) { if (!actx || !noiseBuf) return; const t = actx.currentTime, h = D.hitAt || 0.12;   // a thin, bright tsss and a chime
+    noiseAt(t + Math.max(0, h - 0.07), 8000, 3000, 0.08, 0.3, sfxGain); toneAt(t + h, 1760, 0.18, 0.02, 'sine', sfxGain); },
+};
+function wpDrum(n) {                              // ON BEAT: a drum hit that climbs with the dance
+  if (actx) { const t = actx.currentTime; boomAt(t, 140 + 25 * n, 55, 0.18, 0.55, sfxGain); noiseAt(t, 2400, 900, 0.05, 0.25, sfxGain); }
+  if (n >= 2) wpPop('ON BEAT ×' + (1 + 0.25 * n).toFixed(2).replace(/\.?0+$/, ''), S.p.x, S.p.y, 60, '255,215,110', 0.7);
+  S.rg.wbeatFx = { t: 0, n };
 }
 function wpStep(dt, A) {                          // a weapon's swing: planted wind-up, the lunge into it, the hit (or hits), the recovery
-  const p = S.p, D = A.wd, rooted = S.rg.recall, mT = D.moveT || [0, (D.hitAt || 0.2) * 0.9];
-  A.t += dt;
-  if (A.t >= mT[0] && A.t < mT[1] && !rooted) { const u = (A.t - mT[0]) / (mT[1] - mT[0]), v = D.lunge / (mT[1] - mT[0]) * (D.charge ? 1.25 * (1 - 0.5 * u) : 2 * (1 - u)); p.vx = Math.cos(A.a) * v; p.vy = Math.sin(A.a) * v; }
+  const p = S.p, D = A.wd, rooted = S.rg.recall, mT = D.moveT || [0, (D.hitAt || 0.2) * 0.9], t0 = A.t;
+  A.t += dt * (A.sp || 1);
+  if (D.dive) return wpDiveStep(A, t0);
+  if (A.t >= mT[0] && A.t < mT[1] && !rooted && D.lunge) { const u = (A.t - mT[0]) / (mT[1] - mT[0]), v = D.lunge / (mT[1] - mT[0]) * (D.charge ? 1.25 * (1 - 0.5 * u) : 2 * (1 - u)); p.vx = Math.cos(A.a) * v; p.vy = Math.sin(A.a) * v; }
   else if (A.t < mT[0]) { const f = Math.exp(-25 * dt); p.vx *= f; p.vy *= f; }   // feet planted for the wind-up
-  else if (!A.slowed) { A.slowed = true; p.vx *= 0.12; p.vy *= 0.12; }
+  else if (!A.slowed && !D.proj) { A.slowed = true; p.vx *= 0.12; p.vy *= 0.12; }
   const hT = D.hopT; p.hopZ = hT && A.t > hT[0] && A.t < hT[1] ? D.hop * Math.sin(Math.PI * (A.t - hT[0]) / (hT[1] - hT[0])) : 0;
+  if (D.blink && !A.blinked && A.t >= D.blinkAt) { A.blinked = true; wpBlink(D, A.a); }
   if (D.charge) {                                 // everything in your path is bowled over
     if (A.t < mT[1] + 0.04) { const n = wpHit(D, A.a); if (Math.random() < dt * 30) dustKick(p.x, p.y, A.a, 2, 90); if (n && actx) boomAt(actx.currentTime, 110, 40, 0.16, 0.6, sfxGain); }
   } else if (D.hits) { while (A.hi < D.hits.length && A.t >= D.hits[A.hi].at) { const H = Object.assign({}, D, D.hits[A.hi++]); A.hit = new Set(); wpHit(H, A.a); } }
-  else if (!A.done && A.t >= D.hitAt) { A.done = true; wpHit(D, A.a); }
-  if (A.t >= D.dur) {
-    p.atkLast = { i: A.i, pose: A.pose, end: S.t }; p.atk = null; p.hopZ = 0;
-    if (A.rollQ) dodge(); else if (A.queued) startSwing();
-  }
+  else if (!A.done && !D.blink && A.t >= D.hitAt) { A.done = true; wpHit(D, A.a); }
+  if (ARMS[A.w].beat && !A.cue && A.t >= D.dur - 0.07) { A.cue = true; if (actx) toneAt(actx.currentTime, 880, 0.05, 0.035, 'square', sfxGain); }   // the beat: tap now
+  if (A.t >= D.dur) wpEnd(A);
 }
-function wpHit(D, a) {                            // the blow itself goes through atkHit (enemies, bosses, the lot); then the axe's own weight on top
-  const rg = S.rg, p = S.p, n = atkHit(Object.assign({ wpn: 1 }, D), a) || 0;
+function wpEnd(A) {
+  const p = S.p; p.atkLast = { i: A.i, pose: A.pose, end: S.t, w: A.key }; p.atk = null; p.hopZ = 0;
+  if (A.rollQ) dodge(); else if (A.queued) { S.rg.wbeatQ = !!A.onBeat; startSwing(); }
+}
+function wpHit(D, a) {                            // the blow goes through atkHit (enemies, bosses, the lot); then the weapon's own weight on top
+  const rg = S.rg, p = S.p, A = p.atk, w = A ? A.w : curW();
+  if (D.proj) return wpShoot(D, a);
+  const trip = rg.wtrip ? 3 : 1, back = w === 'knife' && rg.wvan, k = (A && A.k || 1) * trip;
+  const D2 = Object.assign({ wpn: 1 }, D, { dmg: D.dmg * k, boss: D.boss * k, kh: D.kh || 'swing' });
+  if (back) Object.assign(D2, { dmg: 99, boss: D.boss * 3, kh: 'backstab' });   // out of nowhere: a backstab kills anything that isn't a boss
+  const n = atkHit(D2, a) || 0;
+  const hit = n ? rg.enemies.filter(o => o.kHitT === S.t && o.kHit === D2.kh) : [];
+  if (n && trip > 1) wpTripSpent(p.x + Math.cos(a) * 40, p.y + Math.sin(a) * 40);
+  if (back && n) wpBackstab();
   if (D.charge) return n;
-  rg.slashes = rg.slashes || [];
-  const side = p.atk ? p.atk.side : 1;
-  if (D.round) rg.slashes.push({ i: 0, a: a - Math.PI / 2, side: 1, t: 0, life: 0.3, r: D.reach, arc: Math.PI * 2, axe: 1, whirl: 1 });
-  else if (D.cleave) rg.slashes.push({ i: 0, a, side, t: 0, life: 0.34, r: D.reach, arc: D.arc, axe: 1, cleave: 1 });
-  else rg.slashes.push({ i: 0, a, side, t: 0, life: 0.26, r: D.reach, arc: D.arc, axe: 1 });
-  const ix = p.x + Math.cos(a) * D.reach * 0.62, iy = p.y + Math.sin(a) * D.reach * 0.62;
-  if (D.cleave) {                                 // a split in the ground runs out ahead of you, throwing up dirt all along it
-    wpCrack(p.x + Math.cos(a) * 18, p.y + Math.sin(a) * 18, a, D.reach * 1.05, 1);
-    for (let f = 0.2; f <= 1; f += 0.2) { ashBurst(p.x + Math.cos(a) * D.reach * f, p.y + Math.sin(a) * D.reach * f, 5, 16); wpChips(p.x + Math.cos(a) * D.reach * f, p.y + Math.sin(a) * D.reach * f, 4, 'dirt', 5); }
-    if (!n) { addShake(0.45); hitStop(0.06); camKick(a, 10); }
-    if (actx) { const t = actx.currentTime; boomAt(t, 62, 26, 0.6, 0.95, sfxGain); noiseAt(t, 900, 110, 0.45, 0.5, sfxGain); noiseAt(t + 0.02, 3000, 900, 0.12, 0.3, sfxGain); }
-    wpPop(n ? 'CLEAVE' : '', p.x, p.y, 70, '255,180,110', 1);
-  } else if (D.round) {
-    if (actx) { const t = actx.currentTime; noiseAt(t, 1800, 500, 0.2, 0.4, sfxGain); if (n) boomAt(t, 130, 50, 0.16, 0.6, sfxGain); }
-  } else {                                        // the head bites the ground where it lands
-    if (D.crack) wpCrack(ix, iy, a + side * 0.5, 26, 0);
-    wpChips(ix, iy, 3, n ? 'wood' : 'dirt', n ? 8 : 6); dustKick(ix, iy, a + Math.PI, 5, 60);
-    if (!n) { addShake(0.12); camKick(a, 4); }
-    if (actx) { const t = actx.currentTime; if (n) { boomAt(t, 125, 38, 0.2, 0.75, sfxGain); noiseAt(t, 2300, 500, 0.14, 0.5, sfxGain); } else { boomAt(t, 90, 50, 0.12, 0.4, sfxGain); noiseAt(t, 800, 250, 0.16, 0.32, sfxGain); } }
-  }
+  (WHIT[w] || WHIT.axe)(D, n, a, hit);
+  if (D.fin && n) wpFinish(D, a);
   return n;
 }
-// ---- a hit away from your hands (the thrown axe, a falling tree): anything within r of (x, y), once per set, knocked away from (ox, oy) ----
+function wpSlash(D, a, o) {                       // the weapon's own smear through the air, in its own colours
+  const W = ARMS[curW()], p = S.p, side = p.atk ? p.atk.side : 1, rg = S.rg; rg.slashes = rg.slashes || [];
+  rg.slashes.push(Object.assign({ i: 0, a, side, t: 0, life: D.thrust ? 0.18 : 0.24, r: D.reach, arc: D.round ? Math.PI * 2 : D.arc, axe: 1, tint: W.tint, whirl: D.round ? 1 : 0, cleave: D.thrust ? 1 : 0 }, o || {}));
+}
+function wpRing(x, y, r, col, life = 0.45) { (S.rg.wrings = S.rg.wrings || []).push({ x, y, r, col, t: 0, life }); }
+function wpFinish(D, a) {                         // every combo ends on the big one: a ring on the ground, a word over your head
+  const p = S.p, W = ARMS[curW()];
+  wpRing(p.x + Math.cos(a) * 20, p.y + Math.sin(a) * 20, (D.reach || 80) * 0.9, W.col);
+  wpPop(D.fin, p.x, p.y, 72, W.col, 1.05);
+}
+const WHIT = {                                    // each weapon's impact: what a hit looks, sounds and feels like
+  axe(D, n, a) {
+    const rg = S.rg, p = S.p, side = p.atk ? p.atk.side : 1;
+    rg.slashes = rg.slashes || [];
+    if (D.round) rg.slashes.push({ i: 0, a: a - Math.PI / 2, side: 1, t: 0, life: 0.3, r: D.reach, arc: Math.PI * 2, axe: 1, whirl: 1 });
+    else if (D.cleave) rg.slashes.push({ i: 0, a, side, t: 0, life: 0.34, r: D.reach, arc: D.arc, axe: 1, cleave: 1 });
+    else rg.slashes.push({ i: 0, a, side, t: 0, life: 0.26, r: D.reach, arc: D.arc, axe: 1 });
+    const ix = p.x + Math.cos(a) * D.reach * 0.62, iy = p.y + Math.sin(a) * D.reach * 0.62;
+    if (D.cleave) {                               // a split in the ground runs out ahead of you, throwing up dirt all along it
+      wpCrack(p.x + Math.cos(a) * 18, p.y + Math.sin(a) * 18, a, D.reach * 1.05, 1);
+      for (let f = 0.2; f <= 1; f += 0.2) { ashBurst(p.x + Math.cos(a) * D.reach * f, p.y + Math.sin(a) * D.reach * f, 5, 16); wpChips(p.x + Math.cos(a) * D.reach * f, p.y + Math.sin(a) * D.reach * f, 4, 'dirt', 5); }
+      if (!n) { addShake(0.45); hitStop(0.06); camKick(a, 10); }
+      if (actx) { const t = actx.currentTime; boomAt(t, 62, 26, 0.6, 0.95, sfxGain); noiseAt(t, 900, 110, 0.45, 0.5, sfxGain); noiseAt(t + 0.02, 3000, 900, 0.12, 0.3, sfxGain); }
+      wpPop(n ? 'CLEAVE' : '', p.x, p.y, 70, '255,180,110', 1);
+    } else if (D.round) {
+      if (actx) { const t = actx.currentTime; noiseAt(t, 1800, 500, 0.2, 0.4, sfxGain); if (n) boomAt(t, 130, 50, 0.16, 0.6, sfxGain); }
+    } else {                                      // the head bites the ground where it lands
+      if (D.crack) wpCrack(ix, iy, a + side * 0.5, 26, 0);
+      wpChips(ix, iy, 3, n ? 'wood' : 'dirt', n ? 8 : 6); dustKick(ix, iy, a + Math.PI, 5, 60);
+      if (!n) { addShake(0.12); camKick(a, 4); }
+      if (actx) { const t = actx.currentTime; if (n) { boomAt(t, 125, 38, 0.2, 0.75, sfxGain); noiseAt(t, 2300, 500, 0.14, 0.5, sfxGain); } else { boomAt(t, 90, 50, 0.12, 0.4, sfxGain); noiseAt(t, 800, 250, 0.16, 0.32, sfxGain); } }
+    }
+  },
+  hook(D, n, a, hit) {                            // it bites, and drags: anything hooked is pulled toward you
+    const p = S.p; wpSlash(D, a, { life: D.yank ? 0.3 : 0.26 });
+    if (D.yank) {
+      const tx = p.x + Math.cos(a) * 40, ty = p.y + Math.sin(a) * 40;
+      for (const o of hit) if (o.type !== 'tall') { o.wyank = { t: 0, x0: o.x, y0: o.y, x1: tx + (Math.random() - 0.5) * 16, y1: ty + (Math.random() - 0.5) * 16 }; o.frozen = Math.max(o.frozen || 0, 0.8); }
+      const L = Math.min(D.reach, hit.length ? Math.max(...hit.map(o => Math.hypot(o.x - p.x, o.y - p.y))) : D.reach);
+      (S.rg.wchains = S.rg.wchains || []).push({ a, L, t: 0, life: 0.3 });   // the hook flies out on its chain and comes back
+      if (actx) { const t = actx.currentTime; noiseAt(t, 4200, 1500, 0.08, 0.3, sfxGain); if (n) { boomAt(t + 0.03, 150, 60, 0.15, 0.6, sfxGain); for (let k = 0; k < 4; k++) toneAt(t + 0.05 + k * 0.035, 2600 + k * 300, 0.04, 0.03, 'square', sfxGain); } }
+    } else for (const o of hit) if (o.type !== 'tall' && o.type !== 'brute') { const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy) || 1, m = Math.max(0, Math.min(D.pull, d - 26)); o.x += dx / d * m; o.y += dy / d * m; }
+    for (const o of hit) wpEmbers(o.x, o.y, 22, 6, '255,150,60');
+    if (actx && n && !D.yank) { const t = actx.currentTime; boomAt(t, 140, 55, 0.12, 0.5, sfxGain); toneAt(t, 2200, 0.06, 0.03, 'square', sfxGain); noiseAt(t, 3000, 900, 0.08, 0.3, sfxGain); }
+  },
+  twin(D, n, a, hit) {                            // the spear: a thin bright line straight out, a tick on contact, almost no weight
+    const p = S.p; wpSlash(D, a, { life: D.fin ? 0.24 : 0.14 });
+    if (D.land) { dustKick(p.x, p.y, a, 10, 90); ashBurst(p.x, p.y, 6, 8); wpRing(p.x, p.y, 50, '200,230,110', 0.35); addShake(0.18); }
+    if (actx && n) { const t = actx.currentTime; noiseAt(t, 5200, 2200, 0.05, 0.32, sfxGain); toneAt(t, 1900, 0.05, 0.02, 'triangle', sfxGain); if (D.fin) boomAt(t, 140, 60, 0.16, 0.55, sfxGain); }
+  },
+  knife(D, n, a, hit) {                           // tiny freezes that stack into a rattle; little sprays of sparks
+    const p = S.p; wpSlash(D, a, { life: D.fin ? 0.22 : 0.12 });
+    for (const o of hit) wpEmbers(o.x, o.y, 20, 4, '200,240,190');
+    if (actx && n) { const t = actx.currentTime; noiseAt(t, 7000, 3000, 0.04, 0.3, sfxGain); boomAt(t, 220, 90, 0.05, 0.25, sfxGain); if (D.fin) boomAt(t, 120, 50, 0.14, 0.5, sfxGain); }
+  },
+  club(D, n, a, hit) {                            // a deep thud and they go flying
+    const p = S.p; wpSlash(D, a, { life: 0.32 });
+    for (const o of hit) if (o.type !== 'tall' && o.type !== 'brute') { const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1, f = D.fly || 400; o.popT = 0.45; o.pvx = dx / d * f; o.pvy = dy / d * f; o.wfly = 0.5; o.frozen = Math.max(o.frozen || 0, 0.5); }
+    for (const o of hit) { wpChips(o.x, o.y, 14, 'leaf', 4); }
+    if (D.slam) { wpChips(p.x, p.y, 2, 'dirt', 14); wpCrack(p.x, p.y, a, 50, 0); wpCrack(p.x, p.y, a + 2.1, 44, 0); wpCrack(p.x, p.y, a - 2.1, 44, 0); }
+    if (actx) { const t = actx.currentTime; if (n) { boomAt(t, 90, 30, 0.28, 0.85, sfxGain); noiseAt(t, 1200, 200, 0.16, 0.45, sfxGain); } else noiseAt(t, 700, 200, 0.12, 0.28, sfxGain); }
+    if (!n && !D.slam) addShake(0.1);
+  },
+  glaive(D, n, a, hit) {                          // gold ribbons; it rings louder the further into the dance you are
+    const p = S.p, b = S.rg.wbeat || 0; wpSlash(D, a, { life: 0.3, a: D.round ? a - Math.PI / 2 : a, ribbon: 1, hot: b });
+    for (const o of hit) wpEmbers(o.x, o.y, 26, 5 + b * 2, '255,210,90');
+    if (actx && n) { const t = actx.currentTime; toneAt(t, 1320 + 220 * b, 0.25, 0.04, 'triangle', sfxGain); noiseAt(t, 4800, 1600, 0.07, 0.3, sfxGain); boomAt(t, 150, 60, 0.12, 0.4, sfxGain); }
+  },
+  fists(D, n, a, hit) {                           // a punch: a dull heavy crack and a puff of sand off them
+    const p = S.p; wpSlash(D, a, { life: 0.14, r: D.reach * 0.9 });
+    for (const o of hit) { dustKick(o.x, o.y, a + Math.PI, 5, 80); if (D.upper || D.dive) o.frozen = Math.max(o.frozen || 0, 0.9); }
+    if (D.upper && n) for (const o of hit) wpEmbers(o.x, o.y, 40, 8, '255,200,120');
+    if (actx && n) { const t = actx.currentTime; boomAt(t, D.upper ? 95 : 130, 40, D.upper ? 0.25 : 0.14, D.upper ? 0.85 : 0.6, sfxGain); noiseAt(t, 1800, 400, 0.08, 0.38, sfxGain); }
+    if (actx && !n) noiseAt(actx.currentTime, 900, 300, 0.06, 0.18, sfxGain);
+  },
+  lance(D, n, a, hit) {                           // white-gold glints all down the line
+    const p = S.p; wpSlash(D, a, { life: D.fin ? 0.26 : 0.18 });
+    for (const o of hit) wpEmbers(o.x, o.y, 26, 5, '255,245,210');
+    if (actx && n) { const t = actx.currentTime; toneAt(t, 2640, 0.2, 0.025, 'sine', sfxGain); noiseAt(t, 6000, 2500, 0.06, 0.3, sfxGain); if (n > 1) toneAt(t + 0.04, 3520, 0.2, 0.02, 'sine', sfxGain); }
+    if (n > 2) wpPop('×' + n, p.x + Math.cos(a) * 60, p.y + Math.sin(a) * 60, 40, '255,245,210', 0.8);
+  },
+};
+function wpEmbers(x, y, h, n, rgb) {
+  const rg = S.rg;
+  for (let k = 0; k < n; k++) { const b = Math.random() * 7, v = 60 + Math.random() * 140; rg.embers.push({ x, y, z: h * (0.4 + Math.random() * 0.6), vx: Math.cos(b) * v, vy: Math.sin(b) * v, vz: 40 + Math.random() * 100, life: 0.2 + Math.random() * 0.25, ember: true }); }
+}
+// ---- a hit away from your hands (the thrown axe, a falling tree, an arrow, roots...): anything within r of (x, y), once per set, knocked away from (ox, oy) ----
 function wpSpark(x, y, h, n = 9) {
   const rg = S.rg;
   for (let k = 0; k < n; k++) { const b = Math.random() * 7, v = 60 + Math.random() * 150; rg.embers.push({ x, y, z: h * (0.4 + Math.random() * 0.5), vx: Math.cos(b) * v, vy: Math.sin(b) * v, vz: 50 + Math.random() * 110, life: 0.25 + Math.random() * 0.3, ember: true }); }
@@ -7813,18 +8226,29 @@ function wpHitAt(x, y, r, dmg, bdmg, knock, set, kh, ox, oy) {
   }
   return n;
 }
-// ---- the special: Throw (axe) or Flare (torch) ----
+// ---- the special: every weapon's second button ----
 function wpSpecial() {
   if (!wpOn() || !S.running || S.rg.phase !== 'fight' || S.rg.drink) return;
   const rg = S.rg, p = S.p, w = curW();
   if (w === 'axe' && rg.wax) return wpRecall();
-  if ((rg.wspT || 0) > 0 || p.wact) return wpDenied();
+  if (w === 'glaive' && rg.worb) return wpOrbitEnd();
+  if ((rg.wspT || 0) > 0 || p.wact || rg.wgrab) return wpDenied();
   if (p.atk) { p.atkLast = null; p.atk = null; p.hopZ = 0; }   // the special cuts a swing short
-  if (w === 'axe') p.wact = { pose: AXP + 4, t: 0, dur: 0.34, rel: 0.18, a: S.aimW || 0, fn: wpThrow };
+  const a = S.aimW || 0;
+  if (w === 'axe') p.wact = { pose: AXP + 4, t: 0, dur: 0.34, rel: 0.18, a, fn: wpThrow };
+  else if (w === 'hook') p.wact = { pose: WPP.hookS, t: 0, dur: 0.42, rel: 0.16, a, fn: wpPlant };
+  else if (w === 'twin') p.wact = { pose: WPP.turn, t: 0, dur: 0.36, rel: 0.06, a, fn: wpTurn };
+  else if (w === 'knife') p.wact = { pose: WPP.vanish, t: 0, dur: 0.3, rel: 0.1, a, fn: wpVanish };
+  else if (w === 'club') p.wact = { pose: WPP.rootS, t: 0, dur: 0.56, rel: 0.27, a, fn: wpRoots };
+  else if (w === 'glaive') p.wact = { pose: AXP + 4, t: 0, dur: 0.34, rel: 0.18, a, fn: wpOrbit };
+  else if (w === 'fists') p.wact = { pose: WPP.grab, t: 0, dur: 0.66, rel: 0.1, a, fn: wpSeize, rel2: 0.34, fn2: wpHurl };
+  else if (w === 'lance') p.wact = { pose: WPP.lnS, t: 0, dur: 0.42, rel: 0.2, a, fn: wpLight };
   else wpFlare();
   wpUi(true);
 }
 function wpDenied() { if (actx) toneAt(actx.currentTime, 180, 0.09, 0.05, 'square', sfxGain); }
+function wpCool(w) { S.rg.wspT = ARMS[w].spCool; }
+// the Felling Axe: thrown, it cuts both ways and fells trees
 function wpThrow() {
   const rg = S.rg, p = S.p, a = p.wact.a;
   rg.wax = { x: p.x + Math.cos(a) * 14, y: p.y + Math.sin(a) * 14, ux: Math.cos(a), uy: Math.sin(a), d: 0, max: 400, sp: 650, st: 'out', hit: new Set(), spin: 0, t: 0, wt: 0 };
@@ -7842,6 +8266,11 @@ function wpTreeAt(x, y) {                         // a trunk the flying axe woul
   if (inBeyond()) return null;
   const m = miniLive(); if (m && m.standing) for (const t of m.standing) if (Math.hypot(t.x - x, t.y - y) < 10 * t.s + 6) return t;
   for (const o of propsNear(x, y, 40)) if (o.kind === 'tree' && o.key && Math.hypot(o.x - x, o.y - y) < o.r * o.s + 7) return o;
+  return null;
+}
+function wpSolidAt(x, y, pad = 4) {               // any trunk or rock at (x, y): arrows stick in it, light bounces off it
+  for (const o of propsNear(x, y, 40)) if (o.r && o.s && Math.hypot(o.x - x, o.y - y) < o.r * o.s + pad) return o;
+  const m = miniLive(); if (m && m.standing) for (const t of m.standing) if (Math.hypot(t.x - x, t.y - y) < 10 * t.s + pad) return t;
   return null;
 }
 function wpAxeStep(dt) {
@@ -7871,7 +8300,7 @@ function wpAxeStep(dt) {
   }
 }
 function wpCatch() {
-  const rg = S.rg, p = S.p, X = rg.wax; rg.wax = null; rg.wspT = ARMS.axe.spCool;
+  const rg = S.rg, p = S.p, X = rg.wax; rg.wax = null; wpCool('axe');
   if (!p.atk) p.wact = { pose: AXP + 5, t: 0, dur: 0.26 };
   addShake(0.12); camKick(Math.atan2(X.uy, X.ux), 5);
   if (actx) { const t = actx.currentTime; boomAt(t, 210, 110, 0.1, 0.45, sfxGain); toneAt(t, 1650, 0.16, 0.05, 'triangle', sfxGain); noiseAt(t, 4200, 1600, 0.06, 0.25, sfxGain); }
@@ -7897,26 +8326,262 @@ function wpCrash(g) {                             // it lands: everything along 
   if (n > 1) wpPop('CRUSHED ×' + n, (g.bx + ex) / 2, (g.by + ey) / 2, 50, '255,230,190', 1);
 }
 function wpFlare() {                              // the torch's special: everything in the beam is blinded and frozen a moment
-  const rg = S.rg, p = S.p; rg.wspT = ARMS.torch.spCool; p.wact = { pose: AXP + 7, t: 0, dur: 0.34 };
+  const rg = S.rg, p = S.p; wpCool('torch'); p.wact = { pose: AXP + 7, t: 0, dur: 0.34 };
   let n = 0;
   for (const e of rg.enemies) if (!e.dead && e.beam > 0) { e.frozen = Math.max(e.frozen || 0, 1.8); e.hp -= 0.15 * e.maxHp; e.jit = 1; e.swung = true; e.kHit = 'swing'; e.kHitT = S.t; n++; }
   rg.wflare = { t: 0 }; addShake(0.22); hitStop(0.04); camKick(S.aimW || 0, -5);
   if (actx) { const t = actx.currentTime; noiseAt(t, 9000, 2500, 0.35, 0.5, sfxGain); boomAt(t, 180, 60, 0.25, 0.4, sfxGain); toneAt(t, 2400, 0.3, 0.04, 'sine', sfxGain); }
   wpPop(n ? 'BLINDED' + (n > 1 ? ' ×' + n : '') : 'FLARE', p.x, p.y, 74, '255,240,205', 1);
 }
+// the Lamp Hook: plant a lamp. In its light every hit on you is halved; they come to stamp it out
+const WLAMP_R = 120;
+function wpPlant() {
+  const rg = S.rg, p = S.p, a = p.wact.a, L = rg.wlamps = rg.wlamps || [];
+  if (L.length >= 3) { const o = L.shift(); wpLampOut(o, true); }
+  const l = { x: p.x + Math.cos(a) * 26, y: p.y + Math.sin(a) * 26, hp: 3, t: 0, seed: Math.random() * 9, stamp: 0 };
+  L.push(l); wpCool('hook');
+  addShake(0.16); hitStop(0.03); dustKick(l.x, l.y, a, 6, 60); wpRing(l.x, l.y, WLAMP_R, '255,170,70', 0.5);
+  for (let k = 0; k < 10; k++) wpEmbers(l.x, l.y, 30, 1, '255,170,70');
+  if (actx) { const t = actx.currentTime; boomAt(t, 120, 60, 0.12, 0.5, sfxGain); toneAt(t + 0.05, 988, 0.4, 0.04, 'triangle', sfxGain); toneAt(t + 0.1, 1319, 0.4, 0.03, 'triangle', sfxGain); noiseAt(t + 0.05, 3000, 6000, 0.25, 0.12, sfxGain); }
+  wpPop('LAMP ' + L.length + '/3', l.x, l.y, 50, '255,190,110', 0.8);
+}
+function wpLampOut(l, quiet) {                    // stamped out (or pulled up for a new one): a puff of sparks and dark
+  l.out = true; ashBurst(l.x, l.y, 8, 20); wpEmbers(l.x, l.y, 16, 10, '255,160,60');
+  if (actx) { const t = actx.currentTime; noiseAt(t, 2000, 300, 0.3, quiet ? 0.15 : 0.35, sfxGain); if (!quiet) toneAt(t, 330, 0.3, 0.04, 'sawtooth', sfxGain); }
+  if (!quiet) wpPop('LAMP OUT', l.x, l.y, 46, '255,150,90', 0.8);
+}
+function wpGuard() {                              // standing in one of your lamps' light: hits are halved
+  const L = wpOn() && S.rg.wlamps; if (!L) return 1;
+  return L.some(l => Math.hypot(l.x - S.p.x, l.y - S.p.y) < WLAMP_R) ? 0.5 : 1;
+}
+// the Twins: the turn arms the next hit at triple
+function wpTurn() {
+  const rg = S.rg, p = S.p; rg.wtrip = true; wpCool('twin');
+  wpHitAt(p.x, p.y, 44, 0.3, 0.4, 30, new Set(), 'swing', p.x, p.y);
+  wpSlash({ reach: 50, round: 1 }, 0, { life: 0.26 });
+  addShake(0.1); hitStop(0.03);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 5000, 1800, 0.18, 0.3, sfxGain); toneAt(t + 0.04, 784, 0.3, 0.04, 'triangle', sfxGain); toneAt(t + 0.11, 1175, 0.35, 0.04, 'triangle', sfxGain); }
+  wpPop('TWIN TURN', p.x, p.y, 70, '200,230,110', 0.95);
+}
+function wpTripSpent(x, y) {                      // the tripled hit lands
+  const rg = S.rg; rg.wtrip = false;
+  wpRing(x, y, 70, '230,255,150', 0.4); addShake(0.35); hitStop(0.08);
+  if (actx) { const t = actx.currentTime; boomAt(t, 110, 40, 0.3, 0.8, sfxGain); toneAt(t, 1568, 0.3, 0.04, 'triangle', sfxGain); }
+  wpPop('TWIN STRIKE', x, y, 60, '220,255,140', 1.1);
+}
+function wpShoot(D, a) {                          // the bow: arrows fly fast and pierce one, and stick in trees
+  const rg = S.rg, p = S.p, L = rg.warrows = rg.warrows || [], n = D.n || 1;
+  for (let k = 0; k < n; k++) {
+    const b = a + (k - (n - 1) / 2) * (D.spread || 0);
+    L.push({ x: p.x + Math.cos(b) * 14, y: p.y + Math.sin(b) * 14, ux: Math.cos(b), uy: Math.sin(b), d: 0, max: 540, sp: 980, hit: new Set(), pierce: 1, dmg: D.dmg, boss: D.boss, kh: D.kh, trip: 1, t: 0 });
+  }
+  if (rg.wtrip) L[L.length - Math.ceil(n / 2)].trip = 3;
+  camKick(a, -2); addShake(n > 1 ? 0.12 : 0.05);
+  if (actx) { const t = actx.currentTime; toneAt(t, 196, 0.12, 0.05, 'triangle', sfxGain); noiseAt(t, 3500, 1200, 0.08, 0.28, sfxGain); if (n > 1) toneAt(t + 0.02, 262, 0.12, 0.04, 'triangle', sfxGain); }
+  if (D.fin) wpPop(D.fin, p.x, p.y, 66, '200,230,110', 0.9);
+  return 0;
+}
+function wpArrowStep(dt) {
+  const rg = S.rg;
+  for (const r of rg.warrows) {
+    r.t += dt;
+    if (r.stuck) { r.stuck -= dt; continue; }
+    const v = r.sp * dt; r.x += r.ux * v; r.y += r.uy * v; r.d += v;
+    const k = r.trip || 1, n = wpHitAt(r.x, r.y, 12, r.dmg * k, r.boss * k, 10, r.hit, r.kh, r.x - r.ux * 20, r.y - r.uy * 20);
+    if (n) { hitStop(0.012); if (k > 1) { r.trip = 1; wpTripSpent(r.x, r.y); } if (actx) noiseAt(actx.currentTime, 4500, 1800, 0.05, 0.26, sfxGain); if (--r.pierce < 0) r.gone = true; }
+    if (!r.gone && wpSolidAt(r.x, r.y)) { r.stuck = 1.2; if (actx) boomAt(actx.currentTime, 260, 120, 0.06, 0.3, sfxGain); }   // thunk: it stands quivering in the trunk
+    if (r.d > r.max) r.gone = true;
+  }
+  rg.warrows = rg.warrows.filter(r => !r.gone && !(r.stuck !== undefined && r.stuck <= 0));
+}
+// the Huntsman's Knife: the blink, and the vanish
+function wpBlink(D, a) {                          // a short blink straight through them, cutting all you pass
+  const rg = S.rg, p = S.p, x0 = p.x, y0 = p.y, set = new Set(); let d = 0, n = 0;
+  while (d < D.blink) { const nx = x0 + Math.cos(a) * (d + 8), ny = y0 + Math.sin(a) * (d + 8); if (wpSolidAt(nx, ny, 10) || exSafeAt(nx, ny)) break; d += 8; }
+  for (let f = 0; f <= d; f += 14) n += wpHitAt(x0 + Math.cos(a) * f, y0 + Math.sin(a) * f, 22, D.dmg, D.boss, D.knock, set, 'blink', x0, y0);
+  p.x = x0 + Math.cos(a) * d; p.y = y0 + Math.sin(a) * d; p.vx = Math.cos(a) * 60; p.vy = Math.sin(a) * 60;
+  rg.wstreak = { x0, y0, x1: p.x, y1: p.y, t: 0 };
+  p.ghosts = [{ x: x0, y: y0, a: 0.5 }, { x: (x0 + p.x) / 2, y: (y0 + p.y) / 2, a: 0.4 }];
+  if (n) { hitStop(0.05 + 0.015 * Math.min(4, n)); addShake(0.2 + 0.05 * n); }
+  if (n > 1) wpPop('BLINK ×' + n, p.x, p.y, 62, '190,240,170', 0.9);
+  if (actx && n) { const t = actx.currentTime; for (let k = 0; k < Math.min(5, n); k++) noiseAt(t + k * 0.03, 7000, 3000, 0.04, 0.3, sfxGain); }
+}
+function wpVanish() {                             // gone in a puff of smoke: they lose you and go hunting where you were
+  const rg = S.rg, p = S.p; rg.wvan = { t: 0, x: p.x, y: p.y, dur: 2 }; wpCool('knife');
+  for (let k = 0; k < 18; k++) { const b = Math.random() * 7, v = 20 + Math.random() * 60; rg.ash.push({ x: p.x, y: p.y, z: 4 + Math.random() * 30, vx: Math.cos(b) * v, vy: Math.sin(b) * v, vz: 10 + Math.random() * 30, life: 0.6 + Math.random() * 0.5 }); }
+  rg.wsmoke = { x: p.x, y: p.y, t: 0 };
+  for (const e of rg.enemies) e.wseed = Math.random() * 99;
+  if (actx) { const t = actx.currentTime; noiseAt(t, 800, 3000, 0.3, 0.3, sfxGain); toneAt(t, 440, 0.3, 0.03, 'sine', sfxGain); toneAt(t + 0.08, 330, 0.4, 0.03, 'sine', sfxGain); }
+  wpPop('VANISHED', p.x, p.y, 66, '170,220,150', 0.9);
+}
+function wpBackstab() {
+  const rg = S.rg, p = S.p; rg.wvan = null; hitStop(0.14); addShake(0.5);
+  wpRing(p.x, p.y, 60, '200,255,180', 0.4);
+  if (actx) { const t = actx.currentTime; boomAt(t, 70, 30, 0.4, 0.9, sfxGain); noiseAt(t, 6000, 1500, 0.12, 0.45, sfxGain); toneAt(t + 0.02, 220, 0.5, 0.05, 'sawtooth', sfxGain); }
+  wpPop('BACKSTAB', p.x, p.y, 74, '200,255,180', 1.2);
+}
+// the Warden Club: roots burst out in a line, and the club chips
+function wpRoots() {
+  const rg = S.rg, p = S.p, a = p.wact.a;
+  rg.wroots = { x: p.x + Math.cos(a) * 20, y: p.y + Math.sin(a) * 20, ux: Math.cos(a), uy: Math.sin(a), d: 0, max: 300, next: 0, hit: new Set() };
+  wpCool('club'); addShake(0.4); hitStop(0.06); camKick(a, 8);
+  wpCrack(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, 40, 1); wpChips(p.x + Math.cos(a) * 18, p.y + Math.sin(a) * 18, 4, 'dirt', 12);
+  if (actx) { const t = actx.currentTime; boomAt(t, 55, 25, 0.6, 0.9, sfxGain); noiseAt(t, 700, 100, 0.5, 0.45, sfxGain); }
+  const c = rg.wclub = Math.min(3, (rg.wclub || 0) + 1);
+  wpChips(p.x, p.y, 30, 'wood', 10);
+  wpPop(c < 3 ? 'CLUB CHIPPED' : 'CLUB WORN DOWN', p.x, p.y, 58, '170,200,130', 0.7);
+}
+function wpRootStep(dt) {
+  const rg = S.rg, R = rg.wroots, step = 24, v = 620 * dt;
+  R.d += v; R.x += R.ux * v; R.y += R.uy * v;
+  while (R.next <= R.d && R.next <= R.max) {      // each step a spike of root bursts up and holds whatever it catches
+    const x = R.x - R.ux * (R.d - R.next), y = R.y - R.uy * (R.d - R.next);
+    (rg.wspikes = rg.wspikes || []).push({ x, y, t: 0, life: 1.1, s: 0.8 + Math.random() * 0.5, a: Math.atan2(R.uy, R.ux) + (Math.random() - 0.5) * 0.8, side: Math.random() < 0.5 ? -1 : 1 });
+    const n = wpHitAt(x, y, 30, 1.6, 2.6, 18, R.hit, 'roots', x - R.ux * 20, y - R.uy * 20);
+    for (const o of rg.enemies) if (o.kHit === 'roots' && o.kHitT === S.t) o.frozen = Math.max(o.frozen || 0, 1.6);
+    wpChips(x, y, 2, 'dirt', 3); if (n) { hitStop(0.03); addShake(0.15); }
+    if (actx) { const t = actx.currentTime; noiseAt(t, 1500, 400, 0.08, 0.22, sfxGain); if (n) boomAt(t, 100, 45, 0.15, 0.5, sfxGain); }
+    R.next += step;
+  }
+  if (R.d > R.max + step) rg.wroots = null;
+}
+// the Dervish Glaive: let go, it orbits you, cutting anything close
+const WORB_R = 58;
+function wpOrbit() {
+  const rg = S.rg, p = S.p; rg.worb = { t: 0, dur: 4, a: p.wact.a, set: new Set(), clr: 0, wt: 0 };
+  addShake(0.12); if (actx) { const t = actx.currentTime; noiseAt(t, 3000, 1500, 0.2, 0.35, sfxGain); toneAt(t, 1760, 0.3, 0.03, 'triangle', sfxGain); }
+  wpPop('ORBIT', p.x, p.y, 66, '255,210,90', 0.9); wpUi(true);
+}
+function wpOrbitStep(dt) {
+  const rg = S.rg, p = S.p, O = rg.worb;
+  O.t += dt; O.a += dt * 10.5;
+  if ((O.clr -= dt) <= 0) { O.clr = 0.26; O.set = new Set(); }   // the same one can be cut again every quarter second
+  const x = p.x + Math.cos(O.a) * WORB_R, y = p.y + Math.sin(O.a) * WORB_R;
+  const n = wpHitAt(x, y, 22, 0.42, 0.65, 16, O.set, 'orbit', p.x, p.y);
+  if (n) { hitStop(0.012); for (let k = 0; k < n; k++) wpEmbers(x, y, 26, 4, '255,210,90'); if (actx) { const t = actx.currentTime; toneAt(t, 1980, 0.12, 0.025, 'triangle', sfxGain); noiseAt(t, 5000, 2000, 0.05, 0.22, sfxGain); } }
+  if ((O.wt -= dt) <= 0 && actx) { O.wt = 0.1; noiseAt(actx.currentTime, 2200, 1200, 0.06, 0.1, sfxGain); }   // the whirr of it going round
+  if (O.t >= O.dur) wpOrbitEnd();
+}
+function wpOrbitEnd() {                           // back into your hand
+  const rg = S.rg, p = S.p; if (!rg.worb) return; rg.worb = null; wpCool('glaive');
+  if (!p.atk) p.wact = { pose: AXP + 5, t: 0, dur: 0.26 };
+  addShake(0.1); if (actx) { const t = actx.currentTime; boomAt(t, 220, 120, 0.08, 0.35, sfxGain); toneAt(t, 2093, 0.2, 0.04, 'triangle', sfxGain); }
+  wpUi(true);
+}
+// the King's Gauntlets: the dive, and the grab and hurl
+function wpDiveStep(A, t0) {                      // under the sand toward the nearest one ahead, then up out of the ground under them
+  const p = S.p, D = A.wd, rg = S.rg;
+  if (!A.tgt) {
+    let best = null, bd = 230;
+    for (const o of rg.enemies) { if (o.dead) continue; const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd && Math.abs(angDiff(Math.atan2(o.y - p.y, o.x - p.x), A.a)) < 0.7) { bd = d; best = o; } }
+    A.tgt = best ? { x: best.x, y: best.y } : { x: p.x + Math.cos(A.a) * 150, y: p.y + Math.sin(A.a) * 150 }; A.x0 = p.x; A.y0 = p.y;
+    for (let i = 0; i < 10; i++) dustKick(p.x, p.y, A.a, 1, 90);
+  }
+  if (A.t < D.diveT) {
+    const u = A.t / D.diveT, e = u * u * (3 - 2 * u); p.x = A.x0 + (A.tgt.x - A.x0) * e; p.y = A.y0 + (A.tgt.y - A.y0) * e; p.vx = p.vy = 0;
+    p.rollSafe = Math.max(p.rollSafe || 0, 0.06);
+    if (Math.random() < 0.6) dustKick(p.x, p.y, A.a, 1, 50);
+  } else if (!A.done) {                           // ERUPT
+    A.done = true; const n = wpHit(D, A.a);
+    for (let k = 0; k < 4; k++) ashBurst(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 30, 8, 30);
+    wpChips(p.x, p.y, 4, 'dirt', 18); wpRing(p.x, p.y, D.reach, '230,160,70', 0.5); addShake(n ? 0.55 : 0.35); hitStop(n ? 0.1 : 0.05);
+    if (actx) { const t = actx.currentTime; boomAt(t, 60, 25, 0.5, 0.9, sfxGain); noiseAt(t, 1200, 150, 0.4, 0.5, sfxGain); }
+    if (n) wpPop('ERUPT' + (n > 1 ? ' ×' + n : ''), p.x, p.y, 70, '230,160,70', 1.05);
+  }
+  if (A.t >= D.dur) wpEnd(A);
+}
+function wpSeize() {                              // seize the nearest one in front of you
+  const rg = S.rg, p = S.p, a = p.wact.a; let best = null, bd = 82;
+  for (const o of rg.enemies) { if (o.dead || o.type === 'tall' || o.type === 'centi') continue; const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd && (d < 26 || Math.abs(angDiff(Math.atan2(o.y - p.y, o.x - p.x), a)) < 1.1)) { bd = d; best = o; } }
+  if (!best) { p.wact.fn2 = null; rg.wspT = 0.8; wpPop('MISSED', p.x, p.y, 56, '200,180,150', 0.7); if (actx) noiseAt(actx.currentTime, 900, 300, 0.1, 0.2, sfxGain); return; }
+  rg.wgrab = { e: best, t: 0 }; best.frozen = Math.max(best.frozen || 0, 1.2); best.jit = 1;
+  hitStop(0.06); addShake(0.2);
+  if (actx) { const t = actx.currentTime; boomAt(t, 140, 70, 0.12, 0.55, sfxGain); noiseAt(t, 1500, 500, 0.1, 0.3, sfxGain); }
+  wpPop('GRABBED', p.x, p.y, 62, '230,160,70', 0.8);
+}
+function wpHurl() {                               // and HURL it into the rest
+  const rg = S.rg, p = S.p, G = rg.wgrab; rg.wgrab = null; wpCool('fists'); if (!G || G.e.dead) return;
+  const a = S.aimW || 0, e = G.e;
+  rg.whurl = { e, ux: Math.cos(a), uy: Math.sin(a), d: 0, max: 340, sp: 760, hit: new Set([e]), n: 0 };
+  e.frozen = Math.max(e.frozen || 0, 1); camKick(a, 9); addShake(0.3); hitStop(0.05);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 1400, 400, 0.25, 0.45, sfxGain); boomAt(t, 90, 40, 0.15, 0.5, sfxGain); }
+}
+function wpHurlStep(dt) {
+  const rg = S.rg, H = rg.whurl, e = H.e, v = H.sp * dt;
+  e.x += H.ux * v; e.y += H.uy * v; H.d += v; e.frozen = Math.max(e.frozen || 0, 0.3);
+  if (Math.random() < 0.5) dustKick(e.x, e.y, Math.atan2(H.uy, H.ux), 1, 60);
+  const n = wpHitAt(e.x, e.y, 24, 1.4, 2.2, 44, H.hit, 'hurl', e.x - H.ux * 20, e.y - H.uy * 20);
+  if (n) { H.n += n; hitStop(0.04); addShake(0.22); if (actx) boomAt(actx.currentTime, 120, 45, 0.14, 0.6, sfxGain); }
+  if (H.d >= H.max || e.dead || wpSolidAt(e.x, e.y, 6)) {   // it lands hard
+    rg.whurl = null; if (!e.dead) { e.hp -= 2.2 * (1 + 0.12 * sr('might')); e.swung = true; e.kHit = 'hurl'; e.kHitT = S.t; e.jit = 1; }
+    ashBurst(e.x, e.y, 10, 20); wpRing(e.x, e.y, 46, '230,160,70', 0.35); addShake(0.35); hitStop(0.06);
+    if (actx) { const t = actx.currentTime; boomAt(t, 70, 30, 0.35, 0.8, sfxGain); noiseAt(t, 900, 150, 0.25, 0.4, sfxGain); }
+    if (H.n) wpPop('STRIKE ×' + H.n, e.x, e.y, 50, '255,200,120', 1);
+  }
+}
+// the Mirror Lance: decoys from every roll, copies of your thrusts, and a lance of light that bounces
+function wpDecoy() {
+  const rg = S.rg, p = S.p, L = rg.wdecoys = rg.wdecoys || [];
+  if (L.length >= 2) L.shift();
+  L.push({ x: p.x, y: p.y, t: 0, life: 3.2, aim: S.aim, aimW: S.aimW || 0 });
+  if (actx) { const t = actx.currentTime; toneAt(t, 2093, 0.3, 0.025, 'sine', sfxGain); toneAt(t + 0.05, 2637, 0.3, 0.02, 'sine', sfxGain); }
+}
+function wpEcho(D, a) {                           // every decoy throws the same thrust a beat after you
+  const rg = S.rg; if (!rg.wdecoys) return;
+  for (const c of rg.wdecoys) (rg.wechoes = rg.wechoes || []).push({ c, a, D, t: -0.09 - (D.hitAt || 0.15) });
+}
+function wpEchoStep(dt) {
+  const rg = S.rg;
+  for (const E of rg.wechoes) {
+    E.t += dt; if (E.t < 0 || E.done) continue; E.done = true;
+    const c = E.c, D = E.D, set = new Set(); let n = 0;
+    for (let f = 16; f <= D.reach; f += 16) n += wpHitAt(c.x + Math.cos(E.a) * f, c.y + Math.sin(E.a) * f, 14, D.dmg * 0.6, D.boss * 0.5, 10, set, 'echo', c.x, c.y);
+    rg.slashes = rg.slashes || []; rg.slashes.push({ i: 0, a: E.a, side: 1, t: 0, life: 0.2, r: D.reach, arc: D.arc, axe: 1, tint: ARMS.lance.tint, cleave: 1, o: { x: c.x, y: c.y } });
+    c.flash = 1; if (actx) toneAt(actx.currentTime, 3136, 0.12, 0.015, 'sine', sfxGain);
+  }
+  rg.wechoes = rg.wechoes.filter(E => !E.done);
+}
+function wpLight() {
+  const rg = S.rg, p = S.p, a = p.wact.a; wpCool('lance');
+  (rg.wbolts = rg.wbolts || []).push({ x: p.x + Math.cos(a) * 16, y: p.y + Math.sin(a) * 16, ux: Math.cos(a), uy: Math.sin(a), d: 0, max: 1100, sp: 1150, b: 0, hit: new Set(), tr: [] });
+  camKick(a, -4); addShake(0.15); hitStop(0.03);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 9000, 4000, 0.2, 0.35, sfxGain); toneAt(t, 1568, 0.4, 0.04, 'sine', sfxGain); toneAt(t + 0.03, 2349, 0.4, 0.03, 'sine', sfxGain); }
+}
+function wpBoltStep(dt) {
+  const rg = S.rg;
+  for (const B of rg.wbolts) {
+    const steps = 4, v = B.sp * dt / steps;
+    for (let s = 0; s < steps && !B.gone; s++) {
+      B.x += B.ux * v; B.y += B.uy * v; B.d += v;
+      const o = wpSolidAt(B.x, B.y, 2);
+      if (o) {                                    // off the trunk like light off a mirror
+        if (B.b >= 3) { B.gone = true; break; }
+        const nx = B.x - o.x, ny = B.y - o.y, nl = Math.hypot(nx, ny) || 1, ux = nx / nl, uy = ny / nl, dot = B.ux * ux + B.uy * uy;
+        B.ux -= 2 * dot * ux; B.uy -= 2 * dot * uy; B.x = o.x + ux * ((o.r || 10) * (o.s || 1) + 4); B.y = o.y + uy * ((o.r || 10) * (o.s || 1) + 4); B.b++; B.hit = new Set();
+        wpEmbers(B.x, B.y, 20, 8, '255,245,210'); rg.blasts.push({ x: B.x, y: B.y, t: 0, life: 0.2, r: 40, col: 'white' });
+        if (actx) { const t = actx.currentTime; toneAt(t, 2637 + 300 * B.b, 0.18, 0.03, 'sine', sfxGain); noiseAt(t, 7000, 3000, 0.05, 0.2, sfxGain); }
+      }
+      const n = wpHitAt(B.x, B.y, 16, 1.4, 2.0, 16, B.hit, B.b ? 'ricochet' : 'pierce', B.x - B.ux * 20, B.y - B.uy * 20);
+      if (n) { hitStop(0.02); addShake(0.1); }
+    }
+    B.tr.push([B.x, B.y]); if (B.tr.length > 14) B.tr.shift();
+    if (B.d > B.max) B.gone = true;
+  }
+  rg.wbolts = rg.wbolts.filter(B => !B.gone || (B.fade = (B.fade || 0) + dt) < 0.15);
+}
 // ---- the swap: Q or the Swap button. A flourish that knocks back anything right next to you ----
 function wpSwap() {
   if (!wpOn() || !S.running || S.rg.phase !== 'fight') return;
-  const rg = S.rg, p = S.p; if (!XS.wsel[1] || (rg.wswT || 0) > 0 || rg.drink) return;
-  rg.wax = null;                                  // a thrown axe goes straight back on your back
+  const rg = S.rg, p = S.p; if (!XS.wsel[1] || (rg.wswT || 0) > 0 || rg.drink || rg.wgrab) return;
+  rg.wax = null; if (rg.worb) { rg.worb = null; wpCool('glaive'); }   // a thrown weapon goes straight back on your back
   XS.wcur = XS.wcur ? 0 : 1; exSave();
-  p.atk = null; p.atkLast = null; p.hopZ = 0; p.wact = { pose: AXP + 6, t: 0, dur: 0.3 }; rg.wswT = 0.45;
+  p.atk = null; p.atkLast = null; p.hopZ = 0; p.wact = { pose: AXP + 6, t: 0, dur: 0.3 }; rg.wswT = 0.45; rg.wspT = Math.min(rg.wspT || 0, 0.6);
   wpHitAt(p.x, p.y, 46, 0.25, 0.3, 36, new Set(), 'swing', p.x, p.y);
   const w = curW(); rg.slashes = rg.slashes || [];
-  rg.slashes.push(w === 'axe' ? { i: 0, a: S.aimW || 0, side: 1, t: 0, life: 0.3, r: 52, arc: Math.PI * 2, axe: 1, whirl: 1 } : { i: 0, a: S.aimW || 0, side: 1, t: 0, life: 0.28, r: 52, arc: Math.PI * 2 });
+  rg.slashes.push(w === 'torch' ? { i: 0, a: S.aimW || 0, side: 1, t: 0, life: 0.28, r: 52, arc: Math.PI * 2 } : { i: 0, a: S.aimW || 0, side: 1, t: 0, life: 0.3, r: 52, arc: Math.PI * 2, axe: 1, whirl: 1, tint: ARMS[w].tint });
   wpPop(ARMS[w].name.toUpperCase(), p.x, p.y, 66, ARMS[w].col, 0.95);
   addShake(0.1); hitStop(0.03);
-  if (actx) { const t = actx.currentTime; noiseAt(t, 6500, 2200, 0.18, 0.4, sfxGain); toneAt(t + 0.03, w === 'axe' ? 330 : 660, 0.25, 0.05, 'triangle', sfxGain); toneAt(t + 0.08, w === 'axe' ? 495 : 990, 0.3, 0.04, 'triangle', sfxGain); }
+  if (actx) { const t = actx.currentTime; noiseAt(t, 6500, 2200, 0.18, 0.4, sfxGain); toneAt(t + 0.03, w === 'torch' ? 660 : 330, 0.25, 0.05, 'triangle', sfxGain); toneAt(t + 0.08, w === 'torch' ? 990 : 495, 0.3, 0.04, 'triangle', sfxGain); }
   wpUi(true);
 }
 function wpReady() {                              // the special is back: a tick, and a little glyph over your head
@@ -7924,8 +8589,11 @@ function wpReady() {                              // the special is back: a tick
   if (actx) { const t = actx.currentTime; toneAt(t, 1320, 0.08, 0.04, 'square', sfxGain); toneAt(t + 0.06, 1760, 0.12, 0.04, 'square', sfxGain); }
 }
 // ---- won from a boss: it stands in the ground where he fell, and you walk over to take it ----
+const wpOf = boss => Object.keys(ARMS).find(id => ARMS[id].boss === boss);
+function wpDrop(boss, x, y) { const id = wpOf(boss); if (id && WP_ON && !S.day && S.rg) S.rg.wdrop = { id, x, y, t: 0 }; }
 function wpClaim(D) {
   const rg = S.rg; rg.wdrop = null;
+  (XS.wgot = XS.wgot || {})[D.id] = 1;
   if (!XS.wsel.includes(D.id)) XS.wsel[1] = D.id;
   XS.wcur = XS.wsel.indexOf(D.id); XS.wnew = 1; exSave();
   S.p.wact = { pose: AXP + 5, t: 0, dur: 0.3 }; rg.wcard = { id: D.id, t: 0 };
@@ -7933,25 +8601,70 @@ function wpClaim(D) {
   if (actx) { const t = actx.currentTime; boomAt(t, 80, 34, 0.9, 0.7, sfxGain); [523, 659, 784, 1047].forEach((f, i) => toneAt(t + 0.08 * i, f, 0.5, 0.05, 'triangle', sfxGain)); }
   wpUi(true);
 }
+// ---- the things that pull them off you: your lamps, your decoys, and the spot where you vanished ----
+function wpLure(e) {
+  const rg = S.rg; if (!wpOn()) return null;
+  if (rg.wvan) { const v = rg.wvan, s = e.wseed ?? (e.wseed = Math.random() * 99); return { x: v.x + Math.cos(s + S.t * 0.8) * 80, y: v.y + Math.sin(s * 1.7 + S.t * 0.7) * 80 }; }
+  let best = null, bd = Math.hypot(S.p.x - e.x, S.p.y - e.y) + 40;
+  if (rg.wdecoys) for (const c of rg.wdecoys) { const d = Math.hypot(c.x - e.x, c.y - e.y); if (d < 280 && d < bd) { bd = d; best = c; } }
+  if (rg.wlamps) for (const l of rg.wlamps) { const d = Math.hypot(l.x - e.x, l.y - e.y); if (d < 180 && d < bd) { bd = d; best = l; } }
+  return best;
+}
 // ---- every frame ----
 function wpTick(dt) {
   const rg = S.rg, p = S.p, on = wpOn();
-  if (p.wact) { const w = p.wact; w.t += dt; if (w.fn && !w.done && w.t >= w.rel) { w.done = true; w.fn(); } if (w.t >= w.dur) p.wact = null; }
+  if (p.wact) { const w = p.wact; w.t += dt; if (w.fn && !w.done && w.t >= w.rel) { w.done = true; w.fn(); } if (w.fn2 && !w.done2 && w.t >= w.rel2) { w.done2 = true; w.fn2(); } if (w.t >= w.dur) p.wact = null; }
   if (rg.wspT > 0 && (rg.wspT -= dt) <= 0 && on) wpReady();
   if (rg.wswT > 0) rg.wswT -= dt;
+  if (on && curW() === 'twin' && !p.atk) {        // the Twins' stance follows your feet: still, the spear; moving, the bow
+    const want = screenSpeed(p) > 40 ? 'bow' : 'spear';
+    if (want !== rg.wst) { rg.wstT = (rg.wstT || 0) + dt; if (rg.wstT > 0.1 || !rg.wst) { rg.wst = want; rg.wstT = 0; if (actx) toneAt(actx.currentTime, want === 'bow' ? 520 : 390, 0.06, 0.02, 'triangle', sfxGain); } } else rg.wstT = 0;
+  }
   if (rg.wax) wpAxeStep(dt);
+  if (rg.worb) wpOrbitStep(dt);
+  if (rg.warrows) wpArrowStep(dt);
+  if (rg.wroots) wpRootStep(dt);
+  if (rg.wbolts) wpBoltStep(dt);
+  if (rg.wechoes) wpEchoStep(dt);
+  if (rg.whurl) wpHurlStep(dt);
+  if (rg.wgrab) { const G = rg.wgrab, a = S.aimW || 0; G.t += dt; if (G.e.dead) rg.wgrab = null; else { G.e.x = p.x + Math.cos(a + 0.4) * 20; G.e.y = p.y + Math.sin(a + 0.4) * 20; G.e.frozen = Math.max(G.e.frozen || 0, 0.3); } }
+  if (rg.wvan) { rg.wvan.t += dt; if (rg.wvan.t >= rg.wvan.dur || !on) { rg.wvan = null; if (actx) noiseAt(actx.currentTime, 2500, 600, 0.2, 0.18, sfxGain); } }
+  if (rg.wlamps) {                                // they come to stamp out your lamps
+    for (const l of rg.wlamps) {
+      l.t += dt; let k = 0;
+      for (const e of rg.enemies) if (!e.dead && Math.abs(e.x - l.x) < 26 && Math.hypot(e.x - l.x, e.y - l.y) < 24) k++;
+      l.stamp = k; if (k) { l.hp -= dt * k; if (Math.random() < dt * 8) wpEmbers(l.x, l.y, 12, 2, '255,160,60'); }
+      if (l.hp <= 0) wpLampOut(l);
+    }
+    rg.wlamps = rg.wlamps.filter(l => !l.out);
+  }
+  if (rg.wdecoys) { for (const c of rg.wdecoys) { c.t += dt; c.flash = Math.max(0, (c.flash || 0) - dt * 4); for (const e of rg.enemies) if (!e.dead && Math.abs(e.x - c.x) < 18 && Math.hypot(e.x - c.x, e.y - c.y) < 16) c.t += dt * 2; if (c.t >= c.life) { wpEmbers(c.x, c.y, 30, 12, '255,245,210'); if (actx) toneAt(actx.currentTime, 3520, 0.15, 0.02, 'sine', sfxGain); } } rg.wdecoys = rg.wdecoys.filter(c => c.t < c.life); }
+  for (const e of rg.enemies) {
+    if (e.wyank) { const Y = e.wyank; Y.t += dt / 0.16; const u = Math.min(1, Y.t), f = 1 - (1 - u) * (1 - u); e.x = Y.x0 + (Y.x1 - Y.x0) * f; e.y = Y.y0 + (Y.y1 - Y.y0) * f; if (u >= 1) { e.wyank = null; dustKick(e.x, e.y, 0, 4, 50); } }
+    if (e.wfly > 0) { e.wfly -= dt; if (Math.random() < 0.5) dustKick(e.x, e.y, Math.atan2(e.pvy || 0, e.pvx || 0), 1, 40); }
+  }
   if (rg.wfall) { for (const g of rg.wfall) if (g.fall < 1) { g.fall = Math.min(1, g.fall + dt * (0.45 + g.fall * 2.8)); if (g.fall >= 1) wpCrash(g); } rg.wfall = rg.wfall.filter(g => g.fall < 1); }
   if (rg.wlogs) { for (const g of rg.wlogs) if (g.fall >= 1 && (g.lie += dt) > 20) g.gone = Math.min(1, (g.gone || 0) + dt * 1.2); rg.wlogs = rg.wlogs.filter(g => !(g.gone >= 1)); }
   if (rg.wchips) { for (const c of rg.wchips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; } rg.wchips = rg.wchips.filter(c => c.life > 0); }
   if (rg.wcracks) { for (const k of rg.wcracks) k.t += dt; rg.wcracks = rg.wcracks.filter(k => k.t < k.life); }
+  if (rg.wspikes) { for (const k of rg.wspikes) k.t += dt; rg.wspikes = rg.wspikes.filter(k => k.t < k.life); }
+  if (rg.wrings) { for (const k of rg.wrings) k.t += dt; rg.wrings = rg.wrings.filter(k => k.t < k.life); }
+  if (rg.wchains) { for (const k of rg.wchains) k.t += dt; rg.wchains = rg.wchains.filter(k => k.t < k.life); }
   if (rg.wpops) { for (const q of rg.wpops) q.t += dt; rg.wpops = rg.wpops.filter(q => q.t < 1); }
+  if (rg.wstreak && (rg.wstreak.t += dt) > 0.35) rg.wstreak = null;
+  if (rg.wsmoke && (rg.wsmoke.t += dt) > 1.2) rg.wsmoke = null;
+  if (rg.wbeatFx && (rg.wbeatFx.t += dt) > 0.4) rg.wbeatFx = null;
+  if (rg.wbeat && (!p.atkLast || S.t - p.atkLast.end > ATK_CHAIN) && !p.atk) rg.wbeat = 0;   // the dance ends when you stop
   if (rg.wflare && (rg.wflare.t += dt) > 0.4) rg.wflare = null;
   if (rg.wrdy && (rg.wrdy.t += dt) > 0.7) rg.wrdy = null;
   if (rg.wcard && (rg.wcard.t += dt) > 4) rg.wcard = null;
   if (rg.wdrop && on && rg.phase === 'fight' && Math.hypot(rg.wdrop.x - p.x, rg.wdrop.y - p.y) < 30) wpClaim(rg.wdrop);
   wpUi();
 }
-function wpHome() { const rg = S.rg; rg.wax = null; rg.wfell = new Set(); rg.wlogs = []; rg.wfall = []; }   // back inside the fence: the axe's on your back, and the woods grow back while you're in
+function wpHome() {                               // back inside the fence: thrown weapons on your back, the woods grow back, and the club grows back whole
+  const rg = S.rg; rg.wax = null; rg.wfell = new Set(); rg.wlogs = []; rg.wfall = []; rg.worb = null; rg.wlamps = []; rg.wdecoys = []; rg.wvan = null; rg.wgrab = null; rg.whurl = null;
+  if (rg.wclub) { rg.wclub = 0; if (wpOn() && XS.wsel.includes('club')) exNote('the warden club has grown back whole'); }
+}
 function wpChips(x, y, z, kind, n) {
   const rg = S.rg, cols = { wood: ['#c9a26b', '#a07a48', '#5a3e28'], dirt: ['#5a4a38', '#3e3428', '#6e5a40'], leaf: ['#5f8a3a', '#7aa04a', '#a8b86a'] }[kind];
   const L = rg.wchips = rg.wchips || [];
@@ -7960,6 +8673,13 @@ function wpChips(x, y, z, kind, n) {
 }
 function wpCrack(x, y, a, len, big) { (S.rg.wcracks = S.rg.wcracks || []).push({ x, y, a, len, big, t: 0, life: big ? 1.6 : 0.9, seed: Math.random() * 99 }); }
 function wpPop(text, x, y, h, col, s) { if (!text) return; (S.rg.wpops = S.rg.wpops || []).push({ text, x, y, h, col, s, t: 0 }); }
+function wpHoles(hole) {                          // the weapons' own light in the dark
+  const rg = S.rg; if (!wpOn()) return;
+  if (rg.wlamps) for (const l of rg.wlamps) hole(l.x, l.y, (WLAMP_R * 0.85) * (1 + 0.05 * Math.sin(S.t * 8 + l.seed)) * (l.stamp ? 0.8 + 0.2 * Math.random() : 1), 0.62);
+  if (rg.wbolts) for (const B of rg.wbolts) if (!B.gone) hole(B.x, B.y, 60, 0.7);
+  if (rg.wdecoys) for (const c of rg.wdecoys) hole(c.x, c.y, 34 + 20 * (c.flash || 0), 0.45);
+  if (rg.worb) { const a = rg.worb.a; hole(S.p.x + Math.cos(a) * WORB_R, S.p.y + Math.sin(a) * WORB_R, 30, 0.4); }
+}
 // ---- buttons: the special (with its cooldown ring) and the swap ----
 const wspecBtn = document.getElementById('wspec'), wswapBtn = document.getElementById('wswap');
 let wpUiKey = '';
@@ -7967,8 +8687,8 @@ function wpUi(force) {
   const on = wpOn(), rg = S && S.rg, show = on && rg && rg.phase === 'fight';
   document.body.classList.toggle('wp', !!show);
   if (!show) { wspecBtn.hidden = wswapBtn.hidden = true; wpUiKey = ''; return; }
-  const w = curW(), cool = Math.max(0, rg.wspT || 0) / ARMS[w].spCool, lbl = w === 'axe' && rg.wax ? 'Call' : ARMS[w].spName;
-  wspecBtn.style.setProperty('--cd', cool.toFixed(3));
+  const w = curW(), cool = Math.max(0, rg.wspT || 0) / ARMS[w].spCool, lbl = w === 'axe' && rg.wax ? 'Call' : w === 'glaive' && rg.worb ? 'Catch' : ARMS[w].spName;
+  wspecBtn.style.setProperty('--cd', Math.min(1, cool).toFixed(3));
   const key = w + lbl + (cool > 0 ? 1 : 0) + (XS.wsel[1] ? 1 : 0);
   if (!force && key === wpUiKey) return; wpUiKey = key;
   wspecBtn.hidden = false; wspecBtn.textContent = lbl; wspecBtn.dataset.cool = cool > 0 ? '1' : '0';
@@ -7988,7 +8708,7 @@ function wpRack() {
   return Object.keys(ARMS).map(id => {
     const A = ARMS[id], own = wpOwn(id), slot = XS.wsel.indexOf(id), held = slot >= 0 && slot === (XS.wcur | 0);
     return { id: 'w_' + id, name: A.name, desc: A.desc, cls: own ? 'own' + (slot >= 0 ? ' on' : '') : '', have: 0, max: 0,
-      lvl: own ? (slot >= 0 ? `Carried · slot ${slot + 1}${held ? ' · in your hand' : ''}` : 'On the rack') : `Locked · beat the ${A.bossName}`,
+      lvl: own ? (slot >= 0 ? `Carried · slot ${slot + 1}${held ? ' · in your hand' : ''}` : 'On the rack') : `Locked · beat the ${A.bossName}${A.dune !== undefined ? ' in the Dunes' : ''}`,
       tag: !own ? 'LOCKED' : held ? 'IN HAND' : slot >= 0 ? 'CARRIED' : 'RACK',
       buy: own && !held ? ['Take in hand', true, () => wpHold(id)] : null,
       eq: own && id !== 'torch' && slot < 0 ? ['Carry', true, () => { XS.wsel[1] = id; exSave(); renderCamp(); }] : null };
@@ -7996,36 +8716,58 @@ function wpRack() {
 }
 function wpHold(id) {
   let slot = XS.wsel.indexOf(id); if (slot < 0) { XS.wsel[1] = id; slot = 1; }
-  XS.wcur = slot; if (S.rg) S.rg.wax = null; exSave(); renderCamp(); wpUi(true);
+  XS.wcur = slot; if (S.rg) { S.rg.wax = null; S.rg.worb = null; } exSave(); renderCamp(); wpUi(true);
 }
 const WP_ICONS = {
   w_torch: '<path d="M10 21h4l1.2-9H8.8z"/><path d="M12 3c2.2 2.6 3.2 4.2 3.2 6a3.2 3.2 0 0 1-6.4 0c0-1.8 1-3.4 3.2-6z"/>',
   w_axe: '<path d="M5 21L15.5 10.5"/><path d="M13 4.5c3.5-.5 6.5 2.5 6.5 6l-3 .5-4-4z"/><path d="M12.5 7l4.5 4.5"/>',
+  w_hook: '<path d="M7 21V5"/><path d="M7 5c0-2 4-2.5 4.5 0s-1.5 3-2.5 3"/><path d="M9 8v2"/><rect x="7.5" y="10" width="3" height="4"/>',
+  w_twin: '<path d="M4 20L16 8"/><path d="M16 8l3-3-1 4z"/><path d="M14 20c4-2 6-6 6-11"/><path d="M14 20l6-11"/>',
+  w_knife: '<path d="M5 19l4-4"/><path d="M9 15l9-10c1 3-1 7-6 11z"/>',
+  w_club: '<path d="M5 20l7-7"/><path d="M12 13c-1-4 2-8 6-8 1 3-1 7-6 8z"/><circle cx="15.5" cy="8.5" r=".6"/>',
+  w_glaive: '<path d="M4 20L15 9"/><path d="M15 9c1-3 4-5 6-5 0 3-2 5-5 6z"/>',
+  w_fists: '<path d="M6 11V8a2 2 0 0 1 4 0v3"/><path d="M10 10V7a2 2 0 0 1 4 0v3"/><path d="M14 10V8a2 2 0 0 1 4 0v5a6 6 0 0 1-6 6h-1a5 5 0 0 1-5-5v-3h7"/>',
+  w_lance: '<path d="M3 21L17 7"/><path d="M17 7l4-4-1.5 5.5z"/><path d="M14 4l1 3M20 10l-3-1"/>',
   w_rack: '<path d="M4 21V5M20 21V5M3 8h18"/><path d="M8 19l6-10"/><path d="M12.5 7.5c2-.3 3.7 1.4 3.7 3.4l-1.7.3-2.3-2.3z"/><path d="M17 19V11"/><path d="M16 11h2l.5-2h-3z"/>',
 };
 // ---- drawing: everything over the dark ----
-function drawAxeSlash(s) {                        // steel, not fire: a heavy grey-white smear, short and brutal
-  const p = S.p, k = s.t / s.life, fade = 1 - k * k, lift = ((s.cleave ? 4 : s.whirl ? 14 : 9) + (p.hopZ || 0)) * Z, n = 22;
+function drawAxeSlash(s) {                        // a weapon's smear: heavy steel for the axe, each other weapon in its own colours
+  const p = s.o || S.p, k = s.t / s.life, fade = 1 - k * k, lift = ((s.cleave ? 4 : s.whirl ? 14 : 9) + (s.o ? 0 : S.p.hopZ || 0)) * Z, n = 22, T = s.tint || STEEL;
   const sweep = Math.min(1, s.t / (s.whirl ? 0.12 : s.cleave ? 0.04 : 0.07));
   const a0 = s.a - s.side * s.arc / 2, a1 = a0 + s.side * s.arc * sweep, R0 = s.whirl ? 0.62 : s.cleave ? 0.05 : 0.45, pts = [];
-  if (s.cleave) {                                 // a blade of light straight down the line of the cleave, wide at the hilt
-    for (let j = 0; j <= n; j++) { const f = j / n, w = (1 - f) * 0.16 + 0.02; const [x, y] = toScreen(p.x + Math.cos(s.a + w) * s.r * f * sweep, p.y + Math.sin(s.a + w) * s.r * f * sweep); pts.push([x, y - lift]); }
-    for (let j = n; j >= 0; j--) { const f = j / n, w = (1 - f) * 0.16 + 0.02; const [x, y] = toScreen(p.x + Math.cos(s.a - w) * s.r * f * sweep, p.y + Math.sin(s.a - w) * s.r * f * sweep); pts.push([x, y - lift]); }
+  if (s.cleave) {                                 // a blade of light straight down the line, wide at the hilt
+    const wd = s.thin || 0.16;
+    for (let j = 0; j <= n; j++) { const f = j / n, w = (1 - f) * wd + 0.02; const [x, y] = toScreen(p.x + Math.cos(s.a + w) * s.r * f * sweep, p.y + Math.sin(s.a + w) * s.r * f * sweep); pts.push([x, y - lift]); }
+    for (let j = n; j >= 0; j--) { const f = j / n, w = (1 - f) * wd + 0.02; const [x, y] = toScreen(p.x + Math.cos(s.a - w) * s.r * f * sweep, p.y + Math.sin(s.a - w) * s.r * f * sweep); pts.push([x, y - lift]); }
   } else {
     for (let j = 0; j <= n; j++) { const f = j / n, an = a0 + (a1 - a0) * f; const [x, y] = toScreen(p.x + Math.cos(an) * s.r, p.y + Math.sin(an) * s.r); pts.push([x, y - lift]); }
     for (let j = n; j >= 0; j--) { const f = j / n, an = a0 + (a1 - a0) * f, th = 0.35 + 0.65 * f, rr = s.r * (1 - (1 - R0) * th); const [x, y] = toScreen(p.x + Math.cos(an) * rr, p.y + Math.sin(an) * rr); pts.push([x, y - lift]); }
   }
+  const hot = 1 + 0.15 * (s.hot || 0);
   const [cx, cy] = toScreen(p.x, p.y), g = ctx.createRadialGradient(cx, cy - lift, s.r * K() * 0.15, cx, cy - lift, s.r * K() * 1.05);
-  g.addColorStop(0, `rgba(90,100,120,${0.2 * fade})`); g.addColorStop(0.65, `rgba(195,205,222,${0.7 * fade})`); g.addColorStop(1, `rgba(250,252,255,${fade})`);
+  g.addColorStop(0, `rgba(${T[0]},${0.2 * fade})`); g.addColorStop(0.65, `rgba(${T[1]},${Math.min(1, 0.7 * fade * hot)})`); g.addColorStop(1, `rgba(${T[2]},${fade})`);
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.fillStyle = g; ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
   const edge = () => { ctx.beginPath(); for (let j = 0; j <= n; j++) { const [x, y] = pts[j]; j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); };
-  ctx.strokeStyle = `rgba(150,170,205,${0.4 * fade})`; ctx.lineWidth = 12 * Z; edge();
-  ctx.strokeStyle = `rgba(255,255,255,${fade})`; ctx.lineWidth = 3.4 * Z; edge();
+  ctx.strokeStyle = `rgba(${T[1]},${0.4 * fade})`; ctx.lineWidth = (s.ribbon ? 16 : 12) * Z; edge();
+  ctx.strokeStyle = `rgba(${T[2]},${fade})`; ctx.lineWidth = 3.4 * Z; edge();
+  if (s.ribbon) {                                 // the Dervish's ribbons: a second gold streak trailing outside the first
+    ctx.strokeStyle = `rgba(${T[1]},${0.55 * fade})`; ctx.lineWidth = 1.6 * Z; ctx.beginPath();
+    for (let j = 0; j <= n; j++) { const f = j / n, an = a0 + (a1 - a0) * f - s.side * 0.12, [x, y] = toScreen(p.x + Math.cos(an) * s.r * 1.12, p.y + Math.sin(an) * s.r * 1.12); j ? ctx.lineTo(x, y - lift) : ctx.moveTo(x, y - lift); } ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawWpUnder() {                          // drawn on the ground before the figures: lamps, root spikes, rings
+  const rg = S.rg; if (!rg || !wpOn()) return;
+  const ring = (x, y, r, col, a, w) => { const [sx, sy] = toScreen(x, y); ctx.strokeStyle = `rgba(${col},${a})`; ctx.lineWidth = w * Z; ctx.beginPath(); ctx.ellipse(sx, sy, r * K() * 1.42, r * K() * 0.71, 0, 0, 7); ctx.stroke(); };
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  if (rg.wlamps) for (const l of rg.wlamps) { const pul = 0.5 + 0.12 * Math.sin(S.t * 3 + l.seed), near = Math.hypot(l.x - S.p.x, l.y - S.p.y) < WLAMP_R; ring(l.x, l.y, WLAMP_R, '255,170,70', (near ? 0.32 : 0.16) * pul * 2, near ? 2 : 1.2); }
+  if (rg.wrings) for (const R of rg.wrings) { const u = R.t / R.life, e = 1 - (1 - u) * (1 - u); ring(R.x, R.y, R.r * (0.3 + 0.8 * e), R.col, 0.85 * (1 - u), 3 * (1 - u) + 1); }
   ctx.restore();
 }
 function drawWpFx() {
   const rg = S.rg, p = S.p, zk = Math.max(0.8, Math.min(1.3, Z));
+  drawWpUnder();
   if (rg.wcracks) for (const k of rg.wcracks) {   // splits in the ground, glowing hot inside, then closing over
     const u = k.t / k.life, a = (1 - u) * (1 - u), segs = k.big ? 14 : 5, pts = [];
     for (let j = 0; j <= segs; j++) { const f = j / segs, off = (hash(k.seed + j, 3.1) - 0.5) * (k.big ? 14 : 8) * Math.sin(f * Math.PI + 0.2); pts.push(toScreen(k.x + Math.cos(k.a) * k.len * f - Math.sin(k.a) * off, k.y + Math.sin(k.a) * k.len * f + Math.cos(k.a) * off)); }
@@ -8035,7 +8777,82 @@ function drawWpFx() {
     ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,140,50,${0.8 * a})`; ctx.lineWidth = (k.big ? 2.6 : 1.4) * Z; line();
     ctx.restore();
   }
+  if (rg.wspikes) for (const k of rg.wspikes) {   // the Warden's roots: twisted spikes punching up out of the ground, then sinking
+    const u = k.t / k.life, up = u < 0.12 ? stkEase(u / 0.12) : u > 0.7 ? 1 - (u - 0.7) / 0.3 : 1, [x, y] = toScreen(k.x, k.y), H = 26 * k.s * up * Z, lean = Math.cos(k.a) * 6 * k.side * Z;
+    ctx.save(); ctx.fillStyle = COLOUR ? '#3a2c1c' : '#3a3a38'; ctx.strokeStyle = COLOUR ? '#6a8a3a' : '#6a6a66'; ctx.lineWidth = 0.8 * Z;
+    for (const [dx, h, w] of [[-4, 0.7, 2.6], [3, 1, 3.4], [0, 0.55, 2]]) { const bx = x + dx * Z * k.s; ctx.beginPath(); ctx.moveTo(bx - w * Z, y); ctx.quadraticCurveTo(bx - w * 0.3 * Z + lean * 0.5, y - H * h * 0.6, bx + lean * h, y - H * h); ctx.quadraticCurveTo(bx + w * 0.3 * Z + lean * 0.5, y - H * h * 0.6, bx + w * Z, y); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(20,16,10,0.5)'; ctx.beginPath(); ctx.ellipse(x, y, 9 * Z * k.s, 3.5 * Z * k.s, 0, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  if (rg.wlamps) for (const l of rg.wlamps) {     // your lamps: an iron post, a hook, a lantern burning warm
+    const [x, y] = toScreen(l.x, l.y), fl = l.stamp ? 0.5 + 0.5 * Math.random() : 0.9 + 0.1 * Math.sin(S.t * 9 + l.seed), sw = Math.sin(S.t * 2 + l.seed) * 1.2 * Z;
+    ctx.save(); ctx.fillStyle = COLOUR ? '#2a2620' : '#30302e'; ctx.fillRect(x - 1.2 * Z, y - 24 * Z, 2.4 * Z, 24 * Z);
+    ctx.strokeStyle = COLOUR ? '#2b2c30' : '#3a3a38'; ctx.lineWidth = 1.4 * Z; ctx.beginPath(); ctx.moveTo(x, y - 24 * Z); ctx.quadraticCurveTo(x + 6 * Z, y - 26 * Z, x + 5 * Z, y - 21 * Z); ctx.stroke();
+    ctx.fillStyle = COLOUR ? '#2a2620' : '#333331'; ctx.fillRect(x + 5 * Z + sw - 2.4 * Z, y - 20 * Z, 4.8 * Z, 6.5 * Z);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(255,200,120,${fl})`; ctx.fillRect(x + 5 * Z + sw - 1.5 * Z, y - 19 * Z, 3 * Z, 4.5 * Z);
+    const g = ctx.createRadialGradient(x + 5 * Z, y - 17 * Z, 0, x + 5 * Z, y - 17 * Z, 30 * Z); g.addColorStop(0, `rgba(255,170,80,${0.5 * fl})`); g.addColorStop(1, 'rgba(255,150,60,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x + 5 * Z, y - 17 * Z, 30 * Z, 0, 7); ctx.fill();
+    ctx.restore();
+    if (l.hp < 3) { ctx.save(); ctx.fillStyle = 'rgba(8,6,4,0.7)'; ctx.fillRect(x - 9 * Z, y - 32 * Z, 18 * Z, 2.6 * Z); ctx.fillStyle = 'rgba(255,170,70,0.95)'; ctx.fillRect(x - 9 * Z, y - 32 * Z, 18 * Z * Math.max(0, l.hp / 3), 2.6 * Z); ctx.restore(); }
+  }
   if (rg.wchips) { ctx.save(); for (const c of rg.wchips) { const [x, y] = toScreen(c.x, c.y); ctx.globalAlpha = Math.min(1, c.life * 3); ctx.fillStyle = c.col; ctx.save(); ctx.translate(x, y - c.z * Z); ctx.rotate(c.rot); ctx.fillRect(-c.w * Z, -0.8 * Z, c.w * 2 * Z, 1.6 * Z); ctx.restore(); } ctx.restore(); }
+  if (rg.wdecoys) for (const c of rg.wdecoys) {   // the Mirage's trick: a shining copy of you, standing where you rolled from
+    const x0 = p.x, y0 = p.y, t0 = S.tip, t1 = S.tipNow, a0 = S.aim, aw = S.aimW, k = Math.min(1, c.t / 0.15) * Math.min(1, (c.life - c.t) / 0.4);
+    p.x = c.x; p.y = c.y; S.aim = c.aim; S.aimW = c.aimW;
+    ctx.save(); ctx.globalAlpha = (0.38 + 0.25 * (c.flash || 0) + 0.06 * Math.sin(S.t * 14 + c.x)) * k; S.rollGU = -1; drawPlayer(); S.rollGU = null; ctx.restore();
+    p.x = x0; p.y = y0; S.tip = t0; S.tipNow = t1; S.aim = a0; S.aimW = aw;
+    const [x, y] = toScreen(c.x, c.y); ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, y - 18 * Z, 0, x, y - 18 * Z, 30 * Z); g.addColorStop(0, `rgba(255,245,210,${0.3 * k})`); g.addColorStop(1, 'rgba(255,245,210,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 18 * Z, 30 * Z, 0, 7); ctx.fill(); ctx.restore();
+  }
+  if (rg.wsmoke) {                                // the vanish: a cloud of dark smoke where you stood
+    const u = rg.wsmoke.t / 1.2, [x, y] = toScreen(rg.wsmoke.x, rg.wsmoke.y);
+    ctx.save(); for (let k = 0; k < 7; k++) { const a = k / 7 * 7 + rg.wsmoke.x, r = (8 + 26 * Math.sqrt(u)) * Z, ox = Math.cos(a) * r * 0.8, oy = Math.sin(a) * r * 0.4 - (14 + 20 * u) * Z; ctx.fillStyle = `rgba(22,26,22,${0.55 * (1 - u)})`; ctx.beginPath(); ctx.arc(x + ox, y + oy, (10 + 10 * u) * Z, 0, 7); ctx.fill(); } ctx.restore();
+  }
+  if (rg.wvan) {                                  // vanished: a faint shimmer, and where they think you are
+    const [x, y] = toScreen(p.x, p.y), u = rg.wvan.t / rg.wvan.dur;
+    stkText('UNSEEN', x, y - 60 * Z, 9 * zk, '170,220,150', 0.6 + 0.3 * Math.sin(S.t * 6), { w: 600 });
+    ctx.save(); ctx.strokeStyle = 'rgba(170,220,150,0.6)'; ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.arc(x, y - 60 * Z + 9 * Z, 12 * Z, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - u)); ctx.stroke(); ctx.restore();
+  }
+  if (rg.wstreak) {                               // the blink: a streak of pale light where you were
+    const k = rg.wstreak, u = k.t / 0.35, [x0, y0] = toScreen(k.x0, k.y0), [x1, y1] = toScreen(k.x1, k.y1);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(170,230,150,${0.45 * (1 - u)})`; ctx.lineWidth = 10 * Z * (1 - u); ctx.beginPath(); ctx.moveTo(x0, y0 - 18 * Z); ctx.lineTo(x1, y1 - 18 * Z); ctx.stroke();
+    ctx.strokeStyle = `rgba(245,255,240,${0.9 * (1 - u)})`; ctx.lineWidth = 2 * Z; ctx.stroke(); ctx.restore();
+  }
+  if (rg.wchains) for (const C of rg.wchains) {   // the hook's chain: out and back
+    const u = C.t / C.life, ext = u < 0.4 ? u / 0.4 : 1 - (u - 0.4) / 0.6, [px0, py0] = toScreen(p.x, p.y), [hx, hy] = toScreen(p.x + Math.cos(C.a) * C.L * ext, p.y + Math.sin(C.a) * C.L * ext);
+    ctx.save(); ctx.strokeStyle = COLOUR ? '#4a4038' : '#4a4a48'; ctx.lineWidth = 1.2 * Z; ctx.setLineDash([2 * Z, 1.5 * Z]); ctx.beginPath(); ctx.moveTo(px0, py0 - 22 * Z); ctx.lineTo(hx, hy - 16 * Z); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = COLOUR ? '#2b2c30' : '#3a3a38'; ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.arc(hx, hy - 16 * Z, 4 * Z, -0.5 + C.a, 2.6 + C.a); ctx.stroke();
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,170,70,0.5)'; ctx.beginPath(); ctx.arc(hx, hy - 16 * Z, 5 * Z, 0, 7); ctx.fill(); ctx.restore();
+  }
+  if (rg.warrows) for (const r of rg.warrows) {   // arrows: a lime streak in flight, a shaft quivering in the trunk
+    const [x, y] = toScreen(r.x, r.y), [x2, y2] = toScreen(r.x - r.ux * 22, r.y - r.uy * 22), lift = 20 * Z;
+    ctx.save(); ctx.lineCap = 'round';
+    if (!r.stuck) { ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = r.trip > 1 ? 'rgba(240,255,160,0.8)' : 'rgba(190,240,110,0.5)'; ctx.lineWidth = (r.trip > 1 ? 5 : 3) * Z; ctx.beginPath(); ctx.moveTo(x2, y2 - lift); ctx.lineTo(x, y - lift); ctx.stroke(); ctx.globalCompositeOperation = 'source-over'; }
+    const q = r.stuck ? Math.sin(r.t * 60) * 1.2 * Z * r.stuck : 0, [x3, y3] = toScreen(r.x - r.ux * 12, r.y - r.uy * 12);
+    ctx.strokeStyle = COLOUR ? '#8a7350' : '#8a8a86'; ctx.lineWidth = 1 * Z; ctx.beginPath(); ctx.moveTo(x3 + q, y3 - lift); ctx.lineTo(x, y - lift); ctx.stroke();
+    ctx.fillStyle = '#e8eae6'; ctx.beginPath(); ctx.arc(x, y - lift, 1.3 * Z, 0, 7); ctx.fill(); ctx.restore();
+  }
+  if (rg.wbolts) for (const B of rg.wbolts) {     // the light lance: a white-gold bolt with a trail that bends where it bounced
+    if (B.tr.length < 2) continue; const a = B.gone ? 1 - (B.fade || 0) / 0.15 : 1;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const path = () => { ctx.beginPath(); B.tr.forEach(([wx, wy], j) => { const [x, y] = toScreen(wx, wy); j ? ctx.lineTo(x, y - 18 * Z) : ctx.moveTo(x, y - 18 * Z); }); ctx.stroke(); };
+    ctx.strokeStyle = `rgba(255,230,160,${0.35 * a})`; ctx.lineWidth = 10 * Z; path();
+    ctx.strokeStyle = `rgba(255,255,245,${0.95 * a})`; ctx.lineWidth = 2.6 * Z; path();
+    const [hx, hy] = toScreen(B.x, B.y), g = ctx.createRadialGradient(hx, hy - 18 * Z, 0, hx, hy - 18 * Z, 16 * Z); g.addColorStop(0, `rgba(255,255,240,${a})`); g.addColorStop(1, 'rgba(255,240,190,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hx, hy - 18 * Z, 16 * Z, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  if (rg.worb) {                                  // the orbiting glaive: turning end over end round you, a gold ring of its path
+    const O = rg.worb, [px0, py0] = toScreen(p.x, p.y), x = p.x + Math.cos(O.a) * WORB_R, y = p.y + Math.sin(O.a) * WORB_R, [sx, sy] = toScreen(x, y), lift = 18 * Z, L = 16 * Z, sp = O.t * 22, end = Math.min(1, (O.dur - O.t) / 0.3);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,210,90,${0.25 * end})`; ctx.lineWidth = 3 * Z; ctx.beginPath(); ctx.ellipse(px0, py0 - lift, WORB_R * K() * 1.42, WORB_R * K() * 0.71, 0, O.a - 1.4, O.a); ctx.stroke(); ctx.restore();
+    for (let k = 2; k >= 0; k--) { ctx.save(); ctx.globalAlpha = k ? 0.2 / k : 1; const c = Math.cos(sp - k * 0.4), s2 = Math.sin(sp - k * 0.4); wpShape('glaive', ctx, sx - c * L, sy - lift - s2 * L, sx + c * L, sy - lift + s2 * L, 1, Z * 0.7, false); ctx.restore(); }
+  }
+  if (rg.wgrab) { const e = rg.wgrab.e, [x, y] = toScreen(e.x, e.y); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(230,160,70,0.7)'; ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.ellipse(x, y, 16 * Z, 7 * Z, 0, 0, 7); ctx.stroke(); ctx.restore(); }
+  if (p.atk && p.atk.wd && p.atk.wd.dive && p.atk.t < p.atk.wd.diveT && p.atk.t > 0.06) {   // under the sand: a mound racing along, throwing up grit
+    const [x, y] = toScreen(p.x, p.y); ctx.save(); ctx.fillStyle = COLOUR ? (inBeyond() ? '#7a6440' : '#3e3428') : '#4a4a48';
+    ctx.beginPath(); ctx.ellipse(x, y, 13 * Z, 5 * Z, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + 1 * Z, 15 * Z, 5 * Z, 0, 0, Math.PI); ctx.fill(); ctx.restore();
+    S.tip = [x, y - 6 * Z];
+  }
   if (rg.wflare && beamGeo) {                     // the flare: the whole beam goes white and slams out
     const b = beamGeo, u = rg.wflare.t / 0.4, a = (1 - u) * (1 - u), R = b.br * (0.7 + 0.5 * Math.sqrt(u));
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -8046,17 +8863,20 @@ function drawWpFx() {
     ctx.fillStyle = `rgba(255,250,235,${0.09 * a})`; ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
-  if (rg.wdrop) {                                 // won: the axe stands in the ground where he fell, in a pillar of light
-    const D = rg.wdrop, [x, y] = toScreen(D.x, D.y), pul = 0.8 + 0.2 * Math.sin(S.t * 3), near = Math.hypot(D.x - p.x, D.y - p.y) < 110;
+  if (rg.wdrop) {                                 // won: the weapon stands in the ground where he fell, in a pillar of light
+    const D = rg.wdrop, A = ARMS[D.id], [x, y] = toScreen(D.x, D.y), pul = 0.8 + 0.2 * Math.sin(S.t * 3), near = Math.hypot(D.x - p.x, D.y - p.y) < 110;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(x, y, 0, x, y, 60 * Z); g.addColorStop(0, `rgba(255,190,110,${0.55 * pul})`); g.addColorStop(1, 'rgba(255,170,80,0)');
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 60 * Z); g.addColorStop(0, `rgba(${A.col},${0.55 * pul})`); g.addColorStop(1, `rgba(${A.col},0)`);
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, 60 * Z, 30 * Z, 0, 0, 7); ctx.fill();
-    const pg = ctx.createLinearGradient(x, y - 170 * Z, x, y); pg.addColorStop(0, 'rgba(255,200,120,0)'); pg.addColorStop(1, `rgba(255,200,120,${0.32 * pul})`);
+    const pg = ctx.createLinearGradient(x, y - 170 * Z, x, y); pg.addColorStop(0, `rgba(${A.col},0)`); pg.addColorStop(1, `rgba(${A.col},${0.32 * pul})`);
     ctx.fillStyle = pg; ctx.fillRect(x - 9 * Z, y - 170 * Z, 18 * Z, 170 * Z);
-    for (let k = 0; k < 8; k++) { const ph = (S.t * 0.6 + k / 8) % 1, sx = x + Math.sin(k * 7.3 + S.t) * 14 * Z; ctx.fillStyle = `rgba(255,220,160,${Math.sin(ph * Math.PI) * 0.8})`; ctx.beginPath(); ctx.arc(sx, y - ph * 90 * Z, 1.6 * Z, 0, 7); ctx.fill(); }
+    for (let k = 0; k < 8; k++) { const ph = (S.t * 0.6 + k / 8) % 1, sx = x + Math.sin(k * 7.3 + S.t) * 14 * Z; ctx.fillStyle = `rgba(${A.col},${Math.sin(ph * Math.PI) * 0.8})`; ctx.beginPath(); ctx.arc(sx, y - ph * 90 * Z, 1.6 * Z, 0, 7); ctx.fill(); }
     ctx.restore();
-    wpAxeShape(ctx, x - 7 * Z, y - 30 * Z, x + 2 * Z, y - 2 * Z, 1, Z * 0.75, false);   // head down in the dirt, haft up at an angle
-    stkText(ARMS[D.id].name.toUpperCase(), x, y - 52 * Z, 14 * zk, ARMS[D.id].col, 0.9 + 0.1 * pul, { glow: ARMS[D.id].col, blur: 10 });
+    if (D.id === 'axe') wpAxeShape(ctx, x - 7 * Z, y - 30 * Z, x + 2 * Z, y - 2 * Z, 1, Z * 0.75, false);   // head down in the dirt, haft up at an angle
+    else if (D.id === 'fists') { wpFist(x - 6 * Z, y - 8 * Z, -0.4, false); wpFist(x + 6 * Z, y - 9 * Z, -2.7, false); }
+    else wpShape(D.id === 'twin' ? 'twin' : D.id, ctx, x - 4 * Z, y, x + 3 * Z, y - 40 * Z, 1, Z * 0.75, false);   // planted point down, standing up
+    if (D.id === 'twin') wpShape('bow', ctx, x + 10 * Z, y - 4 * Z, x + 12 * Z, y - 30 * Z, 1, Z * 0.75, false);
+    stkText(A.name.toUpperCase(), x, y - 52 * Z, 14 * zk, A.col, 0.9 + 0.1 * pul, { glow: A.col, blur: 10 });
     if (near) stkText('WALK OVER IT TO TAKE IT', x, y - 36 * Z, 9 * zk, '239,239,234', 0.85, { w: 600 });
   }
   if (rg.wax) {                                   // the thrown axe, turning over and over, with a blur of its own turns behind it
@@ -8075,6 +8895,12 @@ function drawWpFx() {
     const [x, y] = toScreen(q.x, q.y), u = q.t, pop = u < 0.12 ? 1.6 - 0.6 * (u / 0.12) : 1, a = u > 0.7 ? (1 - u) / 0.3 : 1;
     stkText(q.text, x, y - q.h * Z - 18 * u * Z, 19 * q.s * zk, q.col, a, { s: pop, glow: q.col, blur: 12 });
   }
+  if (wpOn()) {                                   // over your head: armed (the Twins' triple), the dance's beat, the special ready
+    const [x, y] = toScreen(p.x, p.y), hy = y - 64 * Z;
+    if (rg.wtrip) stkText('×3', x + 16 * Z, hy + 4 * Z, 12 * zk, '220,255,140', 0.75 + 0.25 * Math.sin(S.t * 10), { glow: '200,240,110', blur: 8 });
+    if (curW() === 'glaive' && (rg.wbeat || 0) > 0) { for (let k = 0; k < 4; k++) { ctx.fillStyle = k < rg.wbeat ? 'rgba(255,215,110,0.95)' : 'rgba(255,215,110,0.2)'; ctx.beginPath(); ctx.arc(x + (k - 1.5) * 7 * Z, hy + 8 * Z, 2.2 * Z, 0, 7); ctx.fill(); } }
+    if (rg.wbeatFx) { const u = rg.wbeatFx.t / 0.4; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,215,110,${0.8 * (1 - u)})`; ctx.lineWidth = 2.5 * Z; ctx.beginPath(); ctx.ellipse(x, y, (20 + 40 * u) * Z, (10 + 20 * u) * Z, 0, 0, 7); ctx.stroke(); ctx.restore(); }
+  }
   if (rg.wrdy) {                                  // the special's back: a ring snaps out round your head
     const [x, y] = toScreen(p.x, p.y), u = rg.wrdy.t / 0.7, hy = y - 64 * Z;
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(${ARMS[curW()].col},${0.9 * (1 - u)})`; ctx.lineWidth = (3 - 2 * u) * Z;
@@ -8086,12 +8912,15 @@ function drawWpFx() {
     const [x0, y0] = toScreen(p.x, p.y), x = Math.max(175 * zk, Math.min(W - 175 * zk, x0)), y = Math.min(H - 56 * zk, y0 + 84 * Z), punch = 1 + 0.5 * Math.pow(1 - inA, 2);
     ctx.save(); ctx.globalAlpha = al * 0.8; ctx.fillStyle = 'rgba(8,6,4,0.85)'; ctx.translate(x, y); ctx.transform(1, 0, -0.18, 1, 0, 0);
     ctx.fillRect(-170 * zk, -50 * zk, 340 * zk, 96 * zk); ctx.globalAlpha = al; ctx.fillStyle = `rgb(${A.col})`; ctx.fillRect(-170 * zk, -50 * zk, 340 * zk, 3 * zk); ctx.fillRect(-170 * zk, 43 * zk, 340 * zk, 3 * zk); ctx.restore();
-    const spin = Math.max(0, 1 - u / 0.5) * 9, c = Math.cos(-0.9 - spin), s2 = Math.sin(-0.9 - spin), L = 30 * zk;   // the axe spins in and settles
-    ctx.save(); ctx.globalAlpha = al; wpAxeShape(ctx, x - 130 * zk - c * L, y - 2 * zk - s2 * L, x - 130 * zk + c * L, y - 2 * zk + s2 * L, 1, 1.25 * zk, false); ctx.restore();
+    const spin = Math.max(0, 1 - u / 0.5) * 9, c = Math.cos(-0.9 - spin), s2 = Math.sin(-0.9 - spin), L = 30 * zk;   // the weapon spins in and settles
+    ctx.save(); ctx.globalAlpha = al;
+    if (C.id === 'fists') { wpFist(x - 138 * zk, y - 4 * zk, -0.5 - spin, false); wpFist(x - 122 * zk, y + 2 * zk, -0.5 - spin, false); }
+    else wpShape(C.id, ctx, x - 130 * zk - c * L, y - 2 * zk - s2 * L, x - 130 * zk + c * L, y - 2 * zk + s2 * L, 1, 1.25 * zk, false);
+    ctx.restore();
     stkText(C.rack ? 'ON YOUR BACK' : 'WEAPON CLAIMED', x + 20 * zk, y - 30 * zk, 13 * zk, '255,230,170', al, { s: punch, w: 700 });
-    stkText(A.name.toUpperCase(), x + 20 * zk, y - 4 * zk, 28 * zk, A.col, al, { s: punch, glow: A.col, blur: 16 });
+    stkText(A.name.toUpperCase(), x + 20 * zk, y - 4 * zk, (A.name.length > 14 ? 22 : 28) * zk, A.col, al, { s: punch, glow: A.col, blur: 16 });
     stkText(A.short, x + 20 * zk, y + 20 * zk, 10.5 * zk, '239,239,234', al, { w: 500 });
-    stkText(document.body.classList.contains('mouse') ? 'Q swap · K throw · attack while it flies calls it back' : 'Swap to switch · Throw it at a tree', x + 20 * zk, y + 35 * zk, 9 * zk, '190,186,176', al, { w: 500 });
+    stkText(document.body.classList.contains('mouse') ? A.hint : (A.phone || 'Swap to switch'), x + 20 * zk, y + 35 * zk, 9 * zk, '190,186,176', al, { w: 500 });
   }
 }
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
@@ -8976,7 +9805,7 @@ function bossDie(b, dt) {                        // he falls to his knees, burns
       rg.blasts.push({ x: b.x, y: b.y, t: 0, life: 1.2, r: 320, col: 'white' }); rg.echoes.push({ r: 0, x: b.x, y: b.y, max: 600, burst: true });
       for (let i = 0; i < 6; i++) ashBurst(b.x + (Math.random() - 0.5) * 50, b.y + (Math.random() - 0.5) * 50, 12, 180);
       const c = bossArena(); if (c) { ashBurst(c.x, c.y, 16, 40); rg.blasts.push({ x: c.x, y: c.y, t: 0, life: 0.7, r: 160, col: 'green' }); }
-      XS.wardenDead = true; XS.embers += 60; lifeAdd('embers', 60); lifeAdd('bosses'); lifeTally('bt', 'warden'); exSave();
+      XS.wardenDead = true; XS.embers += 60; lifeAdd('embers', 60); lifeAdd('bosses'); lifeTally('bt', 'warden'); exSave(); wpDrop('warden', b.x, b.y);   // v143: his club stays where he fell
       rg.cleared = 25; for (const e of rg.enemies) e.dead = e.gone = true; rg.enemies = [];   // v112: the woods fall quiet for a breath (was: until you're home), then the deep wakes
       S.msg = { text: 'warden felled', sub: '+60 embers banked · the woods are quiet, for now · take the orb home', t: 0 };
       if (actx) { const t = actx.currentTime; boomAt(t, 45, 20, 3, 1, sfxGain); noiseAt(t, 3000, 100, 2.5, 0.5, sfxGain); }
@@ -9789,7 +10618,7 @@ function miniWin(m) {                            // the last of them goes to ash
   const chest = B.loot.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // v111: his chest is banked on the spot (it never fit a pack, and the Dunes ones couldn't be picked up)
   XS.embers += chest; rg.bankFx = { v: chest, t: 0 }; lifeAdd('embers', chest); lifeAdd('bosses'); lifeTally('bt', B.id);
   m.L.beat = true; exSave();
-  if (B.id === 'woodcutter' && WP_ON && !S.day) rg.wdrop = { id: 'axe', x: u.x, y: u.y, t: 0 };   // v141: his axe stays standing where he fell
+  wpDrop(B.id, u.x, u.y);   // v141: his weapon stays standing where he fell
   const next = lairCur();
   S.msg = { text: B.title + ' felled', sub: `His chest is banked · his wisps are yours${next ? ' · a new fire burns somewhere out there' : ''}`, t: 0 };
   if (B.dune) duneWin(m);
