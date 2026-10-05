@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 155</p>
+      <p class="small" id="verLbl">Version 156</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7366,7 +7366,7 @@ function dayBegin() {
     warm: WARM_MAX, bleed: 0, bleedT: 0, froze: 0, fish: null, ph: 'day',
     camps: new Map(), heat: 0, raids: 0, caught: 0, away: 0, jlog: [], bag: {}, siege: null, won: 0, scout: null, scoutT: 55 };   // v155: the raider camps, the heat and the journal   // v153: the cold, your wounds and the night   // v152: what you've built on the grid, and where your bed is
   S.rg = exNewRun(); exPlaceHome(); wpInit(); S.day.baseHp = S.rg.maxHp;
-  S.msg = { text: 'daylight', sub: 'Gather sticks, stones and fibre · your pack shows what they make', t: 0 };
+  S.msg = { text: 'daylight', sub: 'Sticks and stones lie on the ground · walk up to them and Take', t: 0 };
   dayChanged();
 }
 function dayNote(k, text, gap = 4) { const D = S.day; if ((D.told[k] || -99) > D.t - gap) return; D.told[k] = D.t; exNote(text, true); }
@@ -8088,7 +8088,8 @@ function dayBar(px, py) {                      // stamina, food and water over y
   bar(x0 + tw / 2 + 1, y0, tw / 2 - 1, D.water / FOOD_MAX, 'rgba(110,170,230,0.9)', D.water < 30);
   if (D.warm < 92 || dayNight()) bar(x0, y0 + 6, tw, D.warm / WARM_MAX, 'rgba(150,200,215,0.9)', D.warm < 30);
   const say = D.bleed > 0 ? 'BLEEDING' : D.warm <= 0 ? 'FREEZING' : D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.warm < 30 ? 'COLD' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : '';
-  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); } }
+  drawPickHints(px, py);   // v156
+  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); } }
   { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
   if (say) { ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)'; ctx.fillText(say, px, y0 - 9); }
 }
@@ -9387,6 +9388,68 @@ function drawSiege() {                             // while the signal fire burn
   ctx.fillStyle = G.far ? `rgba(240,160,110,${0.6 + 0.4 * Math.sin(S.t * 7)})` : `rgba(239,239,234,${0.75 + 0.25 * Math.sin(S.t * 4)})`;
   ctx.fillText(G.far ? 'BACK TO THE FIRE' : `HOLD OUT · ${Math.ceil(left)}S`, W * DPR / 2, y + h + 6 * DPR);
   ctx.restore();
+}
+// ---- v156 (Joe: "I have no idea how to get stone or sticks"): what you can gather shows itself. Everything the Take button
+// picks up has a warm ring on the ground and its picture over it as you come near; grass and berry bushes, which you strike
+// instead, get a green ring close up. The thing you'd take next is named over it, and until you've picked up your first
+// sticks and stones an arrow at your feet points to the nearest of them.
+const PICK_SEE = 230, PICK_HIT = 110;
+function dayPickables(R) {                       // [{ o, it, how: 'take' | 'hit' }] near you
+  const D = S.day, p = S.p, out = [];
+  for (const o of dayNodesNear(p.x, p.y, R)) {
+    if (o.gone) continue;
+    if (o.t === 'sticks' || o.t === 'stones' || o.t === 'shroom') out.push({ o, it: o.t === 'shroom' ? 'mushroom' : o.t, how: 'take' });
+    else if (o.t === 'grass' && dist2(o, p) < PICK_HIT) out.push({ o, it: 'fibre', how: 'hit' });
+    else if (o.t === 'bush' && o.ber && dist2(o, p) < PICK_HIT) out.push({ o, it: 'berries', how: 'hit' });
+  }
+  for (const f of D.drops) if (Math.abs(f.x - p.x) < R && Math.abs(f.y - p.y) < R) out.push({ o: f, it: f.it, how: 'take' });
+  return out;
+}
+function dayHitTarget() {                        // the grass or bush a swing would gather from, if nothing is there to take
+  const p = S.p; let best = null, bd = 46;
+  for (const o of dayNodesNear(p.x, p.y, 60)) if (!o.gone && (o.t === 'grass' || (o.t === 'bush' && o.ber))) { const d = dist2(o, p); if (d < bd) { bd = d; best = o; } }
+  return best;
+}
+function drawPickHints(px, py) {
+  const D = S.day, p = S.p, tgt = dayUseTarget();
+  for (const { o, it, how } of dayPickables(PICK_SEE)) {
+    const d = Math.hypot(o.x - p.x, o.y - p.y), f = Math.max(0, 1 - d / (how === 'take' ? PICK_SEE : PICK_HIT)), [x, y] = toScreen(o.x, o.y);
+    const pulse = 0.65 + 0.35 * Math.sin(S.t * 3 + o.x * 0.05), on = o === tgt;
+    ctx.lineWidth = on ? 2.2 : 1.4;
+    ctx.strokeStyle = how === 'take' ? `rgba(255,224,150,${(on ? 0.95 : 0.25 + 0.45 * f) * pulse})` : `rgba(170,225,140,${0.5 * f * pulse})`;
+    ctx.beginPath(); ctx.ellipse(x, y, (on ? 15 : 12) * Z, (on ? 7.5 : 6) * Z, 0, 0, 7); ctx.stroke();
+    if (on || d > (how === 'take' ? PICK_SEE : PICK_HIT)) continue;   // the one you'd take next is named instead
+    const img = iconImg(it); if (!img) continue;
+    const s = 17 * Z, by = y - (17 + 2.5 * Math.sin(S.t * 2.5 + o.x)) * Z;
+    ctx.globalAlpha = (how === 'take' ? 0.4 : 0.25) + 0.55 * f; ctx.drawImage(img, x - s / 2, by - s, s, s); ctx.globalAlpha = 1;
+  }
+  if (!tgt) {                                    // nothing to take: name the grass or bush a swing would gather from
+    const h = dayHitTarget();
+    if (h) { const [x, y] = toScreen(h.x, h.y); dayTag(x, y - 20 * Z, (matchMedia('(pointer: coarse)').matches ? '' : 'CLICK · ') + 'HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES'), 'rgba(200,235,180,0.92)'); }
+  }
+  drawPickGuide(px, py);
+}
+function dayTag(x, y, tx, col) {
+  ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  const w = ctx.measureText(tx).width + 8; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x - w / 2, y - 14, w, 14);
+  ctx.fillStyle = col || 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 2);
+}
+function drawPickGuide(px, py) {                 // until you've held sticks and stones: an arrow to the nearest
+  const D = S.day; if (D.seen.has('sticks') && D.seen.has('stones')) return;
+  if (dayPickables(140).some(q => q.how === 'take' && (q.it === 'sticks' || q.it === 'stones') && dist2(q.o, S.p) < 140)) return;
+  let best = null, bd = 1100;
+  for (const o of dayNodesNear(S.p.x, S.p.y, 1100)) if (!o.gone && ((o.t === 'sticks' && !D.seen.has('sticks')) || (o.t === 'stones' && !D.seen.has('stones')))) { const d = dist2(o, S.p); if (d < bd) { bd = d; best = o; } }
+  if (!best) return;
+  const [x, y] = toScreen(best.x, best.y), cy = py - 18 * Z, a = Math.atan2(y - cy, x - px), r = 62 + 4 * Math.sin(S.t * 4);
+  const ax = px + Math.cos(a) * r, ay = cy + Math.sin(a) * r * 0.8, k = 0.8 + 0.2 * Math.sin(S.t * 4);
+  ctx.save(); ctx.translate(ax, ay); ctx.rotate(a); ctx.scale(1.5, 1.5);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-6, -9); ctx.lineTo(-2, 0); ctx.lineTo(-6, 9); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = `rgba(255,240,200,${k})`; ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-5, -7); ctx.lineTo(-2, 0); ctx.lineTo(-5, 7); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  const tx = ax + Math.cos(a) * 30, ty = ay + Math.sin(a) * 24, img = iconImg(best.t);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(tx, ty, 13, 0, 7); ctx.fill();
+  if (img) ctx.drawImage(img, tx - 10, ty - 10, 20, 20);
+  dayTag(tx, ty - 15, best.t.toUpperCase(), 'rgba(255,240,200,0.95)');
 }
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
