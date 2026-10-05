@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 161</p>
+      <p class="small" id="verLbl">Version 162</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -11296,7 +11296,7 @@ function exPack(ring, n) {                      // v123: a pack of hunters comin
   const pk = S.rg.pkN = (S.rg.pkN || 0) + 1; S.rg.enemies.slice(-n).forEach(e => { e.pk = pk; });   // v134: the last one down is PACK DOWN
 }
 function exPickFoe(r) {
-  const rg = S.rg, ok = EX_SPAWNS.filter(s => s.weight[r] > 0 && (!s.max || rg.enemies.filter(e => e.type === s.type).length < s.max[r]));
+  const rg = S.rg, ok = EX_SPAWNS.filter(s => s.weight[r] > 0 && !(S.day && r === 0 && s.type === 'kamikaze') && (!s.max || rg.enemies.filter(e => e.type === s.type).length < s.max[r]));
   let x = Math.random() * ok.reduce((a, s) => a + s.weight[r], 0);
   for (const s of ok) if ((x -= s.weight[r]) < 0) return s.type;
   return 'shade';
