@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 159</p>
+      <p class="small" id="verLbl">Version 160</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -8036,44 +8036,7 @@ function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
     if (o.n > 1) { c.font = `600 ${Math.round(8 * z + 2)}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillStyle = 'rgba(239,239,234,0.9)'; c.fillText('x' + o.n, sx, y - 8 * z); }
     c.restore(); return;
   }
-  if (o.kind === 'beast') {
-    const B = BEAST[o.k], f = o.face || 1, k = o.k === 'rabbit' ? 0.55 : o.k === 'boar' ? 0.95 : o.k === 'wolf' ? 0.85 : o.k === 'bear' ? 1.35 : 1, s = z * 1.35 * k, run = o.sp > 30, legA = Math.sin(o.ph * (run ? 1.4 : 1)) * (o.sp > 1 ? (run ? 0.7 : 0.35) : 0);
-    c.save(); if (o.dead) { c.globalAlpha *= Math.max(0, 1 - o.dieT / 1.2); }
-    shadow(sx, sy, B.w * z);
-    const body = o.flash > 0 ? '#f4f0e6' : o.k === 'deer' ? C('#8a6040', '#7a7a74') : o.k === 'boar' ? C('#4a3a30', '#4a4a46') : o.k === 'wolf' ? C(o.tame ? '#6e6a62' : '#55524c', '#5e5e58') : o.k === 'bear' ? C('#3a2a20', '#3e3e3a') : C('#8a7a66', '#76766f');
-    const legH = o.k === 'boar' ? 7 : o.k === 'rabbit' ? 4 : o.k === 'wolf' ? 10 : o.k === 'bear' ? 9 : 14, by = sy - (legH + (run && o.k !== 'boar' ? Math.abs(Math.sin(o.ph * 1.4)) * 3 : 0)) * s / k * k;
-    if (o.dead) { c.translate(sx, sy); c.rotate(f * 1.2 * Math.min(1, o.dieT * 4)); c.translate(-sx, -sy); }
-    c.strokeStyle = body; c.lineCap = 'round'; c.lineWidth = (o.k === 'boar' ? 3 : 2) * s;
-    if (o.k !== 'rabbit') { c.beginPath(); for (const [lx, ph] of [[-7, 0], [-5, Math.PI], [6, Math.PI], [8, 0]]) { const sw = Math.sin(ph) * legA; c.moveTo(sx + lx * s * f, by); c.lineTo(sx + (lx + sw * 8) * s * f, sy - 0.5 * s); } c.stroke(); }
-    c.fillStyle = body; c.beginPath(); c.ellipse(sx, by - 2 * s, (o.k === 'boar' ? 12 : 11) * s, (o.k === 'boar' ? 7 : 5.5) * s, 0, 0, 7); c.fill();
-    if (o.k === 'deer') {
-      c.beginPath(); c.moveTo(sx + 8 * s * f, by - 4 * s); c.lineTo(sx + 12 * s * f, by - 14 * s); c.lineWidth = 4 * s; c.stroke();
-      c.beginPath(); c.ellipse(sx + 14 * s * f, by - 15 * s, 4.5 * s, 2.6 * s, f * 0.3, 0, 7); c.fill();
-      c.fillStyle = '#efe9dc'; c.beginPath(); c.arc(sx - 10 * s * f, by - 4 * s, 2 * s, 0, 7); c.fill();
-      if (o.stag) { c.strokeStyle = C('#d8c8a8', '#cfcfc8'); c.lineWidth = 1.3 * s; c.beginPath(); const hx = sx + 12 * s * f, hy = by - 17 * s; c.moveTo(hx, hy); c.lineTo(hx - 3 * s * f, hy - 8 * s); c.lineTo(hx - 7 * s * f, hy - 11 * s); c.moveTo(hx - 2 * s * f, hy - 5 * s); c.lineTo(hx + 2 * s * f, hy - 9 * s); c.moveTo(hx + 2 * s * f, hy); c.lineTo(hx + 4 * s * f, hy - 7 * s); c.stroke(); }
-    } else if (o.k === 'boar') {
-      c.beginPath(); c.ellipse(sx + 12 * s * f, by - 1 * s, 6 * s, 4.5 * s, 0, 0, 7); c.fill();
-      c.strokeStyle = '#efe9dc'; c.lineWidth = 1.4 * s; c.beginPath(); c.moveTo(sx + 15 * s * f, by + 1 * s); c.quadraticCurveTo(sx + 19 * s * f, by, sx + 18 * s * f, by - 3 * s); c.stroke();
-      c.strokeStyle = body; c.lineWidth = 1.2 * s; c.beginPath(); for (let i = -6; i <= 6; i += 2) { c.moveTo(sx + i * s, by - 8 * s); c.lineTo(sx + (i - f) * s, by - 11 * s); } c.stroke();
-      if (o.st === 'wind') { c.fillStyle = 'rgba(226,84,60,0.9)'; c.font = `700 ${Math.round(12 * z)}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.fillText('!', sx, by - 18 * s); }
-    } else if (o.k === 'wolf' || o.k === 'bear') {
-      const big = o.k === 'bear';
-      c.beginPath(); c.ellipse(sx + (big ? 12 : 11) * s * f, by - (big ? 3 : 4) * s, (big ? 6.5 : 5) * s, (big ? 5 : 3.6) * s, f * 0.2, 0, 7); c.fill();   // the head, held low
-      c.beginPath(); c.moveTo(sx + (big ? 15 : 14) * s * f, by - 2 * s); c.lineTo(sx + (big ? 17.5 : 19) * s * f, by - (big ? 2.5 : 1) * s); c.lineTo(sx + (big ? 15 : 14) * s * f, by + 1 * s); c.closePath(); c.fill();   // the muzzle, stubbier on a bear
-      if (big) { for (const e of [-1, 1]) { c.beginPath(); c.arc(sx + (10 + e * 1.4) * s * f, by - 8.5 * s, 2.1 * s, 0, 7); c.fill(); } }   // round bear ears
-      else { c.beginPath(); for (const e of [-1, 1]) { c.moveTo(sx + (10 + e) * s * f, by - 7 * s); c.lineTo(sx + (9.5 + e * 1.6) * s * f, by - 11 * s); c.lineTo(sx + (11.5 + e) * s * f, by - 7.5 * s); } c.fill(); }   // a wolf's pricked ears
-      c.strokeStyle = body; c.lineWidth = (big ? 3.4 : 2.2) * s; c.beginPath(); c.moveTo(sx - (big ? 9 : 10) * s * f, by - (big ? 5 : 2) * s); c.quadraticCurveTo(sx - (big ? 11.5 : 17) * s * f, by - (big ? 5.5 : 6 + Math.sin(o.ph) * 2) * s, sx - (big ? 12 : 19) * s * f, by - (big ? 3.5 : 9) * s); c.stroke();   // a stub on a bear, a brush on a wolf
-      if (big) { c.fillStyle = body; c.beginPath(); c.ellipse(sx - 2 * s, by - 9 * s, 9 * s, 4 * s, 0, 0, 7); c.fill(); }   // the bear's hump
-      c.fillStyle = o.tame ? '#9fd27a' : o.st === 'hunt' || o.st === 'back' || o.st === 'charge' || o.st === 'wind' ? '#e2543c' : '#d8c98a';
-      c.beginPath(); c.arc(sx + (big ? 13 : 12) * s * f, by - (big ? 4.5 : 5.2) * s, 1.3 * s, 0, 7); c.fill();   // the eye
-      if (o.st === 'wind') { c.fillStyle = 'rgba(226,84,60,0.9)'; c.font = `700 ${Math.round(12 * z)}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.fillText('!', sx, by - 20 * s); }
-    } else {
-      c.beginPath(); c.arc(sx + 9 * s * f, by - 5 * s, 4 * s, 0, 7); c.fill();
-      c.lineWidth = 1.8 * s; c.beginPath(); c.moveTo(sx + 8 * s * f, by - 8 * s); c.lineTo(sx + (o.st === 'flee' ? 3 : 7) * s * f, by - 16 * s); c.stroke();
-      c.fillStyle = '#efe9dc'; c.beginPath(); c.arc(sx - 10 * s * f, by - 3 * s, 2.4 * s, 0, 7); c.fill();
-    }
-    c.restore();
-  }
+  if (o.kind === 'beast') drawBeast(o, c, sx, sy);   // v160: drawn as a rig, like the people
 }
 function drawDay() {                           // the sun: a warm wash from the top, going red as it sets
   const lt = dayLight(), set = lt < 1 && lt > 0 ? 1 - lt : 0;
@@ -9546,6 +9509,200 @@ function dayYard(day) {                         // move the camp box and barrels
   CAMP_BOX.x = to[1].x; CAMP_BOX.y = to[1].y; CAMP_BARREL.x = to[2].x; CAMP_BARREL.y = to[2].y;
   yardIs = day;
 }
+// ---- v160 (Joe): the animals drawn the way the people are. Each one is a little rig in its own 3D frame, like the player and the
+// raiders: (forward, right, height) turned to face where it is really going, painted back to front with a dark rim pass first,
+// the far legs in shade and the near ones lit. Four legs that walk in a proper sequence, gallop when they run (rabbits hop),
+// heads that drop to graze and come up to listen, tails and ears that never quite keep still, a jolt when struck, and a body
+// that rolls over onto its side when it dies. Each kind has its own build and its own tell: a boar paws the ground and drops
+// its head before it charges, a bear rears up on its hind legs, a wolf flattens out to stalk and snaps forward when it bites.
+const BART = {   // body length, shoulder and hip height, body depth, leg width, neck, head, colours (colour, grey)
+  deer:   { len: 25, sh: 21, hip: 20, bw: 8.5, lw: 2.2, neckF: 5, neckH: 12, hr: [3.2, 2.7], mz: 4.6, mzw: 2.4, stride: 7.5, lift: 4.5,
+            col: ['#8e6542', '#7c7c76'], belly: ['#d9c6a6', '#c2c2ba'], back: ['#61412a', '#5c5c56'], eye: '#1c1612' },
+  rabbit: { len: 9, sh: 6.5, hip: 7.5, bw: 5.8, lw: 1.8, neckF: 1, neckH: 2.5, hr: [2.5, 2.2], mz: 1.6, mzw: 1.8, stride: 4, lift: 2,
+            col: ['#8c7c68', '#7a7a73'], belly: ['#e6dccb', '#cfcfc8'], back: ['#665846', '#5e5e58'], eye: '#1c1612' },
+  boar:   { len: 22, sh: 14.5, hip: 12.5, bw: 10.5, lw: 3, neckF: 2, neckH: 0, hr: [4.3, 3.7], mz: 5.4, mzw: 3.6, stride: 5.5, lift: 3,
+            col: ['#4e3d31', '#4c4c48'], belly: ['#6e5a4a', '#64645e'], back: ['#2e241e', '#30302c'], eye: '#d8c98a' },
+  wolf:   { len: 23, sh: 16, hip: 15, bw: 7.6, lw: 2.3, neckF: 4, neckH: 4.5, hr: [3.3, 2.9], mz: 5.2, mzw: 2.2, stride: 8, lift: 4,
+            col: ['#6a665e', '#62625c'], belly: ['#b8b2a4', '#ababa4'], back: ['#3c3a35', '#3a3a36'], eye: '#d8c98a' },
+  bear:   { len: 32, sh: 23, hip: 20, bw: 15, lw: 5, neckF: 3, neckH: 2.5, hr: [5.4, 4.8], mz: 4.4, mzw: 3.8, stride: 8, lift: 4,
+            col: ['#4a3426', '#454541'], belly: ['#6a4c38', '#5c5c56'], back: ['#2c1e16', '#2c2c29'], eye: '#d8c98a' },
+};
+const bMix = (a, b, k) => {                      // blend two '#rrggbb' / 'rgb()' colours
+  const p = c => c[0] === '#' ? [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)) : c.slice(c.indexOf('(') + 1, -1).split(',').map(Number);
+  const A = p(a), B = p(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(',')})`;
+};
+function drawBeast(o, c, sx, sy) {
+  const A = BART[o.k], Bt = BEAST[o.k], col = v => COLOUR ? v[0] : v[1];
+  // ---- motion: face the way it really moves (turning smoothly), stride in time with the ground ----
+  const dt = Math.min(0.1, Math.max(0, S.t - (o.aT ?? S.t))); o.aT = S.t;
+  const mdx = o.x - (o.ax ?? o.x), mdy = o.y - (o.ay ?? o.y); o.ax = o.x; o.ay = o.y;
+  if (dt > 0) { const v = Math.hypot(mdx, mdy) / dt; o.av = (o.av || 0) + (Math.min(v, 400) - (o.av || 0)) * Math.min(1, dt * 10); if (v > 4) o.aHead = Math.atan2(mdy, mdx); }
+  const v = o.av || 0, still = v < 6;
+  const want = !still && o.aHead !== undefined ? o.aHead : o.dir || 0;   // a heading on the ground (a long body needs true foreshortening)
+  o.aFace = o.aFace === undefined ? want : o.aFace + Math.max(-7 * dt, Math.min(7 * dt, angDiff(want, o.aFace)));
+  const run = v > (o.k === 'rabbit' ? 30 : 70), gk = Math.min(1, v / (run ? Bt.sp * 0.7 : 40));
+  o.aPh = (o.aPh || Math.random() * 7) + dt * (still ? 0 : (run ? 2.2 : 1.4) * v / Math.max(4, A.stride * 1.6));
+  if ((o.bite || 0) > (o.aBite || 0) + 0.3) o.atkT = 0.3;   // a bite just landed: snap the head forward
+  o.aBite = o.bite || 0; o.atkT = Math.max(0, (o.atkT || 0) - dt);
+  if (o.flash > 0.9 && !(o.hitT > 0)) o.hitT = 0.25; o.hitT = Math.max(0, (o.hitT || 0) - dt);
+  const now = S.t, sd0 = o.seed ?? (o.seed = Math.random() * 9), ph = o.aPh;
+  // ---- pose ----
+  const st = o.dead ? 'dead' : o.st, angry = st === 'hunt' || st === 'charge' || st === 'back' || st === 'wind';
+  const graze = !angry && still && st === 'graze' && o.k !== 'bear' ? Math.max(0, Math.min(1, Math.sin(now * 0.55 + sd0) * 2.2 - 0.4)) : 0;
+  const alert = st === 'flee' || (still && !graze && !angry);
+  const stalk = o.k === 'wolf' && st === 'hunt' && !o.tame ? 1 : 0;
+  const rear = o.k === 'bear' && st === 'wind' ? Math.min(1, (0.6 - (o.t || 0)) / 0.25 + 0.2) : 0;   // up on its hind legs, then down
+  const paw = o.k === 'boar' && st === 'wind' ? 1 : 0;
+  const lunge = o.atkT > 0 ? Math.sin((1 - o.atkT / 0.3) * Math.PI) : 0;
+  const recoil = o.hitT > 0 ? Math.sin((1 - o.hitT / 0.25) * Math.PI) : 0;
+  const sc = o.k === 'bear' ? 1.05 : 1, Zs = Z * sc;
+  const ca = Math.cos(o.aFace), sa = Math.sin(o.aFace), IS = Math.SQRT1_2;                 // forward and right on the ground, as the iso camera sees them
+  const Fx = (ca - sa) * IS, Fy = (ca + sa) * IS * 0.5, Rx = (-sa - ca) * IS, Ry = (ca - sa) * IS * 0.5;
+  const nearS = Ry > 0 ? 1 : -1, facingUs = Fy > 0.04;
+  // dying: it rolls over away from you onto its side
+  const roll = o.dead ? Math.min(1, o.dieT * 3.2) * Math.PI / 2 * 0.92 : 0, rs = -nearS, cr = Math.cos(roll), sr = Math.sin(roll);
+  const shake = paw ? Math.sin(now * 30) * 0.5 : 0, jolt = -recoil * 3 + lunge * 4;
+  const P = (f, r, h) => {
+    if (rear > 0) { const hh = Math.max(0, h), k = rear * 0.95; const pf = -A.len * 0.32;   // pivot on the hind feet
+      const ang = k, df = f - pf, nf = pf + df * Math.cos(ang) - hh * Math.sin(ang) * 0.35, nh = hh + df * Math.sin(ang); f = nf; h = nh; }
+    if (roll) { const r2 = r * cr + h * sr * rs, h2 = h * cr - r * sr * rs + A.bw * 0.5 * sr; r = r2; h = Math.max(0.3, h2); }
+    f += jolt; r += shake;
+    return [sx + (f * Fx + r * Rx) * Zs, sy + (f * Fy + r * Ry - h) * Zs];
+  };
+  // ---- the body's shape this frame ----
+  const gal = run ? 1 : 0, breathe = still ? Math.sin(now * 2.4 + sd0) * 0.25 : 0;
+  const pitch = gal * Math.sin(ph * 2) * 0.09 * gk;                                   // rocking through a gallop
+  const bob = (run ? Math.abs(Math.sin(ph)) * 2.2 : Math.abs(Math.sin(ph * 2)) * 0.5) * gk;
+  let hop = 0; if (o.k === 'rabbit' && !still) hop = Math.max(0, Math.sin(ph)) * 5 * gk;
+  const crouch = stalk * 3.2 + (o.k === 'rabbit' && still ? 0.8 : 0) + (paw ? 1.2 : 0) + (st === 'charge' ? 1.5 : 0);
+  const L2 = A.len / 2, fF = L2 - A.len * 0.12, fH = -L2 + A.len * 0.12;               // front and hind leg roots along the body
+  const shH = A.sh + bob + hop - crouch + pitch * L2, hpH = A.hip + bob + hop - crouch * 0.6 - pitch * L2;
+  const back = f => hpH + (shH - hpH) * (f - fH) / (fF - fH);                           // height of the back at f
+  const cH = f => back(f) - A.bw * 0.5 + breathe;                                       // the body's centre line
+  // ---- legs: a hip (or shoulder), a joint and a foot; walk in sequence, gallop in pairs, hop together ----
+  const legOff = run && o.k !== 'rabbit' ? { fl: Math.PI, fr: Math.PI + 0.5, hl: 0, hr: 0.5 } : { fl: Math.PI * 0.5, fr: Math.PI * 1.5, hl: 0, hr: Math.PI };
+  const leg = (front, side) => {
+    const off = legOff[(front ? 'f' : 'h') + (side < 0 ? 'l' : 'r')], f0 = front ? fF : fH, r0 = side * A.bw * 0.28;
+    const top = [f0, r0, cH(f0) - 0.5];
+    let sw = Math.sin(ph + off) * A.stride * gk, lift = Math.max(0, Math.cos(ph + off)) * A.lift * gk;
+    if (o.k === 'rabbit') { const s2 = Math.sin(ph); sw = (front ? 1 : -1) * s2 * A.stride * gk; lift = hop * (front ? 0.3 : 0.1); }
+    if (paw && front && side === nearS) { const k = Math.sin(now * 9); sw = 3 + k * 4; lift = Math.max(0, -k) * 4; }   // scraping the ground
+    if (rear > 0 && front) { sw = 4 * rear + Math.sin(now * 8 + side) * 1.5 * rear; lift = 6 * rear; }           // claws up
+    const foot = [f0 + sw, side * A.bw * 0.26, lift];
+    const mid = [(top[0] + foot[0]) / 2 + (front ? 0.6 + lift * 0.35 : -1.6 - lift * 0.2), side * A.bw * 0.27, (top[2] + foot[2]) / 2 + (front ? 0 : 1)];
+    return [top, mid, foot];
+  };
+  // ---- the head: up and listening, down to graze, low and level to stalk, forward to bite ----
+  const headUp = [fF + A.neckF, 0, A.sh + A.neckH], headDown = [fF + A.neckF + 3, 0, 2.6 + A.hr[1]];
+  const headLow = [fF + A.neckF + 2, 0, A.sh - 2];
+  let hd = headUp.map((v, i) => v + (headDown[i] - v) * graze);
+  if (stalk || st === 'charge' || paw) hd = hd.map((v, i) => v + (headLow[i] - v) * 0.85);
+  if (alert && o.k !== 'boar') hd[2] += 1.2;
+  hd[0] += lunge * 4; hd[2] += bob * 0.6 + hop - crouch * 0.4 + Math.sin(now * 1.7 + sd0) * 0.3 * (1 - gk);
+  if (o.k === 'rabbit' && still) hd[2] += Math.sin(now * 13 + sd0) * 0.15;               // nose going
+  const tilt = graze ? 0.7 : stalk ? 0.2 : 0.35;                                         // how far the muzzle points down
+  const mzE = [hd[0] + A.mz * Math.cos(tilt), 0, hd[2] - A.mz * Math.sin(tilt) - (graze ? 1 : 0)];
+  // ---- colours ----
+  const fl = Math.min(1, (o.flash || 0)), BODY0 = col(A.col), tint = c0 => fl > 0 ? bMix(c0, '#f4f0e6', fl * 0.85) : c0;
+  const BODY = tint(BODY0), FAR = tint(shadeC(BODY0, 0.68)), NEAR = tint(shadeC(BODY0, 0.9)), BELLY = tint(col(A.belly)), BACK = tint(col(A.back)), DARK = tint(shadeC(BODY0, 0.42));
+  const EDGE = '#1f1d1a';
+  let OUT = false;
+  const line = (pts, w, cl) => {
+    c.strokeStyle = OUT ? EDGE : cl; c.lineWidth = (w + (OUT ? 1.8 : 0)) * Zs; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); pts.forEach((pt, i) => { const [x, y] = P(...pt); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.stroke();
+  };
+  const det = (pts, w, cl) => { if (!OUT) line(pts, w, cl); };
+  const blob = (pt, rx, ry, cl, rot = 0) => { const [x, y] = P(...pt); c.beginPath(); c.ellipse(x, y, rx * Zs, ry * Zs, rot, 0, 7);
+    if (OUT) { c.strokeStyle = EDGE; c.lineWidth = 1.8 * Zs; c.stroke(); } else { c.fillStyle = cl; c.fill(); } };
+  const tri = (pts, cl) => { c.beginPath(); pts.forEach((pt, i) => { const [x, y] = P(...pt); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath();
+    if (OUT) { c.strokeStyle = EDGE; c.lineWidth = 1.6 * Zs; c.lineJoin = 'round'; c.stroke(); } else { c.fillStyle = cl; c.fill(); } };
+  const legs = { fl: leg(true, -1), fr: leg(true, 1), hl: leg(false, -1), hr: leg(false, 1) };
+  const nearLegs = nearS > 0 ? [legs.hr, legs.fr] : [legs.hl, legs.fl], farLegs = nearS > 0 ? [legs.hl, legs.fl] : [legs.hr, legs.fr];
+  const drawLeg = (lg, near) => {
+    const [top, mid, foot] = lg, w = A.lw * (near ? 1 : 0.92), cl = near ? NEAR : FAR;
+    line([top, mid], w * 1.35, cl); line([mid, foot], w, cl);
+    if (!OUT) { const [x, y] = P(...foot); c.fillStyle = o.k === 'deer' || o.k === 'boar' ? DARK : shadeC(cl, 0.7); c.beginPath(); c.ellipse(x, y, w * 0.62 * Zs, w * 0.4 * Zs, 0, 0, 7); c.fill(); }   // hoof or paw
+  };
+  // ---- the parts ----
+  const tail = () => {
+    const tb = [-L2 + 0.5, 0, back(-L2) - 1.2], wag = Math.sin(now * (o.tame ? 9 : 2.5) + sd0) * (o.tame ? 2.2 : 0.8) + Math.sin(ph) * gk * 1.2;
+    if (o.k === 'wolf') { const up = stalk ? -2.5 : run ? 1 : -1; line([tb, [-L2 - 4, wag * 0.7, tb[2] - 2 + up], [-L2 - 8, wag, tb[2] - 5 + up * 1.6]], 3.6, BODY); det([[-L2 - 7, wag, tb[2] - 4.6 + up * 1.6], [-L2 - 8.2, wag, tb[2] - 5.4 + up * 1.6]], 2.4, BELLY); }
+    else if (o.k === 'deer') { const flick = st === 'flee' ? 3 : Math.max(0, Math.sin(now * 3 + sd0)) * 1.5; line([tb, [-L2 - 2, 0, tb[2] + flick * 0.6]], 3, BODY); if (st === 'flee' || flick > 1) blob([-L2 - 1.4, 0, tb[2] - 0.6], 2.2, 1.8, '#efe9dc'); }
+    else if (o.k === 'rabbit') blob([-L2 - 0.6, 0, tb[2] + 0.3], 2.1, 2, '#efe9dc');
+    else if (o.k === 'boar') { line([tb, [-L2 - 2.2, wag * 0.6, tb[2] - 1.5], [-L2 - 2.8, wag, tb[2] - 4]], 1.2, DARK); }
+    else blob([-L2 - 0.4, 0, tb[2] - 0.4], 2.2, 1.9, BODY);
+  };
+  const body = () => {
+    const sg = 7, pts = []; for (let i = 0; i <= sg; i++) { const f = -L2 + A.len * i / sg; pts.push([f, 0, cH(f)]); }
+    line(pts, A.bw, BODY);
+    if (o.k === 'bear' || o.k === 'boar') line([[fF - 1, 0, cH(fF) + A.bw * 0.15], [fF - A.len * 0.25, 0, cH(fF - A.len * 0.25) + A.bw * 0.2]], A.bw * 0.95, BODY);   // the hump over the shoulders
+    if (OUT) return;
+    const bl = []; for (let i = 1; i < sg; i++) { const f = -L2 + A.len * i / sg; bl.push([f, nearS * A.bw * 0.18, cH(f) - A.bw * 0.22]); }
+    det(bl, A.bw * (o.k === 'boar' || o.k === 'bear' ? 0.3 : 0.42), o.k === 'boar' || o.k === 'bear' ? bMix(BELLY, BODY, 0.45) : BELLY);                                                          // the paler belly
+    const tp = []; for (let i = 0; i <= sg; i++) { const f = -L2 + A.len * i / sg; tp.push([f, 0, back(f) - A.bw * 0.16]); }
+    det(tp, A.bw * 0.3, bMix(BACK, BODY, 0.3));                                                            // the darker back
+    if (o.k === 'wolf' && !o.tame) det([[fF - 4, 0, back(fF - 4) - 1], [fH + 3, 0, back(fH + 3) - 1]], A.bw * 0.55, shadeC(BACK, 0.9));   // its saddle
+    for (let i = 0; i < 7; i++) {                                                         // fur, brushed back along the flank
+      const f = -L2 + 2 + (A.len - 4) * (i + 0.5) / 7, h = cH(f) + ((i * 37 + 11) % 7 - 3) * A.bw * 0.07;
+      det([[f, nearS * A.bw * 0.42, h], [f - 1.8, nearS * A.bw * 0.44, h - 0.6]], 0.7, shadeC(BODY, 0.78));
+    }
+    if (o.k === 'boar') for (let i = 0; i < 9; i++) { const f = fH + (fF - fH + 3) * i / 8; det([[f, 0, back(f) + 0.2], [f - 1.2, 0, back(f) + 2.4 + (st === 'wind' || st === 'charge' ? 1.4 : 0)]], 1, DARK); }   // the bristle ridge stands up when it's angry
+    if (o.k === 'deer') blob([-L2 + 1, -nearS * 0.1, cH(-L2 + 1) + 0.6], 2.6, 2.3, '#e9e1d0');   // a pale rump
+    if (o.tame) det([[fF + 1.6, -A.bw * 0.4, cH(fF) + 2.8], [fF + 2.4, 0, cH(fF) + 3.8], [fF + 1.6, A.bw * 0.4, cH(fF) + 2.8]], 1.3, '#9a7a4a');   // the rope you gave it
+  };
+  const head = () => {
+    const nb = [fF + 0.5, 0, cH(fF) + A.bw * 0.15];
+    line([nb, [(nb[0] + hd[0]) / 2, 0, (nb[2] + hd[2]) / 2 + (o.k === 'deer' ? 0.5 : 0)], hd], o.k === 'deer' ? 3.6 : A.bw * 0.62, BODY);   // the neck
+    if (!OUT && o.k !== 'rabbit') det([nb, hd], (o.k === 'deer' ? 1.6 : A.bw * 0.3), BELLY);
+    // ears behind the skull
+    const ear = (side, len, w, flop) => { const e0 = [hd[0] - 0.6, side * A.hr[0] * 0.55, hd[2] + A.hr[1] * 0.6];
+      const tw = (o.k === 'rabbit' ? Math.sin(now * 2 + side + sd0) * 0.4 : 0) + (Math.sin(now * 0.9 + sd0 * 3 + side) > 0.96 ? 0.6 : 0);   // a flick now and then
+      const e1 = [e0[0] - len * (flop + tw * 0.3), side * (A.hr[0] * 0.7 + len * 0.25), e0[2] + len * (1 - flop * 0.6)];
+      line([e0, e1], w, side === nearS ? BODY : FAR); if (!OUT && w > 1.4) det([mixP3(e0, e1, 0.2), mixP3(e0, e1, 0.75)], w * 0.45, BELLY); };
+    const fold = (graze ? 0.5 : alert ? 0.05 : 0.25) + (stalk ? 0.6 : 0) + (run ? 0.35 : 0);
+    if (o.k === 'deer') { ear(-1, 3.6, 1.9, fold); ear(1, 3.6, 1.9, fold); }
+    else if (o.k === 'rabbit') { ear(-1, 5.5, 1.5, fold * 0.8 + 0.1); ear(1, 5.5, 1.5, fold * 0.8 + 0.1); }
+    else if (o.k === 'wolf') { ear(-1, 2.6, 1.7, fold * 0.8); ear(1, 2.6, 1.7, fold * 0.8); }
+    else if (o.k === 'boar') { ear(-1, 2.2, 1.6, 0.5); ear(1, 2.2, 1.6, 0.5); }
+    else { blob([hd[0] - 1, -A.hr[0] * 0.7, hd[2] + A.hr[1] * 0.8], 1.4, 1.3, FAR); blob([hd[0] - 1, A.hr[0] * 0.7, hd[2] + A.hr[1] * 0.8], 1.4, 1.3, BODY); }   // round bear ears
+    blob(hd, A.hr[0], A.hr[1], BODY);                                                     // the skull
+    const jaw = o.k === 'wolf' || o.k === 'bear' ? (lunge * 0.9 + (stalk || st === 'charge' ? 0.15 : 0)) : 0;
+    line([hd, mzE], A.mzw, BODY);                                                         // the muzzle
+    if (jaw > 0.05) line([[hd[0] + 0.4, 0, hd[2] - A.hr[1] * 0.4], [mzE[0] - 0.8, 0, mzE[2] - jaw * 3]], A.mzw * 0.7, NEAR);   // the jaw drops open
+    if (OUT) return;
+    if (jaw > 0.05) { c.fillStyle = '#efe9dc'; for (const t of [0.55, 0.85]) { const [x, y] = P(hd[0] + (mzE[0] - hd[0]) * t, 0, hd[2] + (mzE[2] - hd[2]) * t - A.mzw * 0.35); c.fillRect(x - 0.4 * Zs, y, 0.8 * Zs, 1.2 * Zs); } }   // teeth
+    { const [x, y] = P(mzE[0] + 0.3, 0, mzE[2]); c.fillStyle = '#141210'; c.beginPath(); c.ellipse(x, y, A.mzw * 0.32 * Zs, A.mzw * 0.26 * Zs, 0, 0, 7); c.fill(); }   // the nose
+    if (o.k === 'boar') { c.strokeStyle = '#efe9dc'; c.lineWidth = 1.2 * Zs; c.lineCap = 'round'; for (const s of [-1, 1]) { const [x0, y0] = P(mzE[0] - 1.3, s * A.mzw * 0.45, mzE[2] - 0.6), [x1, y1] = P(mzE[0] - 0.6, s * A.mzw * 0.75, mzE[2] + 1.9); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); } }   // tusks
+    if (o.k === 'bear' || o.k === 'wolf') det([[hd[0] + A.mz * 0.35, 0, hd[2] - A.mz * 0.25], mzE], A.mzw * 0.55, BELLY);   // a paler snout
+    const ey = o.dead ? '#141210' : o.tame ? '#9fd27a' : angry && o.k !== 'deer' && o.k !== 'rabbit' ? '#e2543c' : A.eye;
+    for (const s of [-1, 1]) { if (s !== nearS && !facingUs) continue;                   // the eyes, the near one always, both from the front
+      const [x, y] = P(hd[0] + A.hr[0] * 0.45, s * A.hr[0] * 0.55, hd[2] + A.hr[1] * 0.25);
+      c.fillStyle = ey; c.beginPath(); c.arc(x, y, (o.k === 'deer' || o.k === 'rabbit' ? 0.95 : 0.8) * Zs, 0, 7); c.fill();
+      if (ey === A.eye) { c.fillStyle = 'rgba(255,250,235,0.85)'; c.beginPath(); c.arc(x + 0.3 * Zs, y - 0.3 * Zs, 0.3 * Zs, 0, 7); c.fill(); } }
+    if (o.k === 'deer' && o.stag) {                                                       // antlers
+      c.strokeStyle = '#d8c8a8'; c.lineCap = 'round';
+      for (const s of [-1, 1]) { const b0 = [hd[0] - 0.4, s * 1.2, hd[2] + A.hr[1] * 0.8], b1 = [b0[0] - 1.5, s * 3, b0[2] + 4.5], b2 = [b0[0] - 3.4, s * 4.2, b0[2] + 8], t1 = [b1[0] + 1.6, s * 3.4, b1[2] + 2.6], t2 = [b2[0] + 1.2, s * 4.6, b2[2] + 2.4];
+        c.lineWidth = 1.2 * Zs; c.beginPath(); for (const [p0, p1] of [[b0, b1], [b1, b2], [b1, t1], [b2, t2]]) { const [x0, y0] = P(...p0), [x1, y1] = P(...p1); c.moveTo(x0, y0); c.lineTo(x1, y1); } c.stroke(); }
+    }
+  };
+  // ---- paint it, far side to near side ----
+  let al = 1; if (o.dead) al = Math.max(0, 1 - Math.max(0, o.dieT - 0.7) / 0.5);
+  if (al <= 0) return;
+  c.save(); c.globalAlpha *= al;
+  const paint = () => {
+    for (const lg of farLegs) drawLeg(lg, false);
+    if (facingUs) tail(); else head();
+    body();
+    for (const lg of nearLegs) drawLeg(lg, true);
+    if (facingUs) head(); else tail();
+  };
+  OUT = true; paint(); OUT = false; paint();
+  if (o.st === 'wind' && !o.dead) {                                                       // the warning, same as before
+    const [x, y] = P(fF, 0, A.sh + A.neckH + 12 + (rear ? 14 : 0)); c.fillStyle = 'rgba(226,84,60,0.9)'; c.font = `700 ${Math.round(12 * Z)}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.fillText('!', x, y);
+  }
+  c.restore();
+}
+const mixP3 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
 // crafting and building each have a short body animation. Struck trees, rocks and bushes shake and throw chips.
