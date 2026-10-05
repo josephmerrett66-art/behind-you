@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 160</p>
+      <p class="small" id="verLbl">Version 161</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7234,7 +7234,8 @@ function exBegin() {
 // v152 stage 2: a hammer, and a base you raise yourself on a grid. See the v152 block below for the builder.
 const DAY_LEN = 140, FOOD_MAX = 100, FOOD_RATE = 0.5, WATER_RATE = 0.65, STARVE_T = 5, DAY_KEY = 'behind-you-day-best';
 const STA_MAX = 100, STA_SWING = 10, STA_SLAM = 18, STA_ROLL = 20, STA_CHOP = 4, STA_REGEN = 34, STA_WAIT = 0.6;
-const HOTN = 6, BASE_SLOTS = 10, BOX_SLOTS = 30, CHEST_SLOTS = 18, SKIN_SIPS = 4;
+const HOTN = 6, BASE_SLOTS = 20,   // v161 (Joe): the pack holds twice what it did
+  BOX_SLOTS = 30, CHEST_SLOTS = 18, SKIN_SIPS = 4;
 const STONE_HEAD = '#9a9893', FLINT_HEAD = '#4d5560', IRON_HEAD = '#b8bcc0';
 // every item: name, colour, stack size, kind, a short blurb; tools carry their job, tier, damage, reach and how long they last
 const DIT = {
@@ -7279,8 +7280,8 @@ const DIT = {
   spear1: { n: 'Stone spear', c: STONE_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', dmg: 1.15, r: 20, dur: 50, b: 'Reach, and a fast thrust' },
   spear2: { n: 'Flint spear', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', dmg: 1.35, r: 24, dur: 100, b: 'Long reach, hits hard' },
   bonec: { n: 'Bone club', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'bone', dmg: 1.75, r: 8, dur: 140, b: 'The hardest hitter' },
-  sack: { n: 'Grass sack', c: '#a8b86a', st: 1, k: 'gear', slot: 'back', bag: 4, b: 'Wear on your back · 4 more slots' },
-  pack: { n: 'Hide pack', c: '#a07850', st: 1, k: 'gear', slot: 'back', bag: 8, b: 'Wear on your back · 8 more slots' },
+  sack: { n: 'Grass sack', c: '#a8b86a', st: 1, k: 'gear', slot: 'back', bag: 8, b: 'Wear on your back · 8 more slots' },
+  pack: { n: 'Hide pack', c: '#a07850', st: 1, k: 'gear', slot: 'back', bag: 16, b: 'Wear on your back · 16 more slots' },
   hood: { n: 'Hide hood', c: '#a07850', st: 1, k: 'gear', slot: 'head', arm: 1, b: 'Armour · soaks one hit, then mends' },
   vest: { n: 'Hide vest', c: '#a07850', st: 1, k: 'gear', slot: 'body', heart: 1, b: 'One more heart' },
   legs: { n: 'Hide leggings', c: '#8a6440', st: 1, k: 'gear', slot: 'legs', arm: 1, b: 'Armour · soaks one hit, then mends' },
@@ -8444,7 +8445,7 @@ function daySave() {
   try { localStorage.setItem(dayKey(), JSON.stringify(out)); } catch (e) {}
 }
 function dayFromV1(d) {                         // a run saved before the overhaul: stacks become slots, tools become items
-  const inv = Array(BASE_SLOTS + (d.bigPack ? 8 : 0)).fill(null), box = Array(BOX_SLOTS).fill(null), gear = { head: null, body: d.armour ? newSlot('vest', 1) : null, legs: null, back: d.bigPack ? newSlot('pack', 1) : null };
+  const inv = Array(BASE_SLOTS + (d.bigPack ? DIT.pack.bag : 0)).fill(null), box = Array(BOX_SLOTS).fill(null), gear = { head: null, body: d.armour ? newSlot('vest', 1) : null, legs: null, back: d.bigPack ? newSlot('pack', 1) : null };
   const order = id => slotOrder({ inv }, id);
   for (const [k, n] of Object.entries(d.inv || {})) if (DIT[k]) { const left = addTo(inv, k, n, undefined, order(k)); if (left) addTo(box, k, left); }
   for (const [k, n] of Object.entries(d.box || {})) if (DIT[k]) addTo(box, k, n);
@@ -8461,6 +8462,7 @@ function dayLoad(sv) {                          // pick a saved run back up wher
     seen: new Set(), known: new Set(d.known || []), fresh: new Set(d.fresh || []), fish: null, warm: d.warm === undefined ? WARM_MAX : d.warm, bleed: d.bleed || 0,
     nodes: new Map(d.nodes.map(([k, L]) => [k, L.map(o => ({ kind: 'dnode', r: 0, s: 1, ...o }))])),
     drops: d.drops.concat(d.logs || []).filter(f => DIT[f.it]).map(f => ({ kind: 'dday', r: 0, s: 1, seed: Math.random() * 9, ...f })) });
+  while (D.inv.length < invSize(D)) D.inv.push(null);   // v161: an older save's smaller pack grows to the new size
   D.baseHp = D.baseHp || rg.maxHp;
   D.beasts = d.beasts.map(b => ({ kind: 'beast', r: 0, s: 1, st: 'graze', t: Math.random() * 3, dir: Math.random() * 7, sp: 0, ph: Math.random() * 9, flash: 0, ...b }));
   for (const sv of d.bld || []) stMake(sv);
