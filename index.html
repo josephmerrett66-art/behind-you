@@ -37,6 +37,13 @@ button { justify-self: start; font: 600 0.9rem var(--mono); letter-spacing: 0.14
 #dodge[data-cool="1"] { opacity: 0.4; }
 #attack { position: fixed; right: 16px; bottom: calc(290px + env(safe-area-inset-bottom, 0px)); width: 76px; height: 76px; padding: 0; border-radius: 50%; font-size: 0.58rem; letter-spacing: 0.1em; color: var(--bone); background: rgba(60,30,10,0.55); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
 #attack:active { background: rgba(255,190,130,0.35); }
+#wspec { position: fixed; right: 22px; bottom: calc(382px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.54rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(45,28,14,0.6); border: 1px solid rgba(255,190,130,0.7); touch-action: manipulation; }
+#wspec::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; pointer-events: none; background: conic-gradient(rgba(255,205,150,0.9) calc((1 - var(--cd, 0)) * 360deg), rgba(255,255,255,0.08) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); }
+#wspec[data-cool="1"] { color: var(--ash); }
+#wspec:active { background: rgba(255,190,130,0.35); }
+#wswap { position: fixed; right: 112px; bottom: calc(588px + env(safe-area-inset-bottom, 0px)); width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
+body.wp #dodge { bottom: calc(466px + env(safe-area-inset-bottom, 0px)); } body.wp.ex #autorun { bottom: calc(552px + env(safe-area-inset-bottom, 0px)); } body.wp.ex #torch { bottom: calc(626px + env(safe-area-inset-bottom, 0px)); }   /* v141: the special sits in the column just above attack; the rest of the column steps up */
+.wallet.rack { --wc: rgb(225,212,190); }
 #autorun { position: fixed; right: 28px; bottom: calc(572px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--ash); background: rgba(5,5,5,0.6); border: 1px solid rgba(138,138,138,0.35); touch-action: manipulation; }
 body.ex #autorun { bottom: calc(488px + env(safe-area-inset-bottom, 0px)); }
 body.ex #torch { bottom: calc(572px + env(safe-area-inset-bottom, 0px)); }   /* v136: the Searchers trial's torch switch, above auto run */   /* no torch button in Expedition: auto run takes its place */
@@ -85,7 +92,7 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .fov output { color: var(--ash); text-align: right; font-variant-numeric: tabular-nums; }
 .audio { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
 .audio h2 { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); font-weight: 600; }
-body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
+body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
 #campBtn { position: fixed; right: 22px; bottom: calc(392px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
 .exuse { position: fixed; right: 27px; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
 #recallBtn { right: 112px; bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
@@ -123,6 +130,12 @@ body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, b
 #craft #craftStoreAll { justify-self: start; }
 #useBtn { right: 112px; bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
 @media (max-height: 520px) { #useBtn { right: 204px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-height: 520px) {   /* v141: the weapon special sits on the top row over the dodge; the rest of that row steps left */
+  #wspec { right: 112px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 58px; }
+  body.wp #flaskBtn { right: 186px; bottom: calc(306px + env(safe-area-inset-bottom, 0px)); } body.wp #recallBtn { right: 254px; bottom: calc(306px + env(safe-area-inset-bottom, 0px)); } body.wp #lampBtn { right: 322px; bottom: calc(306px + env(safe-area-inset-bottom, 0px)); }
+  body.wp.ex #torch { right: 390px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } body.wp #dodge { bottom: calc(226px + env(safe-area-inset-bottom, 0px)); } body.wp.ex #autorun { bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
+  #wswap { right: 270px; bottom: calc(232px + env(safe-area-inset-bottom, 0px)); width: 46px; height: 46px; }
+}
 #craft .rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.6rem; margin-top: 0.5rem; }
 #craft .rc { width: 100%; text-transform: none; letter-spacing: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; text-align: left; padding: 0.7rem 0.8rem; border: 1px solid rgba(239,239,234,0.35); background: rgba(239,239,234,0.05); color: var(--bone); border-radius: 10px; font: inherit; }
 #craft .rc b { font: 600 0.9rem var(--mono); }
@@ -282,6 +295,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <button id="torch" hidden aria-pressed="true">Torch</button>
 <button id="dodge" hidden>Dodge</button>
 <button id="attack" hidden>Attack</button>
+<button id="wspec" hidden>Throw</button>
+<button id="wswap" hidden>Swap</button>
 <button id="autorun" hidden aria-pressed="false">Auto<br>run</button>
 <button id="campBtn" hidden>Shop</button>
 <button id="recallBtn" class="exuse" hidden>Flare</button>
@@ -395,6 +410,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <div class="audio"><h2>Trial</h2>
       <button id="srchBtn" class="alt">Woods enemies: Searchers</button>
       <p class="small">Searchers: the woods stay empty until a searcher's beam finds you, then the swarm comes until you're back inside the fence. Classic brings back the old hunters.</p>
+      <button id="wpnBtn" class="alt">Weapons: on (trial)</button>
+      <p class="small">Boss weapons: beat a boss and take its weapon, carry two and swap between them. So far: the Woodcutter's Felling Axe. Off: the torch only, as before.</p>
     </div>
     <div class="audio"><h2>Audio</h2>
       <label class="fov"><span>Music</span><input id="volMusic" type="range" min="0" max="100" step="5"><output id="volMusicOut"></output></label>
@@ -402,7 +419,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 140</p>
+      <p class="small" id="verLbl">Version 141</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -668,7 +685,7 @@ function propAt(i, j) {
   if (p === undefined) { p = makeProp(i, j); propCache.set(key, p); }
   return p;
 }
-function propAtDay(i, j) { const p = propAt(i, j); return p && S.day && p.key && S.day.felled.has(p.key) ? null : p; }
+function propAtDay(i, j) { const p = propAt(i, j), fs = S.day ? S.day.felled : S.rg && S.rg.wfell; return p && fs && p.key && fs.has(p.key) ? null : p; }   // v141: trees the axe brought down stay down for the trip
 function makeProp(i, j) {
   if (Math.abs(i) < 2 && Math.abs(j) < 2) return null; // clear spawn
   if (S && S.mode === 'expedition' && Math.hypot(i * T + T / 2, j * T + T / 2) < CAMP_R + 60) return null;   // the camp clearing
@@ -1501,6 +1518,8 @@ const ATK_CHAIN = 0.4;                           // how long after a swing the n
 function attack() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight') return;
   if (S.rg.drink) return;                      // v123: drinking
+  if (wpOn() && S.rg.wax) { wpRecall(); return; }   // v141: the axe is out: attack calls it back
+  if (S.p.wact && S.p.wact.fn && !S.p.wact.done) return;
   const p = S.p, A = p.atk;
   if (A && A.t < A.dur) { A.queued = true; return; }   // mid-swing: buffer it, the next one comes out the moment this one ends
   if (S.day && S.day.st < STA_SWING) { dayStam(STA_SWING); return; }   // v128: spent
@@ -1517,6 +1536,7 @@ function startSwing() {
   if ((p.roll || 0) > 0 || (p.rollEnd || 0) > 0) i = 3;   // out of a roll: the dash strike
   else if (prev && S.t - prev.end < ATK_CHAIN && prev.i < 2) i = prev.i + 1;
   const tov = S.day && TOOL_SWING[S.day.sel] && i !== 3 ? TOOL_SWING[S.day.sel] : null; if (tov) i = 0;   // v133: a tool swings its own way, one stroke at a time
+  const WA = !tov && wpOn() && curW() !== 'torch' ? ARMS[curW()].atk : null; if (WA) return wpSwing(i, WA[i]);   // v141: a boss weapon swings its own way
   const D = ATK[i], a = S.aimW !== undefined ? S.aimW : 0;
   if (S.day) { S.day.st = Math.max(0, S.day.st - (D.slam ? STA_SLAM : STA_SWING)); S.day.stT = 0; }
   if (i === 3) p.roll = 0;                        // the roll turns into the thrust
@@ -1535,7 +1555,7 @@ function atkHit(D, a) {                          // everything in reach takes th
   const inReach = (o, rad) => {
     const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
     if (d > D.reach + dayR() + rad) return false;
-    if (D.slam) return true;                      // the slam hits all the way round
+    if (D.slam || D.round) return true;           // the slam (and a whirl) hits all the way round
     return d < rad + 14 || Math.abs(angDiff(Math.atan2(dy, dx), a)) < D.arc / 2 + Math.atan2(rad, Math.max(1, d));
   };
   const spark = (o, h, n) => {                   // a spray of hot sparks off the point of impact, and a little flash ring
@@ -1546,7 +1566,7 @@ function atkHit(D, a) {                          // everything in reach takes th
   const push = (o, k) => { const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1; o.x += dx / d * k; o.y += dy / d * k; };
   for (const o of rg.enemies) {
     if (o.dead || A.hit.has(o) || !inReach(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
-    A.hit.add(o); hits++; o.swung = true; o.kHit = D.slam ? 'slam' : D.dash ? 'dash' : 'swing'; o.kHitT = S.t; stkTouch();
+    A.hit.add(o); hits++; o.swung = true; o.kHit = D.kh || (D.slam ? 'slam' : D.dash ? 'dash' : 'swing'); o.kHitT = S.t; stkTouch();
     o.hp -= D.dmg * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')) * dayK(); o.jit = 1;
     if (o.type !== 'tall' && (o.type !== 'brute' || D.slam || D.dash)) push(o, D.knock);   // v123: brutes have poise; only the slam or the dash strike moves them
     spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.slam ? 14 : 9);
@@ -1596,7 +1616,8 @@ function atkHit(D, a) {                          // everything in reach takes th
     addShake(D.shake); hitStop(hits ? D.stop : 0.05); camKick(a + Math.PI / 2, 4);
     if (actx) { const t = actx.currentTime; boomAt(t, 70, 28, 0.5, 0.9, sfxGain); noiseAt(t, 900, 120, 0.35, 0.45, sfxGain); }
   } else if (hits) { addShake(D.shake); hitStop(D.stop); camKick(a, D.kick); }
-  if (hits && actx) { const t = actx.currentTime; boomAt(t, 160, 50, 0.13, 0.5, sfxGain); noiseAt(t, 5200, 1400, 0.07, 0.35, sfxGain); }
+  if (hits && actx && !D.wpn) { const t = actx.currentTime; boomAt(t, 160, 50, 0.13, 0.5, sfxGain); noiseAt(t, 5200, 1400, 0.07, 0.35, sfxGain); }
+  return hits;
 }
 function atkStep(dt) {                           // called from update, before you move: the leap carries you into the swing
   const p = S.p;
@@ -1604,6 +1625,7 @@ function atkStep(dt) {                           // called from update, before y
   if (S.kick) { const f = Math.exp(-12 * dt); S.kick.x *= f; S.kick.y *= f; }
   if (S.day) dayActStep(dt);
   const A = p.atk; if (!A) { p.hopZ = 0; return; }
+  if (A.wd) return wpStep(dt, A);                // v141: a boss weapon's swing
   const D = A.ov ? Object.assign({}, ATK[A.i], A.ov) : ATK[A.i];
   A.t += dt;
   const air = D.slam ? D.hitAt : D.dur * 0.6, moveT = D.slam ? D.hitAt : D.dur * 0.45;
@@ -1622,7 +1644,7 @@ function slashStep(dt) {
   const rg = S.rg; if (!rg || !rg.slashes) return;
   for (const s of rg.slashes) {
     s.t += dt;
-    if (!s.ring && s.t < 0.1 && Math.random() < 0.8) {   // sparks peel off the leading edge of the blade
+    if (!s.ring && !s.axe && s.t < 0.1 && Math.random() < 0.8) {   // sparks peel off the leading edge of the blade
       const p = S.p, sweep = Math.min(1, s.t / 0.09), an = s.a - s.side * s.arc / 2 + s.side * s.arc * sweep;
       rg.embers.push({ x: p.x + Math.cos(an) * s.r * 0.9, y: p.y + Math.sin(an) * s.r * 0.9, z: 18, vx: Math.cos(an) * 60 + (Math.random() - 0.5) * 50, vy: Math.sin(an) * 60 + (Math.random() - 0.5) * 50, vz: 20 + Math.random() * 50, life: 0.2 + Math.random() * 0.25, ember: true });
     }
@@ -1634,6 +1656,7 @@ function drawSlashes() {                         // a crescent of torchlight swe
   const p = S.p;
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
   for (const s of rg.slashes) {
+    if (s.axe) { drawAxeSlash(s); continue; }      // v141: the axe's heavy steel smear
     const k = s.t / s.life, fade = 1 - k * k;
     if (s.ring) {                                // the slam's shockwave: a flat ring of light racing out across the ground
       const [cx, cy] = toScreen(p.x, p.y), R = s.r * K() * (0.25 + 1.05 * Math.sqrt(k));
@@ -1684,6 +1707,7 @@ function update(dt) {
   }
   if (p.ghosts) { for (const g of p.ghosts) g.a -= dt * 2.2; p.ghosts = p.ghosts.filter(g => g.a > 0); }
   if (isRg() && S.rg) { atkStep(dt); slashStep(dt); }
+  if (S.mode === 'expedition' && S.rg) wpTick(dt);   // v141: boss weapons
   const ox = p.x, oy = p.y;
   p.x += p.vx * dt; p.y += p.vy * dt;
   if (isRg() && S.rg && S.rg.phase === 'fight') { lifeAdd('walk', Math.hypot(p.vx, p.vy) * dt); lifeAdd('time', dt); }   // the record: metres walked, time out
@@ -3181,7 +3205,7 @@ function poseAt(i, u) {                            // the body's shape u of the 
   const K = POSES[i]; let k = 1; while (k < K.length - 1 && K[k].u < u) k++;
   const A = K[k - 1], B = K[k], f = EASE[B.e || 'io'](Math.max(0, Math.min(1, (u - A.u) / ((B.u - A.u) || 1))));
   const o = {};
-  for (const key of ['ph', 'ln', 'cr', 'st', 'tk', 'a', 'R', 'h', 'ta', 'tp']) o[key] = (A[key] || 0) + ((B[key] || 0) - (A[key] || 0)) * f;
+  for (const key of ['ph', 'ln', 'cr', 'st', 'tk', 'a', 'R', 'h', 'ta', 'tp', 'sp']) o[key] = (A[key] || 0) + ((B[key] || 0) - (A[key] || 0)) * f;
   const la = v => v.la === null ? null : v;   // the free hand joins the torch (grip) or swings on its own
   const lA = la(A), lB = la(B);
   if (!lA || !lB) { o.grip = !lB ? (lA ? f : 1) : 1 - f; o.la = (lA || lB) ? (lA || lB).la : 0; o.lR = (lA || lB) ? (lA || lB).lR : 6; o.lh = (lA || lB) ? (lA || lB).lh : -8; }
@@ -3190,6 +3214,7 @@ function poseAt(i, u) {                            // the body's shape u of the 
 }
 function atkPose(p) {                              // the pose to draw, and how much of it (it lets go over 0.16 s once the blow is done)
   if (p.atk) return Object.assign(poseAt(p.atk.pose ?? p.atk.i, Math.min(1, p.atk.t / p.atk.dur)), { w: Math.min(1, p.atk.t / 0.03 + (p.atk.i === (p.atkLast && p.atkLast.i + 1) ? 1 : 0)) });
+  if (p.wact) { const a = p.wact; return Object.assign(poseAt(a.pose, Math.min(1, a.t / a.dur)), { w: Math.max(0, Math.min(1, a.t / 0.04, (a.dur - a.t) / 0.1)) }); }   // v141: throw, catch, swap, flare
   if (p.act) { const a = p.act; return Object.assign(poseAt(a.pose, Math.min(1, a.t / a.dur)), { w: Math.max(0, Math.min(1, a.t / 0.1, (a.dur - a.t) / 0.12)) }); }   // v133: eating, drinking, picking up, building
   const L = p.atkLast; if (!L || !S.rg || S.t - L.end > 0.16) return null;
   return Object.assign(poseAt(L.pose ?? L.i, 1), { w: 1 - (S.t - L.end) / 0.16 });
@@ -3199,7 +3224,7 @@ const KITC = { jacket: mat(0.95, 1.2, 0.72, 1.7), pants: mat(1.3, 1.18, 0.88, 1.
   skin: mat(1.5, 1.12, 0.9, 1.9), scarf: mat(2.0, 0.72, 0.52, 1.6), hat: mat(1.12, 1.15, 0.8, 1.55), hair: mat(1.35, 1.0, 0.75, 1.1) };   // v124: the survivor's kit in colour
 function drawPlayer() {
   const p = S.p, [bx, by0] = toScreen(p.x, p.y), by = by0 - (p.hopZ || 0) * Z;   // up off the ground mid-leap
-  const a = S.aim, v = screenSpeed(p), moving = v > 8;
+  const AP0 = isRg() ? atkPose(p) : null, a = S.aim + (AP0 && AP0.sp ? (AP0.sp % 1) * Math.PI * 2 * AP0.w : 0), v = screenSpeed(p), moving = v > 8;   // v141: a whirl turns the whole body
   const sf = Math.min(1.5, v / WALK);                          // 0 standing, 1 walking, ~1.5 running
   const run = Math.max(0, sf - 1) * 2;                          // 0..1 how much of a run it is
   const ph = p.phase;
@@ -3213,7 +3238,7 @@ function drawPlayer() {
   // body motion
   const bob = moving ? Math.abs(Math.cos(ph)) * (1.2 + run * 1.3) : 0;
   const breathe = moving ? 0 : Math.sin(S.t * 1.8) * 0.35;
-  const AP = isRg() ? atkPose(p) : null, aw = AP ? AP.w : 0, mx = (a0, b0) => a0 + (b0 - a0) * aw;   // an attack takes the body over
+  const AP = AP0, aw = AP ? AP.w : 0, mx = (a0, b0) => a0 + (b0 - a0) * aw;   // an attack takes the body over
   const walkW = 1 - aw;
   const lean = (sf * 1.4 + run * 2) * walkW + (AP ? AP.ln * 2 * aw : 0);   // leans into the walk, more when running; and into every blow
   const crouch = AP ? AP.cr * aw : 0;
@@ -3247,6 +3272,7 @@ function drawPlayer() {
   let rEl = [rSh[0] + 4, 5.2, shH - 6.5 + sway], rHa = [rSh[0] + 9.5, 3.6, shH - 7.5 + sway];
   let tipL = [rHa[0] + 6, 3.4, rHa[2] - 1.2];
   const tip0 = tipL;                               // where the lens sits at rest: the beam keeps coming from there
+  if (wpHand() === 'axe') { rHa = [rSh[0] + 3, 4.2, shH - 5]; rEl = [rSh[0] + 1.5, 6.4, shH - 9.5]; tipL = [rHa[0] - 4, rHa[1] + 0.6, rHa[2] + 5]; }   // v141: the axe rides on the shoulder
   if (AP) {                                        // the torch hand swings round the body on its arc; the elbow follows, bent out
     const add = (q, d) => [q[0] + d[0], q[1] + d[1], q[2] + d[2]], mix3 = (q0, q1, f) => [q0[0] + (q1[0] - q0[0]) * f, q0[1] + (q1[1] - q0[1]) * f, q0[2] + (q1[2] - q0[2]) * f];
     const hand = add(rSh, [Math.cos(AP.a) * AP.R, Math.sin(AP.a) * AP.R - 1.8, AP.h]);
@@ -3297,16 +3323,17 @@ function drawPlayer() {
   const drawTorchArm = near => {
     line([rSh, rEl], near ? 3.9 : 3.7, G(36, near, 'jacket')); line([rEl, rHa], near ? 3.5 : 3.3, G(33, near, 'jacket'));
     detail([mid(rEl, rHa, 0.78), mid(rEl, rHa, 0.86)], 3.8, G(44, near, 'jacket'));
-    if (S.day) dayHeld(P, rHa, tipL, near, OUT); else {   // v133: in Daylight you hold a tool, not the torch
+    const wh = wpHand();
+    if (S.day) dayHeld(P, rHa, tipL, near, OUT); else if (wh === 'axe') wpHeldAxe(P, rHa, tipL, near, OUT); else if (!wh) {   // v133: in Daylight you hold a tool, not the torch; v141: or a boss weapon
     line([[rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL], 3.4, '#2f2f2d');                 // a dented service torch
     detail([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.3), mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.55)], 3.6, '#454542');   // grip
     line([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.85), tipL], 4.2, '#3a3a37', 'butt');   // head of the torch
     }
     if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
     const [tx, ty] = P(...tipL);
-    if (!OUT && !S.day) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
+    if (!OUT && !S.day && !wh) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
     S.tip = AP ? P(...tip0) : [tx, ty];           // mid-blow the beam stays put; the torch itself goes where the swing takes it
-    S.tipNow = [tx, ty];
+    S.tipNow = wh === 'axe' && S.wpHead ? S.wpHead : [tx, ty];
   };
   const lt = lean * 0.5;
   // rucksack on the back, a rolled bedroll strapped across the top
@@ -3344,6 +3371,10 @@ function drawPlayer() {
     slab([[0.5, 4.6, hipH - 1.6], [-2.5, 4.9, hipH - 1.6], [-2.5, 5.1, hipH - 5.2], [0.5, 4.8, hipH - 5.2]], G(26, false, 'rig'));                          // hip pouch
     line([[lt + 2.2, -3.6, shH + 1.3], [lt + 3.2, 0, shH + 0.6], [lt + 2.2, 3.6, shH + 1.3]], 1.8, G(44, false, 'jacket'));                                   // collar
   }
+  if (!OUT && wpHand()) {                          // v141: the torch clipped to the chest rig while a weapon's in hand
+    const fr = lt * 0.7 + 3.3; slab([[fr, -3.8, shH - 6.2], [fr, -1, shH - 6.2], [fr + 0.3, -1, shH - 2.6], [fr + 0.3, -3.8, shH - 2.6]], '#2f2f2d');
+    if (facingUs || Math.abs(Fx) > 0.6) { const [lx2, ly2] = P(fr + 0.6, -2.4, shH - 4.4); ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(lx2, ly2, 1.5 * Z, 0, 7); ctx.fill(); }
+  }
   if (!packFirst) drawPack();
 
   // head: a scarf at the neck, a stubbled face on the side toward us, a battered boonie hat
@@ -3376,8 +3407,9 @@ function drawPlayer() {
   };
   OUT = true; paint();
   OUT = false; paint();
+  if (wpHand()) S.tip = wpLampAt(bx, by0, sf, run);   // v141: the beam comes from the chest
   // the torch leaves a hot streak through the air behind it as it swings (kept relative to you, so it travels with the lunge)
-  if (p.atk && S.tipNow && p.trailT !== S.t) { p.trailT = S.t; (p.tTrail = p.tTrail || []).push([S.tipNow[0] - bx, S.tipNow[1] - by0, S.t]); }
+  if ((p.atk || p.wact) && S.tipNow && p.trailT !== S.t) { p.trailT = S.t; (p.tTrail = p.tTrail || []).push([S.tipNow[0] - bx, S.tipNow[1] - by0, S.t]); }
   if (p.tTrail && p.tTrail.length) {
     p.tTrail = p.tTrail.filter(q => S.t - q[2] < 0.16);
     const T = p.tTrail;
@@ -3386,6 +3418,7 @@ function drawPlayer() {
       for (let i = 1; i < T.length; i++) {
         const k = 1 - (S.t - T[i][2]) / 0.16;
         if (S.day) { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = `rgba(250,248,240,${0.32 * k})`; ctx.lineWidth = (1 + 4 * k) * Z; ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke(); continue; }   // v133: a plain swish in daylight, no torch glow
+        if (wpHand() === 'axe') { if (Math.hypot(T[i][0] - T[i - 1][0], T[i][1] - T[i - 1][1]) < 1) continue; ctx.strokeStyle = `rgba(190,205,230,${0.5 * k})`; ctx.lineWidth = (2 + 10 * k) * Z; ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke(); ctx.strokeStyle = `rgba(255,255,255,${0.75 * k})`; ctx.lineWidth = (0.6 + 2 * k) * Z; ctx.stroke(); continue; }   // v141: a steel streak
         ctx.strokeStyle = `rgba(255,190,120,${0.7 * k})`; ctx.lineWidth = (1.5 + 6 * k) * Z;
         ctx.beginPath(); ctx.moveTo(bx + T[i - 1][0], by0 + T[i - 1][1]); ctx.lineTo(bx + T[i][0], by0 + T[i][1]); ctx.stroke();
         ctx.strokeStyle = `rgba(255,250,240,${0.7 * k})`; ctx.lineWidth = (0.5 + 1.6 * k) * Z; ctx.stroke();
@@ -3982,6 +4015,7 @@ function renderScene() {
   if (isRg()) drawDodgeFx();
   if (isRg()) { surviveLight(bx, by, br, casters, lx, ly); drawSurviveFx(bx, by, br); }
   if (S.mode === 'expedition') drawExFx();
+  if (S.mode === 'expedition' && S.rg && !S.day) drawWpFx();   // v141
 
   if (S.q) {                                   // is the creature inside the beam, with nothing in the way?
     const q = S.q, [qx, qy] = toScreen(q.x, q.y), d = Math.hypot(qx - bx, qy - by);
@@ -4617,7 +4651,7 @@ const STK_PTS = { shade: 10, stalker: 10, kamikaze: 5, splitling: 5, splitter: 2
 const STK_COL = { shade: '236,226,210', stalker: '196,160,235', brute: '226,170,120', bomber: '255,90,70' };   // what each kind's points look like: its own colour (the rest: their eyes)
 const stkCol = t => STK_COL[t] || EYES[t] || '236,226,210';
 const STK_HIT_T = 0.35, STK_BOSS_WIN = 4, STK_WISP = 150, STK_BLOW = 15;
-const STK_BONUS = { double: ['DOUBLE', 20], triple: ['TRIPLE', 60], multi: ['MULTI', 150], slam: ['SLAM', 25], skewer: ['SKEWER', 25], burnout: ['BURNOUT', 10],
+const STK_BONUS = { cleave: ['CLEAVE', 25], timber: ['TIMBER', 40], bulldoze: ['BULLDOZE', 25], boomerang: ['BOOMERANG', 30], double: ['DOUBLE', 20], triple: ['TRIPLE', 60], multi: ['MULTI', 150], slam: ['SLAM', 25], skewer: ['SKEWER', 25], burnout: ['BURNOUT', 10],
   near: ['NEAR MISS', 40], revenge: ['REVENGE', 50], pack: ['PACK DOWN', 100], ff: ['FRIENDLY FIRE', 60], last: ['LAST LIGHT', 0], untouched: ['UNTOUCHED', 300],
   punish: ['PUNISH', 100], nohit: ['NO HIT', 2000], boss: ['BOSS DOWN', 0] };
 let STK_MODE = 'full'; try { STK_MODE = localStorage.getItem('behind-you-streak') || 'full'; } catch (e) {} if (!['full', 'quiet', 'off'].includes(STK_MODE)) STK_MODE = 'full';   // Settings > Look: full, quiet or off
@@ -4668,7 +4702,7 @@ function stkKill(e) {                             // called from killFoe: every 
   const k = rg.stk, src = e.kHitT !== undefined && S.t - e.kHitT < 0.5 ? e.kHit : 'beam';
   if (!k.burst || S.t - k.burst.t0 > 0.2) k.burst = { t0: S.t, n: 1 };
   else { k.burst.n++; const n = k.burst.n; if (n === 2) stkWord('double'); else if (n === 3) stkWord('triple', 40); else if (n === 4) stkWord('multi', 90); }
-  if (src === 'slam') stkWord('slam'); else if (src === 'dash') stkWord('skewer'); else if (src === 'ff') stkWord('ff');
+  if (src === 'slam') stkWord('slam'); else if (src === 'dash') stkWord('skewer'); else if (src === 'ff') stkWord('ff'); else if (['cleave', 'timber', 'bulldoze', 'boomerang'].includes(src)) stkWord(src);
   else if (src === 'beam' && !e.swung) stkWord('burnout');
   if (S.t - k.near < 1) { k.near = -9; stkWord('near'); }
   if (k.foe === e && S.t - k.foeT < 3) { k.foe = null; stkWord('revenge'); }
@@ -6553,6 +6587,7 @@ function drawCampPiece(o, c, sx, sy, col, mask) {
       for (let m = 0; m < 4; m++) { const x = sx - 6 * Z + m * 4 * Z; c.moveTo(x - 3 * Z, sy + 1 * Z); c.lineTo(x + 2 * Z, sy - 32 * Z); } c.stroke();
       c.fillStyle = col('#7a756c');
       for (let m = 0; m < 4; m++) { const x = sx - 4 * Z + m * 4 * Z; c.beginPath(); c.moveTo(x - 1.2 * Z, sy - 31 * Z); c.lineTo(x + 0.6 * Z, sy - 38 * Z); c.lineTo(x + 1.6 * Z, sy - 31 * Z); c.closePath(); c.fill(); }
+      if (!mask && WP_ON && XS && wpOwn('axe') && c === ctx) wpAxeShape(c, sx + 14 * Z, sy + 1 * Z, sx + 11 * Z, sy - 24 * Z, 1, Z * 0.55, false);   // v141: the Felling Axe leans on the rack
       break;
     }
     case 'brazier': {                           // an iron fire basket on three legs
@@ -6599,7 +6634,7 @@ function drawCampFlames() {
 function exItems() {   // camp, chests and dropped packs, drawn in with the trees
   const rg = S.rg; if (!rg) return [];
   if (rg.beyond) return rg.next ? [] : dunePillars();
-  return CAMP.concat([TELE, TELE2], PLINTHS, exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones(), lairStones(), S.day ? dayItems() : [], srchOn() && rg.srch ? rg.srch.filter(s => !s.dead) : []);
+  return CAMP.concat([TELE, TELE2], PLINTHS, exChestsNear(S.cam.x, S.cam.y, viewR()), rg.loose, bossStones(), lairStones(), S.day ? dayItems() : [], srchOn() && rg.srch ? rg.srch.filter(s => !s.dead) : [], rg.wlogs || []);
 }
 
 // ---- personal stats: kills drop violet wisps, wisps buy small boosts that last for good (Nightfall and Expedition) ----
@@ -6902,7 +6937,7 @@ function exBegin() {
   if (XS.orbs >= 3 && !XS.dorb && (XS.dorbs || 0) < 3) exNewDorb();
   if (XS.orbField && XS.orb && Math.hypot(XS.orb.x, XS.orb.y) < RINGS[2]) exNewOrb();   // an orb from before the woods grew: move it out into the new deep   // one orb is out there at a time
   exSave();
-  S.rg = exNewRun(); exPlaceHome();
+  S.rg = exNewRun(); exPlaceHome(); wpInit();
   S.msg = note ? { text: note[0], sub: note[1], t: 0 }
     : { text: 'expedition', sub: XS.dorbs >= 3 ? 'Both portals are open' : XS.orbs >= 3 ? `The portal is open · ${XS.dorbs || 0} of 3 teal orbs home` : XS.orbs ? `${XS.orbs} of 3 orbs home` : 'A green light waits in the deep', t: 0 };
 }
@@ -6976,7 +7011,7 @@ function dayBegin() {
   S.day = { t: 0, n: 1, food: FOOD_MAX, water: FOOD_MAX, st: STA_MAX, stT: 9, sick: 0, starve: 0, heal: 0, warn: {}, raidDue: false, eatT: 0, nagT: 0,
     sel: 'hand', inv: {}, box: {}, axe: 0, pick: 0, wpn: 'fists', armour: 0, bigPack: 0, skin: 0, sips: 0,
     cut: new Map(), felled: new Set(), builds: [], chips: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {} };
-  S.rg = exNewRun(); exPlaceHome();
+  S.rg = exNewRun(); exPlaceHome(); wpInit();
   S.msg = { text: 'daylight', sub: matchMedia('(pointer: coarse)').matches ? 'Tap Take to pick things up · open your Pack to eat, drink and craft' : 'E picks things up · C opens your pack to eat, drink and craft', t: 0 };
 }
 function dayNote(k, text, gap = 4) { const D = S.day; if ((D.told[k] || -99) > D.t - gap) return; D.told[k] = D.t; exNote(text, true); }
@@ -7570,6 +7605,461 @@ function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the t
     else { const bone = w === 'bone', col = bone ? C('#e6dfcc', '#d8d8d2') : C('#6e5235', '#5a5a56'); seg(-1, 5, 1.8, col); seg(4, 11, bone ? 3.2 : 3.6, col); if (!OUT && bone) { ctx.fillStyle = col; for (const k of [6.5, 9.5]) { const [x, y] = at(k); ctx.beginPath(); ctx.arc(x, y, 2.2 * Z, 0, 7); ctx.fill(); } } }
   }
 }
+// ---- v141 TRIAL (Joe, after Hades): boss weapons. Beat a boss and take its weapon; each one fights its own way, with its own
+// combo, dash strike, special, body animation, sound and feel. You carry two and swap between them (the swap is a move too).
+// Settings > Trial > Weapons turns it off, and then you fight with the torch exactly as before. Step 1: the system, and the
+// Woodcutter's Felling Axe: slow, huge chops, a whirl into an overhead cleave, a shoulder charge, and a throw that fells trees.
+let WP_ON = true; try { WP_ON = localStorage.getItem('behind-you-weapons') !== 'off'; } catch (e) {}
+const wpOn = () => WP_ON && !!S && S.mode === 'expedition' && !S.day && !!XS && !!S.rg;
+const AXP = POSES.length;                         // the weapons' poses go on the end of the table
+const ARMS = {
+  torch: { name: 'Torch', col: '255,200,130', spName: 'Flare', spCool: 7, short: 'Quick cuts, a leaping slam · Flare',
+    desc: 'Your old torch. Two quick cuts, then a leap and a slam that hits all round. Out of a roll, a lunging thrust. Special: Flare, a blinding flash down the beam that freezes everything in it.' },
+  axe: { name: 'Felling Axe', col: '255,150,90', boss: 'woodcutter', bossName: 'Woodcutter', spName: 'Throw', spCool: 3.2, short: 'Huge slow chops · throw it to fell trees',
+    desc: 'The Woodcutter\'s axe. Two heavy chops that knock them flat, then a whirl that ends in an overhead cleave. Out of a roll, a shoulder charge that sends them flying. Special: Throw. It cuts on the way out and back, and if it bites a tree, the tree comes down on whatever is beyond it. Attack while it\'s out to call it back.',
+    atk: [
+      { reach: 78, arc: 1.9, lunge: 30, moveT: [0.16, 0.27], hop: 0, dur: 0.46, hitAt: 0.25, dmg: 1.0, boss: 1.7, knock: 36, shake: 0.32, stop: 0.09, kick: 12, pose: AXP, crack: 1 },
+      { reach: 82, arc: 2.4, lunge: 34, moveT: [0.15, 0.26], hop: 0, dur: 0.46, hitAt: 0.24, dmg: 1.0, boss: 1.7, knock: 44, shake: 0.3, stop: 0.09, kick: 12, pose: AXP + 1 },
+      { dur: 0.82, pose: AXP + 2, lunge: 70, moveT: [0.33, 0.44], hopT: [0.33, 0.44], hop: 26, hits: [
+        { at: 0.25, reach: 88, arc: 7, round: 1, dmg: 0.9, boss: 1.4, knock: 48, shake: 0.24, stop: 0.05, kick: 5 },
+        { at: 0.44, reach: 150, arc: 0.62, dmg: 2.3, boss: 3.6, knock: 72, shake: 0.7, stop: 0.15, kick: 18, kh: 'cleave', cleave: 1 }] },
+      { dur: 0.36, pose: AXP + 3, charge: 1, lunge: 175, moveT: [0.03, 0.26], reach: 30, arc: 7, round: 1, dmg: 0.8, boss: 1.3, knock: 95, shake: 0.35, stop: 0.07, kick: 14, kh: 'bulldoze' },
+    ] },
+};
+const wpOwn = id => id === 'torch' || (!!ARMS[id] && !!XS && !!XS.lairs && XS.lairs.some(L => L.id === ARMS[id].boss && L.beat));
+const curW = () => wpOn() ? (XS.wsel && XS.wsel[XS.wcur | 0]) || 'torch' : 'torch';
+const wpHand = () => { if (!wpOn()) return null; const w = curW(); return w === 'torch' ? null : S.rg.wax ? 'none' : w; };   // what's in the torch hand instead of the torch
+function wpInit() {                               // every trip: the loadout is sound, and a weapon won earlier shows up on your back
+  if (!XS) return;
+  if (!Array.isArray(XS.wsel)) XS.wsel = ['torch', null];
+  XS.wsel = XS.wsel.map(id => id && wpOwn(id) ? id : null); if (!XS.wsel[0]) XS.wsel[0] = 'torch';
+  if (!XS.wsel[1]) { const n = Object.keys(ARMS).find(id => id !== 'torch' && wpOwn(id) && !XS.wsel.includes(id)); if (n) XS.wsel[1] = n; }
+  if (!XS.wsel[XS.wcur | 0]) XS.wcur = 0;
+  if (WP_ON && !S.day && S.rg && XS.wsel[1] && !XS.wnew) { XS.wnew = 1; S.rg.wcard = { id: XS.wsel[1], t: -2.2, rack: true }; }
+}
+// the body: each key as in POSES, plus sp (how far round the whole body has spun, in turns). The rest pose carries the axe on the shoulder.
+const AK = (u, o, e) => Object.assign({ ph: 0, ln: 0, cr: 0, st: 1, tk: 0, a: 0.2, R: 3, h: -5, ta: 3.0, tp: 0.9, la: -1.6, lR: 6, lh: -7, sp: 0 }, o, { u, e });
+POSES.push(
+  [AK(0, {}), AK(0.4, { ph: -0.95, ln: -2, cr: 1.5, st: 3, a: 2.0, R: 5, h: 8, ta: 2.9, tp: 1.35, la: null }, 'io'),             // chop: hauled up high over the shoulder in both hands
+    AK(0.54, { ph: 0.95, ln: 6.5, cr: 5.5, st: 7.5, a: -0.55, R: 14, h: -10, ta: -0.45, tp: -1.0, la: null }, 'o'),                // and driven down across the body into the ground
+    AK(0.82, { ph: 0.9, ln: 6, cr: 5, st: 7.5, a: -0.6, R: 13.5, h: -10.5, ta: -0.5, tp: -1.05, la: null }, 'io'),                 // bitten into the dirt
+    AK(1, { ph: 0.5, ln: 2.5, cr: 2.5, st: 5, a: -0.2, R: 10, h: -6, ta: -0.2, tp: -0.4, la: null }, 'io')],
+  [AK(0, { ph: 0.5, ln: 2.5, cr: 2.5, st: 5, a: -0.2, R: 10, h: -6, ta: -0.2, tp: -0.4, la: null }),
+    AK(0.36, { ph: 1.15, ln: 1, cr: 4, st: -2, a: -2.0, R: 9, h: -5, ta: -2.7, tp: -0.2, la: null }, 'io'),                       // coiled low across the far hip
+    AK(0.52, { ph: -1.0, ln: 5, cr: 3, st: -7, a: 1.7, R: 15, h: 2, ta: 1.8, tp: 0.45, la: null }, 'o'),                          // ripped up and across
+    AK(0.8, { ph: -1.05, ln: 4, cr: 2.5, st: -6.5, a: 2.0, R: 13, h: 4, ta: 2.2, tp: 0.7, la: null }, 'io'),
+    AK(1, { ph: -0.5, ln: 2, cr: 1.5, st: -3, a: 1.4, R: 8, h: 4, ta: 2.6, tp: 1.0, la: null }, 'io')],
+  [AK(0, { ph: -0.5, ln: 2, cr: 1.5, st: -3, a: 1.4, R: 8, h: 4, ta: 2.6, tp: 1.0, la: null }),
+    AK(0.12, { ph: -1.0, ln: 2, cr: 4.5, st: 3, a: 2.3, R: 11, h: -3, ta: 2.6, tp: 0.05, la: null }, 'io'),                       // crouched, the axe out low behind
+    AK(0.4, { ph: 0, ln: 3, cr: 3, st: 2, a: 1.6, R: 16, h: -3, ta: 1.6, tp: 0.05, la: null, sp: 1 }, 'io'),                       // the whirl: one full turn at arm's length
+    AK(0.48, { ph: 0, ln: -2.5, cr: -1.5, st: 1, tk: 6, a: 0.05, R: 2, h: 12, ta: 0, tp: 1.85, la: null, sp: 1 }, 'o'),            // up, the axe high over the head
+    AK(0.54, { ph: 0, ln: 9, cr: 8, st: 5, tk: 0, a: 0, R: 16, h: -13, ta: 0, tp: -1.15, la: null, sp: 1 }, 'o'),                  // CLEAVE
+    AK(0.84, { ph: 0, ln: 8, cr: 7.5, st: 5, a: 0, R: 15.5, h: -13.5, ta: 0, tp: -1.15, la: null, sp: 1 }, 'io'),
+    AK(1, { ph: 0.2, ln: 3, cr: 2.5, st: 3, a: 0.2, R: 6, h: -3, ta: 2.2, tp: 0.8, sp: 1 }, 'io')],
+  [AK(0, { ph: 0.2, ln: 4, cr: 3, st: 3, a: 0.6, R: 5, h: -2, ta: 2.8, tp: 0.9 }),
+    AK(0.15, { ph: -1.15, ln: 8.5, cr: 4.5, st: 7, a: 1.6, R: 7, h: 2, ta: 2.9, tp: 1.0, la: 0.5, lR: 5, lh: -4 }, 'o'),             // shoulder charge: shoulder down, axe held back
+    AK(0.75, { ph: -1.1, ln: 8, cr: 4.2, st: 7, a: 1.6, R: 7, h: 2, ta: 2.9, tp: 1.0, la: 0.5, lR: 5, lh: -4 }, 'io'),
+    AK(1, { ph: -0.3, ln: 3, cr: 2, st: 4, a: 0.6, R: 5, h: -3, ta: 2.9, tp: 0.9 }, 'io')],
+  [AK(0, {}), AK(0.42, { ph: -1.0, ln: -1.5, cr: 2, st: 3.5, a: 2.4, R: 8, h: 8, ta: 2.9, tp: 1.4, la: 0.15, lR: 9, lh: -2 }, 'io'),   // the throw: reared back, the free arm pointing the way
+    AK(0.56, { ph: 1.05, ln: 6.5, cr: 3.5, st: 7, a: -0.2, R: 15.5, h: -1, ta: -0.1, tp: -0.15, la: -2.6, lR: 8, lh: -7 }, 'o'),   // and let fly
+    AK(1, { ph: 0.5, ln: 2.5, cr: 1.5, st: 4, a: -0.1, R: 10, h: -4, ta: 0, tp: -0.1, la: -2, lR: 6, lh: -8 }, 'io')],
+  [AK(0, { ph: 0.3, ln: 2, a: 0.1, R: 14, h: 1, ta: 0.1, tp: 0.4, la: -2, lR: 6, lh: -8 }),                                         // the catch: arm out, and the weight
+    AK(0.3, { ph: -0.5, ln: -1.5, cr: 1.5, st: 2, a: 1.4, R: 6, h: 4, ta: 2.9, tp: 1.2 }, 'o'),                                       // snaps it back to the shoulder
+    AK(1, {}, 'io')],
+  [AK(0, {}), AK(0.15, { ph: -0.6, cr: 2.5, a: 1.6, R: 13, h: -2, ta: 1.6, tp: 0.1 }, 'io'),                                         // the swap: a flourish, the weapon swung round you once
+    AK(0.7, { ph: 0.3, cr: 2, st: 3, a: 1.6, R: 13, h: -2, ta: 1.6, tp: 0.1, sp: 1 }, 'io'), AK(1, { sp: 1 }, 'io')],
+  [AK(0, { a: -0.19, R: 9.7, h: -7.5, ta: 0, tp: -0.2 }), AK(0.3, { ph: 0.7, ln: 5, cr: 2.5, st: 6, a: -0.05, R: 16, h: 2, ta: 0, tp: 0.15, la: -2.4, lR: 7, lh: -3 }, 'o'),   // flare: the torch thrust out high
+    AK(0.7, { ph: 0.65, ln: 4.5, cr: 2.3, st: 6, a: -0.05, R: 15.5, h: 1.5, ta: 0, tp: 0.12, la: -2.4, lR: 7, lh: -3 }, 'io'), AK(1, { a: -0.19, R: 9.7, h: -7.5, ta: 0, tp: -0.2 }, 'io')]);
+// ---- the axe, drawn: a bearded head on a long haft, the edge catching the light ----
+function wpAxeShape(c, bx, by, hx, hy, side, sc, OUT) {   // haft from (bx,by) to (hx,hy) on screen; the head at the far end, its blade to one side
+  const C = (col, grey) => COLOUR ? col : grey, dx = hx - bx, dy = hy - by, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy * side, ny = ux * side;
+  const at = (a, n) => [hx + ux * a * sc + nx * n * sc, hy + uy * a * sc + ny * n * sc];
+  c.lineCap = 'round';
+  c.strokeStyle = OUT ? 'rgba(239,239,234,0.2)' : C('#6b4a2e', '#5e5e5a'); c.lineWidth = (2.3 + (OUT ? 1.6 : 0)) * sc; c.beginPath(); c.moveTo(bx, by); c.lineTo(hx + ux * 1.5 * sc, hy + uy * 1.5 * sc); c.stroke();
+  const head = () => { c.beginPath(); const p = [at(0.8, 1), at(2.8, 8.5), at(-1.6, 11)]; c.moveTo(...p[0]); c.lineTo(...p[1]); c.lineTo(...p[2]); c.quadraticCurveTo(...at(-7, 13.5), ...at(-11.5, 9)); c.lineTo(...at(-8.5, 4)); c.lineTo(...at(-4.5, 1)); c.lineTo(...at(-4.5, -3.2)); c.lineTo(...at(0.8, -3.2)); c.closePath(); };
+  if (OUT) { head(); c.strokeStyle = 'rgba(239,239,234,0.2)'; c.lineWidth = 1.6 * sc; c.lineJoin = 'round'; c.stroke(); return; }
+  head(); c.fillStyle = C('#474c54', '#4a4a48'); c.fill();
+  c.strokeStyle = C('#e4e8ee', '#d4d4d0'); c.lineWidth = 1.1 * sc; c.beginPath(); c.moveTo(...at(-1.6, 11)); c.quadraticCurveTo(...at(-7, 13.5), ...at(-11.5, 9)); c.stroke();   // the edge, ground bright
+  c.strokeStyle = C('#2c2f34', '#2c2c2a'); c.lineWidth = 0.7 * sc; c.beginPath(); c.moveTo(...at(-1.5, 2)); c.lineTo(...at(-3.5, 7)); c.stroke();   // a dark weld line
+  const g0 = L * 0.18 / sc, g1 = L * 0.38 / sc;   // a red leather grip wrap near the end of the haft
+  c.strokeStyle = C('#8a2f22', '#3a3a38'); c.lineWidth = 2.9 * sc; c.beginPath(); c.moveTo(bx + ux * g0 * sc, by + uy * g0 * sc); c.lineTo(bx + ux * g1 * sc, by + uy * g1 * sc); c.stroke();
+}
+function wpHeldAxe(P, hand, tip, near, OUT) {     // in the hand: from the grip along the haft to the head
+  const d = [tip[0] - hand[0], tip[1] - hand[1], tip[2] - hand[2]], dl = Math.hypot(...d) || 1, u = d.map(v => v / dl);
+  const at = k => P(hand[0] + u[0] * k, hand[1] + u[1] * k, hand[2] + u[2] * k);
+  const [bx, by] = at(-4), [hx, hy] = at(20), [fx, fy] = toScreen(S.p.x + Math.cos(S.aimW || 0) * 20, S.p.y + Math.sin(S.aimW || 0) * 20), [px, py] = toScreen(S.p.x, S.p.y);
+  const side = ((-(hy - by)) * (fx - px) + (hx - bx) * (fy - py)) >= 0 ? 1 : -1;   // the blade faces the way you're aiming
+  wpAxeShape(ctx, bx, by, hx, hy, side, Z * 0.74, OUT);
+  if (!OUT) S.wpHead = [hx, hy];
+}
+function wpLampAt(bx, by0, sf, run) {             // with a weapon in your hand the torch rides clipped to the chest rig: the beam comes from there
+  const ca = Math.cos(S.aim), sa = Math.sin(S.aim), f = (sf * 1.4 + run * 2) * 0.35 + 3.6, r = -2.2, h = 27;
+  return [bx + (f * ca + r * -sa) * Z, by0 + (f * sa + r * ca * 0.5 - h) * Z];
+}
+// ---- swings ----
+function wpSwing(i, D) {
+  const p = S.p, rg = S.rg, a = S.aimW !== undefined ? S.aimW : 0;
+  if (i === 3) p.roll = 0;                        // the roll turns into the charge
+  lifeAdd('swings');
+  p.atk = { i, t: 0, dur: D.dur, a, side: i === 1 ? -1 : 1, hit: new Set(), done: false, queued: false, pose: D.pose, wd: D, hi: 0 };
+  rg.atkHist = (rg.atkHist || []).filter(h => S.t - h.t < 1.6).concat([{ i, side: p.atk.side, t: S.t }]);
+  camKick(a, D.charge ? 6 : -3); addShake(D.charge ? 0.12 : 0.04);   // heavy: the wind-up pulls you back before it throws you forward
+  if (actx && noiseBuf) {
+    const t = actx.currentTime, h = D.hits ? D.hits[0].at : D.hitAt || 0;
+    if (D.charge) { noiseAt(t, 900, 200, 0.3, 0.42, sfxGain); boomAt(t, 70, 45, 0.18, 0.3, sfxGain); }
+    else { noiseAt(t + Math.max(0, h - 0.13), 1100, 260, 0.16, 0.38, sfxGain); noiseAt(t + Math.max(0, h - 0.06), 2600, 700, 0.08, 0.22, sfxGain); }   // the heavy whoosh just before it lands
+    if (D.hits) noiseAt(t + D.hits[1].at - 0.1, 1400, 300, 0.12, 0.42, sfxGain);
+  }
+}
+function wpStep(dt, A) {                          // a weapon's swing: planted wind-up, the lunge into it, the hit (or hits), the recovery
+  const p = S.p, D = A.wd, rooted = S.rg.recall, mT = D.moveT || [0, (D.hitAt || 0.2) * 0.9];
+  A.t += dt;
+  if (A.t >= mT[0] && A.t < mT[1] && !rooted) { const u = (A.t - mT[0]) / (mT[1] - mT[0]), v = D.lunge / (mT[1] - mT[0]) * (D.charge ? 1.25 * (1 - 0.5 * u) : 2 * (1 - u)); p.vx = Math.cos(A.a) * v; p.vy = Math.sin(A.a) * v; }
+  else if (A.t < mT[0]) { const f = Math.exp(-25 * dt); p.vx *= f; p.vy *= f; }   // feet planted for the wind-up
+  else if (!A.slowed) { A.slowed = true; p.vx *= 0.12; p.vy *= 0.12; }
+  const hT = D.hopT; p.hopZ = hT && A.t > hT[0] && A.t < hT[1] ? D.hop * Math.sin(Math.PI * (A.t - hT[0]) / (hT[1] - hT[0])) : 0;
+  if (D.charge) {                                 // everything in your path is bowled over
+    if (A.t < mT[1] + 0.04) { const n = wpHit(D, A.a); if (Math.random() < dt * 30) dustKick(p.x, p.y, A.a, 2, 90); if (n && actx) boomAt(actx.currentTime, 110, 40, 0.16, 0.6, sfxGain); }
+  } else if (D.hits) { while (A.hi < D.hits.length && A.t >= D.hits[A.hi].at) { const H = Object.assign({}, D, D.hits[A.hi++]); A.hit = new Set(); wpHit(H, A.a); } }
+  else if (!A.done && A.t >= D.hitAt) { A.done = true; wpHit(D, A.a); }
+  if (A.t >= D.dur) {
+    p.atkLast = { i: A.i, pose: A.pose, end: S.t }; p.atk = null; p.hopZ = 0;
+    if (A.rollQ) dodge(); else if (A.queued) startSwing();
+  }
+}
+function wpHit(D, a) {                            // the blow itself goes through atkHit (enemies, bosses, the lot); then the axe's own weight on top
+  const rg = S.rg, p = S.p, n = atkHit(Object.assign({ wpn: 1 }, D), a) || 0;
+  if (D.charge) return n;
+  rg.slashes = rg.slashes || [];
+  const side = p.atk ? p.atk.side : 1;
+  if (D.round) rg.slashes.push({ i: 0, a: a - Math.PI / 2, side: 1, t: 0, life: 0.3, r: D.reach, arc: Math.PI * 2, axe: 1, whirl: 1 });
+  else if (D.cleave) rg.slashes.push({ i: 0, a, side, t: 0, life: 0.34, r: D.reach, arc: D.arc, axe: 1, cleave: 1 });
+  else rg.slashes.push({ i: 0, a, side, t: 0, life: 0.26, r: D.reach, arc: D.arc, axe: 1 });
+  const ix = p.x + Math.cos(a) * D.reach * 0.62, iy = p.y + Math.sin(a) * D.reach * 0.62;
+  if (D.cleave) {                                 // a split in the ground runs out ahead of you, throwing up dirt all along it
+    wpCrack(p.x + Math.cos(a) * 18, p.y + Math.sin(a) * 18, a, D.reach * 1.05, 1);
+    for (let f = 0.2; f <= 1; f += 0.2) { ashBurst(p.x + Math.cos(a) * D.reach * f, p.y + Math.sin(a) * D.reach * f, 5, 16); wpChips(p.x + Math.cos(a) * D.reach * f, p.y + Math.sin(a) * D.reach * f, 4, 'dirt', 5); }
+    if (!n) { addShake(0.45); hitStop(0.06); camKick(a, 10); }
+    if (actx) { const t = actx.currentTime; boomAt(t, 62, 26, 0.6, 0.95, sfxGain); noiseAt(t, 900, 110, 0.45, 0.5, sfxGain); noiseAt(t + 0.02, 3000, 900, 0.12, 0.3, sfxGain); }
+    wpPop(n ? 'CLEAVE' : '', p.x, p.y, 70, '255,180,110', 1);
+  } else if (D.round) {
+    if (actx) { const t = actx.currentTime; noiseAt(t, 1800, 500, 0.2, 0.4, sfxGain); if (n) boomAt(t, 130, 50, 0.16, 0.6, sfxGain); }
+  } else {                                        // the head bites the ground where it lands
+    if (D.crack) wpCrack(ix, iy, a + side * 0.5, 26, 0);
+    wpChips(ix, iy, 3, n ? 'wood' : 'dirt', n ? 8 : 6); dustKick(ix, iy, a + Math.PI, 5, 60);
+    if (!n) { addShake(0.12); camKick(a, 4); }
+    if (actx) { const t = actx.currentTime; if (n) { boomAt(t, 125, 38, 0.2, 0.75, sfxGain); noiseAt(t, 2300, 500, 0.14, 0.5, sfxGain); } else { boomAt(t, 90, 50, 0.12, 0.4, sfxGain); noiseAt(t, 800, 250, 0.16, 0.32, sfxGain); } }
+  }
+  return n;
+}
+// ---- a hit away from your hands (the thrown axe, a falling tree): anything within r of (x, y), once per set, knocked away from (ox, oy) ----
+function wpSpark(x, y, h, n = 9) {
+  const rg = S.rg;
+  for (let k = 0; k < n; k++) { const b = Math.random() * 7, v = 60 + Math.random() * 150; rg.embers.push({ x, y, z: h * (0.4 + Math.random() * 0.5), vx: Math.cos(b) * v, vy: Math.sin(b) * v, vz: 50 + Math.random() * 110, life: 0.25 + Math.random() * 0.3, ember: true }); }
+  rg.blasts.push({ x, y, t: 0, life: 0.16, r: 30, col: 'white' });
+}
+function wpHitAt(x, y, r, dmg, bdmg, knock, set, kh, ox, oy) {
+  const rg = S.rg, mult = (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); let n = 0;
+  const push = (o, k) => { const dx = o.x - ox, dy = o.y - oy, d = Math.hypot(dx, dy) || 1; o.x += dx / d * k; o.y += dy / d * k; };
+  for (const o of rg.enemies) {
+    const f = FOES[o.type]; if (o.dead || set.has(o) || Math.hypot(o.x - x, o.y - y) > r + (f ? f.w : 12) * 0.5) continue;
+    set.add(o); n++; o.swung = true; o.kHit = kh; o.kHitT = S.t; stkTouch(); o.hp -= dmg * mult; o.jit = 1;
+    if (o.type !== 'tall' && o.type !== 'brute') push(o, knock); wpSpark(o.x, o.y, f ? f.h : 30);
+  }
+  if (srchOn() && rg.srch) for (const s of rg.srch) if (!s.dead && !set.has(s) && Math.hypot(s.x - x, s.y - y) < r + 8) { set.add(s); n++; wpSpark(s.x, s.y, 38); srchDown(s); }
+  const b = S.mode === 'expedition' && bossLive();
+  if (b && !set.has(b) && ['walk', 'tell', 'act', 'recover', 'roar'].includes(b.st) && Math.hypot(b.x - x, b.y - y) < r + 12 * BS) {
+    set.add(b); n++; b.hp -= bdmg * (b.st === 'recover' ? 1.35 : 1) * mult; b.flinch = Math.max(b.flinch, 0.7); wpSpark(b.x, b.y, 38 * BS, 14); stkBlow(b, 38 * BS, FOE_TINT.warden.join(','), b.st === 'recover');
+  }
+  const m = S.mode === 'expedition' && miniLive();
+  if (m) for (const u of m.units) {
+    if (set.has(u) || u.hid || !['walk', 'tell', 'act', 'recover'].includes(u.st) || Math.hypot(u.x - x, u.y - y) > r + 9 * MK[u.kind].s) continue;
+    set.add(u); n++; u.hp -= bdmg * (u.st === 'recover' ? (MK[u.kind].dune ? 1.6 : 1.35) : 1) * mult * miniShield(u); u.flinch = Math.max(u.flinch, 0.7);
+    wpSpark(u.x, u.y, 38 * MK[u.kind].s, 12); stkBlow(u, 38 * MK[u.kind].s, (FOE_TINT[u.kind] || [255, 200, 120]).join(','), u.st === 'recover');
+  }
+  return n;
+}
+// ---- the special: Throw (axe) or Flare (torch) ----
+function wpSpecial() {
+  if (!wpOn() || !S.running || S.rg.phase !== 'fight' || S.rg.drink) return;
+  const rg = S.rg, p = S.p, w = curW();
+  if (w === 'axe' && rg.wax) return wpRecall();
+  if ((rg.wspT || 0) > 0 || p.wact) return wpDenied();
+  if (p.atk) { p.atkLast = null; p.atk = null; p.hopZ = 0; }   // the special cuts a swing short
+  if (w === 'axe') p.wact = { pose: AXP + 4, t: 0, dur: 0.34, rel: 0.18, a: S.aimW || 0, fn: wpThrow };
+  else wpFlare();
+  wpUi(true);
+}
+function wpDenied() { if (actx) toneAt(actx.currentTime, 180, 0.09, 0.05, 'square', sfxGain); }
+function wpThrow() {
+  const rg = S.rg, p = S.p, a = p.wact.a;
+  rg.wax = { x: p.x + Math.cos(a) * 14, y: p.y + Math.sin(a) * 14, ux: Math.cos(a), uy: Math.sin(a), d: 0, max: 400, sp: 650, st: 'out', hit: new Set(), spin: 0, t: 0, wt: 0 };
+  camKick(a, 7); addShake(0.1); dustKick(p.x, p.y, a, 5, 70);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 2000, 500, 0.22, 0.45, sfxGain); boomAt(t, 140, 70, 0.08, 0.3, sfxGain); }
+  wpUi(true);
+}
+function wpRecall() {                             // called back: it tears free (felling the tree if it had bitten one) and flies home
+  const X = S.rg.wax; if (!X || X.st === 'back') return;
+  if (X.st === 'stuck' && X.tree) wpFell(X.tree, Math.atan2(X.uy, X.ux));
+  X.st = 'back'; X.hit = new Set(); X.tree = null;
+  if (actx) noiseAt(actx.currentTime, 1200, 3200, 0.18, 0.3, sfxGain);
+}
+function wpTreeAt(x, y) {                         // a trunk the flying axe would bite into
+  if (inBeyond()) return null;
+  const m = miniLive(); if (m && m.standing) for (const t of m.standing) if (Math.hypot(t.x - x, t.y - y) < 10 * t.s + 6) return t;
+  for (const o of propsNear(x, y, 40)) if (o.kind === 'tree' && o.key && Math.hypot(o.x - x, o.y - y) < o.r * o.s + 7) return o;
+  return null;
+}
+function wpAxeStep(dt) {
+  const rg = S.rg, p = S.p, X = rg.wax;
+  X.t += dt; if (!wpOn() || X.t > 5) { rg.wax = null; return; }
+  if (X.st !== 'stuck') { X.spin += dt * 26; if ((X.wt -= dt) <= 0 && actx) { X.wt = 0.12; noiseAt(actx.currentTime, 1500, 700, 0.07, 0.16, sfxGain); } }   // the wum-wum of it turning over
+  const cut = () => { if (wpHitAt(X.x, X.y, 17, 1.2, 1.8, 28, X.hit, 'boomerang', X.x - X.ux * 20, X.y - X.uy * 20)) { hitStop(0.035); addShake(0.14); wpChips(X.x, X.y, 14, 'wood', 4); if (actx) { const t = actx.currentTime; boomAt(t, 140, 50, 0.12, 0.5, sfxGain); noiseAt(t, 2600, 700, 0.1, 0.4, sfxGain); } } };
+  if (X.st === 'out') {
+    const v = X.sp * (1 - 0.4 * X.d / X.max) * dt; X.x += X.ux * v; X.y += X.uy * v; X.d += v;
+    cut();
+    const tr = wpTreeAt(X.x, X.y);
+    if (tr) {                                     // THOCK: it bites the trunk, and the tree shudders
+      X.st = 'stuck'; X.tree = tr; X.t2 = 0; tr.shakeT = S.t;
+      const d = Math.hypot(X.x - tr.x, X.y - tr.y) || 1, rr = 10 * tr.s * 0.8; X.x = tr.x + (X.x - tr.x) / d * rr; X.y = tr.y + (X.y - tr.y) / d * rr;
+      hitStop(0.06); addShake(0.25); wpChips(X.x, X.y, 22, 'wood', 10);
+      if (actx) { const t = actx.currentTime; boomAt(t, 190, 80, 0.16, 0.7, sfxGain); noiseAt(t, 1800, 400, 0.12, 0.5, sfxGain); noiseAt(t + 0.05, 300, 120, 0.5, 0.25, sfxGain); }
+    } else if (X.d >= X.max) { X.st = 'back'; X.hit = new Set(); }
+  } else if (X.st === 'stuck') {
+    if (((X.t2 += dt) * 10 | 0) !== ((X.t2 - dt) * 10 | 0)) X.tree.shakeT = S.t;   // shuddering as it goes
+    if (X.t2 >= 0.32) { wpFell(X.tree, Math.atan2(X.uy, X.ux)); X.st = 'back'; X.hit = new Set(); X.tree = null; }
+  } else {                                        // home: faster and faster back to your hand, cutting through anything on the way
+    X.tb = (X.tb || 0) + dt;
+    const dx = p.x - X.x, dy = p.y - X.y, d = Math.hypot(dx, dy) || 1, v = Math.min(d, (700 + 600 * Math.min(1, X.tb * 2)) * dt);
+    X.ux = dx / d; X.uy = dy / d; X.x += X.ux * v; X.y += X.uy * v;
+    cut();
+    if (d < 20) wpCatch();
+  }
+}
+function wpCatch() {
+  const rg = S.rg, p = S.p, X = rg.wax; rg.wax = null; rg.wspT = ARMS.axe.spCool;
+  if (!p.atk) p.wact = { pose: AXP + 5, t: 0, dur: 0.26 };
+  addShake(0.12); camKick(Math.atan2(X.uy, X.ux), 5);
+  if (actx) { const t = actx.currentTime; boomAt(t, 210, 110, 0.1, 0.45, sfxGain); toneAt(t, 1650, 0.16, 0.05, 'triangle', sfxGain); noiseAt(t, 4200, 1600, 0.06, 0.25, sfxGain); }
+  wpUi(true);
+}
+function wpFell(t, a) {                           // the tree goes over, away from you, along the line the axe flew
+  const rg = S.rg, len = treeLen(t), m = miniLive();
+  const g = { kind: 'felled', type: t.type, seed: t.seed, s: t.s, r: 0, bx: t.x, by: t.y, ux: Math.cos(a), uy: Math.sin(a), len, fall: 0, x: t.x + Math.cos(a) * len / 2, y: t.y + Math.sin(a) * len / 2, lie: 0 };
+  if (t.wc !== undefined && m && m.standing) { m.felled.add(t); m.standing = m.standing.filter(o => o !== t); m.logs.push(g); }   // one of the Woodcutter's own trees: it stays down as cover
+  else { (rg.wfell = rg.wfell || new Set()).add(t.key); (rg.wlogs = rg.wlogs || []).push(g); }
+  (rg.wfall = rg.wfall || []).push(g);
+  wpPop('TIMBER!', t.x, t.y, 95, '255,200,110', 1.25);
+  if (actx) { const t0 = actx.currentTime; noiseAt(t0, 380, 110, 0.9, 0.35, sfxGain); toneAt(t0 + 0.05, 92, 0.6, 0.05, 'sawtooth', sfxGain); }   // the creak as it goes
+}
+function wpCrash(g) {                             // it lands: everything along the trunk is crushed
+  const rg = S.rg, [ex, ey] = logEnd(g), set = new Set(); let n = 0;
+  for (let f = 0.12; f <= 1.001; f += 0.11) { const x = g.bx + (ex - g.bx) * f, y = g.by + (ey - g.by) * f; n += wpHitAt(x, y, 22, 6, 4.5, 34, set, 'timber', x, y); }
+  for (let i = 1; i <= 5; i++) { const x = g.bx + (ex - g.bx) * i / 5, y = g.by + (ey - g.by) * i / 5; ashBurst(x, y, 6, 12); wpChips(x, y, 8, i > 2 ? 'leaf' : 'wood', 6); }
+  rg.blasts.push({ x: (g.bx + ex) / 2, y: (g.by + ey) / 2, t: 0, life: 0.45, r: g.len * 0.55, col: 'white' });
+  const near = Math.max(0.3, 1 - Math.hypot((g.bx + ex) / 2 - S.p.x, (g.by + ey) / 2 - S.p.y) / 900);
+  addShake(0.75 * near); hitStop(n ? 0.12 : 0.06);
+  if (actx) { const t = actx.currentTime; boomAt(t, 62, 26, 0.75, 0.95 * near, sfxGain); noiseAt(t, 700, 90, 0.6, 0.5 * near, sfxGain); noiseAt(t + 0.03, 2600, 600, 0.25, 0.25 * near, sfxGain); }
+  if (n > 1) wpPop('CRUSHED ×' + n, (g.bx + ex) / 2, (g.by + ey) / 2, 50, '255,230,190', 1);
+}
+function wpFlare() {                              // the torch's special: everything in the beam is blinded and frozen a moment
+  const rg = S.rg, p = S.p; rg.wspT = ARMS.torch.spCool; p.wact = { pose: AXP + 7, t: 0, dur: 0.34 };
+  let n = 0;
+  for (const e of rg.enemies) if (!e.dead && e.beam > 0) { e.frozen = Math.max(e.frozen || 0, 1.8); e.hp -= 0.15 * e.maxHp; e.jit = 1; e.swung = true; e.kHit = 'swing'; e.kHitT = S.t; n++; }
+  rg.wflare = { t: 0 }; addShake(0.22); hitStop(0.04); camKick(S.aimW || 0, -5);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 9000, 2500, 0.35, 0.5, sfxGain); boomAt(t, 180, 60, 0.25, 0.4, sfxGain); toneAt(t, 2400, 0.3, 0.04, 'sine', sfxGain); }
+  wpPop(n ? 'BLINDED' + (n > 1 ? ' ×' + n : '') : 'FLARE', p.x, p.y, 74, '255,240,205', 1);
+}
+// ---- the swap: Q or the Swap button. A flourish that knocks back anything right next to you ----
+function wpSwap() {
+  if (!wpOn() || !S.running || S.rg.phase !== 'fight') return;
+  const rg = S.rg, p = S.p; if (!XS.wsel[1] || (rg.wswT || 0) > 0 || rg.drink) return;
+  rg.wax = null;                                  // a thrown axe goes straight back on your back
+  XS.wcur = XS.wcur ? 0 : 1; exSave();
+  p.atk = null; p.atkLast = null; p.hopZ = 0; p.wact = { pose: AXP + 6, t: 0, dur: 0.3 }; rg.wswT = 0.45;
+  wpHitAt(p.x, p.y, 46, 0.25, 0.3, 36, new Set(), 'swing', p.x, p.y);
+  const w = curW(); rg.slashes = rg.slashes || [];
+  rg.slashes.push(w === 'axe' ? { i: 0, a: S.aimW || 0, side: 1, t: 0, life: 0.3, r: 52, arc: Math.PI * 2, axe: 1, whirl: 1 } : { i: 0, a: S.aimW || 0, side: 1, t: 0, life: 0.28, r: 52, arc: Math.PI * 2 });
+  wpPop(ARMS[w].name.toUpperCase(), p.x, p.y, 66, ARMS[w].col, 0.95);
+  addShake(0.1); hitStop(0.03);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 6500, 2200, 0.18, 0.4, sfxGain); toneAt(t + 0.03, w === 'axe' ? 330 : 660, 0.25, 0.05, 'triangle', sfxGain); toneAt(t + 0.08, w === 'axe' ? 495 : 990, 0.3, 0.04, 'triangle', sfxGain); }
+  wpUi(true);
+}
+function wpReady() {                              // the special is back: a tick, and a little glyph over your head
+  S.rg.wrdy = { t: 0 };
+  if (actx) { const t = actx.currentTime; toneAt(t, 1320, 0.08, 0.04, 'square', sfxGain); toneAt(t + 0.06, 1760, 0.12, 0.04, 'square', sfxGain); }
+}
+// ---- won from a boss: it stands in the ground where he fell, and you walk over to take it ----
+function wpClaim(D) {
+  const rg = S.rg; rg.wdrop = null;
+  if (!XS.wsel.includes(D.id)) XS.wsel[1] = D.id;
+  XS.wcur = XS.wsel.indexOf(D.id); XS.wnew = 1; exSave();
+  S.p.wact = { pose: AXP + 5, t: 0, dur: 0.3 }; rg.wcard = { id: D.id, t: 0 };
+  addShake(0.3); hitStop(0.05); rg.blasts.push({ x: D.x, y: D.y, t: 0, life: 0.5, r: 90, col: 'white' }); wpChips(D.x, D.y, 6, 'dirt', 12);
+  if (actx) { const t = actx.currentTime; boomAt(t, 80, 34, 0.9, 0.7, sfxGain); [523, 659, 784, 1047].forEach((f, i) => toneAt(t + 0.08 * i, f, 0.5, 0.05, 'triangle', sfxGain)); }
+  wpUi(true);
+}
+// ---- every frame ----
+function wpTick(dt) {
+  const rg = S.rg, p = S.p, on = wpOn();
+  if (p.wact) { const w = p.wact; w.t += dt; if (w.fn && !w.done && w.t >= w.rel) { w.done = true; w.fn(); } if (w.t >= w.dur) p.wact = null; }
+  if (rg.wspT > 0 && (rg.wspT -= dt) <= 0 && on) wpReady();
+  if (rg.wswT > 0) rg.wswT -= dt;
+  if (rg.wax) wpAxeStep(dt);
+  if (rg.wfall) { for (const g of rg.wfall) if (g.fall < 1) { g.fall = Math.min(1, g.fall + dt * (0.45 + g.fall * 2.8)); if (g.fall >= 1) wpCrash(g); } rg.wfall = rg.wfall.filter(g => g.fall < 1); }
+  if (rg.wlogs) { for (const g of rg.wlogs) if (g.fall >= 1 && (g.lie += dt) > 20) g.gone = Math.min(1, (g.gone || 0) + dt * 1.2); rg.wlogs = rg.wlogs.filter(g => !(g.gone >= 1)); }
+  if (rg.wchips) { for (const c of rg.wchips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; } rg.wchips = rg.wchips.filter(c => c.life > 0); }
+  if (rg.wcracks) { for (const k of rg.wcracks) k.t += dt; rg.wcracks = rg.wcracks.filter(k => k.t < k.life); }
+  if (rg.wpops) { for (const q of rg.wpops) q.t += dt; rg.wpops = rg.wpops.filter(q => q.t < 1); }
+  if (rg.wflare && (rg.wflare.t += dt) > 0.4) rg.wflare = null;
+  if (rg.wrdy && (rg.wrdy.t += dt) > 0.7) rg.wrdy = null;
+  if (rg.wcard && (rg.wcard.t += dt) > 4) rg.wcard = null;
+  if (rg.wdrop && on && rg.phase === 'fight' && Math.hypot(rg.wdrop.x - p.x, rg.wdrop.y - p.y) < 30) wpClaim(rg.wdrop);
+  wpUi();
+}
+function wpHome() { const rg = S.rg; rg.wax = null; rg.wfell = new Set(); rg.wlogs = []; rg.wfall = []; }   // back inside the fence: the axe's on your back, and the woods grow back while you're in
+function wpChips(x, y, z, kind, n) {
+  const rg = S.rg, cols = { wood: ['#c9a26b', '#a07a48', '#5a3e28'], dirt: ['#5a4a38', '#3e3428', '#6e5a40'], leaf: ['#5f8a3a', '#7aa04a', '#a8b86a'] }[kind];
+  const L = rg.wchips = rg.wchips || [];
+  for (let k = 0; k < n; k++) { const a = Math.random() * 7, v = 40 + Math.random() * 120; L.push({ x, y, z, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 60 + Math.random() * 130, rot: Math.random() * 7, vr: (Math.random() - 0.5) * 30, life: 0.7 + Math.random() * 0.5, col: COLOUR ? cols[k % 3] : '#8a8a86', w: kind === 'leaf' ? 2.4 : 1.8 }); }
+  if (L.length > 200) L.splice(0, L.length - 200);
+}
+function wpCrack(x, y, a, len, big) { (S.rg.wcracks = S.rg.wcracks || []).push({ x, y, a, len, big, t: 0, life: big ? 1.6 : 0.9, seed: Math.random() * 99 }); }
+function wpPop(text, x, y, h, col, s) { if (!text) return; (S.rg.wpops = S.rg.wpops || []).push({ text, x, y, h, col, s, t: 0 }); }
+// ---- buttons: the special (with its cooldown ring) and the swap ----
+const wspecBtn = document.getElementById('wspec'), wswapBtn = document.getElementById('wswap');
+let wpUiKey = '';
+function wpUi(force) {
+  const on = wpOn(), rg = S && S.rg, show = on && rg && rg.phase === 'fight';
+  document.body.classList.toggle('wp', !!show);
+  if (!show) { wspecBtn.hidden = wswapBtn.hidden = true; wpUiKey = ''; return; }
+  const w = curW(), cool = Math.max(0, rg.wspT || 0) / ARMS[w].spCool, lbl = w === 'axe' && rg.wax ? 'Call' : ARMS[w].spName;
+  wspecBtn.style.setProperty('--cd', cool.toFixed(3));
+  const key = w + lbl + (cool > 0 ? 1 : 0) + (XS.wsel[1] ? 1 : 0);
+  if (!force && key === wpUiKey) return; wpUiKey = key;
+  wspecBtn.hidden = false; wspecBtn.textContent = lbl; wspecBtn.dataset.cool = cool > 0 ? '1' : '0';
+  wswapBtn.hidden = !XS.wsel[1]; wswapBtn.textContent = 'Swap';
+}
+wspecBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSpecial(); });
+wswapBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSwap(); });
+addEventListener('keydown', e => {
+  if (e.repeat || !wpOn() || !S.running) return;
+  const k = e.key.toLowerCase();
+  if (k === 'q') wpSwap();
+  if (k === 'k' || k === 'shift') wpSpecial();
+});
+cv.addEventListener('mousedown', e => { if (e.button === 1 && wpOn()) { e.preventDefault(); wpSpecial(); } });
+// ---- the camp's weapon rack (the Shop's third door) ----
+function wpRack() {
+  return Object.keys(ARMS).map(id => {
+    const A = ARMS[id], own = wpOwn(id), slot = XS.wsel.indexOf(id), held = slot >= 0 && slot === (XS.wcur | 0);
+    return { id: 'w_' + id, name: A.name, desc: A.desc, cls: own ? 'own' + (slot >= 0 ? ' on' : '') : '', have: 0, max: 0,
+      lvl: own ? (slot >= 0 ? `Carried · slot ${slot + 1}${held ? ' · in your hand' : ''}` : 'On the rack') : `Locked · beat the ${A.bossName}`,
+      tag: !own ? 'LOCKED' : held ? 'IN HAND' : slot >= 0 ? 'CARRIED' : 'RACK',
+      buy: own && !held ? ['Take in hand', true, () => wpHold(id)] : null,
+      eq: own && id !== 'torch' && slot < 0 ? ['Carry', true, () => { XS.wsel[1] = id; exSave(); renderCamp(); }] : null };
+  });
+}
+function wpHold(id) {
+  let slot = XS.wsel.indexOf(id); if (slot < 0) { XS.wsel[1] = id; slot = 1; }
+  XS.wcur = slot; if (S.rg) S.rg.wax = null; exSave(); renderCamp(); wpUi(true);
+}
+const WP_ICONS = {
+  w_torch: '<path d="M10 21h4l1.2-9H8.8z"/><path d="M12 3c2.2 2.6 3.2 4.2 3.2 6a3.2 3.2 0 0 1-6.4 0c0-1.8 1-3.4 3.2-6z"/>',
+  w_axe: '<path d="M5 21L15.5 10.5"/><path d="M13 4.5c3.5-.5 6.5 2.5 6.5 6l-3 .5-4-4z"/><path d="M12.5 7l4.5 4.5"/>',
+  w_rack: '<path d="M4 21V5M20 21V5M3 8h18"/><path d="M8 19l6-10"/><path d="M12.5 7.5c2-.3 3.7 1.4 3.7 3.4l-1.7.3-2.3-2.3z"/><path d="M17 19V11"/><path d="M16 11h2l.5-2h-3z"/>',
+};
+// ---- drawing: everything over the dark ----
+function drawAxeSlash(s) {                        // steel, not fire: a heavy grey-white smear, short and brutal
+  const p = S.p, k = s.t / s.life, fade = 1 - k * k, lift = ((s.cleave ? 4 : s.whirl ? 14 : 9) + (p.hopZ || 0)) * Z, n = 22;
+  const sweep = Math.min(1, s.t / (s.whirl ? 0.12 : s.cleave ? 0.04 : 0.07));
+  const a0 = s.a - s.side * s.arc / 2, a1 = a0 + s.side * s.arc * sweep, R0 = s.whirl ? 0.62 : s.cleave ? 0.05 : 0.45, pts = [];
+  if (s.cleave) {                                 // a blade of light straight down the line of the cleave, wide at the hilt
+    for (let j = 0; j <= n; j++) { const f = j / n, w = (1 - f) * 0.16 + 0.02; const [x, y] = toScreen(p.x + Math.cos(s.a + w) * s.r * f * sweep, p.y + Math.sin(s.a + w) * s.r * f * sweep); pts.push([x, y - lift]); }
+    for (let j = n; j >= 0; j--) { const f = j / n, w = (1 - f) * 0.16 + 0.02; const [x, y] = toScreen(p.x + Math.cos(s.a - w) * s.r * f * sweep, p.y + Math.sin(s.a - w) * s.r * f * sweep); pts.push([x, y - lift]); }
+  } else {
+    for (let j = 0; j <= n; j++) { const f = j / n, an = a0 + (a1 - a0) * f; const [x, y] = toScreen(p.x + Math.cos(an) * s.r, p.y + Math.sin(an) * s.r); pts.push([x, y - lift]); }
+    for (let j = n; j >= 0; j--) { const f = j / n, an = a0 + (a1 - a0) * f, th = 0.35 + 0.65 * f, rr = s.r * (1 - (1 - R0) * th); const [x, y] = toScreen(p.x + Math.cos(an) * rr, p.y + Math.sin(an) * rr); pts.push([x, y - lift]); }
+  }
+  const [cx, cy] = toScreen(p.x, p.y), g = ctx.createRadialGradient(cx, cy - lift, s.r * K() * 0.15, cx, cy - lift, s.r * K() * 1.05);
+  g.addColorStop(0, `rgba(90,100,120,${0.2 * fade})`); g.addColorStop(0.65, `rgba(195,205,222,${0.7 * fade})`); g.addColorStop(1, `rgba(250,252,255,${fade})`);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.fillStyle = g; ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
+  const edge = () => { ctx.beginPath(); for (let j = 0; j <= n; j++) { const [x, y] = pts[j]; j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); };
+  ctx.strokeStyle = `rgba(150,170,205,${0.4 * fade})`; ctx.lineWidth = 12 * Z; edge();
+  ctx.strokeStyle = `rgba(255,255,255,${fade})`; ctx.lineWidth = 3.4 * Z; edge();
+  ctx.restore();
+}
+function drawWpFx() {
+  const rg = S.rg, p = S.p, zk = Math.max(0.8, Math.min(1.3, Z));
+  if (rg.wcracks) for (const k of rg.wcracks) {   // splits in the ground, glowing hot inside, then closing over
+    const u = k.t / k.life, a = (1 - u) * (1 - u), segs = k.big ? 14 : 5, pts = [];
+    for (let j = 0; j <= segs; j++) { const f = j / segs, off = (hash(k.seed + j, 3.1) - 0.5) * (k.big ? 14 : 8) * Math.sin(f * Math.PI + 0.2); pts.push(toScreen(k.x + Math.cos(k.a) * k.len * f - Math.sin(k.a) * off, k.y + Math.sin(k.a) * k.len * f + Math.cos(k.a) * off)); }
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const line = () => { ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); };
+    ctx.strokeStyle = `rgba(12,9,6,${0.85 * Math.min(1, (1 - u) * 3)})`; ctx.lineWidth = (k.big ? 6 : 3.5) * Z; line();
+    ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,140,50,${0.8 * a})`; ctx.lineWidth = (k.big ? 2.6 : 1.4) * Z; line();
+    ctx.restore();
+  }
+  if (rg.wchips) { ctx.save(); for (const c of rg.wchips) { const [x, y] = toScreen(c.x, c.y); ctx.globalAlpha = Math.min(1, c.life * 3); ctx.fillStyle = c.col; ctx.save(); ctx.translate(x, y - c.z * Z); ctx.rotate(c.rot); ctx.fillRect(-c.w * Z, -0.8 * Z, c.w * 2 * Z, 1.6 * Z); ctx.restore(); } ctx.restore(); }
+  if (rg.wflare && beamGeo) {                     // the flare: the whole beam goes white and slams out
+    const b = beamGeo, u = rg.wflare.t / 0.4, a = (1 - u) * (1 - u), R = b.br * (0.7 + 0.5 * Math.sqrt(u));
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(b.bx, b.by, 0, b.bx, b.by, R); g.addColorStop(0, `rgba(255,255,255,${0.95 * a})`); g.addColorStop(0.6, `rgba(255,245,220,${0.55 * a})`); g.addColorStop(1, 'rgba(255,240,210,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(b.bx, b.by);
+    for (let t = -HALF - 0.1; t <= HALF + 0.101; t += HALF / 8) ctx.lineTo(b.bx + Math.cos(S.aim + t) * R, b.by + Math.sin(S.aim + t) * R);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = `rgba(255,250,235,${0.09 * a})`; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+  if (rg.wdrop) {                                 // won: the axe stands in the ground where he fell, in a pillar of light
+    const D = rg.wdrop, [x, y] = toScreen(D.x, D.y), pul = 0.8 + 0.2 * Math.sin(S.t * 3), near = Math.hypot(D.x - p.x, D.y - p.y) < 110;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 60 * Z); g.addColorStop(0, `rgba(255,190,110,${0.55 * pul})`); g.addColorStop(1, 'rgba(255,170,80,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, 60 * Z, 30 * Z, 0, 0, 7); ctx.fill();
+    const pg = ctx.createLinearGradient(x, y - 170 * Z, x, y); pg.addColorStop(0, 'rgba(255,200,120,0)'); pg.addColorStop(1, `rgba(255,200,120,${0.32 * pul})`);
+    ctx.fillStyle = pg; ctx.fillRect(x - 9 * Z, y - 170 * Z, 18 * Z, 170 * Z);
+    for (let k = 0; k < 8; k++) { const ph = (S.t * 0.6 + k / 8) % 1, sx = x + Math.sin(k * 7.3 + S.t) * 14 * Z; ctx.fillStyle = `rgba(255,220,160,${Math.sin(ph * Math.PI) * 0.8})`; ctx.beginPath(); ctx.arc(sx, y - ph * 90 * Z, 1.6 * Z, 0, 7); ctx.fill(); }
+    ctx.restore();
+    wpAxeShape(ctx, x - 7 * Z, y - 30 * Z, x + 2 * Z, y - 2 * Z, 1, Z * 0.75, false);   // head down in the dirt, haft up at an angle
+    stkText(ARMS[D.id].name.toUpperCase(), x, y - 52 * Z, 14 * zk, ARMS[D.id].col, 0.9 + 0.1 * pul, { glow: ARMS[D.id].col, blur: 10 });
+    if (near) stkText('WALK OVER IT TO TAKE IT', x, y - 36 * Z, 9 * zk, '239,239,234', 0.85, { w: 600 });
+  }
+  if (rg.wax) {                                   // the thrown axe, turning over and over, with a blur of its own turns behind it
+    const X = rg.wax, [x, y] = toScreen(X.x, X.y), hz = (X.st === 'stuck' ? 22 : 15) * Z, L = 15 * Z;
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y, 9 * Z, 3 * Z, 0, 0, 7); ctx.fill(); ctx.restore();
+    const one = (ang, al) => { ctx.save(); ctx.globalAlpha = al; const c = Math.cos(ang), s2 = Math.sin(ang); wpAxeShape(ctx, x - c * L, y - hz - s2 * L, x + c * L, y - hz + s2 * L, 1, Z * 0.62, false); ctx.restore(); };
+    if (X.st === 'stuck') one(Math.atan2(-X.uy * 0.5, -X.ux) + 0.4, 1);
+    else {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(210,220,240,0.35)'; ctx.lineWidth = 2.2 * Z;
+      ctx.beginPath(); ctx.ellipse(x, y - hz, L * 1.15, L * 1.15, 0, 0, 7); ctx.stroke(); ctx.restore();
+      for (let k = 2; k >= 1; k--) one(-X.spin + k * 0.45, 0.22 / k);
+      one(-X.spin, 1);
+    }
+  }
+  if (rg.wpops) for (const q of rg.wpops) {       // words: punch in, rise, fade
+    const [x, y] = toScreen(q.x, q.y), u = q.t, pop = u < 0.12 ? 1.6 - 0.6 * (u / 0.12) : 1, a = u > 0.7 ? (1 - u) / 0.3 : 1;
+    stkText(q.text, x, y - q.h * Z - 18 * u * Z, 19 * q.s * zk, q.col, a, { s: pop, glow: q.col, blur: 12 });
+  }
+  if (rg.wrdy) {                                  // the special's back: a ring snaps out round your head
+    const [x, y] = toScreen(p.x, p.y), u = rg.wrdy.t / 0.7, hy = y - 64 * Z;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(${ARMS[curW()].col},${0.9 * (1 - u)})`; ctx.lineWidth = (3 - 2 * u) * Z;
+    ctx.beginPath(); ctx.arc(x, hy, (6 + 18 * stkEase(Math.min(1, u * 1.4))) * Z, 0, 7); ctx.stroke(); ctx.restore();
+    stkText('READY', x, hy, 10 * zk, ARMS[curW()].col, 1 - u, { s: 1 + 0.4 * (1 - Math.min(1, u * 4)), glow: ARMS[curW()].col, blur: 8 });
+  }
+  if (rg.wcard && rg.wcard.t > 0) {               // WEAPON CLAIMED: over your head, arcade style
+    const C = rg.wcard, A = ARMS[C.id], u = C.t, inA = Math.min(1, u / 0.25), out = u > 3.4 ? 1 - (u - 3.4) / 0.6 : 1, al = Math.max(0, Math.min(inA, out));
+    const [x0, y0] = toScreen(p.x, p.y), x = Math.max(175 * zk, Math.min(W - 175 * zk, x0)), y = Math.min(H - 56 * zk, y0 + 84 * Z), punch = 1 + 0.5 * Math.pow(1 - inA, 2);
+    ctx.save(); ctx.globalAlpha = al * 0.8; ctx.fillStyle = 'rgba(8,6,4,0.85)'; ctx.translate(x, y); ctx.transform(1, 0, -0.18, 1, 0, 0);
+    ctx.fillRect(-170 * zk, -50 * zk, 340 * zk, 96 * zk); ctx.globalAlpha = al; ctx.fillStyle = `rgb(${A.col})`; ctx.fillRect(-170 * zk, -50 * zk, 340 * zk, 3 * zk); ctx.fillRect(-170 * zk, 43 * zk, 340 * zk, 3 * zk); ctx.restore();
+    const spin = Math.max(0, 1 - u / 0.5) * 9, c = Math.cos(-0.9 - spin), s2 = Math.sin(-0.9 - spin), L = 30 * zk;   // the axe spins in and settles
+    ctx.save(); ctx.globalAlpha = al; wpAxeShape(ctx, x - 130 * zk - c * L, y - 2 * zk - s2 * L, x - 130 * zk + c * L, y - 2 * zk + s2 * L, 1, 1.25 * zk, false); ctx.restore();
+    stkText(C.rack ? 'ON YOUR BACK' : 'WEAPON CLAIMED', x + 20 * zk, y - 30 * zk, 13 * zk, '255,230,170', al, { s: punch, w: 700 });
+    stkText(A.name.toUpperCase(), x + 20 * zk, y - 4 * zk, 28 * zk, A.col, al, { s: punch, glow: A.col, blur: 16 });
+    stkText(A.short, x + 20 * zk, y + 20 * zk, 10.5 * zk, '239,239,234', al, { w: 500 });
+    stkText(document.body.classList.contains('mouse') ? 'Q swap · K throw · attack while it flies calls it back' : 'Swap to switch · Throw it at a tree', x + 20 * zk, y + 35 * zk, 9 * zk, '190,186,176', al, { w: 500 });
+  }
+}
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
 // v112: first-trip hints, each shown once per save, one at a time when the banner slot is free. Saves that already brought an orb home skip them.
 const TIPS = [
@@ -7621,7 +8111,7 @@ function showDeathCard() {                    // what the dark took, and how far
 }
 document.getElementById('dcGo').addEventListener('click', () => { deathCard.hidden = true; menuBtn.hidden = false; if (S.mode === 'expedition' && S.rg && S.rg.phase === 'dead') { if (S.day) begin('daynew'); else exWake(); } });
 function exWake() {
-  S.rg = exNewRun(); exPlaceHome(); S.msg = null;
+  S.rg = exNewRun(); exPlaceHome(); wpInit(); S.msg = null;
   S.rg.pop = { t: 0, refill: 0 };
   if (XS.grace && XS.orbs === 2 && !XS.wardenDead) {   // killed near the Woodwarden: wake at the lantern by his stones
     const p = S.p; p.x = XS.grace.x; p.y = XS.grace.y; S.cam.x = p.x; S.cam.y = p.y; S.rg.inCamp = false; S.rg.ringMax = 3;
@@ -7716,6 +8206,7 @@ function exDeposit() {
 function exHome() {
   stkCash(true);                          // stepped inside the fence: bank the pack, heal up
   const rg = S.rg;
+  wpHome();
   if (srchOn()) {                          // v135 trial: back inside the fence, the alarm drops and the swarm melts back into the dark
     if (rg.alarm) { rg.safeFx = { t: 0 }; rg.spotFx = null; }
     rg.alarm = false; rg.srGr = 0; rg.susTop = 0; for (const s of rg.srch || []) { s.sus = 0; if (s.st === 'sus') { s.st = 'look'; s.t = 1; } }
@@ -9264,6 +9755,7 @@ function miniWin(m) {                            // the last of them goes to ash
   const chest = B.loot.reduce((a, k) => a + ITEMS[k].val, 0) * (pact('wick') ? 2 : 1);   // v111: his chest is banked on the spot (it never fit a pack, and the Dunes ones couldn't be picked up)
   XS.embers += chest; rg.bankFx = { v: chest, t: 0 }; lifeAdd('embers', chest); lifeAdd('bosses'); lifeTally('bt', B.id);
   m.L.beat = true; exSave();
+  if (B.id === 'woodcutter' && WP_ON && !S.day) rg.wdrop = { id: 'axe', x: u.x, y: u.y, t: 0 };   // v141: his axe stays standing where he fell
   const next = lairCur();
   S.msg = { text: B.title + ' felled', sub: `His chest is banked · his wisps are yours${next ? ' · a new fire burns somewhere out there' : ''}`, t: 0 };
   if (B.dune) duneWin(m);
@@ -11374,8 +11866,10 @@ const CATS = [
 ];
 const POWER_GROUPS = [['Torch', 'Beam'], ['Body', 'Body'], ['Allies', 'Allies'], ['Senses', 'Senses']];
 let campCat = null, campOpen = null;
+Object.assign(ICONS, WP_ICONS); for (const id in ARMS) SHORT['w_' + id] = ARMS[id].short;   // v141
 const svgIcon = id => { const s = el('span', 'ic'); s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] || ''}</svg>`; return s; };
 function campItems(cat) {                    // everything in a category, in one shape for drawing
+  if (cat === 'Weapons') return wpRack();       // v141
   const levelled = (list, own, price, buy, extra) => list.map(t => {
     const have = own[t.id] || 0, cost = price(t), maxed = have >= t.max, locked = !have && t.lock && t.lock();
     return { id: t.id, name: t.name, desc: t.desc, cls: have ? 'own' : '', lvl: locked ? 'Locked · bring your first orb home' : `${have ? t.lvl(have) + ' · ' : ''}upgrade ${have} of ${t.max} · ${extra}`, tag: maxed ? 'MAX' : locked ? 'LOCKED' : String(cost), have, max: t.max,
@@ -11431,7 +11925,8 @@ function renderCamp() {
     };
     w.append(
       tile('ember', 'embers', 'ember upgrades', `${XS.embers} embers`, 'Torch, kit and gear', () => { campCat = 'embers'; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); }),
-      tile('wisp', 'wisp', 'wisp upgrades', `${ST.w} wisps`, 'Hearts, speed and power', () => openStats('camp')));
+      tile('wisp', 'wisp', 'wisp upgrades', `${ST.w} wisps`, 'Hearts, speed and power', () => openStats('camp')),
+      ...(WP_ON ? [tile('rack', 'w_rack', 'weapon rack', `${Object.keys(ARMS).filter(wpOwn).length} of ${Object.keys(ARMS).length} weapons`, 'Pick what you carry', () => { campCat = 'Weapons'; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); })] : []));
     body.replaceChildren(w);
     return;
   }
@@ -11457,7 +11952,7 @@ function renderCamp() {
     return;
   }
   const head = el('div', 'cathead'), back = el('button', 'mini alt', '‹ Back'); back.type = 'button';
-  back.addEventListener('click', () => { campCat = 'embers'; campOpen = null; renderCamp(); });
+  back.addEventListener('click', () => { campCat = campCat === 'Weapons' ? null : 'embers'; campOpen = null; renderCamp(); });
   head.append(back, el('h3', '', (CATS.find(c => c.id === campCat) || {}).nm || campCat));
   const list = el('div', 'items');
   let grp = null;
@@ -11496,6 +11991,10 @@ srchBtn.addEventListener('click', () => {
   srchLabel();
 });
 srchLabel();
+const wpnBtn = document.getElementById('wpnBtn');   // v141 trial switch: boss weapons on or off
+function wpnLabel() { wpnBtn.textContent = 'Weapons: ' + (WP_ON ? 'on (trial)' : 'off'); }
+wpnBtn.addEventListener('click', () => { WP_ON = !WP_ON; try { localStorage.setItem('behind-you-weapons', WP_ON ? 'on' : 'off'); } catch (e) {} if (S && S.rg) S.rg.wax = null; wpnLabel(); });
+wpnLabel();
 const streakBtn = document.getElementById('streakBtn');
 function streakLabel() { streakBtn.textContent = 'Streak: ' + { full: 'full', quiet: 'quiet', off: 'off' }[STK_MODE]; }
 streakBtn.addEventListener('click', () => { STK_MODE = { full: 'quiet', quiet: 'off', off: 'full' }[STK_MODE] || 'full'; try { localStorage.setItem('behind-you-streak', STK_MODE); } catch (e) {} streakLabel(); });
@@ -11544,6 +12043,7 @@ function begin(mode) {
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
   document.getElementById('deathCard').hidden = true;
+  wspecBtn.hidden = wswapBtn.hidden = true; document.body.classList.remove('wp');
   initAudio(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = !S.day; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = true; craftBtn.hidden = true; useBtn.hidden = true; hotbarEl.hidden = true; if (S.day) renderHotbar(); craftEl.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
 }
 document.getElementById('start2').addEventListener('click', () => begin('blink'));
