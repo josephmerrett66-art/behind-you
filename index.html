@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 157</p>
+      <p class="small" id="verLbl">Version 158</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -3996,6 +3996,7 @@ function renderScene() {
   const lights = lightsNear(S.cam.x, S.cam.y, viewR() + 200);
   const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(decorInView(lights), lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : [], S.mode === 'expedition' && S.rg ? S.rg.enemies.concat(exItems()) : []).map(o => ({ o, k: o.x + o.y }));
   items.sort((a, b) => a.k - b.k);
+  if (S.day) drawSunShadows(items);   // v158: the sun's shadows, on the floor before anything stands on it
   for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : it.o.kind === 'searcher' ? drawSearcher(it.o) : drawProp(it.o);
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
@@ -9457,6 +9458,55 @@ function drawPickGuide(px, py) {                 // until you've held sticks and
   ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(tx, ty, 13, 0, 7); ctx.fill();
   if (img) ctx.drawImage(img, tx - 10, ty - 10, 20, 20);
   dayTag(tx, ty - 15, best.t.toUpperCase(), 'rgba(255,240,200,0.95)');
+}
+// ---- v158 (Joe): the sun crosses the sky from east to west, and everything standing throws a shadow away from it. They stretch
+// long to the west at sunrise, pull in short at midday (the sun swings across the far side of the sky, so midday shadows fall towards you where you can see them), and reach long to the east by evening, so the way the
+// shadows lie tells you the time of day. Each tree and rock throws its own true shape (its silhouette laid over on the ground);
+// you, the animals, the raiders and what you build throw a soft column. Drawn onto the floor before anything stands on it.
+function daySun() {                              // { th, L, a } while the sun is up: th the way shadows point, L how long they are
+  const D = S.day, lt = dayLight(); if (lt < 0.04) return null;
+  const f = (D.t % DAY_LEN) / DAY_LEN, u = Math.max(0, Math.min(1, ((f - 0.94 + 1) % 1) / 0.78));   // 0 sunrise, 0.5 noon, 1 sunset
+  return { u, th: Math.PI * (1 - u), L: 0.5 + 1.5 * Math.pow(1 - Math.sin(Math.PI * u), 1.6), a: 0.44 * Math.min(1, lt * 1.6) };
+}
+const sunCv = document.createElement('canvas'), sunCx = sunCv.getContext('2d');   // drawn at screen-point size, not device pixels: a shadow wants no fine detail, and it costs a ninth as much on a phone
+function drawSunShadows(items) {
+  const sun = daySun(); if (!sun) return;
+  const Dx = Math.cos(sun.th) * sun.L, Dy = Math.sin(sun.th) * sun.L * 0.5;   // on the ground, seen from above at our angle
+  let Px = -Math.sin(sun.th), Py = Math.cos(sun.th) * 0.5; const pl = Math.hypot(Px, Py) || 1, pk = Math.max(0.55, pl) / pl; Px *= pk; Py *= pk;
+  const c = sunCx, cw = Math.ceil(W), ch = Math.ceil(H);
+  if (sunCv.width !== cw || sunCv.height !== ch) { sunCv.width = cw; sunCv.height = ch; }
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cw, ch); c.fillStyle = '#000'; c.strokeStyle = '#000'; c.lineCap = 'round';
+  const col = (sx, sy, w, h) => {                // a soft standing column: foot, top, and the body between
+    const tx = sx + Dx * h, ty = sy + Dy * h;
+    c.beginPath(); c.ellipse(sx, sy, w, w * 0.5, 0, 0, 7); c.fill();
+    c.lineWidth = w * 1.5; c.beginPath(); c.moveTo(sx, sy); c.lineTo(tx, ty); c.stroke();
+    c.beginPath(); c.ellipse(tx, ty, w * 0.85, w * 0.55, 0, 0, 7); c.fill();
+  };
+  const slab = (x0, y0, x1, y1, h) => {          // a wall: its top edge laid down along the ground
+    const [ax, ay] = toScreen(x0, y0), [bx, by] = toScreen(x1, y1);
+    c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.lineTo(bx + Dx * h, by + Dy * h); c.lineTo(ax + Dx * h, ay + Dy * h); c.closePath(); c.fill();
+  };
+  const sil = (kind, v, sx, sy, s) => {          // the thing's own silhouette, laid over away from the sun
+    const spr = sprite(kind, v, 1), k = s / SPR;
+    c.save(); c.transform(Px * k, Py * k, -Dx * k, -Dy * k, sx, sy); c.drawImage(spr.mk, -spr.ax * SPR, -spr.ay * SPR); c.restore();
+  };
+  const R = 260 * Z;
+  for (const { o } of items) {
+    if (o.dead || o.gone) continue;
+    const [sx, sy] = toScreen(o.x, o.y);
+    if (sx < -R || sx > W + R || sy < -R * 0.5 || sy > H + R * 0.5) continue;
+    if (o.kind === 'tree') { const kind = o.type === 'pine' || o.type === 'oak' || o.type === 'cherry' ? o.type : 'dead'; sil(kind, (o.seed * 997 | 0) % SPRITE_KINDS[kind][0], sx, sy, o.s * Z); }
+    else if (o.kind === 'rock') sil('rock', (hash(o.x * 0.37, o.y * 0.91) * 50 | 0) % SPRITE_KINDS.rock[0], sx, sy, o.s * Z * 0.95);
+    else if (o.kind === 'post') sil('post', (hash(o.x * 0.53, o.y * 0.29) * 50 | 0) % SPRITE_KINDS.post[0], sx, sy, Z);
+    else if (o.kind === 'shade' || o.kind === 'searcher') col(sx, sy, 5 * Z, ((FOES[o.type] || {}).h || 38) * Z);
+    else if (o.kind === 'beast') col(sx, sy, BEAST[o.k].w * 0.45 * Z, BEAST[o.k].h * 0.8 * Z);
+    else if (o.kind === 'dst' && (o.k === 'wall' || o.k === 'door' || o.k === 'window') && (o.done || o.put)) { const ux = Math.cos(o.a) * GRID / 2, uy = Math.sin(o.a) * GRID / 2; slab(o.x - ux, o.y - uy, o.x + ux, o.y + uy, (o.k === 'window' ? 30 : 36) * Z * (o.done ? 1 : 0.4)); }
+    else if (o.kind === 'dbuild') col(sx, sy, (o.sub === 'signal' ? 18 : o.sub === 'chest' || o.sub === 'bench' ? 10 : 5) * Z, (o.sub === 'signal' ? 60 : o.sub === 'tpost' ? 46 : o.sub === 'effigy' ? 44 : o.sub === 'furnace' ? 30 : 16) * Z);
+    else if (o.kind === 'dcamp' && (o.sub === 'stake' || o.sub === 'relic' || o.sub === 'tent')) col(sx, sy, (o.sub === 'tent' ? 12 : 4) * Z, (o.sub === 'relic' ? 70 : o.sub === 'tent' ? 26 : 38) * Z);
+    else if (o.camp) col(sx, sy, 5 * Z, 26 * Z);
+  }
+  { const [px, py] = toScreen(S.p.x, S.p.y); col(px, py, 5.5 * Z, 34 * Z); }   // you
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = sun.a; ctx.imageSmoothingEnabled = true; ctx.drawImage(sunCv, 0, 0, W * DPR, H * DPR); ctx.restore();
 }
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
