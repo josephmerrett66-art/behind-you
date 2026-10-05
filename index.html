@@ -419,7 +419,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 145</p>
+      <p class="small" id="verLbl">Version 146</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -8187,7 +8187,7 @@ function wpHit(D, a) {                            // the blow goes through atkHi
   const rg = S.rg, p = S.p, A = p.atk, w = A ? A.w : curW();
   if (D.proj) return wpShoot(D, a);
   const trip = rg.wtrip ? 3 : 1, back = w === 'knife' && rg.wvan, k = (A && A.k || 1) * trip;
-  const D2 = Object.assign({ wpn: 1 }, D, { dmg: D.dmg * k, boss: D.boss * k, kh: D.kh || 'swing' });
+  const D2 = Object.assign({ wpn: 1 }, D, { dmg: D.dmg * k * wjPow(w), boss: D.boss * k * wjPow(w), kh: D.kh || 'swing' }); wjFeel(w, D2);   // v146: power climbs boss by boss, and the weight goes into the feel
   if (back) Object.assign(D2, { dmg: 99, boss: D.boss * 3, kh: 'backstab' });   // out of nowhere: a backstab kills anything that isn't a boss
   const n = atkHit(D2, a) || 0;
   const hit = n ? rg.enemies.filter(o => o.kHitT === S.t && o.kHit === D2.kh) : [];
@@ -8195,6 +8195,7 @@ function wpHit(D, a) {                            // the blow goes through atkHi
   if (back && n) wpBackstab();
   if (D.charge) return n;
   (WHIT[w] || WHIT.axe)(D, n, a, hit);
+  if (WJ[w]) wjHit(w, D2, n, a, hit);   // v146
   if (D.fin && n) wpFinish(D, a);
   return n;
 }
@@ -8280,6 +8281,141 @@ const WHIT = {                                    // each weapon's impact: what 
     if (n > 2) wpPop('×' + n, p.x + Math.cos(a) * 60, p.y + Math.sin(a) * 60, 40, '255,245,210', 0.8);
   },
 };
+// ---- v146: weight and power. Every boss weapon hits as hard as it looks, and each boss's weapon outclasses the last one's ----
+// power climbs with the boss you took it from (woodcutter first, the Mirage last); the feel multipliers bring every weapon up to the axe's weight
+const WPOW = { torch: 1, axe: 1, hook: 1.12, twin: 1.25, knife: 1.38, club: 1.5, glaive: 1.65, fists: 1.8, lance: 2 };
+const WJ = { hook: [1.5, 1.7, 1.6], twin: [1.6, 2.2, 1.6], knife: [1.6, 1.9, 1.8], club: [1.25, 1.35, 1.3], glaive: [1.6, 1.7, 1.5], fists: [1.7, 1.8, 1.6], lance: [1.7, 1.9, 1.7] };   // shake, hit-stop, camera kick
+const wjPow = w => WPOW[w] || 1;
+function wjFeel(w, D2) {                          // the weapon's weight goes into the blow's shake, freeze and kick
+  const J = WJ[w]; if (!J) return;
+  const f = D2.fin ? 1.15 : 1;
+  D2.shake = Math.min(0.95, (D2.shake || 0) * J[0] * f); D2.stop = Math.min(0.22, (D2.stop || 0) * J[1] * f); D2.kick = (D2.kick || 0) * J[2];
+}
+function wjSpray(o, a, rgb, n, sp = 1) {         // hot sparks thrown out the far side of whatever you hit, in the weapon's colour
+  const rg = S.rg; rg.wsparks = rg.wsparks || []; const h = (FOES[o.type] ? FOES[o.type].h : 30) * (o.k || 1);
+  for (let k = 0; k < n; k++) { const b = a + (Math.random() - 0.5) * 1.3, v = (160 + Math.random() * 260) * sp; rg.wsparks.push({ x: o.x, y: o.y, z: h * (0.35 + Math.random() * 0.35), vx: Math.cos(b) * v, vy: Math.sin(b) * v, vz: 30 + Math.random() * 140, life: 0.18 + Math.random() * 0.22, max: 0.4, col: Math.random() < 0.35 ? '255,255,245' : rgb }); }
+  if (rg.wsparks.length > 420) rg.wsparks.splice(0, rg.wsparks.length - 420);
+}
+function wjMark(o, a, rgb, len = 26, life = 0.16, w = 1) {   // the cut itself, slashed across the body for a blink
+  const rg = S.rg; (rg.wmarks = rg.wmarks || []).push({ x: o.x, y: o.y, h: (FOES[o.type] ? FOES[o.type].h : 30) * (o.k || 1) * 0.55, a, len, col: rgb, t: 0, life, w });
+}
+function wjLine(x0, y0, x1, y1, rgb, life, w, burn) {   // a line of light left hanging in the air (burn: it hurts what walks through it)
+  (S.rg.wlines = S.rg.wlines || []).push({ x0, y0, x1, y1, col: rgb, t: 0, life, w, burn, hit: new Set() });
+}
+function wjFlash(rgb, k = 0.2) { S.rg.wflash = { t: 0, col: rgb, k }; }
+function wjBody(weight, pitch = 1) {             // the meat of the hit: a deep thump under the weapon's own sound
+  if (!actx) return; const t = actx.currentTime;
+  boomAt(t, 120 * pitch, 38, 0.12 + 0.1 * weight, 0.35 + 0.4 * weight, sfxGain); noiseAt(t, 3400, 900, 0.05, 0.16 + 0.14 * weight, sfxGain);
+}
+function wjHit(w, D, n, a, hit) {
+  const rg = S.rg, p = S.p, W = ARMS[w], side = p.atk ? p.atk.side : 1, col = W.trail[0], hot = W.trail[1], pw = wjPow(w);
+  const thrust = D.thrust, big = !!(D.fin || D.upper || D.slam);
+  for (const o of hit) {
+    wjSpray(o, a, col, big ? 16 : 8, big ? 1.3 : 1);
+    wjMark(o, thrust ? a : a + side * 1.25, hot, big ? 38 : 26, big ? 0.24 : 0.15, big ? 1.5 : 1);
+  }
+  if (n) { wjBody(big ? 1 : 0.45, w === 'knife' || w === 'lance' ? 1.4 : w === 'club' || w === 'fists' ? 0.8 : 1); if (big) { wjFlash(col, 0.09 + 0.03 * pw); rg.blasts.push({ x: p.x + Math.cos(a) * (D.reach || 60) * 0.6, y: p.y + Math.sin(a) * (D.reach || 60) * 0.6, t: 0, life: 0.22, r: 70, col: 'white' }); } }
+  if (w === 'hook') {                             // the lantern spills: what it touches catches fire
+    for (const o of hit) { o.wburn = Math.max(o.wburn || 0, D.yank ? 2.4 : 1.6); o.wburnK = pw; wpEmbers(o.x, o.y, 26, 8, '255,150,60'); }
+    if (D.yank) for (const o of hit) if (o.wyank) o.wyank.hook = 1;   // they land at your feet with a thump
+    if (n) for (let k = 0; k < 10; k++) { const b = a + side * (0.6 - k * 0.14); rg.embers.push({ x: p.x + Math.cos(b) * (D.reach || 90) * 0.8, y: p.y + Math.sin(b) * (D.reach || 90) * 0.8, z: 20, vx: (Math.random() - 0.5) * 50, vy: (Math.random() - 0.5) * 50, vz: -10, life: 0.4 + Math.random() * 0.3, ember: true }); }   // a shower of lantern sparks along the arc
+  }
+  if (w === 'twin' && !D.proj) {                  // a hard white line straight through: the spear goes in and out
+    const L = D.reach || 92; wjLine(p.x + Math.cos(a) * 10, p.y + Math.sin(a) * 10, p.x + Math.cos(a) * L, p.y + Math.sin(a) * L, '250,255,220', D.fin ? 0.22 : 0.1, D.fin ? 4 : 2);
+    if (D.fin) for (const o of hit) if (o.type !== 'tall') { o.x += Math.cos(a) * 34; o.y += Math.sin(a) * 34; o.frozen = Math.max(o.frozen || 0, 0.6); wjMark(o, a, '255,255,255', 54, 0.3, 2); }   // skewered and shoved down the shaft
+    if (D.land && n) { wjFlash('200,230,110', 0.15); wpCrack(p.x, p.y, a, 40, 0); }
+  }
+  if (w === 'knife') {                            // a crossed cut on each one, and they bleed
+    for (const o of hit) { wjMark(o, a - side * 1.25, '255,255,255', 22, 0.14); o.wbleed = Math.min(4, (o.wbleed || 0) + 1); o.wbleedT = 2.2; o.wbleedK = pw; }
+    if (D.fin && n) { for (let k = 0; k < 8; k++) { const b = k / 8 * Math.PI * 2; wjLine(p.x + Math.cos(b) * 14, p.y + Math.sin(b) * 14, p.x + Math.cos(b + 0.7) * 64, p.y + Math.sin(b + 0.7) * 64, '220,255,210', 0.22, 2.5); } wpRing(p.x, p.y, 70, '200,255,190', 0.4); }
+  }
+  if (w === 'club') for (const o of hit) if (o.wfly > 0) { o.wbowl = new Set([o]); o.wbowlK = pw * (D.fin ? 1.6 : 1); }   // whatever goes flying bowls over the rest
+  if (w === 'club' && n) { wpRing(p.x + Math.cos(a) * 50, p.y + Math.sin(a) * 50, 60 + (D.fin ? 50 : 0), '170,220,120', 0.4); for (let f = 0.4; f <= 1; f += 0.3) wpChips(p.x + Math.cos(a) * (D.reach || 90) * f, p.y + Math.sin(a) * (D.reach || 90) * f, 4, 'leaf', 3); if (D.fin) { wjFlash('190,240,140', 0.22); if (actx) { const t = actx.currentTime; boomAt(t, 300, 120, 0.06, 0.6, sfxGain); toneAt(t, 900, 0.18, 0.05, 'square', sfxGain); } } }
+  if (w === 'glaive') {                           // the deeper into the dance, the bigger it rings out
+    const b = rg.wbeat || 0;
+    if (n) { wpRing(p.x, p.y, 50 + 22 * b, b >= 3 ? '255,240,170' : '255,205,80', 0.32 + 0.05 * b); if (b >= 3) wjFlash('255,215,100', 0.12 + 0.03 * b); }
+    if (D.fin && n) (rg.wdevils = rg.wdevils || []).push({ x: p.x, y: p.y, t: 0, life: 1.4 + 0.2 * b, r: 74 + 8 * b, tick: 0, k: pw * (1 + 0.25 * b) });   // the whirlwind leaves a dust devil spinning where you stood
+  }
+  if (w === 'fists') {                            // every punch lands with a shockwave off the knuckles
+    const fx = p.x + Math.cos(a) * (D.reach || 56) * 0.8, fy = p.y + Math.sin(a) * (D.reach || 56) * 0.8;
+    if (n) wpRing(fx, fy, D.upper ? 80 : 30, '255,230,190', D.upper ? 0.4 : 0.2);
+    if (D.upper && n) { wpCrack(fx, fy, a, 46, 1); wpCrack(fx, fy, a + 2.2, 34, 0); wpCrack(fx, fy, a - 2.2, 34, 0); for (const o of hit) { wpEmbers(o.x, o.y, 60, 14, '255,200,120'); o.wlift = { t: 0 }; } if (actx) { const t = actx.currentTime; boomAt(t + 0.02, 70, 26, 0.45, 0.8, sfxGain); } }
+  }
+  if (w === 'lance') {                            // the thrust leaves its line of light hanging, and it burns
+    const L = D.reach || 150; wjLine(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, p.x + Math.cos(a) * L, p.y + Math.sin(a) * L, '255,248,215', D.fin ? 0.5 : 0.32, D.fin ? 5 : 3, 0.45 * pw);
+    if (D.fin) {                                  // PIERCE: the light runs on past the point, and bursts where it ends
+      const L2 = L + 190, ex = p.x + Math.cos(a) * L2, ey = p.y + Math.sin(a) * L2, set = new Set(hit);
+      wjLine(p.x + Math.cos(a) * L, p.y + Math.sin(a) * L, ex, ey, '255,255,240', 0.45, 4, 0.6 * pw);
+      for (let f = L; f <= L2; f += 30) wpHitAt(p.x + Math.cos(a) * f, p.y + Math.sin(a) * f, 22, 1.2, 1.6, 20, set, 'lunge', p.x, p.y);
+      rg.blasts.push({ x: ex, y: ey, t: 0, life: 0.35, r: 80, col: 'white' }); wpRing(ex, ey, 70, '255,245,210', 0.4); wjFlash('255,250,225', 0.22);
+      if (actx) { const t = actx.currentTime; toneAt(t, 1320, 0.5, 0.05, 'sine', sfxGain); toneAt(t + 0.05, 1980, 0.5, 0.04, 'sine', sfxGain); noiseAt(t + 0.1, 5000, 800, 0.3, 0.4, sfxGain); boomAt(t + 0.1, 110, 40, 0.3, 0.6, sfxGain); }
+    }
+  }
+}
+function wjTick(dt) {
+  const rg = S.rg; if (!rg) return;
+  if (rg.wsparks) { for (const s of rg.wsparks) { s.vz -= 520 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z = Math.max(0, s.z + s.vz * dt); s.vx *= 1 - 3 * dt; s.vy *= 1 - 3 * dt; s.life -= dt; } rg.wsparks = rg.wsparks.filter(s => s.life > 0); }
+  if (rg.wmarks) { for (const k of rg.wmarks) k.t += dt; rg.wmarks = rg.wmarks.filter(k => k.t < k.life); }
+  if (rg.wflash && (rg.wflash.t += dt) > 0.18) rg.wflash = null;
+  if (rg.wlines) {
+    for (const L of rg.wlines) {
+      L.t += dt; if (!L.burn) continue;
+      const dx = L.x1 - L.x0, dy = L.y1 - L.y0, len = Math.hypot(dx, dy) || 1;
+      for (const o of rg.enemies) {
+        if (o.dead || L.hit.has(o)) continue;
+        const u = Math.max(0, Math.min(1, ((o.x - L.x0) * dx + (o.y - L.y0) * dy) / (len * len))), d = Math.hypot(L.x0 + dx * u - o.x, L.y0 + dy * u - o.y);
+        if (d < 10 + (FOES[o.type] ? FOES[o.type].w : 12) * 0.5) { L.hit.add(o); o.hp -= L.burn; o.jit = 1; o.kHit = 'lunge'; o.kHitT = S.t; wjSpray(o, Math.atan2(dy, dx), L.col, 6); wjMark(o, Math.atan2(dy, dx), '255,255,255', 30, 0.14); stkTouch(); }
+      }
+    }
+    rg.wlines = rg.wlines.filter(L => L.t < L.life);
+  }
+  if (rg.wdevils) {                               // the dust devil: it spins, drifts a little, cuts what's in it
+    for (const v of rg.wdevils) {
+      v.t += dt; v.tick -= dt; v.x += Math.cos(S.t * 1.7 + v.r) * 30 * dt; v.y += Math.sin(S.t * 1.3 + v.r) * 30 * dt;
+      if (Math.random() < dt * 40) { const b = Math.random() * 7; rg.ash.push({ x: v.x + Math.cos(b) * v.r * 0.6, y: v.y + Math.sin(b) * v.r * 0.6, z: 2 + Math.random() * 30, vx: -Math.sin(b) * 160, vy: Math.cos(b) * 160, vz: 40 + Math.random() * 60, life: 0.5 }); }
+      if (v.tick <= 0) { v.tick = 0.22; let n = 0; for (const o of rg.enemies) if (!o.dead && Math.hypot(o.x - v.x, o.y - v.y) < v.r) { o.hp -= 0.32 * v.k; o.jit = 1; o.kHit = 'whirlwind'; o.kHitT = S.t; n++; const b = Math.atan2(o.y - v.y, o.x - v.x) + 1.3; o.x += Math.cos(b) * 10; o.y += Math.sin(b) * 10; if (Math.random() < 0.5) wjSpray(o, b, '255,210,90', 3); } if (n) stkTouch(); if (actx && n) noiseAt(actx.currentTime, 4000, 1600, 0.06, 0.12, sfxGain); }
+    }
+    rg.wdevils = rg.wdevils.filter(v => v.t < v.life);
+  }
+  for (const e of rg.enemies) {
+    if (e.dead) continue;
+    if (e.wburn > 0) { e.wburn -= dt; e.hp -= 0.42 * (e.wburnK || 1) * dt; e.jit = Math.max(e.jit || 0, 0.3); if (Math.random() < dt * 14) wpEmbers(e.x, e.y, 30, 1, '255,150,60'); }
+    if (e.wbleedT > 0) { e.wbleedT -= dt; e.hp -= 0.16 * e.wbleed * (e.wbleedK || 1) * dt; if (Math.random() < dt * 6 * e.wbleed) wjSpray(e, Math.random() * 7, '200,40,30', 1, 0.3); if (e.wbleedT <= 0) e.wbleed = 0; }
+    if (e.wyank && e.wyank.hook && e.wyank.t >= 1) { /* landed below */ }
+    if (e.wlift) { e.wlift.t += dt; if (e.wlift.t > 0.55) { e.wlift = null; wpRing(e.x, e.y, 46, '255,220,170', 0.3); ashBurst(e.x, e.y, 8, 6); addShake(0.12); for (const o of rg.enemies) if (o !== e && !o.dead && Math.hypot(o.x - e.x, o.y - e.y) < 46) { o.hp -= 0.6 * wjPow('fists'); o.jit = 1; o.kHit = 'uppercut'; o.kHitT = S.t; } if (actx) boomAt(actx.currentTime, 100, 35, 0.18, 0.5, sfxGain); } }   // it comes back down hard
+    if (e.wbowl && e.wfly > 0) for (const o of rg.enemies) {
+      if (o.dead || e.wbowl.has(o) || Math.hypot(o.x - e.x, o.y - e.y) > 12 + (FOES[o.type] ? FOES[o.type].w : 12) * 0.6) continue;
+      e.wbowl.add(o); o.hp -= 0.7 * e.wbowlK; o.jit = 1; o.kHit = 'homerun'; o.kHitT = S.t; stkTouch();
+      if (o.type !== 'tall' && o.type !== 'brute') { const s = Math.hypot(e.pvx || 0, e.pvy || 0) || 1; o.popT = 0.35; o.pvx = (e.pvx || 0) * 0.6 + (Math.random() - 0.5) * 120; o.pvy = (e.pvy || 0) * 0.6 + (Math.random() - 0.5) * 120; o.wfly = 0.35; o.wbowl = e.wbowl; o.wbowlK = e.wbowlK * 0.8; }
+      wjSpray(o, Math.atan2(e.pvy || 0, e.pvx || 0), '170,220,120', 8); addShake(0.14); hitStop(0.025);
+      if (actx) { const t = actx.currentTime; boomAt(t, 140, 50, 0.12, 0.55, sfxGain); noiseAt(t, 1600, 400, 0.08, 0.3, sfxGain); }
+    }
+    if (e.wfly <= 0 && e.wbowl) e.wbowl = null;
+  }
+}
+function drawWj() {
+  const rg = S.rg; if (!rg) return;
+  ctx.save(); ctx.lineCap = 'round'; ctx.globalCompositeOperation = 'lighter';
+  if (rg.wdevils) for (const v of rg.wdevils) {   // a spinning column of gold-lit sand
+    const u = v.t / v.life, a = Math.min(1, v.t / 0.15) * (1 - u * u), [x, y] = toScreen(v.x, v.y);
+    for (let k = 0; k < 5; k++) { const h = k * 12 * Z, r = v.r * Z * (0.55 + 0.12 * k), sp = S.t * (9 - k) + k; ctx.strokeStyle = `rgba(255,${200 + k * 8},${90 + k * 20},${0.32 * a})`; ctx.lineWidth = (3.4 - k * 0.4) * Z; ctx.beginPath(); ctx.ellipse(x, y - h, r, r * 0.4, 0, sp, sp + 4); ctx.stroke(); }
+  }
+  if (rg.wlines) for (const L of rg.wlines) {
+    const u = L.t / L.life, a = 1 - u, [x0, y0] = toScreen(L.x0, L.y0), [x1, y1] = toScreen(L.x1, L.y1), lift = 16 * Z;
+    for (const [w, al] of [[L.w * 4, 0.18], [L.w * 1.8, 0.45], [L.w * 0.7, 0.95]]) { ctx.strokeStyle = al > 0.9 ? `rgba(255,255,255,${al * a})` : `rgba(${L.col},${al * a})`; ctx.lineWidth = Math.max(1, w * Z * (1 - 0.4 * u)); ctx.beginPath(); ctx.moveTo(x0, y0 - lift); ctx.lineTo(x1, y1 - lift); ctx.stroke(); }
+  }
+  if (rg.wmarks) for (const k of rg.wmarks) {     // the cut: a bright line across the body that snaps open then thins
+    const u = k.t / k.life, [x, y0] = toScreen(k.x, k.y), y = y0 - k.h * Z, sa = k.a, L = k.len * Z * (0.6 + 0.6 * Math.min(1, u * 4)), dx = Math.cos(sa) * L / 2, dy = Math.sin(sa) * L / 2 * 0.7;
+    ctx.strokeStyle = `rgba(${k.col},${0.75 * (1 - u)})`; ctx.lineWidth = 5 * k.w * Z * (1 - u); ctx.beginPath(); ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${1 - u})`; ctx.lineWidth = 1.8 * k.w * Z * (1 - u * 0.5); ctx.beginPath(); ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy); ctx.stroke();
+  }
+  if (rg.wsparks) for (const s of rg.wsparks) {   // streaks, not dots: they read as speed
+    const [x, y0] = toScreen(s.x, s.y), y = y0 - s.z * Z, [x2, y2b] = toScreen(s.x - s.vx * 0.025, s.y - s.vy * 0.025), y2 = y2b - (s.z - s.vz * 0.025) * Z, a = Math.min(1, s.life / 0.15);
+    ctx.strokeStyle = `rgba(${s.col},${a})`; ctx.lineWidth = 1.6 * Z; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+  ctx.restore();
+  if (rg.wflash) { const u = rg.wflash.t / 0.18; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(${rg.wflash.col},${rg.wflash.k * (1 - u)})`; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); }
+}
 function wpEmbers(x, y, h, n, rgb) {
   const rg = S.rg;
   for (let k = 0; k < n; k++) { const b = Math.random() * 7, v = 60 + Math.random() * 140; rg.embers.push({ x, y, z: h * (0.4 + Math.random() * 0.6), vx: Math.cos(b) * v, vy: Math.sin(b) * v, vz: 40 + Math.random() * 100, life: 0.2 + Math.random() * 0.25, ember: true }); }
@@ -8291,7 +8427,7 @@ function wpSpark(x, y, h, n = 9) {
   rg.blasts.push({ x, y, t: 0, life: 0.16, r: 30, col: 'white' });
 }
 function wpHitAt(x, y, r, dmg, bdmg, knock, set, kh, ox, oy) {
-  const rg = S.rg, mult = (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')); let n = 0;
+  const rg = S.rg, mult = (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')) * wjPow(curW()); let n = 0;   // v146: specials scale with the weapon too
   const push = (o, k) => { const dx = o.x - ox, dy = o.y - oy, d = Math.hypot(dx, dy) || 1; o.x += dx / d * k; o.y += dy / d * k; };
   for (const o of rg.enemies) {
     const f = FOES[o.type]; if (o.dead || set.has(o) || Math.hypot(o.x - x, o.y - y) > r + (f ? f.w : 12) * 0.5) continue;
@@ -8705,6 +8841,7 @@ function wpTick(dt) {
     const want = screenSpeed(p) > 40 ? 'bow' : 'spear';
     if (want !== rg.wst) { rg.wstT = (rg.wstT || 0) + dt; if (rg.wstT > 0.1 || !rg.wst) { rg.wst = want; rg.wstT = 0; if (actx) toneAt(actx.currentTime, want === 'bow' ? 520 : 390, 0.06, 0.02, 'triangle', sfxGain); } } else rg.wstT = 0;
   }
+  wjTick(dt);   // v146
   if (rg.wax) wpAxeStep(dt);
   if (rg.worb) wpOrbitStep(dt);
   if (rg.warrows) wpArrowStep(dt);
@@ -8725,7 +8862,7 @@ function wpTick(dt) {
   }
   if (rg.wdecoys) { for (const c of rg.wdecoys) { c.t += dt; c.flash = Math.max(0, (c.flash || 0) - dt * 4); for (const e of rg.enemies) if (!e.dead && Math.abs(e.x - c.x) < 18 && Math.hypot(e.x - c.x, e.y - c.y) < 16) c.t += dt * 2; if (c.t >= c.life) { wpEmbers(c.x, c.y, 30, 12, '255,245,210'); if (actx) toneAt(actx.currentTime, 3520, 0.15, 0.02, 'sine', sfxGain); } } rg.wdecoys = rg.wdecoys.filter(c => c.t < c.life); }
   for (const e of rg.enemies) {
-    if (e.wyank) { const Y = e.wyank; Y.t += dt / 0.16; const u = Math.min(1, Y.t), f = 1 - (1 - u) * (1 - u); e.x = Y.x0 + (Y.x1 - Y.x0) * f; e.y = Y.y0 + (Y.y1 - Y.y0) * f; if (u >= 1) { e.wyank = null; dustKick(e.x, e.y, 0, 4, 50); } }
+    if (e.wyank) { const Y = e.wyank; Y.t += dt / 0.16; const u = Math.min(1, Y.t), f = 1 - (1 - u) * (1 - u); e.x = Y.x0 + (Y.x1 - Y.x0) * f; e.y = Y.y0 + (Y.y1 - Y.y0) * f; if (u >= 1) { if (e.wyank.hook) { wpRing(e.x, e.y, 40, '255,170,70', 0.3); ashBurst(e.x, e.y, 8, 6); addShake(0.22); hitStop(0.04); if (actx) boomAt(actx.currentTime, 110, 40, 0.16, 0.6, sfxGain); } e.wyank = null; dustKick(e.x, e.y, 0, 4, 50); } }
     if (e.wfly > 0) { e.wfly -= dt; if (Math.random() < 0.5) dustKick(e.x, e.y, Math.atan2(e.pvy || 0, e.pvx || 0), 1, 40); }
   }
   if (rg.wfall) { for (const g of rg.wfall) if (g.fall < 1) { g.fall = Math.min(1, g.fall + dt * (0.45 + g.fall * 2.8)); if (g.fall >= 1) wpCrash(g); } rg.wfall = rg.wfall.filter(g => g.fall < 1); }
@@ -9007,6 +9144,7 @@ function drawWpFx() {
     stkText(A.short, x + 20 * zk, y + 20 * zk, 10.5 * zk, '239,239,234', al, { w: 500 });
     stkText(document.body.classList.contains('mouse') ? A.hint : (A.phone || 'Swap to switch'), x + 20 * zk, y + 35 * zk, 9 * zk, '190,186,176', al, { w: 500 });
   }
+  drawWj();   // v146
 }
 function exPlaceHome() { const p = S.p; p.x = -40; p.y = 60; p.vx = p.vy = 0; S.cam.x = p.x; S.cam.y = p.y; }
 // v112: first-trip hints, each shown once per save, one at a time when the banner slot is free. Saves that already brought an orb home skip them.
