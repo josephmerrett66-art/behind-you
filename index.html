@@ -419,7 +419,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 141</p>
+      <p class="small" id="verLbl">Version 142</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1477,6 +1477,22 @@ const ROLL_T = 0.32, ROLL_DIST = 100, ROLL_SAFE = 0.26, ROLL_COOL = 0.85;   // L
 const DODGE_CH_T = 1.6, DODGE_OIL = 4;          // seconds to refill one charge; oil burnt by a roll with no charge left
 const dodgeMax = () => 2 + (lv('feet') > 1 ? 1 : 0);   // Light Feet 2: a third ring
 const dodgeRefill = () => DODGE_CH_T * (1 - 0.18 * lv('feet')) * (1 - 0.08 * sr('nimble'));
+// v142: the dodge is a real forward roll. The torch goes over with you (down at the floor, behind you, up at the sky, forward again)
+// and nothing burns while you tumble: that's the price of the roll.
+function rollU() { const p = S.p; return isRg() && p && p.roll > 0 ? Math.min(1, 1 - p.roll / ROLL_T) : -1; }
+function rollTurn(u) { return 2 * Math.PI * (0.35 * u + 0.65 * (1 - (1 - u) * (1 - u))); }   // quick as you dive in, easing as you come up
+function rollBeam() {                            // where the tumbling torch's light lands right now
+  const u = rollU(); if (u < 0) return null;
+  const p = S.p, th = rollTurn(u), f = Math.cos(S.aimW - p.rollA), s = Math.sin(S.aimW - p.rollA);   // the torch splits into along the roll (turns over) and across it (stays put)
+  const al = f * Math.cos(th), dn = f * Math.sin(th), hz = Math.hypot(al, s), gw = p.rollA + Math.atan2(s, al);
+  const [x0, y0] = toScreen(p.x, p.y), [x1, y1] = toScreen(p.x + Math.cos(gw) * 10, p.y + Math.sin(gw) * 10);
+  return { ang: Math.atan2(y1 - y0, x1 - x0), len: dn >= 0 ? 0.1 + 0.9 * hz ** 4 : 0.1 + 0.9 * hz * hz, al: dn >= 0 ? 1 : hz ** 3, pool: Math.max(0, dn) };   // down: a pool at your feet; up: lost in the sky
+}
+function rollLand(p) {                           // you come up out of the roll in a scuff of dust
+  if (S.rg && S.rg.ash) for (let i = 0; i < 8; i++) { const a = p.rollA + (Math.random() - 0.5) * 2.4, v = 25 + Math.random() * 50; S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 10 + Math.random() * 25, life: 0.35 + Math.random() * 0.25 }); }
+  addShake(0.07);
+  if (actx && noiseBuf) noiseAt(actx.currentTime, 420, 110, 0.14, 0.32, sfxGain);
+}
 function dodge() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall) return;
   const p = S.p; if ((p.roll || 0) > 0) return;
@@ -1495,7 +1511,7 @@ function dodge() {
   if (mv > 15) a = Math.atan2(p.vy, p.vx);
   else { const [wx, wy] = screenDirToWorld(-Math.cos(S.aim), -Math.sin(S.aim)); a = Math.atan2(wy, wx); }   // backstep
   p.atk = null;                                   // a roll cancels a swing, like Hades' dash
-  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollBack = mv <= 15; p.ghosts = []; lifeAdd('rolls');
+  p.rollA = a; p.roll = ROLL_T; p.rollSafe = ROLL_SAFE; p.rollBack = mv <= 15; p.ghosts = []; p.rollThud = 0; lifeAdd('rolls');
   if (isEx() && !S.day) {
     if (burn) { if (!S.rg.inCamp) S.rg.oil -= DODGE_OIL; p.oilPuff = S.t; for (let i = 0; i < 8; i++) S.rg.ash.push({ x: p.x, y: p.y, z: 6, vx: (Math.random() - 0.5) * 70, vy: (Math.random() - 0.5) * 70, vz: 30 + Math.random() * 40, life: 0.5 + Math.random() * 0.3, t: 0 }); }
     else p.dch -= 1;
@@ -1698,12 +1714,13 @@ function update(dt) {
     const u = 1 - p.roll / ROLL_T, v = ROLL_DIST / ROLL_T * 2 * (1 - u);
     p.vx = Math.cos(p.rollA) * v; p.vy = Math.sin(p.rollA) * v;
     p.roll -= dt; p.rollSafe -= dt;
-    if (p.ghosts) { p.ghosts.push({ x: p.x, y: p.y, a: 0.45 }); if (p.ghosts.length > 5) p.ghosts.shift(); }
+    if (p.ghosts) { p.ghosts.push({ x: p.x, y: p.y, a: 0.45, u: 1 - p.roll / ROLL_T }); if (p.ghosts.length > 5) p.ghosts.shift(); }
     if (isRg() && S.rg && lv('feet') && (p.trailT = (p.trailT || 0) - dt) <= 0) {   // Light Feet: burning light where you rolled
       const ex = isEx(), life = ex ? 3 + 0.5 * lv('feet') : 1.2 + 0.5 * lv('feet');   // Expedition: a long streak of burning light; at 3 it freezes
       p.trailT = 0.05; S.rg.fires.push({ x: p.x, y: p.y, r: ex ? 24 : 20, life, max: life, seed: Math.random() * 9, freeze: ex && lv('feet') > 2 });
     }
-    if (p.roll <= 0) { p.vx *= 0.3; p.vy *= 0.3; p.rollEnd = 0.16; }   // a moment after a roll still counts for the dash strike
+    if (!p.rollThud && p.roll < ROLL_T * 0.55) { p.rollThud = 1; if (actx && noiseBuf) noiseAt(actx.currentTime, 300, 120, 0.09, 0.2, sfxGain); }   // v142: shoulders hit the ground
+    if (p.roll <= 0) { p.vx *= 0.3; p.vy *= 0.3; p.rollEnd = 0.16; rollLand(p); }   // a moment after a roll still counts for the dash strike
   }
   if (p.ghosts) { for (const g of p.ghosts) g.a -= dt * 2.2; p.ghosts = p.ghosts.filter(g => g.a > 0); }
   if (isRg() && S.rg) { atkStep(dt); slashStep(dt); }
@@ -3224,14 +3241,20 @@ const KITC = { jacket: mat(0.95, 1.2, 0.72, 1.7), pants: mat(1.3, 1.18, 0.88, 1.
   skin: mat(1.5, 1.12, 0.9, 1.9), scarf: mat(2.0, 0.72, 0.52, 1.6), hat: mat(1.12, 1.15, 0.8, 1.55), hair: mat(1.35, 1.0, 0.75, 1.1) };   // v124: the survivor's kit in colour
 function drawPlayer() {
   const p = S.p, [bx, by0] = toScreen(p.x, p.y), by = by0 - (p.hopZ || 0) * Z;   // up off the ground mid-leap
-  const AP0 = isRg() ? atkPose(p) : null, a = S.aim + (AP0 && AP0.sp ? (AP0.sp % 1) * Math.PI * 2 * AP0.w : 0), v = screenSpeed(p), moving = v > 8;   // v141: a whirl turns the whole body
+  const RU = S.rollGU ?? rollU(), AIM = S.aimR ?? S.aim;   // v142: mid-roll (or an after-image of one)
+  let RL = null;
+  if (RU >= 0) {                                   // tucked up and turning head over heels along the roll (a backstep goes over backwards)
+    const [x0, y0] = toScreen(p.x, p.y), [x1, y1] = toScreen(p.x + Math.cos(p.rollA) * 10, p.y + Math.sin(p.rollA) * 10), fa = Math.atan2(y1 - y0, x1 - x0) + (p.rollBack ? Math.PI : 0), th = rollTurn(RU) * (p.rollBack ? -1 : 1);
+    RL = { fa, c: Math.cos(th), s: Math.sin(th), hc: 14, lift: Math.sin(Math.PI * RU) * 3, env: Math.max(0, Math.min(1, RU / 0.1, (1 - RU) / 0.14)), ta: Math.max(-1.2, Math.min(1.2, angDiff(AIM, fa))) };
+  }
+  const AP0 = RL ? { w: RL.env, ph: 0, ln: 3, cr: 7, st: 0, tk: 7, a: 0, R: 5, h: -6, ta: RL.ta, tp: 0, la: 0.5, lR: 4.5, lh: -6, grip: 0, sp: 0 } : isRg() ? atkPose(p) : null, a = RL ? RL.fa : AIM + (AP0 && AP0.sp ? (AP0.sp % 1) * Math.PI * 2 * AP0.w : 0), v = screenSpeed(p), moving = v > 8;   // v141: a whirl turns the whole body
   const sf = Math.min(1.5, v / WALK);                          // 0 standing, 1 walking, ~1.5 running
   const run = Math.max(0, sf - 1) * 2;                          // 0..1 how much of a run it is
   const ph = p.phase;
   // local frame: forward and right lie on the ground (squashed like the iso floor), height goes straight up
   const Fx = Math.cos(a), Fy = Math.sin(a),   // forward is not squashed, so strides match on-screen movement in every direction
     Rx = -Math.sin(a), Ry = Math.cos(a) * 0.5;
-  const P = (f, r, h) => [bx + (f * Fx + r * Rx) * Z, by + (f * Fy + r * Ry - h) * Z];
+  const P = (f, r, h) => { if (RL) { const dh = h - RL.hc, f2 = f * RL.c + dh * RL.s; h = RL.hc + dh * RL.c - f * RL.s + RL.lift; f = f2; } return [bx + (f * Fx + r * Rx) * Z, by + (f * Fy + r * Ry - h) * Z]; };   // v142: the roll turns every point over
   const rightNear = Ry > 0;                                     // is the right side toward the camera?
   const facingUs = Fy > 0.1;
 
@@ -3332,7 +3355,7 @@ function drawPlayer() {
     if (!OUT) { const [x, y] = P(...rHa); ctx.fillStyle = G(16, near, 'glove'); ctx.beginPath(); ctx.arc(x, y, 1.9 * Z, 0, 7); ctx.fill(); }
     const [tx, ty] = P(...tipL);
     if (!OUT && !S.day && !wh) { ctx.fillStyle = S.torchLvl > 0.5 ? '#efefea' : '#555552'; ctx.beginPath(); ctx.arc(tx, ty, 1.7 * Z, 0, 7); ctx.fill(); } // lens
-    S.tip = AP ? P(...tip0) : [tx, ty];           // mid-blow the beam stays put; the torch itself goes where the swing takes it
+    S.tip = AP && !RL ? P(...tip0) : [tx, ty];   // v142: mid-roll the light comes from the torch wherever it is           // mid-blow the beam stays put; the torch itself goes where the swing takes it
     S.tipNow = wh === 'axe' && S.wpHead ? S.wpHead : [tx, ty];
   };
   const lt = lean * 0.5;
@@ -3407,9 +3430,9 @@ function drawPlayer() {
   };
   OUT = true; paint();
   OUT = false; paint();
-  if (wpHand()) S.tip = wpLampAt(bx, by0, sf, run);   // v141: the beam comes from the chest
+  if (wpHand()) S.tip = RL ? P(lt * 0.7 + 3.9, -2.4, shH - 4.4) : wpLampAt(bx, by0, sf, run);   // v141: the beam comes from the chest
   // the torch leaves a hot streak through the air behind it as it swings (kept relative to you, so it travels with the lunge)
-  if ((p.atk || p.wact) && S.tipNow && p.trailT !== S.t) { p.trailT = S.t; (p.tTrail = p.tTrail || []).push([S.tipNow[0] - bx, S.tipNow[1] - by0, S.t]); }
+  if ((p.atk || p.wact || (RL && S.rollGU == null && S.torchLvl > 0.5)) && S.tipNow && p.trailT !== S.t) { p.trailT = S.t; (p.tTrail = p.tTrail || []).push([S.tipNow[0] - bx, S.tipNow[1] - by0, S.t]); }
   if (p.tTrail && p.tTrail.length) {
     p.tTrail = p.tTrail.filter(q => S.t - q[2] < 0.16);
     const T = p.tTrail;
@@ -3895,10 +3918,10 @@ function renderScene() {
   dctx.fillStyle = '#050505'; dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
   // beam is drawn in screen space so its width and length never change with direction
-  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * flicker() * (0.2 + 0.8 * torchFade()) * (isRg() ? rgRange() : 1); // beam starts at the torch lens and reaches most of the way across the screen
+  const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * flicker() * (0.2 + 0.8 * torchFade()) * (isRg() ? rgRange() : 1) * (S.rollK ? S.rollK.len : 1); // beam starts at the torch lens and reaches most of the way across the screen
   // soft sides: the beam is drawn small as stacked wedges of slightly different widths, blurred, then stretched over the dark,
   // so the light fades out over its edges instead of stopping dead (the shadow canvases are free until the shadow pass below)
-  const beamA = S.torchLvl * (0.55 + 0.45 * torchFade()), FEATHER = 0.06 + HALF * 0.14, NW = 9;
+  const beamA = S.torchLvl * (0.55 + 0.45 * torchFade()) * (S.rollK ? S.rollK.al : 1), FEATHER = 0.06 + HALF * 0.14, NW = 9;
   shActx.setTransform(1, 0, 0, 1, 0, 0); shActx.clearRect(0, 0, shA.width, shA.height); shActx.setTransform(1 / SH, 0, 0, 1 / SH, 0, 0);
   const bre = br * 1.15;   // the light trails off a little past where it used to stop
   const grad = shActx.createRadialGradient(bx, by, 0, bx, by, bre);   // a long, eased fade instead of a short drop
@@ -3911,12 +3934,22 @@ function renderScene() {
     shActx.closePath(); shActx.fill();
   }
   shActx.globalAlpha = 1;
+  S.rollPool = null;
+  if (S.rollK && S.rollK.pool > 0.05 && S.torchLvl > 0.3) {   // v142: torch pointed at the floor mid-roll: a bright pool round your feet
+    const [px0, py0] = toScreen(S.p.x, S.p.y), qx = px0 + Math.cos(S.aim) * 14 * Z, qy = py0 + Math.sin(S.aim) * 7 * Z, qr = (26 + 26 * S.rollK.pool) * Z;
+    S.rollPool = [qx, qy, qr];
+    shActx.setTransform(1 / SH, 0, 0, 0.5 / SH, 0, qy * 0.5 / SH);
+    const g = shActx.createRadialGradient(qx, qy, 0, qx, qy, qr); g.addColorStop(0, `rgba(0,0,0,${0.95 * S.rollK.pool * S.torchLvl})`); g.addColorStop(0.6, `rgba(0,0,0,${0.5 * S.rollK.pool * S.torchLvl})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    shActx.fillStyle = g; shActx.beginPath(); shActx.arc(qx, qy, qr, 0, 7); shActx.fill();
+    shActx.setTransform(1 / SH, 0, 0, 1 / SH, 0, 0);
+  }
   shBctx.setTransform(1, 0, 0, 1, 0, 0); shBctx.clearRect(0, 0, shB.width, shB.height);
   shBctx.globalCompositeOperation = 'lighter'; shBctx.globalAlpha = 0.2;   // one small blur to melt the steps between wedges
   for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) shBctx.drawImage(shA, ox, oy);
   shBctx.globalCompositeOperation = 'source-over'; shBctx.globalAlpha = 1;
   { // only the part of the screen the beam covers
     let x0 = bx, x1 = bx, y0 = by, y1 = by;
+    if (S.rollPool) { const [qx, qy, qr] = S.rollPool; x0 = Math.min(x0, qx - qr); x1 = Math.max(x1, qx + qr); y0 = Math.min(y0, qy - qr); y1 = Math.max(y1, qy + qr); }
     for (let t = -1; t <= 1; t += 0.25) { const a = S.aim + t * (HALF + FEATHER); x0 = Math.min(x0, bx + Math.cos(a) * bre); x1 = Math.max(x1, bx + Math.cos(a) * bre); y0 = Math.min(y0, by + Math.sin(a) * bre); y1 = Math.max(y1, by + Math.sin(a) * bre); }
     const sx0 = Math.max(0, Math.floor(x0 / SH) - 2), sy0 = Math.max(0, Math.floor(y0 / SH) - 2);
     const sx1 = Math.min(shB.width, Math.ceil(x1 / SH) + 2), sy1 = Math.min(shB.height, Math.ceil(y1 / SH) + 2);
@@ -3925,7 +3958,7 @@ function renderScene() {
       dctx.drawImage(shB, sx0, sy0, sx1 - sx0, sy1 - sy0, sx0 * SH * DPR, sy0 * SH * DPR, (sx1 - sx0) * SH * DPR, (sy1 - sy0) * SH * DPR); dctx.restore();
     }
   }
-  beamGeo = { bx, by, br, a: S.torchLvl * (0.55 + 0.45 * torchFade()) };
+  beamGeo = { bx, by, br, a: beamA };
   if (isRg()) cutSurviveLights(bx, by, br);
 
   // shadows: everything behind an obstacle (seen from the torch) goes back to dark
@@ -4003,9 +4036,9 @@ function renderScene() {
   drawEyeshine(bx, by, br, casters, lx, ly);
   if (S.q && S.q.lit) { ctx.save(); ctx.globalAlpha = Math.max(0, S.q.fall) * S.torchLvl; drawQuarry(S.q); ctx.restore(); }
   if (S.p.ghosts && S.p.ghosts.length) {   // after-images trailing the roll
-    const p = S.p, x0 = p.x, y0 = p.y;
-    for (const g of p.ghosts) { p.x = g.x; p.y = g.y; ctx.save(); ctx.globalAlpha = Math.max(0, g.a); drawPlayer(); ctx.restore(); }
-    p.x = x0; p.y = y0;
+    const p = S.p, x0 = p.x, y0 = p.y, t0 = S.tip, t1 = S.tipNow;
+    for (const g of p.ghosts) { p.x = g.x; p.y = g.y; S.rollGU = g.u ?? null; ctx.save(); ctx.globalAlpha = Math.max(0, g.a); drawPlayer(); ctx.restore(); }   // v142: each one caught at its own point in the turn
+    p.x = x0; p.y = y0; S.rollGU = null; S.tip = t0; S.tipNow = t1;
   }
   drawLensGlow();
   drawPlayer(); // drawn over the dark so the whole figure stays readable
@@ -5518,8 +5551,9 @@ function cutSurviveLights(bx, by, br) {
 }
 function surviveLight(bx, by, br, casters, lx, ly) {
   const rg = S.rg; if (!rg) return;
-  S.beamInfo = { bx, by, br };
-  const on = S.torchLvl > 0.6, [px, py] = toScreen(S.p.x, S.p.y);
+  const rolling = rollU() >= 0;                  // v142: a tumbling torch burns nothing
+  S.beamInfo = rolling ? null : { bx, by, br };
+  const on = S.torchLvl > 0.6 && !rolling, [px, py] = toScreen(S.p.x, S.p.y);
   for (const e of rg.enemies) {
     const f = FOES[e.type], [sx, sy0] = toScreen(e.x, e.y), sy = sy0 - f.h * 0.5 * Z;
     let k = 0;
@@ -12159,7 +12193,9 @@ function frame(now) {
   if (S.running) { if (S.hitstop > 0) S.hitstop -= raw; else update(dt); } else S.t += dt;
   burnAudio();
   if (titleLive()) titleStep(dt);
-  render();
+  const RB = rollBeam();                          // v142: mid-roll the light goes wherever the tumbling torch points
+  if (RB) { S.aimR = S.aim; S.aim = RB.ang; S.rollK = RB; }
+  try { render(); } finally { if (RB) { S.aim = S.aimR; S.aimR = null; S.rollK = null; } }
   hotbarEl.hidden = !(S && S.day && S.running && S.rg && S.rg.phase === 'fight');   // v131: the hotbar only while you play
   if (titleLive()) drawTitleEyes();
   requestAnimationFrame(frame);
