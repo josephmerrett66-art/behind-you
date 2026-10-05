@@ -485,7 +485,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 153</p>
+      <p class="small" id="verLbl">Version 154</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7217,7 +7217,7 @@ function exBegin() {
 const DAY_LEN = 140, FOOD_MAX = 100, FOOD_RATE = 0.5, WATER_RATE = 0.65, STARVE_T = 5, DAY_KEY = 'behind-you-day-best';
 const STA_MAX = 100, STA_SWING = 10, STA_SLAM = 18, STA_ROLL = 20, STA_CHOP = 4, STA_REGEN = 34, STA_WAIT = 0.6;
 const HOTN = 6, BASE_SLOTS = 10, BOX_SLOTS = 30, CHEST_SLOTS = 18, SKIN_SIPS = 4;
-const STONE_HEAD = '#9a9893', FLINT_HEAD = '#4d5560';
+const STONE_HEAD = '#9a9893', FLINT_HEAD = '#4d5560', IRON_HEAD = '#b8bcc0';
 // every item: name, colour, stack size, kind, a short blurb; tools carry their job, tier, damage, reach and how long they last
 const DIT = {
   sticks: { n: 'Sticks', c: '#8a6a44', st: 20, k: 'mat', b: 'Handles and kindling' },
@@ -7240,6 +7240,17 @@ const DIT = {
   tea: { n: 'Herb tea', c: '#8aa86a', st: 4, k: 'food', b: 'Cures sickness · a long drink', eat: { food: 8, water: 28, cure: 1 } },
   fish: { n: 'Raw fish', c: '#8aa8b0', st: 8, k: 'food', b: 'Cook it, or risk sickness', eat: { food: 9, water: 4, sick: 0.35 } },
   fishC: { n: 'Cooked fish', c: '#c8a070', st: 8, k: 'food', b: 'Filling · heals half a heart', eat: { food: 32, water: 6, heal: 0.5 } },
+  ironore: { n: 'Iron ore', c: '#9a6a52', st: 12, k: 'mat', b: 'Rusty rock from the deep woods' },
+  iron: { n: 'Iron bar', c: '#b8bcc0', st: 12, k: 'mat', b: 'Smelted at a furnace' },
+  jerky: { n: 'Dried meat', c: '#8a4a28', st: 12, k: 'food', b: 'Keeps · the food you take with you', eat: { food: 26 } },
+  axe3: { n: 'Iron axe', c: '#b8bcc0', st: 1, k: 'tool', tool: 'axe', tier: 3, dmg: 1.25, dur: 300, b: 'Fells a tree in 2 chops' },
+  pick3: { n: 'Iron pick', c: '#b8bcc0', st: 1, k: 'tool', tool: 'pick', tier: 3, dmg: 1.15, dur: 300, b: 'Breaks rock in one · the most iron' },
+  spear3: { n: 'Iron spear', c: '#b8bcc0', st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', dmg: 1.8, r: 26, dur: 260, b: 'Long, and it goes right through' },
+  helm: { n: 'Iron helm', c: '#b8bcc0', st: 1, k: 'gear', slot: 'head', arm: 2, b: 'Armour · soaks two hits, then mends' },
+  mail: { n: 'Iron mail', c: '#b8bcc0', st: 1, k: 'gear', slot: 'body', heart: 1, arm: 1, b: 'One more heart, and armour with it' },
+  furnace: { n: 'Furnace', c: '#8e8c86', st: 2, k: 'place', build: 'furnace', b: 'Smelts ore into iron bars' },
+  rack: { n: 'Drying rack', c: '#a07850', st: 2, k: 'place', build: 'rack', b: 'Dries meat and fish so they keep' },
+  plot: { n: 'Garden plot', c: '#4a3a26', st: 2, k: 'place', build: 'plot', b: 'Sow berries · pick them when ripe' },
   rod: { n: 'Fishing rod', c: '#8a6a44', st: 1, k: 'tool', tool: 'rod', dmg: 0.5, r: 4, dur: 120, b: 'Cast at a pond and pull on the bite' },
   skin: { n: 'Waterskin', c: '#6eaae6', st: 1, k: 'drink', b: `Carries ${SKIN_SIPS} drinks out with you` },
   axe1: { n: 'Stone axe', c: STONE_HEAD, st: 1, k: 'tool', tool: 'axe', tier: 1, dmg: 0.9, dur: 60, b: 'Fells a tree in 5 chops' },
@@ -7288,6 +7299,17 @@ const DREC = [
   { id: 'campfire', g: 'stn', out: 'campfire', at: 'hand', cost: { sticks: 6, stones: 5 } },
   { id: 'bench', g: 'stn', out: 'bench', at: 'hand', cost: { logs: 4, stones: 4, rope: 2 } },
   { id: 'chest', g: 'stn', out: 'chest', at: 'bench', cost: { planks: 6, rope: 1 } },
+  { id: 'furnace', g: 'stn', out: 'furnace', at: 'bench', cost: { stones: 14, planks: 4 } },
+  { id: 'rack', g: 'stn', out: 'rack', at: 'bench', cost: { sticks: 8, rope: 3 } },
+  { id: 'plot', g: 'stn', out: 'plot', at: 'bench', cost: { planks: 2, fibre: 6 } },
+  { id: 'iron', g: 'mat', out: 'iron', at: 'furnace', cost: { ironore: 2, logs: 1 } },
+  { id: 'axe3', g: 'tool', out: 'axe3', at: 'furnace', cost: { iron: 3, planks: 2 } },
+  { id: 'pick3', g: 'tool', out: 'pick3', at: 'furnace', cost: { iron: 3, planks: 2 } },
+  { id: 'spear3', g: 'wpn', out: 'spear3', at: 'furnace', cost: { iron: 3, sticks: 3, rope: 1 } },
+  { id: 'helm', g: 'gear', out: 'helm', at: 'furnace', cost: { iron: 4, hide: 2 } },
+  { id: 'mail', g: 'gear', out: 'mail', at: 'furnace', cost: { iron: 6, hide: 3, rope: 2 } },
+  { id: 'jerky', g: 'food', out: 'jerky', n: 2, at: 'rack', cost: { meat: 2, fibre: 1 } },
+  { id: 'jerkyf', g: 'food', out: 'jerky', n: 2, at: 'rack', cost: { fish: 2, fibre: 1 } },
   { id: 'torch', g: 'tool', out: 'torch', at: 'hand', cost: { sticks: 2, fibre: 3 } },
   { id: 'bandage', g: 'gear', out: 'bandage', n: 2, at: 'hand', cost: { fibre: 4, hide: 1 } },
   { id: 'tea', g: 'food', out: 'tea', at: 'fire', cost: { mushroom: 2, berries: 2 } },
@@ -7299,12 +7321,14 @@ const DREC = [
 ];
 const DCATS = [{ id: 'tool', n: 'Tools', icon: 'pick1' }, { id: 'wpn', n: 'Weapons', icon: 'spear2' }, { id: 'gear', n: 'Gear', icon: 'vest' },
   { id: 'food', n: 'Food', icon: 'cooked' }, { id: 'stn', n: 'Stations', icon: 'bench' }, { id: 'build', n: 'Build', icon: 'wall' }, { id: 'mat', n: 'Materials', icon: 'rope' }];
-const AT_NAME = { hand: 'By hand', fire: 'At a fire', bench: 'At a workbench' };
+const AT_NAME = { hand: 'By hand', fire: 'At a fire', bench: 'At a workbench', furnace: 'At a furnace', rack: 'At a drying rack' };
 const recName = r => r.name || DIT[r.out].n, recBlurb = r => r.sh || DIT[r.out].b;
 const BEAST = {   // health, run speed, size, how close you get before it reacts, what it leaves
   deer: { hp: 2.4, sp: 150, w: 14, h: 30, scare: 210, drop: { meat: 2, hide: 1 } },
   rabbit: { hp: 0.5, sp: 145, w: 6, h: 9, scare: 120, drop: { meat: 1 } },
   boar: { hp: 4.5, sp: 175, w: 14, h: 20, scare: 170, drop: { meat: 3, hide: 1, bone: 1 }, angry: true },
+  wolf: { hp: 3.4, sp: 190, w: 12, h: 18, scare: 330, drop: { meat: 2, hide: 1, bone: 1 }, angry: true, pack: true },
+  bear: { hp: 14, sp: 160, w: 20, h: 32, scare: 230, drop: { meat: 6, hide: 3, bone: 2 }, angry: true, big: true },
 };
 const dayClock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 function dayBest() { try { return JSON.parse(localStorage.getItem(DAY_KEY) || 'null') || { days: 0, t: 0 }; } catch (e) { return { days: 0, t: 0 }; } }
@@ -7475,7 +7499,7 @@ function dayStep(dt, inCamp) {
   for (const c of D.chips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; }
   D.chips = D.chips.filter(c => c.life > 0);
   beastStep(dt); buildStep(dt); stStep(dt);
-  dayWarmStep(dt); dayBleedStep(dt); dayFishStep(dt); dayTorchStep(dt);
+  dayWarmStep(dt); dayBleedStep(dt); dayFishStep(dt); dayTorchStep(dt); dayPlotStep(dt);
   { const o = dayUseTarget(), lab = o ? useLabel(o) : 'Take'; if (useBtn.textContent !== lab) useBtn.textContent = lab; }
   { const v = dayVerb(); if (attackBtn.textContent !== v) attackBtn.textContent = v; }
   { const on = dayTool() === 'build'; if (on !== !!D.barOn) { D.barOn = on; renderBuildBar(); layoutBtns(); if (on) dayNote('bhint', 'pick a piece, lay it out, then hammer it up', 999); } }
@@ -7560,7 +7584,7 @@ function dayUseTarget() {                        // the nearest thing in reach y
   for (const f of D.drops) { const d = dist2(f, p); if (d < bd) { bd = d; best = f; } }
   for (const o of dayNodesNear(p.x, p.y, 60)) if ((o.t === 'sticks' || o.t === 'stones' || o.t === 'shroom') && !o.gone) { const d = dist2(o, p); if (d < bd) { bd = d; best = o; } }
   for (const c of exChestsNear(p.x, p.y, 60)) if (!S.rg.looted.has(c.key)) { const d = dist2(c, p) - 8; if (d < bd) { bd = d; best = c; } }
-  for (const B of D.builds) if (B.t === 'chest') { const d = dist2(B, p) - 12; if (d < bd) { bd = d; best = B; } }
+  for (const B of D.builds) if (B.t === 'chest' || B.t === 'plot') { const d = dist2(B, p) - (B.t === 'plot' ? 22 : 12); if (d < bd) { bd = d; best = B; } }
   { const P = lakeAt(p.x, p.y, 30); if (P && (D.water < FOOD_MAX - 2 || D.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS))) { const d = Math.max(0, Math.hypot(P.x - p.x, P.y - p.y) - P.rad); if (d < bd) { bd = d; best = P; } } }
   if (S.rg.inCamp) {
     { const d = dist2(CAMP_BOX, p) - 14; if (d < bd) { bd = d; best = CAMP_BOX; } }
@@ -7568,12 +7592,14 @@ function dayUseTarget() {                        // the nearest thing in reach y
   }
   return best;
 }
-const useLabel = o => o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
+const useLabel = o => o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
 function dayUse() {
   const D = S.day, rg = S.rg; if (!D || !rg || rg.phase !== 'fight' || !S.running) return;
+  if (dayTameTry()) return;                     // v154: meat in your hand and a wolf in front of you
   const o = dayUseTarget(); if (!o) return;
   if (o === CAMP_BARREL) { dayDrink(); return; }
   if (o.kind === 'dlake') { dayPondFill(); return; }
+  if (o.t === 'plot') { dayPlotPlant(o); return; }
   if (o === CAMP_BOX || o.t === 'chest') { openCraft(o); return; }
   dayAct(7, 0.42); S.p.vx *= 0.3; S.p.vy *= 0.3;
   if (o.kind === 'dday') { const got = dayGive(o.it, o.n, o.x, o.y, true, o.ex); if (got) { exNote(`+${got} ${DIT[o.it].n.toLowerCase()}`); pickSnd(); } o.n -= got; if (o.n <= 0) o.gone = true; D.drops = D.drops.filter(f => !f.gone); }
@@ -7635,6 +7661,7 @@ function dayHarvest(Dk, a, inReach, spark) {
     if (c >= need) {
       D.felled.add(best.key); ashBurst(best.x, best.y, 14, 14); addShake(0.25);
       dayDrop(best.x, best.y, 'stones', 3); dayDrop(best.x, best.y, 'flint', T.tier > 1 ? 3 : 2);
+      if (Math.hypot(best.x, best.y) > IRON_FROM && T.tier > 1) { const n = (T.tier > 2 ? 2 : 1) + (Math.random() < 0.4 ? 1 : 0); dayDrop(best.x, best.y, 'ironore', n); exNote(`iron in the rock · ${n}`, true); }
     } else exNote(`crack · ${need - c} more`);
   } else if (best.t === 'grass') {
     best.gone = true; dayGive('fibre', tool === 'hand' ? 2 : 3, best.x, best.y); chips('leaf');
@@ -7667,7 +7694,9 @@ function beastStep(dt) {
       const cx = (ci + 0.5) * BC, cy = (cj + 0.5) * BC, far = Math.hypot(cx, cy);
       if (far < CAMP_R + 300 || D.beasts.some(b => b.chunk === key && !b.dead) || D.beasts.filter(b => !b.dead).length >= 16 || Math.random() < 0.35) continue;
       const r = Math.random(), herd = (k, n) => { for (let i = 0; i < n; i++) D.beasts.push({ kind: 'beast', k, chunk: key, x: cx + (Math.random() - 0.5) * BC * 0.6, y: cy + (Math.random() - 0.5) * BC * 0.6, r: 0, s: 1, hp: BEAST[k].hp, st: 'graze', t: Math.random() * 3, dir: Math.random() * 7, sp: 0, ph: Math.random() * 9, flash: 0, stag: k === 'deer' && Math.random() < 0.35 }); };
-      if (r < 0.38) herd('deer', 2 + Math.floor(Math.random() * 3));
+      if (far > IRON_FROM && r < (dayNight() ? 0.34 : 0.17)) herd('wolf', 2 + Math.floor(Math.random() * 3));   // v154: the deep woods hunt back
+      else if (far > 2600 && r < 0.2) herd('bear', 1);
+      else if (r < 0.38) herd('deer', 2 + Math.floor(Math.random() * 3));
       else if (r < 0.75) herd('rabbit', 1 + Math.floor(Math.random() * 3));
       else if (r < 0.95 && far > 900) herd('boar', 1 + (Math.random() < 0.3 ? 1 : 0));
     }
@@ -7676,7 +7705,8 @@ function beastStep(dt) {
     b.flash = Math.max(0, b.flash - dt * 4);
     if (b.dead) { b.dieT += dt; continue; }
     b.t -= dt;
-    if (b.st === 'graze') {
+    if (B.pack || b.tame) { wolfPack(b, dt, d, dx, dy); }
+    else if (b.st === 'graze') {
       if (b.t <= 0) { b.t = 1.5 + Math.random() * 3; b.dir = Math.random() * 7; b.sp = Math.random() < 0.5 ? 0 : 18; }
       if (d < B.scare * (Math.hypot(p.vx, p.vy) > 60 ? 1 : 0.6)) beastScare(b);
     } else if (b.st === 'flee') {
@@ -7701,6 +7731,7 @@ function beastStep(dt) {
   D.beasts = D.beasts.filter(b => !(b.dead && b.dieT > 1.2) && Math.hypot(b.x - p.x, b.y - p.y) < 2600);
 }
 function beastScare(b) {
+  if (BEAST[b.k].pack) { beastCall(b); return; }
   if (BEAST[b.k].angry) { if (b.st === 'graze' || b.st === 'flee') { b.st = 'wind'; b.t = 0.6; if (actx && monNear(b, 600) > 0) noiseAt(actx.currentTime, 300, 120, 0.35, 0.45 * monNear(b, 600), sfxGain); } return; }
   if (b.st !== 'flee') { b.st = 'flee'; b.t = 3 + Math.random() * 2; if (actx && monNear(b, 600) > 0) noiseAt(actx.currentTime, b.k === 'deer' ? 1800 : 3500, 900, 0.18, 0.3 * monNear(b, 600), sfxGain); }
   for (const o of S.day.beasts) if (o !== b && o.chunk === b.chunk && o.k === b.k && !o.dead && o.st === 'graze' && dist2(o, b) < 260) { o.st = 'flee'; o.t = 3 + Math.random() * 2; }   // the herd goes with it
@@ -7788,8 +7819,8 @@ const ICON = (() => {
     cooked: '<path d="M14 4.5c4.2 0 6.5 3.2 5.5 7.4s-5.2 6.3-9.3 5.3l-3.3 3.1-2.3-2.3 3.1-3.3c-1-4.2 2-10.2 6.3-10.2z" fill="#8a4a28"/><path d="M11 9l5 5M13.5 6.8l4.5 4.5" stroke="#5a2c14" stroke-width="1.2"/><circle cx="4.8" cy="19.2" r="2.1" fill="#efe6d2"/>',
     stew: '<path d="M3 11.5h18c0 5-4 8.5-9 8.5s-9-3.5-9-8.5z" fill="#7a5232"/><ellipse cx="12" cy="11.5" rx="9" ry="2.5" fill="#b0783a"/><circle cx="9" cy="11.2" r="1" fill="#c23a4a"/><circle cx="14" cy="11.6" r="1.2" fill="#8a4a28"/><path d="M9 7.5c0-2 2-2 1-4M14 7.5c0-2 2-2 1-4" stroke="#ccc" stroke-width="1" fill="none" opacity=".6"/>',
     skin: '<path d="M9 4.5h6v2.8c3.2 1 5.2 4 5.2 8 0 4-3.2 6.2-8.2 6.2s-8.2-2.2-8.2-6.2c0-4 2-7 5.2-8z" fill="#7a5a3a"/><rect x="9" y="2.5" width="6" height="2.6" rx="1" fill="#3a2a1a"/><path d="M6.5 15c2.5 2.2 8.5 2.2 11 0" stroke="#6eaae6" stroke-width="1.6" fill="none"/>',
-    axe1: axe(STONE_HEAD), axe2: axe(FLINT_HEAD), pick1: pick(STONE_HEAD), pick2: pick(FLINT_HEAD),
-    spear1: spear(STONE_HEAD), spear2: spear(FLINT_HEAD), club: club('#6e5235'),
+    axe1: axe(STONE_HEAD), axe2: axe(FLINT_HEAD), axe3: axe(IRON_HEAD), pick1: pick(STONE_HEAD), pick2: pick(FLINT_HEAD), pick3: pick(IRON_HEAD),
+    spear1: spear(STONE_HEAD), spear2: spear(FLINT_HEAD), spear3: spear(IRON_HEAD), club: club('#6e5235'),
     bonec: club('#e6dfcc') + '<g fill="#e6dfcc"><circle cx="19" cy="5" r="1.6"/><circle cx="20.5" cy="9.5" r="1.4"/><circle cx="13.5" cy="4" r="1.3"/></g><path d="M5 20.5l7-9" stroke="#a07850" stroke-width="2.6" stroke-dasharray="1.6 1.4"/>',
     sack: '<path d="M8 6.5c-3 3-4.2 7-4.2 10 0 3 3.2 4.8 8.2 4.8s8.2-1.8 8.2-4.8c0-3-1.2-7-4.2-10z" fill="#a8b86a"/><path d="M8 6.5h8" stroke="#6e7a3a" stroke-width="2.2"/><path d="M8.5 12c1 3 0 5-1 7M15.5 12c-1 3 0 5 1 7" stroke="#8a9a52" stroke-width=".9" fill="none"/>',
     pack: '<rect x="5" y="6.5" width="14" height="15" rx="3" fill="#a07850"/><rect x="7" y="12.5" width="10" height="6" rx="1.5" fill="#7a5232"/><path d="M8 6.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="#5a3e28" stroke-width="1.7" fill="none"/><path d="M5 10h14" stroke="#7a5232" stroke-width="1.4"/>',
@@ -7800,6 +7831,14 @@ const ICON = (() => {
     bench: '<path d="M2.5 8h19v3.5h-19z" fill="#b08a58"/><path d="M5 11.5v9M19 11.5v9M5 16.5h14" stroke="#7a5232" stroke-width="2.2"/><path d="M13.5 8V4.8l3.2-1.3" stroke="#9a9a94" stroke-width="1.7" fill="none" stroke-linecap="round"/><rect x="5" y="6" width="5" height="2" fill="#8d8b85"/>',
     chest: '<rect x="3" y="9.5" width="18" height="11" rx="1.2" fill="#8a6440"/><path d="M3 9.5c0-3.2 2.2-5.4 9-5.4s9 2.2 9 5.4z" fill="#a07850"/><path d="M3 14.5h18" stroke="#5a3e28" stroke-width="1"/><rect x="10.5" y="9" width="3" height="4.2" rx=".5" fill="#d8c070"/><path d="M6.5 9.5v11M17.5 9.5v11" stroke="#5a3e28" stroke-width="1.2"/>',
     wall: '<g fill="#7a5232"><path d="M3.5 20.5V7.5l2.3-2.6 2.3 2.6v13z"/><path d="M9.7 20.5V5.5L12 2.9l2.3 2.6v15z"/><path d="M15.9 20.5V7.5l2.3-2.6 2.3 2.6v13z"/></g><path d="M3 11h18M3 16.5h18" stroke="#3a2a1a" stroke-width="1.3"/>',
+    ironore: '<path d="M4 14.5l4-7.5 7-2.5 5 6-2 8-8 2.5z" fill="#7a6a60"/><path d="M8 7l7 4.5-1 9" fill="none" stroke="#5a4e46" stroke-width="1.1"/><g fill="#b8744a"><circle cx="9.5" cy="13" r="1.6"/><circle cx="14" cy="8.5" r="1.2"/><circle cx="16" cy="15" r="1.9"/></g>',
+    iron: '<rect x="2.5" y="13" width="15" height="6" rx="1.2" fill="#b8bcc0"/><path d="M17.5 13l4-3v6l-4 3z" fill="#8e9398"/><rect x="5.5" y="6" width="15" height="6" rx="1.2" fill="#c9cdd1"/><path d="M20.5 6l1-1v6l-1 1z" fill="#9aa0a5"/><path d="M7 8h11" stroke="#e6eaee" stroke-width=".9" opacity=".8"/>',
+    jerky: '<path d="M5 17.5c-1.5-3 0-6 2.5-7.5s6-2 8.5-3.5 3.5 1 2.5 3-3 3.5-5 5-5.5 5.5-8.5 3z" fill="#8a4a28"/><g stroke="#5e2f18" stroke-width="1" fill="none"><path d="M8 15c2-2.5 4.5-4 7.5-5.5M7 12.5c2-2 4-3 6.5-4.5"/></g>',
+    helm: '<path d="M4.5 13a7.5 7.5 0 0 1 15 0v6.5h-4V17a3.5 3.5 0 0 0-7 0v2.5h-4z" fill="#b8bcc0"/><path d="M11 5.5h2v8h-2z" fill="#8e9398"/><path d="M6.5 11.5h4M13.5 11.5h4" stroke="#6e7378" stroke-width="1.6"/>',
+    mail: '<path d="M8 4l4 2 4-2 4 2.5-1.5 4-1.5-.8V20H7.5V9.7L6 10.5 4.5 6.5z" fill="#b8bcc0"/><g fill="#8e9398"><circle cx="10" cy="12" r="1.1"/><circle cx="13.5" cy="12" r="1.1"/><circle cx="11.7" cy="15" r="1.1"/><circle cx="15" cy="15.5" r="1.1"/><circle cx="9" cy="16" r="1.1"/></g>',
+    furnace: '<path d="M4.5 20V9l7.5-5 7.5 5v11z" fill="#8e8c86"/><path d="M9 20v-6.5h6V20z" fill="#2a2320"/><path d="M12 19c-1.6-1.4-2.3-2.6-2.3-3.6A2.3 2.3 0 0 1 12 13.2a2.3 2.3 0 0 1 2.3 2.2c0 1-.7 2.2-2.3 3.6z" fill="#ff9a3c"/><path d="M9.5 7.5h5" stroke="#6e6c67" stroke-width="1.4"/>',
+    rack: '<g stroke="#8a6a44" stroke-width="2" stroke-linecap="round"><path d="M4 21V6M20 21V6M3 6h18M3.5 11h17"/></g><g fill="#a0503a"><path d="M6.5 6.5h2.5l.6 6H7z"/><path d="M11 6.5h2.5l.6 6H11.6z"/><path d="M15.5 6.5H18l.6 6H16z"/></g>',
+    plot: '<path d="M2 15l10-4.5L22 15l-10 4.5z" fill="#4a3a26"/><g stroke="#3a2c1c" stroke-width="1"><path d="M6.5 13l10 4.5M9.5 11.7l10 4.5M12 10.5"/></g><g stroke="#6f8a46" stroke-width="1.5" fill="none"><path d="M8 13.5V9M12 15V9.5M16 13.5V9"/></g><g fill="#c23a4a"><circle cx="8" cy="8" r="1.5"/><circle cx="12" cy="8.5" r="1.5"/><circle cx="16" cy="8" r="1.5"/></g>',
     torch: '<path d="M10.5 21.5l1.5-9.5 1.5 9.5z" fill="#7a5a3a"/><path d="M8.6 12.5h6.8l-.7 2.2H9.3z" fill="#4a3a24"/><path d="M12 1.5c2.6 2.3 4.2 4.6 4.2 6.8A4.2 4.2 0 0 1 12 12.5a4.2 4.2 0 0 1-4.2-4.2c0-2.2 1.6-4.5 4.2-6.8z" fill="#ff9a3c"/><path d="M12 4.6c1.4 1.4 2.2 2.8 2.2 4a2.2 2.2 0 1 1-4.4 0c0-1.2.8-2.6 2.2-4z" fill="#ffe8a8"/>',
     rod: '<path d="M3 20.5L19.5 4" stroke="#8a6a44" stroke-width="2.2" stroke-linecap="round"/><path d="M19.5 4c1.8 3.6 1.4 7.6-1 11" stroke="#c8b07a" stroke-width="1" fill="none"/><path d="M16.5 15.5v3.2" stroke="#c8b07a" stroke-width="1"/><ellipse cx="16.5" cy="19.6" rx="1.7" ry="1.4" fill="#efe9dc"/><circle cx="8.5" cy="15" r="2.1" fill="none" stroke="#9a9893" stroke-width="1.3"/>',
     bandage: '<rect x="2.5" y="9" width="19" height="6" rx="3" fill="#e6dfcc" transform="rotate(-24 12 12)"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.4" fill="#cfc6ae" transform="rotate(-24 12 12)"/><g stroke="#b8ae95" stroke-width=".9"><path d="M5.5 14.5l2-1M17 8.5l2-1"/></g>',
@@ -7837,8 +7876,9 @@ function isoBox(c, cx, cy, a, w, d, h, top, sideA, sideB, z0 = 0) {   // a box s
   c.fillStyle = top; c.beginPath(); pts.forEach(([x, y], k) => k ? c.lineTo(x, y - bz - hz) : c.moveTo(x, y - bz - hz)); c.closePath(); c.fill();
   return pts.map(([x, y]) => [x, y - bz - hz]);   // the top's corners, for whatever sits on it
 }
-function dayDrawBuild(o, c, sx, sy) {          // a workbench or a storage chest
+function dayDrawBuild(o, c, sx, sy) {          // a workbench, a chest, and v154's furnace, drying rack and plot
   const C = (col, grey) => COLOUR ? col : grey, B = o.build, a = B.a || 0;
+  if (o.sub === 'furnace' || o.sub === 'rack' || o.sub === 'plot') return dayDrawDeep(o, c, sx, sy);
   if (o.sub === 'bench') {
     const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
     for (const [i, j] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {   // four legs
@@ -7940,11 +7980,11 @@ function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
     c.restore(); return;
   }
   if (o.kind === 'beast') {
-    const B = BEAST[o.k], f = o.face || 1, k = o.k === 'rabbit' ? 0.55 : o.k === 'boar' ? 0.95 : 1, s = z * 1.35 * k, run = o.sp > 30, legA = Math.sin(o.ph * (run ? 1.4 : 1)) * (o.sp > 1 ? (run ? 0.7 : 0.35) : 0);
+    const B = BEAST[o.k], f = o.face || 1, k = o.k === 'rabbit' ? 0.55 : o.k === 'boar' ? 0.95 : o.k === 'wolf' ? 0.85 : o.k === 'bear' ? 1.35 : 1, s = z * 1.35 * k, run = o.sp > 30, legA = Math.sin(o.ph * (run ? 1.4 : 1)) * (o.sp > 1 ? (run ? 0.7 : 0.35) : 0);
     c.save(); if (o.dead) { c.globalAlpha *= Math.max(0, 1 - o.dieT / 1.2); }
     shadow(sx, sy, B.w * z);
-    const body = o.flash > 0 ? '#f4f0e6' : o.k === 'deer' ? C('#8a6040', '#7a7a74') : o.k === 'boar' ? C('#4a3a30', '#4a4a46') : C('#8a7a66', '#76766f');
-    const legH = o.k === 'boar' ? 7 : o.k === 'rabbit' ? 4 : 14, by = sy - (legH + (run && o.k !== 'boar' ? Math.abs(Math.sin(o.ph * 1.4)) * 3 : 0)) * s / k * k;
+    const body = o.flash > 0 ? '#f4f0e6' : o.k === 'deer' ? C('#8a6040', '#7a7a74') : o.k === 'boar' ? C('#4a3a30', '#4a4a46') : o.k === 'wolf' ? C(o.tame ? '#6e6a62' : '#55524c', '#5e5e58') : o.k === 'bear' ? C('#3a2a20', '#3e3e3a') : C('#8a7a66', '#76766f');
+    const legH = o.k === 'boar' ? 7 : o.k === 'rabbit' ? 4 : o.k === 'wolf' ? 10 : o.k === 'bear' ? 9 : 14, by = sy - (legH + (run && o.k !== 'boar' ? Math.abs(Math.sin(o.ph * 1.4)) * 3 : 0)) * s / k * k;
     if (o.dead) { c.translate(sx, sy); c.rotate(f * 1.2 * Math.min(1, o.dieT * 4)); c.translate(-sx, -sy); }
     c.strokeStyle = body; c.lineCap = 'round'; c.lineWidth = (o.k === 'boar' ? 3 : 2) * s;
     if (o.k !== 'rabbit') { c.beginPath(); for (const [lx, ph] of [[-7, 0], [-5, Math.PI], [6, Math.PI], [8, 0]]) { const sw = Math.sin(ph) * legA; c.moveTo(sx + lx * s * f, by); c.lineTo(sx + (lx + sw * 8) * s * f, sy - 0.5 * s); } c.stroke(); }
@@ -7959,6 +7999,17 @@ function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
       c.strokeStyle = '#efe9dc'; c.lineWidth = 1.4 * s; c.beginPath(); c.moveTo(sx + 15 * s * f, by + 1 * s); c.quadraticCurveTo(sx + 19 * s * f, by, sx + 18 * s * f, by - 3 * s); c.stroke();
       c.strokeStyle = body; c.lineWidth = 1.2 * s; c.beginPath(); for (let i = -6; i <= 6; i += 2) { c.moveTo(sx + i * s, by - 8 * s); c.lineTo(sx + (i - f) * s, by - 11 * s); } c.stroke();
       if (o.st === 'wind') { c.fillStyle = 'rgba(226,84,60,0.9)'; c.font = `700 ${Math.round(12 * z)}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.fillText('!', sx, by - 18 * s); }
+    } else if (o.k === 'wolf' || o.k === 'bear') {
+      const big = o.k === 'bear';
+      c.beginPath(); c.ellipse(sx + (big ? 12 : 11) * s * f, by - (big ? 3 : 4) * s, (big ? 6.5 : 5) * s, (big ? 5 : 3.6) * s, f * 0.2, 0, 7); c.fill();   // the head, held low
+      c.beginPath(); c.moveTo(sx + (big ? 15 : 14) * s * f, by - 2 * s); c.lineTo(sx + (big ? 17.5 : 19) * s * f, by - (big ? 2.5 : 1) * s); c.lineTo(sx + (big ? 15 : 14) * s * f, by + 1 * s); c.closePath(); c.fill();   // the muzzle, stubbier on a bear
+      if (big) { for (const e of [-1, 1]) { c.beginPath(); c.arc(sx + (10 + e * 1.4) * s * f, by - 8.5 * s, 2.1 * s, 0, 7); c.fill(); } }   // round bear ears
+      else { c.beginPath(); for (const e of [-1, 1]) { c.moveTo(sx + (10 + e) * s * f, by - 7 * s); c.lineTo(sx + (9.5 + e * 1.6) * s * f, by - 11 * s); c.lineTo(sx + (11.5 + e) * s * f, by - 7.5 * s); } c.fill(); }   // a wolf's pricked ears
+      c.strokeStyle = body; c.lineWidth = (big ? 3.4 : 2.2) * s; c.beginPath(); c.moveTo(sx - (big ? 9 : 10) * s * f, by - (big ? 5 : 2) * s); c.quadraticCurveTo(sx - (big ? 11.5 : 17) * s * f, by - (big ? 5.5 : 6 + Math.sin(o.ph) * 2) * s, sx - (big ? 12 : 19) * s * f, by - (big ? 3.5 : 9) * s); c.stroke();   // a stub on a bear, a brush on a wolf
+      if (big) { c.fillStyle = body; c.beginPath(); c.ellipse(sx - 2 * s, by - 9 * s, 9 * s, 4 * s, 0, 0, 7); c.fill(); }   // the bear's hump
+      c.fillStyle = o.tame ? '#9fd27a' : o.st === 'hunt' || o.st === 'back' || o.st === 'charge' || o.st === 'wind' ? '#e2543c' : '#d8c98a';
+      c.beginPath(); c.arc(sx + (big ? 13 : 12) * s * f, by - (big ? 4.5 : 5.2) * s, 1.3 * s, 0, 7); c.fill();   // the eye
+      if (o.st === 'wind') { c.fillStyle = 'rgba(226,84,60,0.9)'; c.font = `700 ${Math.round(12 * z)}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.fillText('!', sx, by - 20 * s); }
     } else {
       c.beginPath(); c.arc(sx + 9 * s * f, by - 5 * s, 4 * s, 0, 7); c.fill();
       c.lineWidth = 1.8 * s; c.beginPath(); c.moveTo(sx + 8 * s * f, by - 8 * s); c.lineTo(sx + (o.st === 'flee' ? 3 : 7) * s * f, by - 16 * s); c.stroke();
@@ -7993,7 +8044,7 @@ function dayBar(px, py) {                      // stamina, food and water over y
 // ---- v129 building, v151 as items: hold a wall, a trap, a fire, a workbench or a chest and the button puts it down in front of you ----
 const WALL_HP = 14, SPIKE_USES = 10, FIRE_R = 90, BENCH_R = 90;
 function dayPlaceSpot(t) {                     // where it would go, and whether there's room
-  const p = S.p, a = S.aimW || 0, far = t === 'wall' ? 46 : t === 'bench' ? 38 : 34, x = p.x + Math.cos(a) * far, y = p.y + Math.sin(a) * far;
+  const p = S.p, a = S.aimW || 0, far = t === 'wall' ? 46 : t === 'bench' || t === 'furnace' ? 38 : t === 'rack' || t === 'plot' ? 44 : 34, x = p.x + Math.cos(a) * far, y = p.y + Math.sin(a) * far;
   const fake = dayMakeBuild(t, x, y, a, true), pad = t === 'spikes' ? 8 : 12;
   let ok = true;
   for (const q of fake.parts) {
@@ -8031,6 +8082,11 @@ function dayMakeBuild(t, cx, cy, a, fake) {
   } else if (t === 'chest') {
     B.inv = Array(CHEST_SLOTS).fill(null);
     B.parts.push({ kind: 'dbuild', sub: 'chest', x: cx, y: cy, r: 11, s: 1, build: B });
+  } else if (t === 'furnace' || t === 'rack') {
+    B.parts.push({ kind: 'dbuild', sub: t, x: cx, y: cy, r: t === 'furnace' ? 15 : 17, s: 1, build: B });
+  } else if (t === 'plot') {
+    B.crop = null; B.sown = 0; B.grown = false;
+    B.parts.push({ kind: 'dbuild', sub: 'plot', x: cx, y: cy, r: 0, s: 1, build: B, flat: true });
   } else {
     B.parts.push({ kind: 'fire', x: cx, y: cy, r: 10, s: 1, build: B, dfire: true });
   }
@@ -8219,9 +8275,9 @@ function pkSlot(s, w, i, extra) {
   b.addEventListener('click', () => pkTap(w, i));
   return b;
 }
-function stationHere(at) { return at === 'hand' || (at === 'fire' && (S.rg.inCamp || dayFireNear(S.p.x, S.p.y))) || (at === 'bench' && dayBenchNear(S.p.x, S.p.y)); }
+function stationHere(at) { return at === 'hand' || (at === 'fire' && (S.rg.inCamp || dayFireNear(S.p.x, S.p.y))) || (at === 'bench' && dayBenchNear(S.p.x, S.p.y)) || (at === 'furnace' && dayFurnNear(S.p.x, S.p.y)) || (at === 'rack' && dayRackNear(S.p.x, S.p.y)); }
 function canCraft(r) {
-  if (!stationHere(r.at)) return r.at === 'fire' ? 'needs a fire' : 'needs a workbench';
+  if (!stationHere(r.at)) return r.at === 'fire' ? 'needs a fire' : r.at === 'furnace' ? 'needs a furnace' : r.at === 'rack' ? 'needs a rack' : 'needs a workbench';
   if (r.ok && !r.ok()) return 'not now';
   for (const [k, n] of Object.entries(r.cost)) if (dayHave(k) < n) return '';
   if (r.out && roomIn(S.day.inv, r.out) < (r.n || 1) && !(PK.cont && roomIn(PK.cont.inv, r.out) >= (r.n || 1))) return 'pack full';   // nowhere to put it
@@ -8310,7 +8366,7 @@ function renderPack() {
       if (open) {
         const det = el('div', 'rdet'), costs = el('div', 'rcost');
         for (const [k, n] of Object.entries(r.cost)) { const h = dayHave(k), c = el('span', 'chip' + (h < n ? ' no' : '')); c.innerHTML = iconSvg(k) + `<span>${DIT[k].n}</span><b>×${n}</b><i>${h < n ? `only ${h}` : `have ${h}`}</i>`; costs.append(c); }
-        const where = el('span', 'chip at' + (stationHere(r.at) ? '' : ' no')); where.innerHTML = iconSvg(r.at === 'fire' ? 'campfire' : r.at === 'bench' ? 'bench' : 'hand') + `<span>${AT_NAME[r.at]}</span>`; costs.append(where);
+        const where = el('span', 'chip at' + (stationHere(r.at) ? '' : ' no')); where.innerHTML = iconSvg(r.at === 'fire' ? 'campfire' : r.at === 'bench' ? 'bench' : r.at === 'furnace' ? 'furnace' : r.at === 'rack' ? 'rack' : 'hand') + `<span>${AT_NAME[r.at]}</span>`; costs.append(where);
         det.append(costs);
         const go = el('div', 'rgo'), b1 = el('button', 'act main', 'Craft'); b1.disabled = can !== true; b1.addEventListener('click', () => dayCraft(r.id)); go.append(b1);
         if (r.out && DIT[r.out].st > 1) { const b5 = el('button', 'act', 'Craft ×5'); b5.disabled = can !== true; b5.addEventListener('click', () => dayCraft(r.id, 5)); go.append(b5); }
@@ -8345,8 +8401,8 @@ function daySave() {
   d.drops = D.drops.map(f => ({ it: f.it, n: f.n, ex: f.ex, x: Math.round(f.x), y: Math.round(f.y), t: f.t, keep: f.keep }));
   d.bld = [...D.bld.values()].map(o => ({ id: o.id, i: o.i, j: o.j, s: o.s, a: o.a, hp: Math.round(o.hp * 10) / 10, need: o.need, done: o.done }));
   d.logs = D.logs.flatMap(g => [['logs', g.give.logs], ['sticks', g.give.sticks]].filter(([, n]) => n).map(([it, n]) => ({ it, n, x: Math.round(g.bx + g.ux * g.len / 2), y: Math.round(g.by + g.uy * g.len / 2), t: 0 })));   // a tree still falling is saved as its logs
-  d.beasts = D.beasts.filter(b => !b.dead).map(b => ({ k: b.k, x: Math.round(b.x), y: Math.round(b.y), hp: b.hp, stag: b.stag, chunk: b.chunk }));
-  d.builds = D.builds.map(B => ({ t: B.t, x: B.x, y: B.y, a: B.a, hp: B.hp, uses: B.uses, inv: B.inv }));
+  d.beasts = D.beasts.filter(b => !b.dead).map(b => ({ k: b.k, x: Math.round(b.x), y: Math.round(b.y), hp: b.hp, stag: b.stag, chunk: b.chunk, tame: b.tame, fed: b.fed }));
+  d.builds = D.builds.map(B => ({ t: B.t, x: B.x, y: B.y, a: B.a, hp: B.hp, uses: B.uses, inv: B.inv, crop: B.crop, sown: B.sown, grown: B.grown }));
   const out = { v: 2, at: Date.now(), d, p: { x: Math.round(S.p.x), y: Math.round(S.p.y) }, rg: { hp: rg.hp, steel: rg.steel || 0, flask: rg.flask, kills: rg.kills || 0, looted: [...rg.looted] }, xs: XS };
   try { localStorage.setItem(dayKey(), JSON.stringify(out)); } catch (e) {}
 }
@@ -8371,7 +8427,7 @@ function dayLoad(sv) {                          // pick a saved run back up wher
   D.baseHp = D.baseHp || rg.maxHp;
   D.beasts = d.beasts.map(b => ({ kind: 'beast', r: 0, s: 1, st: 'graze', t: Math.random() * 3, dir: Math.random() * 7, sp: 0, ph: Math.random() * 9, flash: 0, ...b }));
   for (const sv of d.bld || []) stMake(sv);
-  for (const B of d.builds) { const nb = dayMakeBuild(B.t, B.x, B.y, B.a || 0); if (B.hp !== undefined) nb.hp = B.hp; if (B.uses !== undefined) nb.uses = B.uses; if (B.inv) nb.inv = B.inv; }
+  for (const B of d.builds) { const nb = dayMakeBuild(B.t, B.x, B.y, B.a || 0); if (B.hp !== undefined) nb.hp = B.hp; if (B.uses !== undefined) nb.uses = B.uses; if (B.inv) nb.inv = B.inv; if (B.crop) { nb.crop = B.crop; nb.sown = B.sown; nb.grown = !!B.grown; } }
   rg.hp = sv.rg.hp; rg.flask = sv.rg.flask; rg.kills = sv.rg.kills; rg.looted = new Set(sv.rg.looted);
   dayGearFx(); rg.hp = Math.min(sv.rg.hp, rg.maxHp); rg.steel = Math.min(sv.rg.steel || 0, steelMax()); D.steelSeen = rg.steel;
   for (const k of d.seen || []) daySee(k, true);   // the book fills back in, quietly
@@ -8827,6 +8883,131 @@ function dayPondFill() {                         // the pond fills your skins, b
   else { D.water = Math.min(FOOD_MAX, D.water + 35); exNote('drank from the pond'); sfx(0.8, 0.3, 'lowpass', 900, 0.25); if (Math.random() < 0.35) { D.sick = 30; exNote('the water was bad', true); } }
   dayChanged();
 }
+// ---- v154 stage 4 (Joe): the deeper woods. Rock out past the near woods has iron in it, and a furnace turns ore into bars and
+// bars into tools and mail that outlast anything you can knap. A drying rack keeps meat for the hard days. Out there wolves hunt
+// in packs and a bear holds its ground, and a wolf you feed enough will follow you home and fight beside you. A plot of dug earth
+// by your camp grows berries, so you need never walk far for food again.
+const IRON_FROM = 1500, FURN_R = 90, RACK_R = 90, GROW_T = 150;
+const dayFurnNear = (x, y) => S.day && S.day.builds.some(B => B.t === 'furnace' && Math.hypot(B.x - x, B.y - y) < FURN_R);
+const dayRackNear = (x, y) => S.day && S.day.builds.some(B => B.t === 'rack' && Math.hypot(B.x - x, B.y - y) < RACK_R);
+// ---- the beasts of the deep woods ----
+function wolfPack(b, dt, d, dx, dy) {            // wolves circle, dart in, and bring the whole pack with them
+  const p = S.p, B = BEAST[b.k];
+  if (b.tame) return tameStep(b, dt);
+  if (b.st === 'graze' && d < B.scare) { beastCall(b); }
+  if (b.st === 'hunt') {
+    const close = d < 110;                       // out wide they circle you; inside that they come straight in
+    b.dir = Math.atan2(-dy, -dx) + (close ? 0 : (b.circ || 0) * Math.min(0.9, (d - 90) / 260));
+    b.sp = d < 21 ? 0 : B.sp * (close ? 1 : 0.85);   // it stops at your shoulder rather than standing in you
+    if (d < 30 && S.rg.inv <= 0 && S.rg.phase === 'fight' && (b.bite = (b.bite || 0) - dt) <= 0) {
+      b.bite = 1.6; hurt({ x: b.x, y: b.y, type: 'half' }); b.st = 'back'; b.t = 1.1;
+      if (actx && monNear(b, 600) > 0) noiseAt(actx.currentTime, 900, 300, 0.2, 0.4 * monNear(b, 600), sfxGain);
+    }
+    if (d > 760) { b.st = 'graze'; b.t = 2; }
+  } else if (b.st === 'back') {                  // off again before you can swing
+    b.dir = Math.atan2(dy, dx); b.sp = B.sp * 0.8;
+    if (b.t <= 0) { b.st = 'hunt'; b.circ = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random()); }
+  }
+}
+function beastCall(b) {                          // one wolf opens up and the pack answers
+  const D = S.day; if (b.st === 'hunt' || b.tame) return;
+  b.st = 'hunt'; b.t = 4; b.circ = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random());
+  if (actx && monNear(b, 700) > 0) { const t = actx.currentTime; boomAt(t, 500, 220, 0.7, 0.3 * monNear(b, 700), sfxGain); noiseAt(t, 1200, 500, 0.5, 0.18 * monNear(b, 700), sfxGain); }
+  for (const o of D.beasts) if (o !== b && o.k === b.k && !o.dead && !o.tame && o.st !== 'hunt' && dist2(o, b) < 420) { o.st = 'hunt'; o.t = 4; o.circ = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random()); }
+}
+function tameStep(b, dt) {                       // your wolf: it goes for whatever is coming for you, and otherwise keeps close
+  const p = S.p, B = BEAST[b.k];
+  let tgt = null, td = 420;
+  for (const e of S.rg.enemies) if (!e.dead) { const d = dist2(e, p); if (d < td) { td = d; tgt = e; } }
+  if (tgt) {
+    const d = dist2(b, tgt); b.dir = Math.atan2(tgt.y - b.y, tgt.x - b.x); b.sp = B.sp * 0.95;
+    if (d < 24 && (b.bite = (b.bite || 0) - dt) <= 0) {
+      b.bite = 0.9; tgt.hp -= 1.1; tgt.flash = 1; tgt.jit = 1; ashBurst(tgt.x, tgt.y, 4, 14);
+      if (actx && monNear(b, 500) > 0) noiseAt(actx.currentTime, 1400, 500, 0.12, 0.3 * monNear(b, 500), sfxGain);
+      if (tgt.hp <= 0 && !tgt.dead) { tgt.dead = true; tgt.dieT = 0; S.rg.kills = (S.rg.kills || 0) + 1; }
+    }
+    return;
+  }
+  const d = dist2(b, p);
+  b.dir = Math.atan2(p.y - b.y, p.x - b.x);
+  b.sp = d > 110 ? B.sp * 0.9 : d > 60 ? 60 : 0;
+  if (b.sp === 0 && Math.random() < dt * 0.4) b.dir = Math.random() * 7;
+}
+function dayTameTry() {                          // hold cooked meat and walk up to a wolf: it takes a few feeds
+  const D = S.day, p = S.p, s = heldSlot();
+  if (!s || (s.id !== 'cooked' && s.id !== 'fishC' && s.id !== 'jerky')) return false;
+  let b = null, bd = 70;
+  for (const o of D.beasts) if (!o.dead && o.k === 'wolf' && !o.tame) { const d = dist2(o, p); if (d < bd) { bd = d; b = o; } }
+  if (!b) return false;
+  s.n--; if (!s.n) D.inv[D.hot] = null;
+  b.fed = (b.fed || 0) + 1; b.st = 'graze'; b.t = 2.5; dayAct(7, 0.5);
+  ashBurst(b.x, b.y, 5, 16); sfx(1.5, 0.25, 'bandpass', 1200, 0.22);
+  if (b.fed >= 3) {
+    b.tame = true; b.hp = BEAST.wolf.hp; exNote('the wolf stays with you', true);
+    addShake(0.2); if (actx) { const t = actx.currentTime; boomAt(t, 400, 180, 0.5, 0.3, sfxGain); }
+    lifeAdd('tamed');
+  } else exNote(`it takes the meat · ${3 - b.fed} more`);
+  dayChanged(); return true;
+}
+// ---- the furnace, the drying rack and the plot ----
+function dayPlotPlant(B) {
+  const D = S.day, s = heldSlot();
+  if (B.grown) {                                 // ripe: take the crop and it starts again
+    const n = 4 + Math.floor(Math.random() * 3);
+    dayGive(B.crop, n, B.x, B.y); dayGive('fibre', 1, B.x, B.y);
+    B.crop = null; B.grown = false; B.sown = 0; dayAct(7, 0.6); exNote(`picked · ${n} berries`); pickSnd(); dayChanged(); return;
+  }
+  if (B.crop) { exNote(`it's still growing · ${Math.max(1, Math.ceil((B.sown + GROW_T - D.t) / 10) * 10)}s`); return; }
+  if (!s || s.id !== 'berries') { dayNote('seed', 'hold berries to sow it', 2); return; }
+  s.n--; if (!s.n) D.inv[D.hot] = null;
+  B.crop = 'berries'; B.sown = D.t; B.grown = false;
+  dayAct(10, 0.9); ashBurst(B.x, B.y, 5, 5); exNote('sown'); sfx(0.8, 0.3, 'lowpass', 700, 0.22);
+  dayChanged();
+}
+function dayPlotStep(dt) {
+  const D = S.day;
+  for (const B of D.builds) if (B.t === 'plot' && B.crop && !B.grown && D.t - B.sown >= GROW_T) { B.grown = true; if (dist2(B, S.p) < 700) exNote('your plot is ripe', true); }
+}
+// ---- drawing: a furnace of stone, a rack of split poles, a dug plot ----
+function dayDrawDeep(o, c, sx, sy) {
+  const C = (col, grey) => COLOUR ? col : grey, B = o.build;
+  if (o.sub === 'furnace') {
+    isoBox(c, o.x, o.y, 0.6, 30, 26, 6, C('#6e6c67', '#67675f'), C('#54524e', '#4c4c48'), C('#403e3a', '#3a3a36'));
+    isoBox(c, o.x, o.y, 0.6, 24, 20, 22, C('#8e8c86', '#8a8a86'), C('#6e6c67', '#67675f'), C('#54524e', '#4c4c48'), 6);
+    isoBox(c, o.x, o.y, 0.6, 12, 10, 8, C('#6e6c67', '#67675f'), C('#54524e', '#4c4c48'), C('#403e3a', '#3a3a36'), 28);   // the chimney
+    const [mx, my] = toScreen(o.x - 9, o.y + 9);
+    c.fillStyle = '#1a1512'; c.beginPath(); c.ellipse(mx, my - 14 * Z, 5 * Z, 6 * Z, 0, 0, 7); c.fill();                   // the mouth
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) { const h = (7 + 4 * Math.sin(S.t * 8 + i * 2)) * Z;
+      c.fillStyle = ['rgba(255,110,40,0.75)', 'rgba(255,180,70,0.7)', 'rgba(255,240,190,0.6)'][i];
+      c.beginPath(); c.ellipse(mx, my - 14 * Z, (4 - i) * Z, h * 0.5, 0, 0, 7); c.fill(); }
+    const [cx2, cy2] = toScreen(o.x, o.y);
+    for (let i = 0; i < 3; i++) { const t = (S.t * 0.4 + i / 3) % 1; c.fillStyle = `rgba(190,185,175,${(1 - t) * 0.22})`; c.beginPath(); c.arc(cx2 + Math.sin(t * 4 + i) * 5 * Z, cy2 - (38 + t * 34) * Z, (3 + t * 7) * Z, 0, 7); c.fill(); }
+    c.restore();
+  } else if (o.sub === 'rack') {
+    for (const k of [-1, 1]) { isoBox(c, o.x + k * 17, o.y - 8, 0, 4, 4, 30, C('#8a6a44', '#76766f'), C('#6a4e30', '#5e5e58'), C('#4a3620', '#4a4a46')); isoBox(c, o.x + k * 17, o.y + 8, 0, 4, 4, 30, C('#8a6a44', '#76766f'), C('#6a4e30', '#5e5e58'), C('#4a3620', '#4a4a46')); }
+    for (const h of [30, 20]) isoBox(c, o.x, o.y, Math.PI / 2 + 0.0001, 38, 3, 3, C('#a07850', '#8a8a84'), C('#7a5232', '#6a6a64'), C('#5a3a20', '#4a4a46'), h);
+    const n = B && B.n ? B.n : 3;
+    for (let i = 0; i < n; i++) {                 // strips hanging to dry
+      const [x, y] = toScreen(o.x - 15 + i * 15, o.y), sw = Math.sin(S.t * 1.6 + i) * 1.4 * Z;
+      c.fillStyle = C('#a0503a', '#7a7a74'); c.beginPath(); c.moveTo(x, y - 30 * Z); c.lineTo(x + 3 * Z + sw, y - 30 * Z); c.lineTo(x + 4 * Z + sw * 1.6, y - 16 * Z); c.lineTo(x + 1 * Z + sw * 1.6, y - 16 * Z); c.closePath(); c.fill();
+    }
+  } else if (o.sub === 'plot') {
+    const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => toScreen(o.x + i * 26, o.y + j * 20));
+    c.fillStyle = C('#4a3a26', '#44443f'); c.beginPath(); q.forEach(([x, y], k) => k ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill();
+    c.strokeStyle = C('#3a2c1c', '#36362f'); c.lineWidth = 1.2 * Z;
+    for (let k = 1; k < 4; k++) { const f = k / 4, [x0, y0] = toScreen(o.x - 26 + f * 52, o.y - 20), [x1, y1] = toScreen(o.x - 26 + f * 52, o.y + 20); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
+    if (B && B.crop) {
+      const g = B.grown ? 1 : Math.min(1, (S.day.t - B.sown) / GROW_T);
+      for (let i = 0; i < 6; i++) {
+        const ox = ((i % 3) - 1) * 15, oy = (Math.floor(i / 3) - 0.5) * 16, [x, y] = toScreen(o.x + ox, o.y + oy);
+        c.strokeStyle = C('#6f8a46', '#777'); c.lineWidth = 1.6 * Z; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.sin(S.t + i) * Z, y - (4 + 10 * g) * Z); c.stroke();
+        if (g > 0.45) { c.fillStyle = C('#5f8a3a', '#6e6e68'); c.beginPath(); c.ellipse(x, y - (6 + 9 * g) * Z, 4 * g * Z, 3 * g * Z, 0, 0, 7); c.fill(); }
+        if (B.grown) { c.fillStyle = C('#c23a4a', '#cfcfc8'); for (const d of [-2.5, 2.5]) { c.beginPath(); c.arc(x + d * Z, y - 15 * Z, 1.9 * Z, 0, 7); c.fill(); } }
+      }
+    }
+  }
+}
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
 // crafting and building each have a short body animation. Struck trees, rocks and bushes shake and throw chips.
@@ -8881,7 +9062,7 @@ function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the t
   }
   if (act && !act.item) return;                  // knelt working: hands only
   if (!T) return;
-  const head = T.tier > 1 || s.id === 'spear2' ? C(FLINT_HEAD, '#4a4a48') : C(STONE_HEAD, '#8a8a86');
+  const head = T.tier > 2 || s.id === 'spear3' ? C(IRON_HEAD, '#c2c2bc') : T.tier > 1 || s.id === 'spear2' ? C(FLINT_HEAD, '#4a4a48') : C(STONE_HEAD, '#8a8a86');
   if (T.tool === 'axe') {
     seg(-1.5, 12, 1.5, C('#7a5a3a', '#6a6a66'));
     if (OUT) return;
