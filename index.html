@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 158</p>
+      <p class="small" id="verLbl">Version 159</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -3640,10 +3640,15 @@ function applyWorldLights(lights, items) {
       const x = cx + Math.cos(th) * base * r, y = cy + Math.sin(th) * base * r;
       n ? lActx.lineTo(x, y) : lActx.moveTo(x, y);
     }
+    if (S.day) {                                // v159 (Daylight): no wobbly cut-off edge, the light just thins out smoothly to nothing
+      lActx.fillStyle = softStops(lActx.createRadialGradient(cx, cy, 0, cx, cy, base * 1.3), '255,255,255', 0.97);
+      lActx.fillRect(cx - base * 1.3, cy - base * 1.3, base * 2.6, base * 2.6);
+    } else {
     const g = lActx.createRadialGradient(cx, cy, 0, cx, cy, base * 1.2);
     g.addColorStop(0, 'rgba(255,255,255,0.97)'); g.addColorStop(0.3, 'rgba(255,255,255,0.8)');
     g.addColorStop(0.65, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
     lActx.fillStyle = g; lActx.fill();
+    }
 
     // shadows from this light only
     lActx.globalCompositeOperation = 'destination-out'; lActx.fillStyle = '#000';
@@ -8189,8 +8194,7 @@ function drawDayFires() {                       // flames on your campfires, and
       ctx.fillStyle = ['rgba(255,120,40,0.75)', 'rgba(255,170,60,0.7)', 'rgba(255,215,120,0.65)', 'rgba(255,245,200,0.6)'][i];
       ctx.beginPath(); ctx.moveTo(x - w + ox, y - 3 * Z); ctx.quadraticCurveTo(x + ox, y - 3 * Z - h * 1.4, x + w + ox, y - 3 * Z); ctx.closePath(); ctx.fill();
     }
-    const g = ctx.createRadialGradient(x, y - 6 * Z, 0, x, y - 6 * Z, 50 * Z); g.addColorStop(0, 'rgba(255,170,80,0.28)'); g.addColorStop(1, 'rgba(255,170,80,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 6 * Z, 50 * Z, 0, 7); ctx.fill();
+    softGlow(ctx, x, y - 6 * Z, 50 * Z, '255,170,80', 0.28);
   }
   ctx.restore();
 }
@@ -8920,15 +8924,12 @@ function drawNight() {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter';
-  const pool = (wx, wy, r, a, col) => {           // what light there is: your fires, and the torch in your hand
-    const [x, y] = toScreen(wx, wy), R = r * Z * DPR, gx = ctx.createRadialGradient(x * DPR, (y - 6 * Z) * DPR, 0, x * DPR, (y - 6 * Z) * DPR, R);
-    gx.addColorStop(0, `rgba(${col},${a * k})`); gx.addColorStop(0.55, `rgba(${col},${a * k * 0.35})`); gx.addColorStop(1, `rgba(${col},0)`);
-    ctx.fillStyle = gx; ctx.beginPath(); ctx.ellipse(x * DPR, (y - 6 * Z) * DPR, R, R * 0.62, 0, 0, 7); ctx.fill();
-  };
+  const pool = (wx, wy, r, a, col) => dayPool(ctx, wx, wy, r, a * k, col);   // what light there is: your fires, and the torch in your hand
   const warm = COLOUR ? '255,186,110' : '230,230,226';
   for (const B of S.day.builds) if (B.t === 'fire' && Math.abs(B.x - S.cam.x) < 900 && Math.abs(B.y - S.cam.y) < 900) pool(B.x, B.y, 160 + Math.sin(S.t * 6 + B.x) * 6, 0.5, warm);
   if (S.rg.inCamp) pool(0, 0, 320, 0.4, warm);
   const T = dayTorch(); if (T) pool(S.p.x, S.p.y, 125 + Math.sin(S.t * 9) * 5, 0.55, warm);
+  dayNightLights(pool, warm);   // v159
   ctx.restore();
 }
 const dayTorch = () => { const s = heldSlot(); return s && DIT[s.id].k === 'light' && s.d > 0 ? s : null; };
@@ -9325,9 +9326,7 @@ function dayDrawCamp(o, c, sx, sy) {
     c.fillStyle = C('#7a6246', '#6e6e68');          // a hide hung off the pole, so it reads from a long way off
     c.beginPath(); c.moveTo(x - 9 * Z, y - 62 * Z); c.lineTo(x + 9 * Z, y - 62 * Z); c.lineTo(x + 6 * Z, y - 40 * Z); c.lineTo(x - 6 * Z, y - 40 * Z); c.closePath(); c.fill();
     c.save(); c.globalCompositeOperation = 'lighter';
-    const g = c.createRadialGradient(x, hy, 0, x, hy, 46 * Z);
-    g.addColorStop(0, 'rgba(255,205,130,0.42)'); g.addColorStop(1, 'rgba(255,170,90,0)');
-    c.fillStyle = g; c.beginPath(); c.arc(x, hy, 46 * Z, 0, 7); c.fill();
+    softGlow(c, x, hy, 46 * Z, '255,195,120', 0.42);
     for (let i = 0; i < 3; i++) { const t = (S.t * 0.5 + i / 3) % 1; c.fillStyle = `rgba(255,210,140,${(1 - t) * 0.3})`; c.beginPath(); c.arc(x + Math.sin(t * 6 + i) * 6 * Z, hy - t * 40 * Z, (1.6 + t * 2) * Z, 0, 7); c.fill(); }
     c.restore();
     const img = iconImg(R);
@@ -9370,9 +9369,7 @@ function dayDrawWar(o, c, sx, sy) {
     }
     c.save(); c.globalCompositeOperation = 'lighter';
     const G = S.day.siege, grow = G ? Math.min(1, 0.5 + G.t / SIEGE_T) : 1;
-    const gl = c.createRadialGradient(x, y - 70 * Z, 0, x, y - 70 * Z, 170 * Z);
-    gl.addColorStop(0, 'rgba(255,170,80,0.45)'); gl.addColorStop(1, 'rgba(255,140,60,0)');
-    c.fillStyle = gl; c.beginPath(); c.arc(x, y - 70 * Z, 170 * Z, 0, 7); c.fill();
+    softGlow(c, x, y - 70 * Z, 170 * Z, '255,160,75', 0.45);
     for (let i = 0; i < 4; i++) { const h = (110 + 50 * Math.sin(S.t * 5 + i * 1.7)) * grow * Z;
       c.fillStyle = ['rgba(255,90,30,0.62)', 'rgba(255,150,50,0.6)', 'rgba(255,210,110,0.55)', 'rgba(255,250,220,0.5)'][i];
       c.beginPath(); c.ellipse(x, y - (56 + h * 0.42) * Z, (26 - i * 5.4) * grow * Z, h * 0.5, 0, 0, 7); c.fill(); }
@@ -9507,6 +9504,47 @@ function drawSunShadows(items) {
   }
   { const [px, py] = toScreen(S.p.x, S.p.y); col(px, py, 5.5 * Z, 34 * Z); }   // you
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = sun.a; ctx.imageSmoothingEnabled = true; ctx.drawImage(sunCv, 0, 0, W * DPR, H * DPR); ctx.restore();
+}
+// ---- v159 (Joe): light that fades out softly instead of stopping at a hard line, and a camp yard where you can see what's in it.
+// Every pool of light in Daylight now falls off along a smooth curve all the way to nothing, drawn as a true ellipse so no edge
+// of it is ever cut off. The camp box and the water barrels used to sit right behind the front of the palisade, where the fence
+// hid them; in Daylight they stand out in the open front-left of the yard instead (Expedition's camp keeps its old layout).
+const SOFT = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+function softStops(g, col, a) {                 // (1 - t²)²: bright in the middle, and no kink anywhere on the way down to zero
+  for (const t of SOFT) { const f = (1 - t * t) * (1 - t * t); g.addColorStop(t, `rgba(${col},${(a * f).toFixed(4)})`); }
+  return g;
+}
+function softGlow(c, x, y, R, col, a, sq = 1) { // a round glow at screen point x, y (in the canvas's own units)
+  if (R <= 0 || a <= 0) return;
+  c.save(); c.translate(x, y); if (sq !== 1) c.scale(1, sq);
+  c.fillStyle = softStops(c.createRadialGradient(0, 0, 0, 0, 0, R), col, a); c.fillRect(-R, -R, R * 2, R * 2);
+  c.restore();
+}
+function dayPool(c, wx, wy, r, a, col) {        // a pool of light lying on the ground, in device pixels (drawNight's own space)
+  const [x, y] = toScreen(wx, wy);
+  softGlow(c, x * DPR, (y - 6 * Z) * DPR, r * Z * DPR, col, a, 0.62);
+}
+function dayNightLights(pool, warm) {           // the lights that came after the night was first drawn: torch posts and the signal fire
+  for (const B of S.day.builds) {
+    if (Math.abs(B.x - S.cam.x) > 900 || Math.abs(B.y - S.cam.y) > 900) continue;
+    if (B.t === 'tpost' && B.fuel > 0) pool(B.x, B.y, 150 + Math.sin(S.t * 7 + B.y) * 5, 0.42, warm);
+    if (B.t === 'signal' && B.lit) pool(B.x, B.y, 300 + Math.sin(S.t * 4) * 10, 0.55, warm);
+  }
+}
+// ---- the yard ----
+const YARD_EX = [], YARD_DAY = [{ x: -12, y: 102 }, { x: -5, y: 75 }, { x: 24, y: 70 }, { x: -38, y: 92 }];   // small crate, big crate (the box), barrel (water), barrel: open ground, clear of the fence and the buttons   // small crate, big crate (the box), barrel (water), barrel
+let yardIs = null;
+function dayYard(day) {                         // move the camp box and barrels to where you can see them, only in Daylight
+  if (yardIs === day) return;
+  const objs = CAMP.filter(o => o.camp === 'crate' || o.camp === 'barrel');        // crate, big crate, barrel, barrel, in that order
+  if (!YARD_EX.length) for (const o of objs) YARD_EX.push({ x: o.x, y: o.y });
+  const to = day ? YARD_DAY : YARD_EX, from = day ? YARD_EX : YARD_DAY;
+  objs.forEach((o, i) => {
+    const sol = CAMP_SOLID.find(q => q.x === o.x && q.y === o.y);
+    o.x = to[i].x; o.y = to[i].y; if (sol) { sol.x = o.x; sol.y = o.y; }
+  });
+  CAMP_BOX.x = to[1].x; CAMP_BOX.y = to[1].y; CAMP_BARREL.x = to[2].x; CAMP_BARREL.y = to[2].y;
+  yardIs = day;
 }
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
@@ -14994,6 +15032,7 @@ function begin(mode) {
   const day = mode === 'day' || mode === 'daynew', fresh = mode === 'daynew'; if (day) mode = 'expedition';   // v127: Daylight runs on Expedition's woods; v132: 'day' carries on a saved run
   camZv = 1;                                    // the title's close-up zoom doesn't carry into the game
   reset(); S.mode = mode; EX_TEST = false; attackBtn.textContent = 'Attack'; useBtn.textContent = 'Take';
+  dayYard(day);   // v159: Daylight's camp box and barrels stand where you can see them
   if (mode === 'free') { S.q = null; }
   else if (mode === 'survive') { S.q = null; S.rg = newRun(); picker.hidden = true; startWave(); }
   else if (mode === 'expedition') { S.q = null; picker.hidden = true; day ? (fresh || !dayReadSave() ? (dayClearSave(), dayBegin()) : dayLoad(dayReadSave())) : exBegin(); }
