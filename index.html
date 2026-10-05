@@ -419,7 +419,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 144</p>
+      <p class="small" id="verLbl">Version 145</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -13100,7 +13100,29 @@ function drawTitleEyes() {
 }
 
 let last = performance.now();
+// ---- v145: phone held upright, the buttons lay themselves out: one main column up the right edge, a second column of
+// small ones just inside it, each stacked from whatever is showing right now so nothing ever lands on top of anything ----
+const BTN_A = ['attack', 'wspec', 'dodge', 'campBtn', 'craftBtn', 'autorun', 'torch'], BTN_B = ['wswap', 'flaskBtn', 'recallBtn', 'lampBtn', 'useBtn'];
+let btnKey = '';
+function layoutBtns() {
+  const portrait = innerHeight > 520, els = id => document.getElementById(id);
+  const shown = id => { const e = els(id); return e && !e.hidden && getComputedStyle(e).display !== 'none' ? e : null; };
+  const a = BTN_A.map(shown).filter(Boolean), b = BTN_B.map(shown).filter(Boolean);
+  const key = portrait + innerHeight + ':' + a.map(e => e.id).join() + '|' + b.map(e => e.id).join();
+  if (key === btnKey) return; btnKey = key;
+  for (const e of [...BTN_A, ...BTN_B].map(els)) if (e) { e.style.bottom = ''; e.style.right = ''; }
+  if (!portrait) return;                           // on its side the phone keeps its own row layout
+  const safe = ' + env(safe-area-inset-bottom, 0px))', GAP = innerHeight < 720 ? 9 : 14, TOP = innerHeight - 120;   // stay under the corner HUD
+  const ring = e => e.id === 'wspec' || e.id === 'flaskBtn' || e.id === 'recallBtn' ? 5 : 0;   // these wear a ring outside the button
+  const colA = [], colB = [];
+  let y = 290;                                      // attack sits above your aiming thumb, everything else climbs from there
+  for (const e of a) { const h = e.offsetHeight || 64; if (y + h > TOP && e.id !== 'attack') { colB.push(e); continue; } colA.push([e, y]); y += h + ring(e) * 2 + GAP; }
+  y = 300; for (const e of [...b, ...colB]) { const h = e.offsetHeight || 48; colB.length; e.style.bottom = `calc(${y + ring(e)}px${safe}`; e.style.right = `${Math.round(130 - (e.offsetWidth || 48) / 2)}px`; y += h + ring(e) * 2 + GAP; }
+  for (const [e, yy] of colA) { e.style.bottom = `calc(${yy + ring(e)}px${safe}`; e.style.right = `${Math.round(54 - (e.offsetWidth || 64) / 2)}px`; }
+}
+addEventListener('resize', () => { btnKey = ''; });
 function frame(now) {
+  layoutBtns();   // v145
   const raw = Math.max(0, (now - last) / 1000);   // v111: rAF's stamp can come before a resume's performance.now(); a negative step once froze the game
   const dt = Math.min(0.05, raw); last = now; frameDt = dt;
   watchSpeed(raw);
