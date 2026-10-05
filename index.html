@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 156</p>
+      <p class="small" id="verLbl">Version 157</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -8266,8 +8266,14 @@ function pkMove(a, b) {                          // move, stack or swap what's i
   arrA[a.i] = dst; arrB[b.i] = src;
   if (b.w === 'inv') daySee(src.id);
 }
+function dayBoxFit() {                          // v157 (Joe): the camp box has no limit. It always keeps a spare row free, growing as you fill it
+  const B = S.day.box; let last = -1; for (let i = 0; i < B.length; i++) if (B[i]) last = i;
+  const want = Math.max(BOX_SLOTS, Math.ceil((last + 1 + 6) / 6) * 6);
+  while (B.length < want) B.push(null); if (B.length > want) B.length = want;
+}
 function pkQuick(w, i) {                         // the whole stack across to the other side: pack to chest, chest to pack
   const D = S.day, from = pkArr(w), s = from[i]; if (!s || !PK.cont) return;
+  if (w === 'inv' && PK.cont.box) dayBoxFit();
   const to = w === 'inv' ? PK.cont.inv : D.inv, left = addTo(to, s.id, s.n, s.d ?? s.w, w === 'inv' ? undefined : slotOrder(D, s.id));
   if (left === s.n) { pkSay(w === 'inv' ? 'it\'s full' : 'your pack is full'); return; }
   if (w === 'cont') daySee(s.id);
@@ -8367,6 +8373,7 @@ function needsHtml() {
     + m('Warmth', D.warm / WARM_MAX, '#96c8d8', D.bleed > 0 ? 'bleeding' : Math.round(D.warm), D.warm < 30 || D.bleed > 0);
 }
 function renderPack() {
+  dayBoxFit();
   const D = S.day, el = pkEl, root = document.getElementById('pkBody');
   document.getElementById('pkNeeds').innerHTML = needsHtml();
   document.getElementById('pkDay').textContent = `Day ${D.n} · ${dayClock(D.t)}`;
@@ -8376,7 +8383,7 @@ function renderPack() {
   if (PK.flash && performance.now() - PK.flash.at < 2600) out.push(el('p', 'pkflash', PK.flash.t));
   if (PK.tab === 'pack') {
     if (PK.cont) {   // the chest or box you opened sits at the top, where you're looking
-      const h2 = el('h3', '', PK.cont.name); h2.append(el('span', '', `${PK.cont.inv.filter(Boolean).length} of ${PK.cont.inv.length}`)); out.push(h2);
+      const h2 = el('h3', '', PK.cont.name); h2.append(el('span', '', PK.cont.box ? `${PK.cont.inv.filter(Boolean).length} used · no limit` : `${PK.cont.inv.filter(Boolean).length} of ${PK.cont.inv.length}`)); out.push(h2);
       const g = el('div', 'pkgrid cont'); PK.cont.inv.forEach((s, i) => g.append(pkSlot(s, 'cont', i))); out.push(g);
       const sa = el('button', 'alt pkstore', 'Store all materials'); sa.addEventListener('click', () => { for (let i = HOTN; i < D.inv.length; i++) if (D.inv[i] && DIT[D.inv[i].id].k === 'mat') pkQuick('inv', i); }); out.push(sa);
     }
