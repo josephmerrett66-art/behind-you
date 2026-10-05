@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 164</p>
+      <p class="small" id="verLbl">Version 165</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -6956,6 +6956,7 @@ const STAT_GROUPS = [
   { id: 'Spirit', line: 'Gathering wisps', icon: 'wisp' },
   { id: 'Beyond', line: 'Power for the Dunes', icon: 'power', lock: () => !beyondOpen(), lockLine: 'Opens when the green portal does' },
   { id: 'Survival', line: 'Hunger, stamina, tools and hides', icon: 'survive', dayOnly: true },   // v164: Daylight only
+  { id: 'Power-ups', line: 'Fireflies, flares, candles and more', icon: 'fireflies', dayOnly: true, pow: true },   // v165
 ];
 function stRead() { try { const s = JSON.parse(localStorage.getItem(stKey())); if (s && typeof s.w === 'number' && s.r) return s; } catch (e) {} return { w: 0, r: {} }; }
 function stSave() { try { localStorage.setItem(stKey(), JSON.stringify(ST)); } catch (e) {} }
@@ -7104,7 +7105,7 @@ function renderStats() {
     cats.append(...STAT_GROUPS.filter(groupShown).map(c => {
       const b = el('button', 'cat'); b.type = 'button';
       const all = STATS.filter(s => s.g === c.id && statShown(s)), got = all.reduce((a, s) => a + sr(s.id), 0), tot = all.reduce((a, s) => a + s.max, 0), locked = c.lock && c.lock();
-      const t = el('span', 'ct'); t.append(el('span', 'nm', c.id), el('span', 'sh', locked ? c.lockLine : c.line), el('span', 'cnt', locked ? 'Locked' : `${got} of ${tot} upgrades`));
+      const t = el('span', 'ct'); t.append(el('span', 'nm', c.id), el('span', 'sh', locked ? c.lockLine : c.line), el('span', 'cnt', locked ? 'Locked' : c.pow ? `${dpowCount()[0]} of ${dpowCount()[1]} owned · ${dpowUsed()} of ${dpowSlots()} slots` : `${got} of ${tot} upgrades`));
       b.append(svgIcon(c.icon), t);
       if (locked) { b.disabled = true; b.style.opacity = '0.45'; return b; }
       b.addEventListener('click', () => { statCat = c.id; statOpen = null; renderStats(); body.querySelector('button').focus({ preventScroll: true }); });
@@ -7112,6 +7113,7 @@ function renderStats() {
     }));
     body.replaceChildren(cats); return;
   }
+  if (statCat === 'Power-ups') return renderDayPow(body);   // v165
   const head = el('div', 'cathead'), back = el('button', 'mini alt', '‹ All'); back.type = 'button';
   back.addEventListener('click', () => { statCat = null; statOpen = null; renderStats(); });
   head.append(back, el('h3', '', statCat));
@@ -9754,6 +9756,82 @@ function dayWispShop() {
   const rg = S.rg; if (!S.day || !rg || rg.phase !== 'fight' || !S.running) return;
   S.running = false; menuBtn.hidden = true; campBtn.hidden = true; craftBtn.hidden = true; hotbarEl.hidden = true;
   openStats('day');
+}
+// ---- v165 (Joe): Expedition's power-ups, bought with wisps. Only the ones that work without a torch beam ----
+// Owned and equipped power-ups live with Daylight's wisp upgrades (stPool), so they stay between runs.
+const DPOW = [   // [id, group, Daylight's own wording where Expedition's talks about the beam]
+  ['halo', 'Around you', 'A ring of light around you stops anything that gets close.'],
+  ['fireflies', 'Around you', null],
+  ['candles', 'Around you', 'You drop candles as you walk. Their light stops raiders in their tracks.'],
+  ['flare', 'Around you', 'Every so often a flare flies at the nearest raider and burns everything around it.'],
+  ['feet', 'Moves', null],
+  ['close', 'Moves', 'Rolling through a hit refills your dodge.'],
+  ['chain', 'Kills', 'Enemies you kill burst, hurting the ones beside them.'],
+  ['nova', 'Kills', 'Every 12 kills charges a nova. Your next dodge lets it go, burning everything around you.'],
+  ['wildfire', 'Kills', 'Every burst is twice the size, and each kill may launch a flare on its own.'],
+];
+const DPOW_LV = { close: ['Your dodge comes straight back', 'Plus a burst of speed'], halo: ['A small ring', 'A bigger ring', 'Bigger again, and the ring burns'],
+  chain: ['A small burst', 'A bigger burst', 'Bigger again'] };
+const DPOW_SLOT = [60, 120, 200, 320, 480];
+const dpowPrice = (u, have) => 3 * upPrice(u, have);   // embers there, wisps here
+const dpow = () => { const P = stPool(); P.own = P.own || {}; P.eq = P.eq || []; P.slot = P.slot || 0; return P; };
+const dpowSlots = () => 3 + dpow().slot;
+const dpowUsed = () => dpow().eq.reduce((a, id) => a + slotCost(id), 0);
+function dayPowApply() {                          // what's equipped is what the run has
+  const rg = S && S.rg; if (!S || !S.day || !rg) return;
+  const P = dpow(); rg.up = {}; for (const id of P.eq) if (P.own[id]) rg.up[id] = P.own[id];
+}
+function dpowBuy(id) {
+  const P = dpow(), u = UP[id], have = P.own[id] || 0, c = dpowPrice(u, have); if (have >= kitMax(u) || P.w < c) return;
+  P.w -= c; P.own[id] = have + 1;
+  if (!P.eq.includes(id) && dpowUsed() + slotCost(id) <= dpowSlots()) P.eq.push(id);   // on straight away if there's room
+  poolSave(); dayPowApply(); wispChime(1.5); sfx(1.4, 0.5, 'bandpass', 1500, 0.3); renderStats();
+}
+function dpowToggle(id) {
+  const P = dpow(), i = P.eq.indexOf(id);
+  if (i >= 0) P.eq.splice(i, 1); else if (P.own[id] && dpowUsed() + slotCost(id) <= dpowSlots()) P.eq.push(id);
+  poolSave(); dayPowApply(); renderStats();
+}
+function dpowBuySlot() {
+  const P = dpow(), c = DPOW_SLOT[P.slot]; if (c === undefined || P.w < c) return;
+  P.w -= c; P.slot++; poolSave(); wispChime(1.5); renderStats();
+}
+function dpowCount() { const P = dpow(); return [DPOW.filter(([id]) => P.own[id]).length, DPOW.length]; }
+function renderDayPow(body) {
+  const P = dpow(), head = el('div', 'cathead'), back = el('button', 'mini alt', '‹ All'); back.type = 'button';
+  back.addEventListener('click', () => { statCat = null; statOpen = null; renderStats(); });
+  head.append(back, el('h3', '', 'Power-ups'));
+  const info = el('p', 'small', `${dpowUsed()} of ${dpowSlots()} slots in use. Power-ups you own switch on and off here.`);
+  const list = el('div', 'items');
+  const row = (id, ic, name, sh, pipsHave, pipsMax, tag, cls, open, more) => {
+    const wrap = el('div', 'item' + cls + (open ? ' open' : '')), r = el('button', 'itemrow'); r.type = 'button'; r.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const t = el('span', 'it'); t.append(el('span', 'nm', name), el('span', 'sh', sh));
+    if (pipsMax) { const pips = el('span', 'pips'); for (let i = 0; i < pipsMax; i++) pips.append(el('i', i < pipsHave ? 'f' : '')); t.append(pips); }
+    r.append(svgIcon(ic), t, el('span', 'pr' + (/^\d+$/.test(tag) ? ' cost' : ''), tag));
+    r.addEventListener('click', () => { statOpen = open ? null : id; renderStats(); });
+    wrap.append(r); if (open) wrap.append(more()); return wrap;
+  };
+  const act = (txt, ok, fn) => { const b = el('button', 'mini', txt); b.type = 'button'; b.disabled = !ok; b.addEventListener('click', fn); return b; };
+  { const c = DPOW_SLOT[P.slot], maxed = c === undefined;
+    list.append(el('p', 'grp', 'Slots'), row('_slot', 'slot', 'Power-up Slot', 'Hold one more power-up at a time', P.slot, DPOW_SLOT.length, maxed ? 'MAX' : String(c), P.slot ? ' own' : '', statOpen === '_slot', () => {
+      const m = el('div', 'more'), a = el('div', 'acts'); a.append(act(maxed ? 'Maxed' : `Buy · ${c}`, !maxed && P.w >= c, dpowBuySlot));
+      m.append(el('p', 'ds', 'Hold one more power-up at a time. Legendary ones take two slots.'), el('p', 'lv', `${dpowSlots()} slots · upgrade ${P.slot} of ${DPOW_SLOT.length}`), a); return m; })); }
+  let grp = null;
+  for (const [id, g, desc] of DPOW) {
+    const u = UP[id]; if (!u) continue;
+    if (g !== grp) { grp = g; list.append(el('p', 'grp', g)); }
+    const mx = kitMax(u), have = P.own[id] || 0, maxed = have >= mx, cost = dpowPrice(u, have), on = P.eq.includes(id), room = dpowUsed() + slotCost(id) <= dpowSlots();
+    const ladder = DPOW_LV[id] || (EX_KIT[id] && EX_KIT[id].lv), text = desc || kitDesc(u);
+    list.append(row(id, id, u.name, text.split('. ')[0].replace(/\.$/, ''), have, mx, on ? 'ON' : maxed ? 'MAX' : String(cost), ' ' + u.r + (on ? ' on' : '') + (have ? ' own' : ''), statOpen === id, () => {
+      const m = el('div', 'more'), a = el('div', 'acts');
+      a.append(act(maxed ? 'Maxed' : have ? `Upgrade · ${cost}` : `Buy · ${cost}`, !maxed && P.w >= cost, () => dpowBuy(id)));
+      if (have) a.append(act(on ? 'Switch off' : room ? 'Switch on' : 'No room', on || room, () => dpowToggle(id)));
+      const lvTxt = ladder ? '\n' + ladder.slice(0, mx).map((t, i) => `${i < have ? '✓' : i === have ? '›' : '·'} ${i + 1}: ${t}`).join('\n') : '';
+      const ds = el('p', 'ds', text + lvTxt); ds.style.whiteSpace = 'pre-line';
+      m.append(ds, el('p', 'lv', `${RARITY[u.r].label}${u.r === 'legendary' ? ' · takes 2 slots' : ''} · ${have ? `upgrade ${have} of ${mx}` : mx === 1 ? 'one upgrade' : `${mx} upgrades`}${on ? ' · on' : ''}`), a);
+      return m; }));
+  }
+  body.replaceChildren(head, info, list);
 }
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
@@ -15251,7 +15329,7 @@ function begin(mode) {
   dayYard(day);   // v159: Daylight's camp box and barrels stand where you can see them
   if (mode === 'free') { S.q = null; }
   else if (mode === 'survive') { S.q = null; S.rg = newRun(); picker.hidden = true; startWave(); }
-  else if (mode === 'expedition') { S.q = null; picker.hidden = true; day ? (fresh || !dayReadSave() ? (dayClearSave(), dayBegin()) : dayLoad(dayReadSave())) : exBegin(); }
+  else if (mode === 'expedition') { S.q = null; picker.hidden = true; day ? (fresh || !dayReadSave() ? (dayClearSave(), dayBegin()) : dayLoad(dayReadSave())) : exBegin(); if (day) dayPowApply(); }   // v165
   else if (mode === 'blink') { S.blinkPhase = 'dark'; S.darkT = BLINK_DARK; S.torchOn = true; spawnQuarry(); S.q.hiddenUntilLit = true; }
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
