@@ -485,7 +485,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 152</p>
+      <p class="small" id="verLbl">Version 153</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -3192,7 +3192,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   const col = x => mask ? maskCol : cm ? hexMat(x, cm) : x;   // v124: camp timber and standing stones take their material in colour
   const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
   if (sx < -110 * s || sx > W + 110 * s || sy < -20 * s || sy - 200 * s > H) return;   // off screen
-  if (o.kind === 'dnode' || o.kind === 'beast' || o.kind === 'dday' || o.kind === 'dbuild' || o.kind === 'dghost' || o.kind === 'dst' || o.kind === 'dstg') { if (!mask) dayDraw(o, c, sx, sy); return; }   // v128, v151, v152
+  if (o.kind === 'dnode' || o.kind === 'beast' || o.kind === 'dday' || o.kind === 'dbuild' || o.kind === 'dghost' || o.kind === 'dst' || o.kind === 'dstg' || o.kind === 'dlake') { if (!mask) dayDraw(o, c, sx, sy); return; }   // v128, v151, v152, v153
   if (o.kind === 'tree') {
     drawTree(o, c, mask, sx, sy, s);
   } else if (o.kind === 'felled') { drawFelled(o, c, mask);
@@ -4745,6 +4745,7 @@ function hurt(e) {
     return;
   }
   rg.regenT = 0; stkHurt(e);
+  if (S.day) dayBleedChance(e);   // v153: some wounds keep bleeding until you bind them
   if (rg.drink) { rg.drink = null; exNote('the flask spilled', true); }   // v123: hit mid-drink, the flask is wasted
   const dune = inBeyond() && !(Math.random() < 0.25 * sr('sandward'));   // Sandward: sometimes it only grazes
   // out in the Dunes every hit is two hearts, and they come quicker after each other
@@ -7213,7 +7214,7 @@ function exBegin() {
 // Crafting is a recipe book that grows as you find things (a recipe shows once you've held everything it needs), made by hand, at a
 // campfire or at a workbench. Stations, walls, traps and chests are items too: hold one and the attack button places it.
 // v152 stage 2: a hammer, and a base you raise yourself on a grid. See the v152 block below for the builder.
-const DAY_LEN = 100, FOOD_MAX = 100, FOOD_RATE = 0.5, WATER_RATE = 0.65, STARVE_T = 5, DAY_KEY = 'behind-you-day-best';
+const DAY_LEN = 140, FOOD_MAX = 100, FOOD_RATE = 0.5, WATER_RATE = 0.65, STARVE_T = 5, DAY_KEY = 'behind-you-day-best';
 const STA_MAX = 100, STA_SWING = 10, STA_SLAM = 18, STA_ROLL = 20, STA_CHOP = 4, STA_REGEN = 34, STA_WAIT = 0.6;
 const HOTN = 6, BASE_SLOTS = 10, BOX_SLOTS = 30, CHEST_SLOTS = 18, SKIN_SIPS = 4;
 const STONE_HEAD = '#9a9893', FLINT_HEAD = '#4d5560';
@@ -7234,6 +7235,12 @@ const DIT = {
   meat: { n: 'Raw meat', c: '#b04a3a', st: 8, k: 'food', b: 'Cook it, or risk sickness', eat: { food: 8, sick: 0.4 } },
   cooked: { n: 'Cooked meat', c: '#8a4a28', st: 8, k: 'food', b: 'Filling · heals half a heart', eat: { food: 30, heal: 0.5 } },
   stew: { n: 'Stew', c: '#b0783a', st: 4, k: 'food', b: 'A big meal · heals a heart', eat: { food: 55, water: 15, heal: 1 } },
+  torch: { n: 'Hand torch', c: '#ff9a3c', st: 1, k: 'light', dur: 200, b: 'Light to carry into the dark · burns down' },
+  bandage: { n: 'Bandage', c: '#e6dfcc', st: 6, k: 'med', b: 'Stops bleeding · heals half a heart' },
+  tea: { n: 'Herb tea', c: '#8aa86a', st: 4, k: 'food', b: 'Cures sickness · a long drink', eat: { food: 8, water: 28, cure: 1 } },
+  fish: { n: 'Raw fish', c: '#8aa8b0', st: 8, k: 'food', b: 'Cook it, or risk sickness', eat: { food: 9, water: 4, sick: 0.35 } },
+  fishC: { n: 'Cooked fish', c: '#c8a070', st: 8, k: 'food', b: 'Filling · heals half a heart', eat: { food: 32, water: 6, heal: 0.5 } },
+  rod: { n: 'Fishing rod', c: '#8a6a44', st: 1, k: 'tool', tool: 'rod', dmg: 0.5, r: 4, dur: 120, b: 'Cast at a pond and pull on the bite' },
   skin: { n: 'Waterskin', c: '#6eaae6', st: 1, k: 'drink', b: `Carries ${SKIN_SIPS} drinks out with you` },
   axe1: { n: 'Stone axe', c: STONE_HEAD, st: 1, k: 'tool', tool: 'axe', tier: 1, dmg: 0.9, dur: 60, b: 'Fells a tree in 5 chops' },
   axe2: { n: 'Flint axe', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'axe', tier: 2, dmg: 1.05, dur: 120, b: 'Fells a tree in 3 chops' },
@@ -7281,6 +7288,11 @@ const DREC = [
   { id: 'campfire', g: 'stn', out: 'campfire', at: 'hand', cost: { sticks: 6, stones: 5 } },
   { id: 'bench', g: 'stn', out: 'bench', at: 'hand', cost: { logs: 4, stones: 4, rope: 2 } },
   { id: 'chest', g: 'stn', out: 'chest', at: 'bench', cost: { planks: 6, rope: 1 } },
+  { id: 'torch', g: 'tool', out: 'torch', at: 'hand', cost: { sticks: 2, fibre: 3 } },
+  { id: 'bandage', g: 'gear', out: 'bandage', n: 2, at: 'hand', cost: { fibre: 4, hide: 1 } },
+  { id: 'tea', g: 'food', out: 'tea', at: 'fire', cost: { mushroom: 2, berries: 2 } },
+  { id: 'fishC', g: 'food', out: 'fishC', at: 'fire', cost: { fish: 1 } },
+  { id: 'rod', g: 'tool', out: 'rod', at: 'bench', cost: { sticks: 3, rope: 2, bone: 1 } },
   { id: 'hammer', g: 'tool', out: 'hammer', at: 'hand', cost: { sticks: 2, stones: 3, fibre: 2 } },
   { id: 'wall', g: 'build', out: 'wall', at: 'hand', cost: { logs: 3 } },
   { id: 'spikes', g: 'build', out: 'spikes', at: 'hand', cost: { sticks: 4, flint: 2 } },
@@ -7303,7 +7315,8 @@ function dayBegin() {
     hot: 0, inv: Array(BASE_SLOTS).fill(null), gear: { head: null, body: null, legs: null, back: null }, box: Array(BOX_SLOTS).fill(null),
     seen: new Set(), known: new Set(), fresh: new Set(), armT: 0, steelSeen: 0,
     cut: new Map(), felled: new Set(), builds: [], chips: [], logs: [], drops: [], nodes: new Map(), beasts: [], bchunks: new Map(), told: {},
-    bld: new Map(), bed: null, piece: 'wallT' };   // v152: what you've built on the grid, and where your bed is
+    bld: new Map(), bed: null, piece: 'wallT',
+    warm: WARM_MAX, bleed: 0, bleedT: 0, froze: 0, fish: null, ph: 'day' };   // v153: the cold, your wounds and the night   // v152: what you've built on the grid, and where your bed is
   S.rg = exNewRun(); exPlaceHome(); wpInit(); S.day.baseHp = S.rg.maxHp;
   S.msg = { text: 'daylight', sub: 'Gather sticks, stones and fibre · your pack shows what they make', t: 0 };
   dayChanged();
@@ -7416,7 +7429,12 @@ function dayStep(dt, inCamp) {
   D.t += dt;
   if ((D.saveT = (D.saveT || 0) + dt) > DAY_SAVE_T) { D.saveT = 0; daySave(); } D.sick = Math.max(0, D.sick - dt);
   const n = 1 + Math.floor(D.t / DAY_LEN);
-  if (n > D.n) { D.n = n; if (inCamp) { D.raidDue = true; rg.ringMsg = { text: `day ${n}`, sub: 'They wait outside the fence', t: 0 }; } else dayRaid(); }
+  if (n > D.n) { D.n = n; rg.ringMsg = { text: `day ${n}`, sub: 'A new morning', t: 0 }; }
+  { const ph = dayNight() ? 'night' : 'day';   // v153: they come with the dark
+    if (ph !== D.ph) { D.ph = ph;
+      if (ph === 'night') { if (inCamp) { D.raidDue = true; rg.ringMsg = { text: 'night', sub: 'They wait outside the fence', t: 0 }; } else { rg.ringMsg = { text: 'night', sub: 'Keep to the firelight', t: 0 }; playRingSting(); dayRaid(); } }
+      else exNote('the sun comes up', true);
+    } }
   if (D.raidDue && !inCamp) { D.raidDue = false; dayRaid(); }
   // stamina comes back once you stop spending it; slower hungry, thirsty or sick
   if ((D.stT += dt) > STA_WAIT) D.st = Math.min(STA_MAX, D.st + STA_REGEN * dt * (D.food < 25 || D.water < 25 ? 0.5 : 1) * (D.sick > 0 ? 0.5 : 1));
@@ -7457,6 +7475,7 @@ function dayStep(dt, inCamp) {
   for (const c of D.chips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; }
   D.chips = D.chips.filter(c => c.life > 0);
   beastStep(dt); buildStep(dt); stStep(dt);
+  dayWarmStep(dt); dayBleedStep(dt); dayFishStep(dt); dayTorchStep(dt);
   { const o = dayUseTarget(), lab = o ? useLabel(o) : 'Take'; if (useBtn.textContent !== lab) useBtn.textContent = lab; }
   { const v = dayVerb(); if (attackBtn.textContent !== v) attackBtn.textContent = v; }
   { const on = dayTool() === 'build'; if (on !== !!D.barOn) { D.barOn = on; renderBuildBar(); layoutBtns(); if (on) dayNote('bhint', 'pick a piece, lay it out, then hammer it up', 999); } }
@@ -7472,13 +7491,15 @@ function dayEat(arr, i) {
   D.food = Math.min(FOOD_MAX, D.food + E.food); if (E.water) D.water = Math.min(FOOD_MAX, D.water + E.water);
   if (E.heal && rg.hp < rg.maxHp) { rg.hp = Math.min(rg.maxHp, rg.hp + E.heal); rg.pop = { t: 0, gained: Math.ceil(rg.hp) - 1 }; }
   exNote(`ate ${DIT[s.id].n.toLowerCase()} · +${E.food}`); sfx(1.2, 0.25, 'bandpass', 900, 0.25); if (actx) setTimeout(() => sfx(1.6, 0.2, 'bandpass', 1400, 0.2), 90);
+  if (E.cure && D.sick > 0) { D.sick = 0; exNote('the sickness passes', true); }
   if (E.sick && Math.random() < E.sick) { D.sick = 30; exNote(`sick from ${DIT[s.id].n.toLowerCase()}`, true); }
   dayChanged();
 }
 const dayWaterHere = () => S.rg.inCamp ? 'the camp barrel' : wxK('rain') > 0.3 ? 'the rain' : '';
 function dayDrink(arr, i) {                      // a waterskin in a slot, or (no slot) the barrel or the rain where you stand
   const D = S.day;
-  if (arr) { const s = arr[i]; if (!s || !(s.w > 0)) { dayNote('dry', 'your waterskin is empty', 2); return; } s.w--; dayAct(9, 1.1, '#6b4a2a', 'skin'); D.water = Math.min(FOOD_MAX, D.water + 30); }
+  if (arr) { const s = arr[i]; if (!s || !(s.w > 0)) { dayNote('dry', 'your waterskin is empty', 2); return; } s.w--; dayAct(9, 1.1, '#6b4a2a', 'skin'); D.water = Math.min(FOOD_MAX, D.water + 30);
+    if (s.dirty) { if (Math.random() < 0.3) { D.sick = 30; exNote('that water was bad', true); } if (!s.w) s.dirty = 0; } }
   else { if (!dayWaterHere()) return; D.water = Math.min(FOOD_MAX, D.water + 40); dayAct(9, 1.1, '#8ab8e0', 'cup'); }
   exNote('a drink'); sfx(0.8, 0.3, 'lowpass', 900, 0.25); dayChanged();
 }
@@ -7492,6 +7513,8 @@ function dayFill() {                             // every waterskin you carry, f
 function dayVerb() {
   const T = heldIt(); if (!T) return 'Attack';
   if (T.tool === 'build') { const o = stAimed(); return !o ? 'Lay out' : o.done ? (o.hp < o.max ? 'Mend' : 'Built') : 'Build'; }
+  if (T.tool === 'rod') { const F = S.day.fish; return F ? (F.st === 'bite' ? 'Pull!' : 'Reel in') : 'Cast'; }
+  if (T.k === 'med') return 'Bind';
   return T.k === 'food' ? 'Eat' : T.k === 'drink' ? 'Drink' : T.k === 'place' ? 'Place' : T.k === 'gear' ? 'Wear' : T.tool === 'axe' ? 'Chop' : T.tool === 'pick' ? 'Mine' : 'Attack';
 }
 function dayPrimary() {                          // true when what you hold is used, not swung
@@ -7506,6 +7529,8 @@ function dayPrimary() {                          // true when what you hold is u
     if (stHammer(o)) dayWear();
     return true;
   }
+  if (T.tool === 'rod') { if (!S.p.act) dayCast(); return true; }
+  if (T.k === 'med') { if (!S.p.act) dayBind(D.inv, D.hot); return true; }
   if (T.k === 'food') { dayEat(D.inv, D.hot); return true; }
   if (T.k === 'drink') { dayDrink(D.inv, D.hot); return true; }
   if (T.k === 'place') { dayPlaceHeld(); return true; }
@@ -7536,17 +7561,19 @@ function dayUseTarget() {                        // the nearest thing in reach y
   for (const o of dayNodesNear(p.x, p.y, 60)) if ((o.t === 'sticks' || o.t === 'stones' || o.t === 'shroom') && !o.gone) { const d = dist2(o, p); if (d < bd) { bd = d; best = o; } }
   for (const c of exChestsNear(p.x, p.y, 60)) if (!S.rg.looted.has(c.key)) { const d = dist2(c, p) - 8; if (d < bd) { bd = d; best = c; } }
   for (const B of D.builds) if (B.t === 'chest') { const d = dist2(B, p) - 12; if (d < bd) { bd = d; best = B; } }
+  { const P = lakeAt(p.x, p.y, 30); if (P && (D.water < FOOD_MAX - 2 || D.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS))) { const d = Math.max(0, Math.hypot(P.x - p.x, P.y - p.y) - P.rad); if (d < bd) { bd = d; best = P; } } }
   if (S.rg.inCamp) {
     { const d = dist2(CAMP_BOX, p) - 14; if (d < bd) { bd = d; best = CAMP_BOX; } }
     { const d = dist2(CAMP_BARREL, p) - 10; if (d < bd && D.water < FOOD_MAX - 2) { bd = d; best = CAMP_BARREL; } }
   }
   return best;
 }
-const useLabel = o => o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
+const useLabel = o => o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
 function dayUse() {
   const D = S.day, rg = S.rg; if (!D || !rg || rg.phase !== 'fight' || !S.running) return;
   const o = dayUseTarget(); if (!o) return;
   if (o === CAMP_BARREL) { dayDrink(); return; }
+  if (o.kind === 'dlake') { dayPondFill(); return; }
   if (o === CAMP_BOX || o.t === 'chest') { openCraft(o); return; }
   dayAct(7, 0.42); S.p.vx *= 0.3; S.p.vy *= 0.3;
   if (o.kind === 'dday') { const got = dayGive(o.it, o.n, o.x, o.y, true, o.ex); if (got) { exNote(`+${got} ${DIT[o.it].n.toLowerCase()}`); pickSnd(); } o.n -= got; if (o.n <= 0) o.gone = true; D.drops = D.drops.filter(f => !f.gone); }
@@ -7733,6 +7760,7 @@ function dayItems() {                          // drawn in with the trees
   const D = S.day; if (!D) return [];
   const R = viewR(), cx = S.cam.x, cy = S.cam.y, near = o => Math.abs(o.x - cx) < R && Math.abs(o.y - cy) < R;
   const out = dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts), [...D.bld.values()].filter(near));
+  for (const P of lakesNear(cx, cy, R)) out.push(P);
   const g = dayGhost(); if (g) out.push(g);
   const sg = stGhost(); if (sg) out.push(sg);
   return out;
@@ -7772,6 +7800,12 @@ const ICON = (() => {
     bench: '<path d="M2.5 8h19v3.5h-19z" fill="#b08a58"/><path d="M5 11.5v9M19 11.5v9M5 16.5h14" stroke="#7a5232" stroke-width="2.2"/><path d="M13.5 8V4.8l3.2-1.3" stroke="#9a9a94" stroke-width="1.7" fill="none" stroke-linecap="round"/><rect x="5" y="6" width="5" height="2" fill="#8d8b85"/>',
     chest: '<rect x="3" y="9.5" width="18" height="11" rx="1.2" fill="#8a6440"/><path d="M3 9.5c0-3.2 2.2-5.4 9-5.4s9 2.2 9 5.4z" fill="#a07850"/><path d="M3 14.5h18" stroke="#5a3e28" stroke-width="1"/><rect x="10.5" y="9" width="3" height="4.2" rx=".5" fill="#d8c070"/><path d="M6.5 9.5v11M17.5 9.5v11" stroke="#5a3e28" stroke-width="1.2"/>',
     wall: '<g fill="#7a5232"><path d="M3.5 20.5V7.5l2.3-2.6 2.3 2.6v13z"/><path d="M9.7 20.5V5.5L12 2.9l2.3 2.6v15z"/><path d="M15.9 20.5V7.5l2.3-2.6 2.3 2.6v13z"/></g><path d="M3 11h18M3 16.5h18" stroke="#3a2a1a" stroke-width="1.3"/>',
+    torch: '<path d="M10.5 21.5l1.5-9.5 1.5 9.5z" fill="#7a5a3a"/><path d="M8.6 12.5h6.8l-.7 2.2H9.3z" fill="#4a3a24"/><path d="M12 1.5c2.6 2.3 4.2 4.6 4.2 6.8A4.2 4.2 0 0 1 12 12.5a4.2 4.2 0 0 1-4.2-4.2c0-2.2 1.6-4.5 4.2-6.8z" fill="#ff9a3c"/><path d="M12 4.6c1.4 1.4 2.2 2.8 2.2 4a2.2 2.2 0 1 1-4.4 0c0-1.2.8-2.6 2.2-4z" fill="#ffe8a8"/>',
+    rod: '<path d="M3 20.5L19.5 4" stroke="#8a6a44" stroke-width="2.2" stroke-linecap="round"/><path d="M19.5 4c1.8 3.6 1.4 7.6-1 11" stroke="#c8b07a" stroke-width="1" fill="none"/><path d="M16.5 15.5v3.2" stroke="#c8b07a" stroke-width="1"/><ellipse cx="16.5" cy="19.6" rx="1.7" ry="1.4" fill="#efe9dc"/><circle cx="8.5" cy="15" r="2.1" fill="none" stroke="#9a9893" stroke-width="1.3"/>',
+    bandage: '<rect x="2.5" y="9" width="19" height="6" rx="3" fill="#e6dfcc" transform="rotate(-24 12 12)"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.4" fill="#cfc6ae" transform="rotate(-24 12 12)"/><g stroke="#b8ae95" stroke-width=".9"><path d="M5.5 14.5l2-1M17 8.5l2-1"/></g>',
+    tea: '<path d="M5 10h11v5.5A4.5 4.5 0 0 1 11.5 20h-2A4.5 4.5 0 0 1 5 15.5z" fill="#8aa86a"/><path d="M16 11.5h1.8a2.2 2.2 0 1 1 0 4.4H16z" fill="none" stroke="#8aa86a" stroke-width="1.5"/><path d="M4 20.5h13" stroke="#6e8a4a" stroke-width="1.6"/><g stroke="#cfe0b0" stroke-width="1.2" fill="none" opacity=".8"><path d="M8.5 7.5c-1-1.2.6-2 -.4-3.4"/><path d="M12.5 7.5c-1-1.2.6-2 -.4-3.4"/></g>',
+    fish: '<path d="M3.5 12c3-3.4 6.6-5 10.5-5 3.2 0 5.4 2 6.5 5-1.1 3-3.3 5-6.5 5-3.9 0-7.5-1.6-10.5-5z" fill="#8aa8b0"/><path d="M3.5 12l-2.2-3.4v6.8z" fill="#6e8a94"/><circle cx="16.5" cy="10.5" r="1.1" fill="#2a3338"/><path d="M8 9.5c1.6 1.8 1.6 3.2 0 5" stroke="#6e8a94" stroke-width="1.1" fill="none"/>',
+    fishC: '<path d="M3.5 12c3-3.4 6.6-5 10.5-5 3.2 0 5.4 2 6.5 5-1.1 3-3.3 5-6.5 5-3.9 0-7.5-1.6-10.5-5z" fill="#c8a070"/><path d="M3.5 12l-2.2-3.4v6.8z" fill="#9a7448"/><circle cx="16.5" cy="10.5" r="1.1" fill="#3a2a1a"/><g stroke="#8a5a30" stroke-width="1.1" fill="none"><path d="M8 9.8c1.4 1.5 1.4 2.9 0 4.4M11 9.2c1.4 1.8 1.4 3.6 0 5.6"/></g>',
     hammer: '<path d="M7 21.5l6.5-9.5" stroke="#7a5a3a" stroke-width="2.4" stroke-linecap="round"/><path d="M10.5 7.2l4.6-3.2 5.4 7.6-4.6 3.2z" fill="#9a9893"/><path d="M12.8 10.4l2.4 3.4" stroke="#a8b86a" stroke-width="1.5"/><path d="M15.1 4l5.4 7.6" stroke="#c2c0b8" stroke-width=".9" opacity=".7"/>',
     spikes: '<g fill="#8a6a44"><path d="M3 20.5l3.6-14.5 2.2 14.5z"/><path d="M9.2 20.5l3.6-16 2.2 16z"/><path d="M15.4 20.5l3.6-14.5 2.2 14.5z"/></g><path d="M2 18h20" stroke="#4a3a2a" stroke-width="2"/>',
     tonic: '<path d="M9.5 3h5v4.5c3 1.2 4.5 3.6 4.5 6.5a7 7 0 0 1-14 0c0-2.9 1.5-5.3 4.5-6.5z" fill="#c23a4a"/><rect x="9" y="2" width="6" height="2.4" rx=".8" fill="#7a5232"/><ellipse cx="9.5" cy="13" rx="1.4" ry="2.4" fill="#fff" opacity=".35"/>',
@@ -7839,6 +7873,7 @@ function dayGhost() {                          // what you'd put down, shown whe
   return { kind: 'dghost', build: T.build, x: sp.x, y: sp.y, a: sp.a, ok: sp.ok, r: 0, s: 1 };
 }
 function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
+  if (o.kind === 'dlake') return lakeDraw(o, c);
   if (o.kind === 'dst') return stDraw(o, c, sx, sy, false);
   if (o.kind === 'dstg') return stDraw(o, c, sx, sy, true);
   const z = Z, C = (col, grey) => COLOUR ? col : grey;
@@ -7932,13 +7967,16 @@ function dayDraw(o, c, sx, sy) {   // sx is shifted when a bush is struck
     c.restore();
   }
 }
-function drawDay() {                           // the sun: a warm wash from the top
+function drawDay() {                           // the sun: a warm wash from the top, going red as it sets
+  const lt = dayLight(), set = lt < 1 && lt > 0 ? 1 - lt : 0;
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
   const g = ctx.createLinearGradient(0, 0, W * DPR * 0.4, H * DPR);
-  g.addColorStop(0, 'rgba(255,226,160,0.5)'); g.addColorStop(1, 'rgba(255,226,160,0)');
-  ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = COLOUR ? 0.6 : 0.12; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
+  const sun = COLOUR ? `rgba(${255},${Math.round(226 - 60 * set)},${Math.round(160 - 90 * set)}` : 'rgba(255,226,160';
+  g.addColorStop(0, sun + ',0.5)'); g.addColorStop(1, sun + ',0)');
+  ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * Math.max(0.25, lt); ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
-  drawDayFires(); drawDayChips();
+  drawNight();
+  drawDayFires(); drawDayChips(); drawFloat();
 }
 function dayBar(px, py) {                      // stamina, food and water over your head
   const D = S.day, tw = 46, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
@@ -7946,9 +7984,10 @@ function dayBar(px, py) {                      // stamina, food and water over y
   bar(x0, y0 - 6, tw, D.st / STA_MAX, D.sick > 0 ? 'rgba(170,190,90,0.9)' : 'rgba(239,226,150,0.9)', D.st < 15);
   bar(x0, y0, tw / 2 - 1, D.food / FOOD_MAX, 'rgba(226,150,80,0.9)', D.food < 30);
   bar(x0 + tw / 2 + 1, y0, tw / 2 - 1, D.water / FOOD_MAX, 'rgba(110,170,230,0.9)', D.water < 30);
-  const say = D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : '';
+  if (D.warm < 92 || dayNight()) bar(x0, y0 + 6, tw, D.warm / WARM_MAX, 'rgba(150,200,215,0.9)', D.warm < 30);
+  const say = D.bleed > 0 ? 'BLEEDING' : D.warm <= 0 ? 'FREEZING' : D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.warm < 30 ? 'COLD' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : '';
   { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); } }
-  { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 5, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 6, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
+  { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
   if (say) { ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)'; ctx.fillText(say, px, y0 - 9); }
 }
 // ---- v129 building, v151 as items: hold a wall, a trap, a fire, a workbench or a chest and the button puts it down in front of you ----
@@ -8149,7 +8188,10 @@ function pkCard() {                             // the card for the selected ite
   const stat = [];
   if (T.eat) stat.push(eatLine(T.eat));
   if (s.d !== undefined) stat.push(`${s.d} of ${T.dur} uses left`);
-  if (T.k === 'drink') stat.push(`${s.w} of ${SKIN_SIPS} drinks`);
+  if (T.k === 'drink') stat.push(`${s.w} of ${SKIN_SIPS} drinks${s.dirty ? ' · murky, boil it' : ''}`);
+  if (T.k === 'light') stat.push(`${s.d}s of burning left`);
+  if (T.k === 'med') stat.push('hold it, then Bind');
+  if (T.tool === 'rod') stat.push('stand by a pond, then Cast');
   if (T.tool === 'weapon') stat.push(`damage ×${T.dmg}${T.r ? ' · long reach' : ''}`);
   if (T.k === 'place') stat.push('hold it, then Place');
   if (stat.length) tx.append(el('span', 'st', stat.join(' · ')));
@@ -8157,10 +8199,11 @@ function pkCard() {                             // the card for the selected ite
   const acts = el('div', 'pkacts'), btn = (t, fn, main) => { const b = el('button', main ? 'act main' : 'act', t); b.addEventListener('click', fn); acts.append(b); };
   const arr = sel.w !== 'gear' ? pkArr(sel.w) : null;
   if (T.eat && arr) btn('Eat', () => { dayEat(arr, sel.i); if (!arr[sel.i]) PK.sel = null; dayChanged(); }, true);
-  if (T.k === 'drink' && arr) { btn('Drink', () => dayDrink(arr, sel.i), true); if (dayWaterHere()) btn('Fill', dayFill); }
+  if (T.k === 'drink' && arr) { btn('Drink', () => dayDrink(arr, sel.i), true); if (dayWaterHere()) btn('Fill', dayFill); if (s.dirty && dayFireHere()) btn('Boil clean', () => { dayBoil(arr, sel.i); renderPack(); }); }
+  if (T.k === 'med' && arr) btn('Bind a wound', () => { dayBind(arr, sel.i); if (!arr[sel.i]) PK.sel = null; dayChanged(); }, true);
   if (T.k === 'gear' && arr) btn('Wear', () => { dayEquip(arr, sel.i); PK.sel = null; dayChanged(); }, true);
   if (sel.w === 'gear') btn('Take off', () => { dayUnequip(sel.i); PK.sel = null; dayChanged(); }, true);
-  if (arr && (T.k === 'tool' || T.k === 'place' || T.k === 'food' || T.k === 'drink') && !(sel.w === 'inv' && sel.i === D.hot)) btn('Hold', () => pkHold(sel.w, sel.i));
+  if (arr && (T.k === 'tool' || T.k === 'place' || T.k === 'food' || T.k === 'drink' || T.k === 'light' || T.k === 'med') && !(sel.w === 'inv' && sel.i === D.hot)) btn('Hold', () => pkHold(sel.w, sel.i));
   if (PK.cont && arr) btn(sel.w === 'inv' ? `Store in ${PK.cont.box ? 'box' : 'chest'}` : 'Take', () => pkQuick(sel.w, sel.i));
   if (arr && s.n > 1) btn('Split', () => pkSplit(sel.w, sel.i));
   if (sel.w !== 'cont') btn('Drop', () => pkDrop(sel.w, sel.i));
@@ -8206,7 +8249,8 @@ function needsHtml() {
   const D = S.day, rg = S.rg, m = (name, f, col, txt, low) => `<div class="need${low ? ' low' : ''}"><span>${name}</span><i style="--f:${Math.max(0, Math.min(1, f)).toFixed(3)};--c:${col}"></i><b>${txt}</b></div>`;
   return m('Health', rg.hp / rg.maxHp, '#e8e4dc', `${rg.hp}/${rg.maxHp}${steelMax() ? ` +${rg.steel || 0}` : ''}`, rg.hp <= 1)
     + m('Food', D.food / FOOD_MAX, '#e2965a', Math.round(D.food), D.food < 30) + m('Water', D.water / FOOD_MAX, '#6eaae6', Math.round(D.water), D.water < 30)
-    + m('Stamina', D.st / STA_MAX, D.sick > 0 ? '#aabe5a' : '#efe296', D.sick > 0 ? 'sick' : Math.round(D.st), D.st < 15);
+    + m('Stamina', D.st / STA_MAX, D.sick > 0 ? '#aabe5a' : '#efe296', D.sick > 0 ? 'sick' : Math.round(D.st), D.st < 15)
+    + m('Warmth', D.warm / WARM_MAX, '#96c8d8', D.bleed > 0 ? 'bleeding' : Math.round(D.warm), D.warm < 30 || D.bleed > 0);
 }
 function renderPack() {
   const D = S.day, el = pkEl, root = document.getElementById('pkBody');
@@ -8293,7 +8337,7 @@ function dayReadSave() { try { const v = JSON.parse(localStorage.getItem(dayKey(
 function dayClearSave() { try { localStorage.removeItem(dayKey()); } catch (e) {} }
 function daySave() {
   const D = S && S.day, rg = S && S.rg; if (!D || !rg || rg.phase !== 'fight' || S.mode !== 'expedition') return;
-  const keep = ['t', 'n', 'food', 'water', 'st', 'sick', 'warn', 'raidDue', 'hot', 'inv', 'box', 'gear', 'told', 'baseHp', 'bed', 'piece', 'died', 'deaths'];
+  const keep = ['t', 'n', 'food', 'water', 'st', 'sick', 'warn', 'raidDue', 'hot', 'inv', 'box', 'gear', 'told', 'baseHp', 'bed', 'piece', 'died', 'deaths', 'warm', 'bleed', 'ph'];
   const d = {}; for (const k of keep) d[k] = D[k];
   d.seen = [...D.seen]; d.known = [...D.known]; d.fresh = [...D.fresh];
   d.felled = [...D.felled]; d.cut = [...D.cut]; d.bchunks = [...D.bchunks];
@@ -8314,14 +8358,14 @@ function dayFromV1(d) {                         // a run saved before the overha
   const tools = [d.axe ? 'axe' + d.axe : null, d.pick ? 'pick' + d.pick : null, { club: 'club', spear: 'spear2', bone: 'bonec' }[d.wpn], d.skin ? 'skin' : null].filter(Boolean);
   for (const t of tools) if (addTo(inv, t, 1, t === 'skin' ? d.sips || 0 : undefined, order(t))) addTo(box, t, 1, t === 'skin' ? d.sips || 0 : undefined);
   const seen = new Set([...Object.keys(d.inv || {}), ...Object.keys(d.box || {}), ...tools, 'sticks', 'stones', 'fibre', 'logs', 'flint', 'hide', 'bone', 'berries', 'meat'].filter(k => DIT[k]));   // they've played: the woods' basics are already in the book
-  return Object.assign({}, d, { inv, box, gear, hot: 0, seen: [...seen], known: [], fresh: [], bld: [], bed: null, piece: 'wallT' });
+  return Object.assign({}, d, { inv, box, gear, hot: 0, seen: [...seen], known: [], fresh: [], bld: [], bed: null, piece: 'wallT', warm: WARM_MAX, bleed: 0, ph: 'day' });
 }
 function dayLoad(sv) {                          // pick a saved run back up where you left it
   dayBegin();
   const D = S.day, d = sv.v === 1 ? dayFromV1(sv.d) : sv.d, rg = S.rg;
   XS = sv.xs || XS;
   Object.assign(D, d, { felled: new Set(d.felled), cut: new Map(d.cut), bchunks: new Map(d.bchunks), builds: [], logs: [], beasts: [], bld: new Map(), piece: d.piece || 'wallT',
-    seen: new Set(), known: new Set(d.known || []), fresh: new Set(d.fresh || []),
+    seen: new Set(), known: new Set(d.known || []), fresh: new Set(d.fresh || []), fish: null, warm: d.warm === undefined ? WARM_MAX : d.warm, bleed: d.bleed || 0,
     nodes: new Map(d.nodes.map(([k, L]) => [k, L.map(o => ({ kind: 'dnode', r: 0, s: 1, ...o }))])),
     drops: d.drops.concat(d.logs || []).filter(f => DIT[f.it]).map(f => ({ kind: 'dday', r: 0, s: 1, seed: Math.random() * 9, ...f })) });
   D.baseHp = D.baseHp || rg.maxHp;
@@ -8597,6 +8641,192 @@ function stDraw(o, c, sx, sy, ghost) {
     }
   }
 }
+// ---- v153 stage 3 (Joe): the night, and what the body needs. Every day ends in a dark night: the only light is the fires you
+// build and a torch you carry, and the cold comes with it, so warmth is a need like food and water. Wounds bleed until you bind
+// them, bad food makes you sick until you brew tea, and the woods have ponds: drink from one and risk it, or boil it clean.
+// Fish them with a rod and you need never go hungry again.
+const NIGHT_IN = 0.62, NIGHT_OUT = 0.94, DUSK = 0.1;   // the share of a day that is light, and how long the sun takes to go
+const WARM_MAX = 100, WARM_NIGHT = 1.15, WARM_RAIN = 0.4, WARM_FIRE = 9, WARM_BITE = 6, BLEED_T = 7;
+const PONDC = 900;
+function dayT() { return (S.day.t % DAY_LEN) / DAY_LEN; }
+function dayLight() {                            // 1 in full sun, 0 at the dead of night
+  const f = dayT();
+  if (f < NIGHT_IN) return 1;
+  if (f < NIGHT_IN + DUSK) return 1 - (f - NIGHT_IN) / DUSK;
+  if (f < NIGHT_OUT) return 0;
+  return (f - NIGHT_OUT) / (1 - NIGHT_OUT);
+}
+const dayNight = () => dayLight() < 0.35;
+const dayClock2 = () => { const f = dayT(), h = Math.floor(((f * 24) + 6) % 24); return h; };
+// ---- warmth, bleeding and sickness ----
+const dayCoats = () => ['head', 'body', 'legs'].filter(k => S.day.gear[k]).length;
+function dayFireHere() { return dayFireNear(S.p.x, S.p.y) || S.rg.inCamp; }
+function dayIndoors() {                          // four or more pieces of your own building close by counts as under cover
+  return stNear(S.p.x, S.p.y, 80).filter(o => o.done).length >= 4;
+}
+function dayWarmStep(dt) {
+  const D = S.day, rg = S.rg;
+  const cold = (dayNight() ? WARM_NIGHT : 0) + wxK('rain') * WARM_RAIN;
+  if (dayFireHere()) D.warm = Math.min(WARM_MAX, D.warm + WARM_FIRE * dt);
+  else if (cold > 0) D.warm = Math.max(0, D.warm - cold * dt * (1 - 0.22 * dayCoats()) * (dayIndoors() ? 0.45 : 1));
+  else D.warm = Math.min(WARM_MAX, D.warm + 3 * dt);
+  if (D.warm < 30 && !D.warn.warm) { D.warn.warm = 1; exNote(D.warm <= 0 ? 'freezing' : 'cold', true); }
+  if (D.warm > 45) D.warn.warm = 0;
+  if (D.warm <= 0) {
+    if ((D.froze = (D.froze || 0) + dt) >= WARM_BITE) {
+      D.froze = 0; rg.hp = Math.max(0, rg.hp - 0.5); rg.hurtFx = 0.5; addShake(0.25);
+      rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };
+      exNote('the cold bites', true); sfx(0.4, 0.6, 'lowpass', 300, 0.3);
+      if (rg.hp <= 0) { D.cause = 'cold'; nightOver(); }
+    }
+    if (Math.random() < dt * 3) addShake(0.035);  // shivering
+  } else D.froze = 0;
+}
+function dayBleedChance(e) {                     // some wounds keep on bleeding
+  const D = S.day; if (!D || D.bleed > 0 || Math.random() > 0.22) return;
+  D.bleed = 26; exNote('you\'re bleeding · bind it', true); sfx(0.5, 0.5, 'lowpass', 500, 0.25);
+}
+function dayBleedStep(dt) {
+  const D = S.day, rg = S.rg; if (D.bleed <= 0) return;
+  D.bleed -= dt;
+  if (Math.random() < dt * 7) { const a = Math.random() * 7; D.chips.push({ x: S.p.x + Math.cos(a) * 5, y: S.p.y + Math.sin(a) * 5, z: 12, vx: 0, vy: 0, vz: -20, rot: 0, vr: 0, life: 0.5, col: COLOUR ? '#9a2a22' : '#6a6a66', w: 1.4 }); }
+  if ((D.bleedT = (D.bleedT || 0) + dt) >= BLEED_T) {
+    D.bleedT = 0; rg.hp = Math.max(0, rg.hp - 0.5); rg.hurtFx = 0.45; addShake(0.2);
+    rg.pop = rg.hp % 1 ? { t: 0, halved: Math.floor(rg.hp) } : { t: 0, lost: rg.hp };
+    if (rg.hp <= 0) { D.cause = 'bled'; nightOver(); }
+  }
+  if (D.bleed <= 0) exNote('the bleeding stopped');
+}
+function dayBind(arr, i) {                       // a bandage: it stops the bleeding and closes a little of the wound
+  const D = S.day, rg = S.rg, s = arr[i]; if (!s) return;
+  s.n--; if (!s.n) arr[i] = null;
+  dayAct(10, 0.9); D.bleed = 0; D.bleedT = 0;
+  if (rg.hp < rg.maxHp) { rg.hp = Math.min(rg.maxHp, rg.hp + 0.5); rg.pop = { t: 0, gained: Math.ceil(rg.hp) - 1 }; }
+  exNote('bound up'); sfx(1.1, 0.35, 'bandpass', 700, 0.25);
+  dayChanged();
+}
+// ---- the ponds: still water out in the woods, deterministic so they're always where you left them ----
+function lakesNear(x, y, R) {
+  const out = [];
+  for (let ci = Math.floor((x - R) / PONDC); ci <= Math.floor((x + R) / PONDC); ci++)
+    for (let cj = Math.floor((y - R) / PONDC); cj <= Math.floor((y + R) / PONDC); cj++) {
+      const h = hash(ci * 2.7 + 11, cj * 3.9 - 5); if (h < 0.42) continue;
+      const px = (ci + 0.18 + hash(ci + 3.3, cj * 1.7) * 0.64) * PONDC, py = (cj + 0.18 + hash(ci * 1.3, cj + 8.1) * 0.64) * PONDC;
+      if (Math.hypot(px, py) < CAMP_R + 220 || inPlaza(px, py)) continue;
+      const r = 46 + hash(ci - 2, cj + 6) * 34;
+      if (propsNear(px, py, r + 26).some(o => o.kind === 'tree' || o.kind === 'rock')) continue;   // no pond where the woods already stand
+      if (Math.abs(px - x) < R + r && Math.abs(py - y) < R + r) out.push({ kind: 'dlake', x: px, y: py, r: 0, s: 1, rad: r, seed: h * 9 });
+    }
+  return out;
+}
+const lakeAt = (x, y, pad = 26) => lakesNear(x, y, 200).find(P => Math.hypot(P.x - x, P.y - y) < P.rad + pad);
+function lakeDraw(P, c) {
+  const ring = (k, f) => { c.beginPath(); for (let i = 0; i <= 26; i++) { const a = i / 26 * 7, r = P.rad * k * (1 + Math.sin(a * 3 + P.seed) * 0.08 + Math.sin(a * 5 - P.seed) * 0.04); const [x, y] = toScreen(P.x + Math.cos(a) * r, P.y + Math.sin(a) * r); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.closePath(); if (f) c.fill(); else c.stroke(); };
+  const C = (col, grey) => COLOUR ? col : grey, lt = dayLight();
+  c.save();
+  c.fillStyle = C('#4a4436', '#4e4e4a'); ring(1.06, 1);                                  // the wet bank
+  c.fillStyle = C(lt > 0.4 ? '#2f4a52' : '#1b2a33', '#333'); ring(1, 1);                 // the water, darker at night
+  c.fillStyle = C(`rgba(150,200,215,${0.1 + 0.12 * lt})`, 'rgba(200,200,200,0.1)'); ring(0.74, 1);
+  c.strokeStyle = C(`rgba(190,225,235,${0.25 + 0.3 * lt})`, 'rgba(220,220,220,0.3)'); c.lineWidth = 1.2 * Z;
+  for (let k = 0; k < 3; k++) {                                                          // ripples crossing it
+    const t = (S.t * 0.25 + k / 3 + P.seed) % 1;
+    c.globalAlpha = (1 - t) * 0.5; ring(0.25 + t * 0.7);
+  }
+  c.globalAlpha = 1;
+  const reeds = 9 + Math.floor(P.seed) % 5;                                              // reeds round the edge
+  c.strokeStyle = C('#6f8a46', '#777'); c.lineCap = 'round';
+  for (let i = 0; i < reeds; i++) {
+    const a = P.seed + i * 6.283 / reeds, r = P.rad * (1.02 + ((i * 7919) % 11) / 90);
+    const [x, y] = toScreen(P.x + Math.cos(a) * r, P.y + Math.sin(a) * r);
+    for (let k = 0; k < 3; k++) { c.lineWidth = 1.5 * Z; c.beginPath(); c.moveTo(x + (k - 1) * 2 * Z, y); c.quadraticCurveTo(x + (k - 1) * 3 * Z + Math.sin(S.t * 1.4 + i + k) * 2 * Z, y - 9 * Z, x + (k - 1) * 4 * Z + Math.sin(S.t * 1.4 + i + k) * 3.5 * Z, y - 17 * Z); c.stroke(); }
+  }
+  c.restore();
+}
+// ---- fishing: cast, wait for the line to go, and pull at the right moment ----
+function dayCast() {
+  const D = S.day, p = S.p, a = S.aimW || 0;
+  const F = D.fish;
+  if (F && F.st === 'bite') {                     // pulled on the bite: it's yours
+    D.fish = null; dayAct(4, 0.5); addShake(0.25); hitStop(0.04);
+    const r = Math.random();
+    if (r < 0.74) { const n = 1 + (Math.random() < 0.18 ? 1 : 0); dayGive('fish', n); exNote(`caught · ${n > 1 ? n + ' fish' : 'a fish'}`, true); sfx(1.8, 0.3, 'bandpass', 1400, 0.3); }
+    else if (r < 0.9) { dayGive('fibre', 2); exNote('a knot of weed'); sfx(0.6, 0.3, 'lowpass', 500, 0.2); }
+    else { dayGive('bone', 1); exNote('something old came up'); sfx(0.7, 0.35, 'lowpass', 400, 0.22); }
+    dayWear(); dayChanged(); return;
+  }
+  if (F) { D.fish = null; exNote('you pulled too early'); sfx(0.5, 0.25, 'lowpass', 400, 0.2); return; }
+  const P = lakeAt(p.x, p.y, 64); if (!P) { dayNote('nopond', 'stand by water to fish', 2); return; }
+  const d = Math.hypot(P.x - p.x, P.y - p.y) || 1, k = Math.min(1, (P.rad * 0.55) / d);
+  let fx = p.x + Math.cos(a) * 60, fy = p.y + Math.sin(a) * 60;
+  if (Math.hypot(fx - P.x, fy - P.y) > P.rad * 0.8) { fx = p.x + (P.x - p.x) * (k + 0.25); fy = p.y + (P.y - p.y) * (k + 0.25); }
+  D.fish = { st: 'wait', t: 0, at: 2.4 + Math.random() * 4.5, x: fx, y: fy, P };
+  dayAct(4, 0.55); exNote('cast'); sfx(1.4, 0.2, 'bandpass', 1100, 0.18);
+}
+function dayFishStep(dt) {
+  const D = S.day, F = D.fish; if (!F) return;
+  F.t += dt;
+  if (Math.hypot(S.p.x - F.x, S.p.y - F.y) > 150 || dayTool() !== 'rod') { D.fish = null; exNote('the line went slack'); return; }
+  if (F.st === 'wait' && F.t >= F.at) { F.st = 'bite'; F.t = 0; addShake(0.12); sfx(2.2, 0.15, 'bandpass', 1900, 0.22); ashBurst(F.x, F.y, 4, 4); }
+  if (F.st === 'bite' && F.t > 1.15) { D.fish = null; exNote('it got away'); sfx(0.5, 0.25, 'lowpass', 350, 0.18); }
+}
+function drawFloat() {
+  const F = S.day && S.day.fish; if (!F) return;
+  const [x, y] = toScreen(F.x, F.y), bob = F.st === 'bite' ? Math.sin(S.t * 30) * 2.5 : Math.sin(S.t * 2.4) * 1;
+  const [hx, hy] = toScreen(S.p.x, S.p.y);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(239,239,234,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, hy - 22 * Z); ctx.lineTo(x, y + bob * Z); ctx.stroke();
+  ctx.fillStyle = F.st === 'bite' ? '#e2543c' : '#efe9dc'; ctx.beginPath(); ctx.ellipse(x, y + bob * Z, 2.6 * Z, 2 * Z, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(200,230,240,${F.st === 'bite' ? 0.8 : 0.35})`; ctx.lineWidth = 1.2 * Z;
+  for (let k = 0; k < 2; k++) { const t = ((S.t * (F.st === 'bite' ? 1.6 : 0.6) + k / 2) % 1); ctx.globalAlpha = 1 - t; ctx.beginPath(); ctx.ellipse(x, y + bob * Z, (4 + t * 16) * Z, (2 + t * 8) * Z, 0, 0, 7); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  if (F.st === 'bite') { ctx.font = `700 ${Math.round(14 * Math.min(1.5, Z))}px "IBM Plex Mono", monospace`; ctx.textAlign = 'center'; ctx.fillStyle = '#ffcf8a'; ctx.fillText('!', x, y - 16 * Z); }
+  ctx.restore();
+}
+// ---- night: the dark comes down, and your fires are all that hold it off ----
+function drawNight() {
+  const lt = dayLight(); if (lt >= 1) return;
+  const k = 1 - lt;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = COLOUR ? 'multiply' : 'multiply';
+  const g = ctx.createLinearGradient(0, 0, 0, H * DPR);
+  const dark = (a, b) => COLOUR ? `rgb(${Math.round(255 - a * k)},${Math.round(255 - b * k)},${Math.round(255 - (b - 14) * k)})` : `rgb(${Math.round(255 - a * k)},${Math.round(255 - a * k)},${Math.round(255 - a * k)})`;
+  g.addColorStop(0, dark(196, 182)); g.addColorStop(1, dark(176, 164));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
+  ctx.restore();
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter';
+  const pool = (wx, wy, r, a, col) => {           // what light there is: your fires, and the torch in your hand
+    const [x, y] = toScreen(wx, wy), R = r * Z * DPR, gx = ctx.createRadialGradient(x * DPR, (y - 6 * Z) * DPR, 0, x * DPR, (y - 6 * Z) * DPR, R);
+    gx.addColorStop(0, `rgba(${col},${a * k})`); gx.addColorStop(0.55, `rgba(${col},${a * k * 0.35})`); gx.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = gx; ctx.beginPath(); ctx.ellipse(x * DPR, (y - 6 * Z) * DPR, R, R * 0.62, 0, 0, 7); ctx.fill();
+  };
+  const warm = COLOUR ? '255,186,110' : '230,230,226';
+  for (const B of S.day.builds) if (B.t === 'fire' && Math.abs(B.x - S.cam.x) < 900 && Math.abs(B.y - S.cam.y) < 900) pool(B.x, B.y, 160 + Math.sin(S.t * 6 + B.x) * 6, 0.5, warm);
+  if (S.rg.inCamp) pool(0, 0, 320, 0.4, warm);
+  const T = dayTorch(); if (T) pool(S.p.x, S.p.y, 125 + Math.sin(S.t * 9) * 5, 0.55, warm);
+  ctx.restore();
+}
+const dayTorch = () => { const s = heldSlot(); return s && DIT[s.id].k === 'light' && s.d > 0 ? s : null; };
+function dayTorchStep(dt) {
+  const s = dayTorch(); if (!s) return;
+  s.wick = (s.wick || 0) + dt;
+  if (s.wick >= 1) { s.wick = 0; s.d--; renderHotbar(); if (s.d <= 0) { exNote('your torch burned out'); const D = S.day, i = D.inv.indexOf(s); if (i >= 0) D.inv[i] = null; dayChanged(); } }
+  if (Math.random() < dt * 8) ashBurst(S.p.x + (Math.random() - 0.5) * 6, S.p.y + (Math.random() - 0.5) * 6, 1, 20);
+}
+// ---- boiling and brewing ----
+function dayBoil(arr, i) {
+  const s = arr[i]; if (!s || !s.dirty) return;
+  if (!dayFireHere()) { dayNote('nofire', 'you need a fire', 2); return; }
+  s.dirty = 0; dayAct(10, 1.1); exNote('boiled clean'); sfx(0.9, 0.5, 'lowpass', 800, 0.3);
+  dayChanged();
+}
+function dayPondFill() {                         // the pond fills your skins, but what comes out of it isn't clean
+  const D = S.day; let n = 0;
+  for (const s of D.inv) if (s && s.id === 'skin' && s.w < SKIN_SIPS) { s.w = SKIN_SIPS; s.dirty = 1; n++; }
+  dayAct(7, 0.7);
+  if (n) { exNote(n > 1 ? `${n} skins filled · murky` : 'filled · murky water'); sfx(0.7, 0.45, 'lowpass', 600, 0.3); }
+  else { D.water = Math.min(FOOD_MAX, D.water + 35); exNote('drank from the pond'); sfx(0.8, 0.3, 'lowpass', 900, 0.25); if (Math.random() < 0.35) { D.sick = 30; exNote('the water was bad', true); } }
+  dayChanged();
+}
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
 // crafting and building each have a short body animation. Struck trees, rocks and bushes shake and throw chips.
@@ -8674,6 +8904,16 @@ function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the t
   } else if (T.wpn) {
     const bone = T.wpn === 'bone', col = bone ? C('#e6dfcc', '#d8d8d2') : C('#6e5235', '#5a5a56'); seg(-1, 5, 1.8, col); seg(4, 11, bone ? 3.2 : 3.6, col);
     if (!OUT && bone) { ctx.fillStyle = col; for (const k of [6.5, 9.5]) { const [x, y] = at(k); ctx.beginPath(); ctx.arc(x, y, 2.2 * Z, 0, 7); ctx.fill(); } }
+  } else if (T.k === 'light') {                 // a torch: a bound head of fibre, burning
+    seg(-1.5, 9, 1.8, C('#7a5a3a', '#6a6a66'));
+    if (OUT) return;
+    const [ex, ey] = at(9), k = Z;
+    ctx.fillStyle = C('#4a3a24', '#5a5a56'); ctx.beginPath(); ctx.ellipse(ex, ey, 2.4 * k, 3 * k, 0, 0, 7); ctx.fill();
+    if (s.d > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) { const h = (7 + 3 * Math.sin(S.t * 11 + i * 2)) * k, w = (3.4 - i) * k, ox = Math.sin(S.t * 7 + i * 1.6) * 1.2 * k;
+        ctx.fillStyle = ['rgba(255,120,40,0.8)', 'rgba(255,180,70,0.75)', 'rgba(255,240,190,0.7)'][i];
+        ctx.beginPath(); ctx.moveTo(ex - w + ox, ey - 2 * k); ctx.quadraticCurveTo(ex + ox, ey - 2 * k - h * 1.5, ex + w + ox, ey - 2 * k); ctx.closePath(); ctx.fill(); }
+      ctx.restore(); }
   } else if (T.tool === 'build') {              // the hammer: a stone head lashed to a short handle
     seg(-1.5, 10, 1.7, C('#7a5a3a', '#6a6a66'));
     if (OUT) return;
