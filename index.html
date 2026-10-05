@@ -419,7 +419,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 148</p>
+      <p class="small" id="verLbl">Version 149</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -4129,12 +4129,29 @@ const MUS = {"parts":["music/backing/0.mp3","music/backing/1.mp3","music/backing
 // the backing track when you come home. 10 pieces of ~47 s, built the same way; the last piece's tail pads wrap round to the start so it loops.
 const DUNE_MUS = {"parts":["music/dunes/0.mp3","music/dunes/1.mp3","music/dunes/2.mp3","music/dunes/3.mp3","music/dunes/4.mp3","music/dunes/5.mp3","music/dunes/6.mp3","music/dunes/7.mp3","music/dunes/8.mp3","music/dunes/9.mp3"],"lens":[2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320],"P":11025};
 const MUS_PAD = MUS.P / 44100, MUS_XF = 0.012, MUS_FADE = 2.5;
-function mkTrack(def) {
-  const len = def.lens.map(n => n / 44100), start = [0];
-  for (let k = 0; k < def.parts.length; k++) start.push(start[k] + len[k]);
-  return { def, K: def.parts.length, pad: def.P / 44100, len, start, lb: start[def.parts.length], g: null, on: false, gen: 0, pos: 0, t0: 0, nextK: 0, nextAt: 0, busy: false, bufs: [], srcs: [], offAt: 0 };
+// v149 (Joe): five more of his songs, shuffled with backing track 2 everywhere except the Dunes (music/songs/). Each ends in 1.5 s of quiet.
+const SONGS = {"yeh":{"parts":["music/songs/yeh/0.mp3","music/songs/yeh/1.mp3","music/songs/yeh/2.mp3","music/songs/yeh/3.mp3"],"lens":[2040026,2040025,2040025,2040026],"P":11025},"quest":{"parts":["music/songs/quest/0.mp3","music/songs/quest/1.mp3","music/songs/quest/2.mp3","music/songs/quest/3.mp3","music/songs/quest/4.mp3"],"lens":[1997896,1997895,1997896,1997895,1997896],"P":11025},"just-wont-do":{"parts":["music/songs/just-wont-do/0.mp3","music/songs/just-wont-do/1.mp3","music/songs/just-wont-do/2.mp3","music/songs/just-wont-do/3.mp3","music/songs/just-wont-do/4.mp3"],"lens":[1967252,1967253,1967252,1967253,1967252],"P":11025},"untitled":{"parts":["music/songs/untitled/0.mp3","music/songs/untitled/1.mp3","music/songs/untitled/2.mp3","music/songs/untitled/3.mp3","music/songs/untitled/4.mp3"],"lens":[2130145,2130145,2130146,2130145,2130145],"P":11025},"crow-game-theme":{"parts":["music/songs/crow-game-theme/0.mp3","music/songs/crow-game-theme/1.mp3","music/songs/crow-game-theme/2.mp3","music/songs/crow-game-theme/3.mp3","music/songs/crow-game-theme/4.mp3","music/songs/crow-game-theme/5.mp3","music/songs/crow-game-theme/6.mp3","music/songs/crow-game-theme/7.mp3","music/songs/crow-game-theme/8.mp3","music/songs/crow-game-theme/9.mp3","music/songs/crow-game-theme/10.mp3","music/songs/crow-game-theme/11.mp3","music/songs/crow-game-theme/12.mp3","music/songs/crow-game-theme/13.mp3","music/songs/crow-game-theme/14.mp3","music/songs/crow-game-theme/15.mp3"],"lens":[2103438,2103439,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103439,2103438],"P":11025}};
+function trSetDef(T, def) {
+  T.def = def; T.K = def.parts.length; T.pad = def.P / 44100; T.len = def.lens.map(n => n / 44100); T.start = [0];
+  for (let k = 0; k < T.K; k++) T.start.push(T.start[k] + T.len[k]);
+  T.lb = T.start[T.K];
 }
-const TRACKS = [mkTrack(MUS), mkTrack(DUNE_MUS)];   // 0 backing track 2, 1 jungle game (the Dunes)
+function mkTrack(def) {
+  const T = { g: null, on: false, gen: 0, pos: 0, t0: 0, nextK: 0, nextAt: 0, busy: false, bufs: {}, srcs: [], offAt: 0 };
+  trSetDef(T, def); return T;
+}
+let plLast = -1;
+function plShuffle() {                         // the playlist: every song once in a random order, strung end to end, then shuffled again
+  const list = [MUS].concat(Object.values(SONGS)), ord = list.map((_, i) => i);
+  for (let i = ord.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ord[i], ord[j]] = [ord[j], ord[i]]; }
+  if (ord[0] === plLast) ord.push(ord.shift());   // never the same song twice in a row
+  plLast = ord[ord.length - 1];
+  const def = { parts: [], lens: [], P: MUS.P };
+  for (const i of ord) { def.parts.push(...list[i].parts); def.lens.push(...list[i].lens); }
+  return def;
+}
+const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop)
+TRACKS[0].shuffle = true;
 const mus = { gain: null, on: false, cur: 0 };
 const musRaw = {};                             // v148: the music lives as separate files next to the game; each is fetched once, then kept
 function musLoad(url) {
@@ -4161,8 +4178,8 @@ function musPlace(T, k, at, buf) {             // play piece k of track T so its
   g.gain.setValueAtTime(0, from); g.gain.linearRampToValueAtTime(1, from + fadeIn);
   g.gain.setValueAtTime(1, end - MUS_XF); g.gain.linearRampToValueAtTime(0, end + MUS_XF);
   src.start(from, T.pad + (from - at)); src.stop(end + MUS_XF);
-  const rec = { src, g, k }; T.srcs.push(rec);
-  src.onended = () => { T.srcs = T.srcs.filter(r => r !== rec); if (!T.srcs.some(r => r.k === k) && T.nextK !== k) T.bufs[k] = null; };
+  const url = T.def.parts[k], rec = { src, g, url }; T.srcs.push(rec);
+  src.onended = () => { T.srcs = T.srcs.filter(r => r !== rec); if (!T.srcs.some(r => r.url === url) && T.def.parts[T.nextK] !== url) delete T.bufs[url]; };
 }
 function trFade(T, to, dur) {
   const now = actx.currentTime, g = T.g.gain;
@@ -4182,7 +4199,7 @@ function trPlay(T, fade) {                     // start (or bring back) a track 
 function trStop(T) {                           // silence it now and remember where it got to
   if (!T.on) return;
   const now = actx.currentTime;
-  T.pos = ((now - T.t0) % T.lb + T.lb) % T.lb;
+  T.pos = now < T.t0 ? 0 : ((now - T.t0) % T.lb + T.lb) % T.lb;   // (before t0 means a fresh shuffle is about to start)
   T.on = false; T.gen++; T.busy = false; T.offAt = 0;
   T.g.gain.cancelScheduledValues(now); T.g.gain.setValueAtTime(T.g.gain.value, now); T.g.gain.linearRampToValueAtTime(0, now + 0.06);
   for (const r of T.srcs) { r.g.gain.cancelScheduledValues(now); r.g.gain.setValueAtTime(r.g.gain.value, now); r.g.gain.linearRampToValueAtTime(0, now + 0.05); try { r.src.stop(now + 0.06); } catch (e) {} }
@@ -4191,14 +4208,16 @@ function trTick(T) {
   if (!T.on) return;
   const now = actx.currentTime;
   if (T.offAt && now >= T.offAt) { trStop(T); return; }
-  if (!T.busy && T.nextAt - now < 12 && !(T.failAt && now - T.failAt < 5)) {   // after a failed load wait a bit before trying again        // decode the next piece a little ahead and line it up
-    const k = T.nextK, at = T.nextAt, gen = T.gen;
+  if (!T.busy && T.nextAt - now < 12 && !(T.failAt && now - T.failAt < 5)) {   // decode the next piece a little ahead and line it up (after a failed load, wait a bit)
+    const k = T.nextK, at = T.nextAt, gen = T.gen, url = T.def.parts[k];
     T.busy = true;
-    (T.bufs[k] ? Promise.resolve(T.bufs[k]) : musLoad(T.def.parts[k])).then(buf => {
+    (T.bufs[url] ? Promise.resolve(T.bufs[url]) : musLoad(url)).then(buf => {
       if (gen !== T.gen) return;
-      T.bufs[k] = buf; T.busy = false;
+      T.bufs[url] = buf; T.busy = false;
+      musPlace(T, k, at, buf);
       T.nextK = (k + 1) % T.K; T.nextAt = at + T.len[k];
-      musPlace(T, k, at, buf); trTick(T);
+      if (T.nextK === 0 && T.shuffle) { trSetDef(T, plShuffle()); T.t0 = T.nextAt; }   // played every song: deal a fresh order
+      trTick(T);
     }, () => { if (gen === T.gen) { T.busy = false; T.failAt = actx.currentTime; } });
   }
 }
