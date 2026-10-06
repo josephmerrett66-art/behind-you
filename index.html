@@ -92,6 +92,10 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .fov output { color: var(--ash); text-align: right; font-variant-numeric: tabular-nums; }
 .audio { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
 .audio h2 { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); font-weight: 600; }
+body.pad #craftBtn, body.pad #useBtn { display: none !important; }
+#padToast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -20px); z-index: 99; padding: 0.55rem 1rem; border-radius: 99px; background: rgba(10,10,10,0.88); border: 1px solid rgba(239,239,234,0.3); color: var(--bone); font: 600 0.72rem var(--mono); letter-spacing: 0.06em; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; }
+#padToast.on { opacity: 1; transform: translate(-50%, 0); }
+.padfocus { outline: 3px solid #ffcf8a !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(255,190,120,0.25), 0 0 18px rgba(255,190,120,0.35) !important; }
 body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body.mouse #attack, body.mouse #autorun, body.mouse #campBtn, body.mouse .exuse { display: none !important; }
 #campBtn { position: fixed; right: 22px; bottom: calc(392px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 0.56rem; letter-spacing: 0.1em; color: var(--void); background: var(--bone); border: 0; touch-action: manipulation; }
 .exuse { position: fixed; right: 27px; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0.5rem; letter-spacing: 0.08em; color: var(--bone); background: rgba(5,5,5,0.6); border: 1px solid rgba(239,239,234,0.55); touch-action: manipulation; }
@@ -521,7 +525,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 171</p>
+      <p class="small" id="verLbl">Version 172</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -574,6 +578,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <div class="controls">
       <span>Phone</span><span>Right thumb aims. Left thumb runs. Tap Attack to swing the torch (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
       <span>Desktop</span><span>Mouse aims<br>W or Space runs<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch (not in Expedition)<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
+      <span>Controller</span><span>Left stick runs, right stick aims<br>A or RT attacks, B dodges<br>X uses, Y is your weapon's special<br>LB and RB change what's in your hand (Expedition: LB swaps weapon)<br>D-pad: up or LT drinks a flask, down lights a recall flare, left plants a lantern, right toggles auto run<br>View opens the pack, Menu pauses<br>In menus, the d-pad or left stick moves, A presses, B goes back</span>
     </div>
   </section>
 </div>
@@ -704,7 +709,7 @@ autoBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropaga
 // returns [worldX, worldY, speed]
 function moveInput() {
   // one control: go forward, toward wherever the torch points
-  let go = keys['w'] || keys['arrowup'] || keys[' '];
+  let go = keys['w'] || keys['arrowup'] || keys[' '] || (PAD.on && PAD.run);   // v172: or the left stick
   let speed = RUN;                               // no walking: going is always a sprint (Joe)
   for (const id in sticks) {
     const s = sticks[id], m = Math.hypot(s.x - s.ox, s.y - s.oy);
@@ -4096,7 +4101,7 @@ function drawLensGlow() {                         // the torch lens itself glows
 }
 
 // ---- game feel: camera shake (trauma that decays) and hit-stop (a few frozen frames on big hits) ----
-function addShake(a) { S.trauma = Math.min(1, (S.trauma || 0) + a); }
+function addShake(a) { S.trauma = Math.min(1, (S.trauma || 0) + a); if (a >= 0.2) padRumble(a); }   // v172: the pad feels the big ones
 function hitStop(t) { S.hitstop = Math.max(S.hitstop || 0, t); }
 function render() {
   const tr = S.trauma || 0; let shx = 0, shy = 0;
@@ -4643,7 +4648,7 @@ document.getElementById('saveNew').addEventListener('click', () => {
   SV.list.push({ id, at: Date.now() }); useSave(id); begin('expedition');
 });
 document.getElementById('savesOpen').addEventListener('click', renderSaves);
-addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hidden && document.getElementById('mainMenu').hidden) { showPanel(null); return; } if (e.key === 'Escape' && S.mode && picker.hidden && campEl.hidden && statsEl.hidden) (overlay.hidden ? openMenu() : resumeBtn.click()); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hidden && document.getElementById('mainMenu').hidden) { showPanel(null); return; } if (e.key === 'Escape' && S.mode && picker.hidden && campEl.hidden && statsEl.hidden && craftEl.hidden) (overlay.hidden ? openMenu() : resumeBtn.click()); });
 resumeBtn.addEventListener('click', () => { overlay.hidden = true; menuBtn.hidden = false; S.running = true; last = performance.now(); });
 
 // ================= NIGHTFALL: the roguelike survival mode =================
@@ -4865,6 +4870,7 @@ function drawRedLaser() {
   ctx.restore();
 }
 function hurt(e) {
+  padRumble(1, 240);   // v172
   const rg = S.rg;
   if (S.mode === 'expedition' && exSafeAt(S.p.x, S.p.y)) return;   // nothing reaches you inside the firelight or an outpost
   if (S.mode === 'expedition' && rg.recall) { rg.recall = null; exNote('the flare went out'); }   // a hit snuffs a recall flare
@@ -10219,6 +10225,135 @@ function dayArmFx() {   // the thrown spear in flight
 function dayArmTint() {   // the held weapon's own materials, for the shared weapon drawings
   const T = heldIt(); WPH = T && T.hc && COLOUR ? T.hc : null; WPB = T && T.bc ? (COLOUR ? T.bc : '#6a6a66') : null; WPS = T && T.spikes ? (COLOUR ? T.spikes : '#c8c8c2') : null;
 }
+// ---- v172 (Joe): controller support. Any gamepad the browser sees (Xbox, PlayStation, Switch Pro, most others in the standard layout).
+// In play: left stick runs that way, right stick aims the torch, RT or A attacks, B dodges, X uses, Y is the weapon's special,
+// LB/RB step along the hotbar (Expedition: LB swaps weapons), d-pad up drinks a flask, down lights the recall flare, left plants a lantern,
+// right toggles auto run, View opens the pack (Expedition: the camp shop), Menu pauses. In any menu the d-pad or left stick moves a
+// highlight between buttons, A presses, B goes back, LB/RB flip the pack's tabs. The pad rumbles with the big hits.
+const PAD = { on: false, idx: -1, prev: [], lx: 0, ly: 0, rx: 0, ry: 0, run: false, aimed: false, navT: 0, navDir: '', focus: null, rumbleT: 0, last: 0 };
+const PAD_DEAD = 0.28;
+const padStick = (x, y) => { const m = Math.hypot(x, y); if (m < PAD_DEAD) return [0, 0, 0]; const k = Math.min(1, (m - PAD_DEAD) / (1 - PAD_DEAD)) / m; return [x * k, y * k, Math.min(1, (m - PAD_DEAD) / (1 - PAD_DEAD))]; };
+addEventListener('gamepadconnected', e => { padToast(`Controller connected · ${padName(e.gamepad)}`); });
+addEventListener('gamepaddisconnected', () => { if (PAD.on) padToast('Controller disconnected'); PAD.on = false; PAD.idx = -1; padBlur(); });
+function padName(g) { const id = (g && g.id || '').toLowerCase(); return /054c|playstation|dualsense|dualshock/.test(id) ? 'PlayStation' : /057e|switch|pro controller/.test(id) ? 'Switch' : /xbox|045e|xinput/.test(id) ? 'Xbox' : 'gamepad'; }
+function padToast(t) {
+  let el = document.getElementById('padToast');
+  if (!el) { el = document.createElement('div'); el.id = 'padToast'; document.body.append(el); }
+  el.textContent = t; el.classList.add('on'); clearTimeout(padToast.t); padToast.t = setTimeout(() => el.classList.remove('on'), 2600);
+}
+function padKey(key) {   // the pad presses a key, so every keyboard path (and its rules) works as it already does
+  const o = { key, bubbles: true, cancelable: true };
+  dispatchEvent(new KeyboardEvent('keydown', o)); dispatchEvent(new KeyboardEvent('keyup', o));
+}
+const padMenuOpen = () => !S || !S.mode || !S.running;   // the title, the pause menu, the pack, the camp, a death card: navigate, don't play
+function padPoll() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let g = PAD.idx >= 0 ? pads[PAD.idx] : null;
+  if (!g || !g.connected) { g = null; for (const q of pads) if (q && q.connected && q.buttons.length >= 12) { g = q; break; } }
+  if (!g) { if (PAD.on) { PAD.on = false; PAD.run = false; } return; }
+  PAD.idx = g.index;
+  const B = g.buttons.map(b => b.pressed || b.value > 0.5), A = g.axes;
+  const down = i => B[i] && !PAD.prev[i], any = B.some(Boolean) || A.some(v => Math.abs(v) > 0.5);
+  if (any && !PAD.on) { PAD.on = true; document.body.classList.add('mouse', 'pad'); }   // a pad in hand hides the thumb buttons, like a mouse does
+  if (any) PAD.last = performance.now();
+  if (!PAD.on) { PAD.prev = B; return; }
+  [PAD.lx, PAD.ly] = padStick(A[0] || 0, A[1] || 0); [PAD.rx, PAD.ry] = padStick(A[2] || 0, A[3] || 0);
+  if (padMenuOpen()) { PAD.run = false; padMenu(g, B, down); PAD.prev = B; return; }
+  padBlur();
+  // ---- in play ----
+  const rAim = Math.hypot(PAD.rx, PAD.ry) > 0, lMove = Math.hypot(PAD.lx, PAD.ly) > 0;
+  if (rAim) S.aim = Math.atan2(PAD.ry, PAD.rx);       // the right stick holds the torch where you point it
+  else if (lMove) S.aim = Math.atan2(PAD.ly, PAD.lx); // with it at rest, the torch looks the way you run
+  if (lMove && S.autoRun) S.autoRun = false;
+  PAD.run = lMove;
+  if (down(0) || down(7)) attack();                     // A or RT
+  if (down(1)) dodge();                                 // B
+  if (down(2)) { if (S.day) dayUse(); else if (S.mode === 'expedition') padKey('e'); }   // X: use, take, open
+  if (down(3) && typeof wpSpecial === 'function') wpSpecial();   // Y: the weapon's special
+  if (down(4)) { if (S.day) daySelect((S.day.hot + HOTN - 1) % HOTN); else if (typeof wpSwap === 'function' && wpOn()) wpSwap(); }   // LB
+  if (down(5)) { if (S.day) daySelect((S.day.hot + 1) % HOTN); }   // RB
+  if (down(6)) padKey('h');                             // LT: a flask
+  if (down(12)) padKey('h');                            // d-pad up: a flask
+  if (down(13)) padKey('g');                            // d-pad down: the recall flare
+  if (down(14)) padKey('t');                            // d-pad left: plant a lantern
+  if (down(15) || down(10)) toggleAutoRun();            // d-pad right or L3: auto run
+  if (down(11)) padKey('f');                            // R3: the torch switch (where there is one)
+  if (down(8)) { if (S.day) openCraft(); else if (S.mode === 'expedition') padKey('e'); }   // View / Share: the pack
+  if (down(9)) padKey('Escape');                        // Menu / Options: pause
+  PAD.prev = B;
+}
+// ---- menus: a highlight that walks between buttons ----
+const PAD_SEL = 'button, summary, input, select, a[href], [role="button"], .slot';
+function padCands() {
+  const out = [];
+  for (const el of document.querySelectorAll(PAD_SEL)) {
+    if (el.disabled || el.hidden || el.closest('[hidden]') || el.closest('#hotbar, #buildbar') || el.offsetParent === null && getComputedStyle(el).position !== 'fixed') continue;
+    const r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4 || r.bottom < -400 || r.top > innerHeight + 2400) continue;
+    const cx = Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), cy = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2));
+    if (r.top >= 0 && r.bottom <= innerHeight) { const top = document.elementFromPoint(cx, cy); if (top && top !== el && !el.contains(top) && !top.contains(el)) continue; }   // under another layer
+    if (getComputedStyle(el).visibility === 'hidden' || getComputedStyle(el).pointerEvents === 'none') continue;
+    out.push({ el, r, x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  }
+  return out;
+}
+function padFocus(el) {
+  if (PAD.focus === el) return;
+  padBlur(); PAD.focus = el; el.classList.add('padfocus');
+  try { el.focus({ preventScroll: true }); } catch (e) {}
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function padBlur() { if (PAD.focus) { PAD.focus.classList.remove('padfocus'); PAD.focus = null; } }
+function padMove(dx, dy) {
+  const C = padCands(); if (!C.length) return;
+  const cur = PAD.focus && C.find(c => c.el === PAD.focus);
+  if (!cur) {   // start on the obvious one: Resume, Begin, the open tab, the main action, else the top-left
+    let first = null; for (const q of [resumeBtn && '#' + resumeBtn.id, '.begin', '[aria-pressed="true"]', '.main']) if (q && !first) first = C.find(c => c.el.matches(q));
+    return padFocus((first || C.sort((a, b) => a.y - b.y || a.x - b.x)[0]).el);
+  }
+  let best = null, bs = 1e9;
+  for (const c of C) {
+    if (c === cur) continue;
+    const vx = c.x - cur.x, vy = c.y - cur.y, along = vx * dx + vy * dy, side = Math.abs(vx * dy - vy * dx);
+    if (along < 4) continue;
+    const s = along + side * 2.2; if (s < bs) { bs = s; best = c; }
+  }
+  if (best) { padFocus(best.el); if (typeof playTick === 'function') playTick(); }
+}
+function padMenu(g, B, down) {
+  if (PAD.focus && (!PAD.focus.isConnected || PAD.focus.closest('[hidden]'))) padBlur();
+  let dx = 0, dy = 0;
+  if (B[12]) dy = -1; else if (B[13]) dy = 1; else if (B[14]) dx = -1; else if (B[15]) dx = 1;
+  else if (Math.abs(PAD.ly) > 0.5 || Math.abs(PAD.lx) > 0.5) { if (Math.abs(PAD.ly) > Math.abs(PAD.lx)) dy = Math.sign(PAD.ly); else dx = Math.sign(PAD.lx); }
+  const dir = dx + ',' + dy, now = performance.now();
+  if (dx || dy) {
+    const F = PAD.focus;
+    if (F && F.type === 'range' && dx) { if (dir !== PAD.navDir || now > PAD.navT) { F.value = +F.value + dx * (+F.step || 1) * Math.max(1, Math.round((F.max - F.min) / (F.step || 1) / 20)); F.dispatchEvent(new Event('input', { bubbles: true })); F.dispatchEvent(new Event('change', { bubbles: true })); PAD.navT = now + (dir !== PAD.navDir ? 380 : 90); PAD.navDir = dir; } }
+    else if (dir !== PAD.navDir || now > PAD.navT) { padMove(dx, dy); PAD.navT = now + (dir !== PAD.navDir ? 380 : 140); PAD.navDir = dir; }
+  } else PAD.navDir = '';
+  if (!PAD.focus && !(dx || dy) && (down(0) || down(1))) padMove(0, 1);   // the first press just shows where you are
+  else if (down(0) && PAD.focus) { const F = PAD.focus; if (F.tagName === 'SUMMARY' || F.tagName === 'BUTTON' || F.tagName === 'A' || F.getAttribute('role') === 'button') { F.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); F.click(); } else if (F.type === 'checkbox') F.click(); }
+  else if (down(1)) padBack();
+  if (down(9)) padKey('Escape');
+  if (down(4) || down(5)) {   // the pack's tabs: Pack, Craft, Journal; in Craft, the places along the top
+    const tabs = [...document.querySelectorAll(PK && PK.tab === 'craft' && (B[6] || B[7]) ? '#craft .pkplace' : '#craft:not([hidden]) .pktab')];
+    if (tabs.length) { const i = tabs.findIndex(t => t.getAttribute('aria-pressed') === 'true'); tabs[(i + (down(5) ? 1 : tabs.length - 1)) % tabs.length].click(); padBlur(); }
+  }
+  if (down(8) && S && S.day && !craftEl.hidden) closeCraft();   // View again closes the pack
+}
+function padBack() {
+  const cr = typeof craftEl !== 'undefined' && !craftEl.hidden;
+  if (cr && PK.sel) { PK.sel = null; renderPack(); return; }
+  if (cr && PK.open) { PK.open = null; renderPack(); return; }
+  if (cr) { closeCraft(); return; }
+  if (typeof campEl !== 'undefined' && !campEl.hidden) { closeCamp(); return; }
+  padKey('Escape');
+}
+function padRumble(k, ms = 120) {   // the hit in your hands
+  if (!PAD.on || PAD.idx < 0) return; const now = performance.now(); if (now < PAD.rumbleT) return; PAD.rumbleT = now + 60;
+  const g = navigator.getGamepads()[PAD.idx], v = g && g.vibrationActuator; if (!v || !v.playEffect) return;
+  v.playEffect('dual-rumble', { duration: ms, strongMagnitude: Math.min(1, k), weakMagnitude: Math.min(1, k * 0.7 + 0.15) }).catch(() => {});
+}
+addEventListener('touchstart', () => { if (PAD.on && performance.now() - PAD.last > 400) { PAD.on = false; document.body.classList.remove('pad'); padBlur(); } }, { passive: true });
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
 // crafting and building each have a short body animation. Struck trees, rocks and bushes shake and throw chips.
@@ -15865,6 +16000,7 @@ function layoutBtns() {
 addEventListener('resize', () => { btnKey = ''; });
 function frame(now) {
   layoutBtns();   // v145
+  padPoll();   // v172: a controller
   const raw = Math.max(0, (now - last) / 1000);   // v111: rAF's stamp can come before a resume's performance.now(); a negative step once froze the game
   const dt = Math.min(0.05, raw); last = now; frameDt = dt;
   watchSpeed(raw);
