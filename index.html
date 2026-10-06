@@ -536,7 +536,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 174</p>
+      <p class="small" id="verLbl">Version 175</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7644,7 +7644,8 @@ function newSlot(id, n, extra) {
 }
 function slotOrder(D, id) {                    // tools, food and things you place look for the hotbar first; materials for your pockets
   const n = D.inv.length, hot = [...Array(HOTN).keys()], rest = [...Array(n - HOTN).keys()].map(i => i + HOTN);
-  return DIT[id].k === 'mat' ? rest.concat(hot) : hot.concat(rest);
+  const o = DIT[id].k === 'mat' ? rest.concat(hot) : hot.concat(rest);
+  return D.hot === undefined || D.inv[D.hot] ? o : o.filter(i => i !== D.hot).concat(D.hot);   // v175 (Joe): nothing jumps into an empty hand; it's the last place filled
 }
 function addTo(arr, id, n, extra, order) {     // put n of an item into a set of slots; what doesn't fit comes back
   const T = DIT[id]; let left = n;
@@ -8325,7 +8326,7 @@ function dayBar(px, py) {                      // stamina, food and water over y
   if (D.warm < 92 || dayNight()) bar(x0, y0 + 6, tw, D.warm / WARM_MAX, 'rgba(150,200,215,0.9)', D.warm < 30);
   const say = D.bleed > 0 ? 'BLEEDING' : D.warm <= 0 ? 'FREEZING' : D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.warm < 30 ? 'COLD' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : '';
   drawPickHints(px, py);   // v156
-  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (STN_N[o.t] ? ' ' + STN_N[o.t].toUpperCase() : o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : o === EX_FIRE ? ` · ${stPool().w} TO SPEND` : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); } }
+  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (PAD.on || matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (STN_N[o.t] ? ' ' + STN_N[o.t].toUpperCase() : o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : o === EX_FIRE ? ` · ${stPool().w} TO SPEND` : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); padGlyph(2, x - w / 2 - 13, y - 34 * Z - 7); } }
   { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
   if (say) { ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)'; ctx.fillText(say, px, y0 - 9); }
 }
@@ -9714,7 +9715,7 @@ function drawPickHints(px, py) {
   }
   if (!tgt) {                                    // nothing to take: name the grass or bush a swing would gather from
     const h = dayHitTarget();
-    if (h) { const [x, y] = toScreen(h.x, h.y); dayTag(x, y - 20 * Z, (matchMedia('(pointer: coarse)').matches ? '' : 'CLICK · ') + 'HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES'), 'rgba(200,235,180,0.92)'); }
+    if (h) { const [x, y] = toScreen(h.x, h.y); dayTag(x, y - 20 * Z, (PAD.on || matchMedia('(pointer: coarse)').matches ? '' : 'CLICK · ') + 'HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES'), 'rgba(200,235,180,0.92)'); if (PAD.on) { ctx.font = '600 10px "IBM Plex Mono", monospace'; padGlyph(0, x - (ctx.measureText('HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES')).width + 8) / 2 - 13, y - 20 * Z - 7); } }
   }
   drawPickGuide(px, py);
 }
@@ -10322,7 +10323,7 @@ function padPoll() {
   let g = PAD.idx >= 0 ? pads[PAD.idx] : null;
   if (!g || !g.connected) { g = null; for (const q of pads) if (q && q.connected && q.buttons.length >= 12) { g = q; break; } }
   if (!g) { if (PAD.on) { PAD.on = false; PAD.run = false; } return; }
-  PAD.idx = g.index;
+  PAD.idx = g.index; { const n = padName(g); PAD.kind = n === 'PlayStation' ? 'ps' : n === 'Switch' ? 'switch' : 'xbox'; }
   const B = g.buttons.map(b => b.pressed || b.value > 0.5), A = g.axes;
   const down = i => B[i] && !PAD.prev[i], any = B.some(Boolean) || A.some(v => Math.abs(v) > 0.5);
   if (any && !PAD.on) { PAD.on = true; document.body.classList.add('mouse', 'pad'); }   // a pad in hand hides the thumb buttons, like a mouse does
@@ -10372,6 +10373,27 @@ function padFocus(el) {
   padBlur(); PAD.focus = el; el.classList.add('padfocus');
   try { el.focus({ preventScroll: true }); } catch (e) {}
   el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// v175 (Joe): with a pad in hand, the button to press shows beside whatever it would do, drawn as that pad's own button
+// (Xbox letters and colours, PlayStation shapes, Switch letters). b: standard-layout index, 0 bottom (attack), 2 left (use).
+PAD.kind = 'xbox';
+function padGlyph(b, x, y) {
+  if (!PAD.on) return;
+  const k = PAD.kind, r = 9, pulse = 0.85 + 0.15 * Math.sin(S.t * 5);
+  const col = k === 'ps' ? (b === 0 ? '#7fb2ff' : '#f2a0d0') : k === 'switch' ? '#e8e8e2' : (b === 0 ? '#7ccf5a' : '#4fa3ff');
+  ctx.save(); ctx.globalAlpha = pulse;
+  ctx.fillStyle = 'rgba(10,10,10,0.82)'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
+  if (k === 'ps') {
+    ctx.lineWidth = 1.6; ctx.beginPath();
+    if (b === 0) { ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4); }
+    else ctx.rect(x - 4, y - 4, 8, 8);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = col; ctx.font = '700 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(k === 'switch' ? (b === 0 ? 'B' : 'Y') : (b === 0 ? 'A' : 'X'), x, y + 0.5);
+  }
+  ctx.restore();
 }
 function padBlur() { if (PAD.focus) { PAD.focus.classList.remove('padfocus'); PAD.focus = null; } }
 function padMove(dx, dy) {
@@ -15527,7 +15549,8 @@ function drawExFx() {
   } else if (S.running) {
     ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = `rgba(239,239,234,${0.55 + 0.15 * Math.sin(S.t * 2.5)})`;
-    ctx.fillText(matchMedia('(pointer: coarse)').matches ? 'TAP SHOP TO SPEND' : 'E · SHOP', px, py - 50 * Z - 4);
+    ctx.fillText(PAD.on ? 'SHOP' : matchMedia('(pointer: coarse)').matches ? 'TAP SHOP TO SPEND' : 'E · SHOP', px, py - 50 * Z - 4);
+    if (PAD.on) padGlyph(2, px - ctx.measureText('SHOP').width / 2 - 15, py - 50 * Z - 4);
   }
   // notes rising over your head: loot taken, embers banked, pack full
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
