@@ -569,7 +569,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 183</p>
+      <p class="small" id="verLbl">Version 184</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -5802,7 +5802,7 @@ function chase(e, sp, d, dt) {      // plain walk straight at you, with footstep
 const FOE_AI = { bomber: bomberStep, laser: laserStep, kamikaze: kamikazeStep, centi: centiStep, spear: spearStep, archer: archerStep };
 const NO_TOUCH = { bomber: 1, kamikaze: 1, centi: 1, spear: 1, archer: 1 };   // these hurt you their own way, not by touch
 // ---- v183 (Joe: enemies just bump into you, so you can't tell when to dodge): every close-in fighter swings now. It stops, raises its
-// arms (a red arc on the ground shows where the blow will land, and a glint flashes just before it falls), lunges and strikes, then
+// arms and trembles (a glint flashes just before it falls), lunges and strikes, then
 // stands open for a moment. Only the strike hurts: step out of the arc or roll through it. A hit while it winds up knocks the blow
 // out of it, except a brute's or a tall one's (they have poise). wind = the warning, trig = how close it starts, hit = the blow's reach.
 const MELEE = {
@@ -5868,44 +5868,16 @@ function swPose(e) {                            // up: arms raised overhead (0-1
   if (s.ph === 'strike') { const k = Math.min(1, s.t / s.T); return { up: 1 - k, fw: k, shake: 0 }; }
   const k = Math.min(1, s.t / s.T); return { up: 0, fw: (1 - k) * (1 - k), shake: 0 };
 }
-function drawFoeTells() {                       // drawn over the dark, so a blow coming from behind you is as plain as one in front
+function drawFoeTells() {                       // the glint, just before a blow falls (v184, Joe: no ground arcs, the animation is the tell)
   const rg = S.rg; if (!rg || !rg.enemies) return;
-  if (S.day) for (const b of S.day.beasts) {     // the beasts the same way: a wolf's snap, a boar's or a bear's charge
-    if (b.dead || b.tame || (b.st !== 'snap' && b.st !== 'wind')) continue;
-    const [sx, sy] = toScreen(b.x, b.y); if (sx < -200 || sy < -200 || sx > W + 200 || sy > H + 200) continue;
-    const snap = b.st === 'snap', T = snap ? WOLF_SNAP : 0.6, prog = Math.max(0, Math.min(1, 1 - b.t / T));
-    const a = snap ? b.dir : Math.atan2(S.p.y - b.y, S.p.x - b.x), len = snap ? 30 : BEAST[b.k].sp * 0.75, half = snap ? 1.1 : 0.22;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const fan = r => { ctx.beginPath(); ctx.moveTo(sx, sy); for (let i = 0; i <= 12; i++) { const t = a - half + 2 * half * i / 12, [px, py] = toScreen(b.x + Math.cos(t) * r, b.y + Math.sin(t) * r); ctx.lineTo(px, py); } ctx.closePath(); };
-    ctx.fillStyle = `rgba(255,70,45,${0.07 + 0.16 * prog})`; fan(len); ctx.fill();
-    ctx.fillStyle = `rgba(255,80,50,${0.2 + 0.25 * prog})`; fan(len * prog); ctx.fill();
-    ctx.restore();
-  }
   for (const e of rg.enemies) {
-    const s = e.sw, M = MELEE[e.type]; if (!s || e.dead || s.ph === 'rec' || !M) continue;
+    const s = e.sw; if (!s || e.dead || s.ph !== 'wind' || !MELEE[e.type]) continue;
+    const left = s.T - s.t; if (left < 0 || left >= 0.2) continue;
     const [sx, sy] = toScreen(e.x, e.y); if (sx < -120 || sy < -120 || sx > W + 120 || sy > H + 120) continue;
-    const k = foeScale(e), prog = s.ph === 'wind' ? Math.min(1, s.t / s.T) : 1;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const pts = [], N = 14;
-    for (let i = 0; i <= N; i++) { const t = s.a - SW_ARC + 2 * SW_ARC * i / N, [px, py] = toScreen(e.x + Math.cos(t) * M.hit * k, e.y + Math.sin(t) * M.hit * k); pts.push([px, py]); }
-    const strike = s.ph === 'strike', al = strike ? 0.34 : 0.08 + 0.2 * prog;
-    ctx.fillStyle = `rgba(255,${strike ? 120 : 70},${strike ? 80 : 45},${al * (strike ? 1 : 0.55)})`;
-    ctx.beginPath(); ctx.moveTo(sx, sy); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = `rgba(255,${strike ? 170 : 90},${strike ? 120 : 60},${Math.min(1, al * 1.8)})`; ctx.lineWidth = (strike ? 2 : 1.3) * Z;
-    ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
-    if (!strike) {                                // the fill creeping out to the rim as the blow gathers
-      ctx.fillStyle = `rgba(255,80,50,${0.1 + 0.16 * prog})`; ctx.beginPath(); ctx.moveTo(sx, sy);
-      for (let i = 0; i <= N; i++) { const t = s.a - SW_ARC + 2 * SW_ARC * i / N, [px, py] = toScreen(e.x + Math.cos(t) * M.hit * k * prog, e.y + Math.sin(t) * M.hit * k * prog); ctx.lineTo(px, py); }
-      ctx.closePath(); ctx.fill();
-    }
-    const left = s.ph === 'wind' ? s.T - s.t : -1;
-    if (left >= 0 && left < 0.2) {                // the glint, just before it falls
-      if (!s.glint) { s.glint = 1; if (actx && monNear(e, 600) > 0) noiseAt(actx.currentTime, 9000, 6000, 0.1, 0.12 * monNear(e, 600), sfxGain); }
-      const g = 1 - left / 0.2, gy = sy - (FOES[e.type].h + 8) * k * Z, r = (6 + 12 * g) * Z;
-      ctx.strokeStyle = `rgba(255,236,214,${0.95 - 0.35 * g})`; ctx.lineWidth = 1.8 * Z;
-      ctx.beginPath(); ctx.moveTo(sx - r, gy); ctx.lineTo(sx + r, gy); ctx.moveTo(sx, gy - r); ctx.lineTo(sx, gy + r); ctx.stroke();
-    }
-    ctx.restore();
+    if (!s.glint) { s.glint = 1; if (actx && monNear(e, 600) > 0) noiseAt(actx.currentTime, 9000, 6000, 0.1, 0.12 * monNear(e, 600), sfxGain); }
+    const k = foeScale(e), g = 1 - left / 0.2, gy = sy - (FOES[e.type].h + 8) * k * Z, r = (6 + 12 * g) * Z;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,236,214,${0.95 - 0.35 * g})`; ctx.lineWidth = 1.8 * Z;
+    ctx.beginPath(); ctx.moveTo(sx - r, gy); ctx.lineTo(sx + r, gy); ctx.moveTo(sx, gy - r); ctx.lineTo(sx, gy + r); ctx.stroke(); ctx.restore();
   }
 }
 function fireFlare() {
