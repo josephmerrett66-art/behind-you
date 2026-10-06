@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 169</p>
+      <p class="small" id="verLbl">Version 170</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1637,7 +1637,7 @@ function startSwing() {
   if ((p.roll || 0) > 0 || (p.rollEnd || 0) > 0) i = 3;   // out of a roll: the dash strike
   else if (prev && S.t - prev.end < ATK_CHAIN && prev.i < 2) i = prev.i + 1;
   const tov = S.day && TOOL_SWING[dayTool()] && i !== 3 ? TOOL_SWING[dayTool()] : null; if (tov) i = 0;   // v133: a tool swings its own way, one stroke at a time
-  if (!tov && wpOn() && curW() !== 'torch') return wpStart(i === 3);   // v141: a boss weapon swings its own way
+  if (!tov && (wpOn() || dArmOn()) && curW() !== 'torch') { if (S.day) { S.day.st = Math.max(0, S.day.st - STA_SWING); S.day.stT = 0; } return wpStart(i === 3); }   // v170: Daylight weapons too   // v141: a boss weapon swings its own way
   const D = ATK[i], a = S.aimW !== undefined ? S.aimW : 0;
   if (S.day) { S.day.st = Math.max(0, S.day.st - (D.slam ? STA_SLAM : STA_SWING)); S.day.stT = 0; }
   if (i === 3) p.roll = 0;                        // the roll turns into the thrust
@@ -1810,6 +1810,7 @@ function update(dt) {
   if (p.ghosts) { for (const g of p.ghosts) g.a -= dt * 2.2; p.ghosts = p.ghosts.filter(g => g.a > 0); }
   if (isRg() && S.rg) { atkStep(dt); slashStep(dt); }
   if (S.mode === 'expedition' && S.rg) wpTick(dt);   // v141: boss weapons
+  if (S.day && S.rg) dayArmTick(dt);   // v170: thrown spears, the parry window
   const ox = p.x, oy = p.y;
   p.x += p.vx * dt; p.y += p.vy * dt;
   if (isRg() && S.rg && S.rg.phase === 'fight') { lifeAdd('walk', Math.hypot(p.vx, p.vy) * dt); lifeAdd('time', dt); }   // the record: metres walked, time out
@@ -3527,7 +3528,8 @@ function drawPlayer0() {
     line([rSh, rEl], near ? 3.9 : 3.7, G(36, near, 'jacket')); line([rEl, rHa], near ? 3.5 : 3.3, G(33, near, 'jacket'));
     detail([mid(rEl, rHa, 0.78), mid(rEl, rHa, 0.86)], 3.8, G(44, near, 'jacket'));
     const wh = wpHand();
-    if (S.day) dayHeld(P, rHa, tipL, near, OUT); else if (wh && wh !== 'none') wpHeld(wh, P, rHa, tipL, near, OUT, lHa); else if (!wh) {   // v133: in Daylight you hold a tool, not the torch; v141: or a boss weapon
+    if (S.day) dayArmTint();   // v170: the tier's own head and body colours
+    if (S.day && !wh) dayHeld(P, rHa, tipL, near, OUT); else if (wh && wh !== 'none') wpHeld(wh, P, rHa, tipL, near, OUT, lHa); else if (!wh) {   // v133: in Daylight you hold a tool, not the torch; v141: or a boss weapon
     line([[rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL], 3.4, '#2f2f2d');                 // a dented service torch
     detail([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.3), mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.55)], 3.6, '#454542');   // grip
     line([mid([rHa[0] - 1.5, rHa[1], rHa[2] + 0.3], tipL, 0.85), tipL], 4.2, '#3a3a37', 'butt');   // head of the torch
@@ -4234,7 +4236,7 @@ function renderScene() {
   if (isRg()) drawDodgeFx();
   if (isRg()) { surviveLight(bx, by, br, casters, lx, ly); drawSurviveFx(bx, by, br); }
   if (S.mode === 'expedition') drawExFx();
-  if (S.mode === 'expedition' && S.rg && !S.day) drawWpFx();   // v141
+  if (S.mode === 'expedition' && S.rg) { drawWpFx(); if (S.day) dayArmFx(); }   // v141; v170: Daylight weapons too
 
   if (S.q) {                                   // is the creature inside the beam, with nothing in the way?
     const q = S.q, [qx, qy] = toScreen(q.x, q.y), d = Math.hypot(qx - bx, qy - by);
@@ -4847,6 +4849,7 @@ function hurt(e) {
     if (lv('close')) { S.p.rollCool = 0; if (isEx()) S.p.dch = dodgeMax(); dodgeBtn.dataset.cool = '0'; rg.rushT = 1.5 + 1.5 * lv('close'); if (isEx() && lv('close') > 1) rg.adren = 2; }   // Close Call 2: a burst of speed too
     return;
   }
+  if (S.day && rg.dparry && e) { dayParry(e); return; }   // v170: the sword met it
   if (rg.shield > 0) {                     // Second Wind: this one bounces off
     rdHitBy(e, 'shield'); rg.shield--; rg.inv = 1.2 + 0.15 * sr('steady'); rg.pop = { t: 0, blocked: true }; rg.windT = 0;
     if (isEx() && lv('wind') > 2) { lightBurst(S.p.x, S.p.y, 150, 0.4, 'white'); for (const o of rg.enemies) if (dist2(o, S.p) < 150) o.frozen = 2; }   // Second Wind 3: breaking it flashes
@@ -7372,7 +7375,7 @@ const DIT = {
   jerky: { n: 'Dried meat', c: '#8a4a28', st: 12, k: 'food', b: 'Keeps · the food you take with you', eat: { food: 26 } },
   axe3: { n: 'Iron axe', c: '#b8bcc0', st: 1, k: 'tool', tool: 'axe', tier: 3, dmg: 1.25, dur: 300, b: 'Fells a tree in 2 chops' },
   pick3: { n: 'Iron pick', c: '#b8bcc0', st: 1, k: 'tool', tool: 'pick', tier: 3, dmg: 1.15, dur: 300, b: 'Breaks rock in one · the most iron' },
-  spear3: { n: 'Iron spear', c: '#b8bcc0', st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', dmg: 1.8, r: 26, dur: 260, b: 'Long, and it goes right through' },
+  spear3: { n: 'Iron spear', c: '#b8bcc0', st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', fam: 'twin', hc: IRON_HEAD, dmg: 1.8, r: 26, dur: 260, b: 'Spear · the longest reach, and it goes right through' },
   helm: { n: 'Iron helm', c: '#b8bcc0', st: 1, k: 'gear', slot: 'head', arm: 2, b: 'Armour · soaks two hits, then mends' },
   mail: { n: 'Iron mail', c: '#b8bcc0', st: 1, k: 'gear', slot: 'body', heart: 1, arm: 1, b: 'One more heart, and armour with it' },
   furnace: { n: 'Furnace', c: '#8e8c86', st: 2, k: 'place', build: 'furnace', b: 'Smelts ore into iron bars' },
@@ -7384,10 +7387,25 @@ const DIT = {
   axe2: { n: 'Flint axe', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'axe', tier: 2, dmg: 1.05, dur: 120, b: 'Fells a tree in 3 chops' },
   pick1: { n: 'Stone pick', c: STONE_HEAD, st: 1, k: 'tool', tool: 'pick', tier: 1, dmg: 0.8, dur: 60, b: 'Breaks rock for flint' },
   pick2: { n: 'Flint pick', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'pick', tier: 2, dmg: 0.95, dur: 120, b: 'Breaks rock in 2 blows, more flint' },
-  club: { n: 'Wooden club', c: '#6e5235', st: 1, k: 'tool', tool: 'weapon', wpn: 'club', dmg: 1.05, r: 6, dur: 60, b: 'Hits harder than fists' },
-  spear1: { n: 'Stone spear', c: STONE_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', dmg: 1.15, r: 20, dur: 50, b: 'Reach, and a fast thrust' },
-  spear2: { n: 'Flint spear', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', dmg: 1.35, r: 24, dur: 100, b: 'Long reach, hits hard' },
-  bonec: { n: 'Bone club', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'bone', dmg: 1.75, r: 8, dur: 140, b: 'The hardest hitter' },
+  club: { n: 'Wooden club', c: '#6e5235', st: 1, k: 'tool', tool: 'weapon', wpn: 'club', fam: 'club', bc: '#6e5235', dmg: 1.05, r: 6, dur: 60, b: 'Club · wide sweeps that send them flying' },
+  spear1: { n: 'Stone spear', c: STONE_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', fam: 'twin', hc: STONE_HEAD, dmg: 1.15, r: 20, dur: 50, b: 'Spear · quick jabs at a safe distance' },
+  spear2: { n: 'Flint spear', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', fam: 'twin', hc: FLINT_HEAD, dmg: 1.35, r: 24, dur: 100, b: 'Spear · long reach, hits hard' },
+  bonec: { n: 'Bone club', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'bone', fam: 'club', bc: '#e6dfcc', dmg: 1.75, r: 8, dur: 140, b: 'Club · heavy, and hard as rock' },
+  // v170: weapon families. fam = the move set it swings with (spear: twin, club, axe, knife, sword); hc = the colour of its head or blade, bc = a club's body
+  spear0: { n: 'Sharpened stick', c: '#a08a62', st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', fam: 'twin', hc: '#b89a6a', dmg: 0.95, dur: 35, b: 'Spear · better than nothing, just' },
+  spearB: { n: 'Bone spear', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', fam: 'twin', hc: '#e6dfcc', dmg: 1.55, dur: 150, b: 'Spear · a jagged bone point that bites deep' },
+  waxe1: { n: 'Stone war axe', c: STONE_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'waxe', fam: 'axe', hc: STONE_HEAD, dmg: 1.15, dur: 70, b: 'War axe · huge slow chops that knock them flat' },
+  waxe2: { n: 'Flint war axe', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'waxe', fam: 'axe', hc: FLINT_HEAD, dmg: 1.4, dur: 130, b: 'War axe · a keen black edge' },
+  waxe3: { n: 'Bone war axe', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'waxe', fam: 'axe', hc: '#e6dfcc', dmg: 1.65, dur: 170, b: 'War axe · a jawbone blade, cruel and heavy' },
+  waxe4: { n: 'Iron war axe', c: IRON_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'waxe', fam: 'axe', hc: IRON_HEAD, dmg: 2.0, dur: 320, b: 'War axe · splits anything in two' },
+  sclub: { n: 'Spiked club', c: '#5e4630', st: 1, k: 'tool', tool: 'weapon', wpn: 'club', fam: 'club', bc: '#5e4630', spikes: FLINT_HEAD, dmg: 1.35, dur: 100, b: 'Club · flint driven through the head' },
+  maul: { n: 'Stone maul', c: STONE_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'club', fam: 'club', bc: '#8d8b85', dmg: 1.5, dur: 120, b: 'Club · a rock lashed to a log' },
+  mace: { n: 'Iron mace', c: IRON_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'club', fam: 'club', bc: '#9aa0a6', spikes: '#d8dce0', dmg: 2.15, dur: 320, b: 'Club · flanged iron, nothing stands up to it' },
+  knife1: { n: 'Flint knife', c: FLINT_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'knife', fam: 'knife', hc: FLINT_HEAD, dmg: 0.9, dur: 70, b: 'Knife · five lightning cuts, and they bleed' },
+  knife2: { n: 'Bone knife', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'knife', fam: 'knife', hc: '#e6dfcc', dmg: 1.15, dur: 130, b: 'Knife · fast, and it holds an edge' },
+  knife3: { n: 'Iron knife', c: IRON_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'knife', fam: 'knife', hc: IRON_HEAD, dmg: 1.45, dur: 280, b: 'Knife · a hunter\'s blade' },
+  sword1: { n: 'Bone sword', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'sword', fam: 'sword', hc: '#e6dfcc', dmg: 1.45, dur: 160, b: 'Sword · cuts both ways, then a spin · parry' },
+  sword2: { n: 'Iron sword', c: IRON_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'sword', fam: 'sword', hc: IRON_HEAD, dmg: 1.9, dur: 340, b: 'Sword · the all-rounder, in good iron · parry' },
   sack: { n: 'Grass sack', c: '#a8b86a', st: 1, k: 'gear', slot: 'back', bag: 8, b: 'Wear on your back · 8 more slots' },
   pack: { n: 'Hide pack', c: '#a07850', st: 1, k: 'gear', slot: 'back', bag: 16, b: 'Wear on your back · 16 more slots' },
   hood: { n: 'Hide hood', c: '#a07850', st: 1, k: 'gear', slot: 'head', arm: 1, b: 'Armour · soaks one hit, then mends' },
@@ -7420,6 +7438,20 @@ const DREC = [
   { id: 'spear1', g: 'wpn', out: 'spear1', at: 'hand', cost: { sticks: 4, stones: 1, fibre: 3 } },
   { id: 'spear2', g: 'wpn', out: 'spear2', at: 'bench', cost: { sticks: 4, flint: 2, rope: 1 } },
   { id: 'bonec', g: 'wpn', out: 'bonec', at: 'bench', cost: { planks: 2, bone: 3, hide: 1 } },
+  { id: 'spear0', g: 'wpn', out: 'spear0', at: 'hand', cost: { sticks: 3 } },   // v170: the weapon families
+  { id: 'spearB', g: 'wpn', out: 'spearB', at: 'bench', cost: { sticks: 4, bone: 3, rope: 1 } },
+  { id: 'waxe1', g: 'wpn', out: 'waxe1', at: 'hand', cost: { sticks: 3, stones: 4, rope: 1 } },
+  { id: 'waxe2', g: 'wpn', out: 'waxe2', at: 'bench', cost: { planks: 2, flint: 4, rope: 2 } },
+  { id: 'waxe3', g: 'wpn', out: 'waxe3', at: 'bench', cost: { planks: 2, bone: 5, hide: 1 } },
+  { id: 'waxe4', g: 'wpn', out: 'waxe4', at: 'furnace', cost: { iron: 4, planks: 2, hide: 1 } },
+  { id: 'sclub', g: 'wpn', out: 'sclub', at: 'bench', cost: { club: 1, flint: 4, rope: 1 } },
+  { id: 'maul', g: 'wpn', out: 'maul', at: 'hand', cost: { logs: 1, stones: 8, rope: 2 } },
+  { id: 'mace', g: 'wpn', out: 'mace', at: 'furnace', cost: { iron: 4, planks: 1, hide: 1 } },
+  { id: 'knife1', g: 'wpn', out: 'knife1', at: 'hand', cost: { sticks: 1, flint: 2, fibre: 2 } },
+  { id: 'knife2', g: 'wpn', out: 'knife2', at: 'bench', cost: { bone: 2, hide: 1, rope: 1 } },
+  { id: 'knife3', g: 'wpn', out: 'knife3', at: 'furnace', cost: { iron: 2, hide: 1 } },
+  { id: 'sword1', g: 'wpn', out: 'sword1', at: 'bench', cost: { bone: 6, planks: 1, hide: 2, rope: 1 } },
+  { id: 'sword2', g: 'wpn', out: 'sword2', at: 'furnace', cost: { iron: 5, planks: 1, hide: 1 } },
   { id: 'sack', g: 'gear', out: 'sack', at: 'hand', cost: { fibre: 10, rope: 2 } },
   { id: 'skin', g: 'gear', out: 'skin', at: 'hand', cost: { hide: 2, rope: 1 } },
   { id: 'pack', g: 'gear', out: 'pack', at: 'bench', cost: { hide: 4, rope: 3, sticks: 4 } },
@@ -7501,7 +7533,7 @@ const heldIt = () => { const s = heldSlot(); return s ? DIT[s.id] : null; };
 function dayTool() { const T = heldIt(); return T && T.tool ? T.tool : 'hand'; }   // what a swing does: 'axe', 'pick', 'weapon' or 'hand'
 const dayWpn = () => { const T = heldIt(); return T && T.wpn || null; };
 const dayK = () => S && S.day ? (dayTool() === 'hand' ? 0.6 : heldIt().dmg) : 1;
-const dayR = () => S && S.day && dayTool() === 'weapon' ? heldIt().r : 0;
+const dayR = () => S && S.day && dayTool() === 'weapon' && !heldIt().fam ? heldIt().r : 0;   // v170: a family's moves carry their own reach
 function newSlot(id, n, extra) {
   const T = DIT[id], s = { id, n };
   if (T.dur) s.d = extra ?? T.dur;
@@ -7973,6 +8005,9 @@ const ICON = (() => {
   const axe = h => `<path d="M5.5 21.5L16.5 6" stroke="#7a5a3a" stroke-width="2.4" stroke-linecap="round"/><path d="M12.5 3.5c3.6-.3 6.8 1.8 8 5l-5.2 4.2-4.6-5.6z" fill="${h}"/><path d="M15 12.5l5.3-4.2" stroke="#e8e2d0" stroke-width=".9" opacity=".7"/><path d="M11.5 9.5l2.5 3" stroke="#a8b86a" stroke-width="1.6"/>`;
   const pick = h => `<path d="M7 21.5l9-12.5" stroke="#7a5a3a" stroke-width="2.4" stroke-linecap="round"/><path d="M3.5 7.5c5.5-4.5 12-4.2 17 1" stroke="${h}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M13 7l2.5 2.5" stroke="#a8b86a" stroke-width="1.6"/>`;
   const spear = h => `<path d="M3.5 20.5L17 7" stroke="#8a6a44" stroke-width="1.9" stroke-linecap="round"/><path d="M15.5 4.5l6-1.8-1.8 6-3.4 1.2-1.8-1.8z" fill="${h}"/><path d="M14.5 8l1.6 1.6" stroke="#a8b86a" stroke-width="1.8"/>`;
+  const waxe = h => `<path d="M5 21.5L17.5 5" stroke="#6b4a2e" stroke-width="2.3" stroke-linecap="round"/><path d="M13.5 2.5c4.2 0 7.6 2.6 8.4 6.6l-6.4 2.4-4.6-5.4z" fill="${h}"/><path d="M16 11.3l5.8-2.2" stroke="#fff" stroke-width=".8" opacity=".6"/><path d="M7 18.5l2 1.6" stroke="#8a2f22" stroke-width="2.6"/>`;
+  const knife = h => `<path d="M4 20l5-5" stroke="#3a2a1a" stroke-width="2.6" stroke-linecap="round"/><path d="M8.5 15.5l9.5-11c1.6 2.6 1 6-1.4 8.6l-6 4.3z" fill="${h}"/><path d="M10 15l8-10" stroke="#fff" stroke-width=".6" opacity=".6"/>`;
+  const sword = h => `<path d="M3.8 20.2l3.4-3.4" stroke="#3a2a1a" stroke-width="2.6" stroke-linecap="round"/><path d="M4.6 14.2l5.2 5.2" stroke="#8a7a5a" stroke-width="1.8" stroke-linecap="round"/><path d="M8.6 16.6L20.5 3.5l-.4 2.8L10.2 18.2z" fill="${h}"/><circle cx="3.4" cy="20.6" r="1.3" fill="#8a7a5a"/>`;
   const club = c => `<path d="M5 20.5l7-9" stroke="${c}" stroke-width="2.6" stroke-linecap="round"/><path d="M11 12.5c-1.5-3.5 1-7.5 4.3-8.5s5.6 2 4.6 5.4-5.3 5.4-8.9 3.1z" fill="${c}"/>`;
   return {
     sticks: '<g stroke="#8a6a44" stroke-width="2.2" stroke-linecap="round"><path d="M4 18L19 7"/><path d="M5 20.5l14.5-4.5"/><path d="M5.5 12.5l11 5"/></g><path d="M9.5 14.2l-1.5-2.4" stroke="#8a6a44" stroke-width="1.4" stroke-linecap="round"/>',
@@ -7993,6 +8028,11 @@ const ICON = (() => {
     skin: '<path d="M9 4.5h6v2.8c3.2 1 5.2 4 5.2 8 0 4-3.2 6.2-8.2 6.2s-8.2-2.2-8.2-6.2c0-4 2-7 5.2-8z" fill="#7a5a3a"/><rect x="9" y="2.5" width="6" height="2.6" rx="1" fill="#3a2a1a"/><path d="M6.5 15c2.5 2.2 8.5 2.2 11 0" stroke="#6eaae6" stroke-width="1.6" fill="none"/>',
     axe1: axe(STONE_HEAD), axe2: axe(FLINT_HEAD), axe3: axe(IRON_HEAD), pick1: pick(STONE_HEAD), pick2: pick(FLINT_HEAD), pick3: pick(IRON_HEAD),
     spear1: spear(STONE_HEAD), spear2: spear(FLINT_HEAD), spear3: spear(IRON_HEAD), club: club('#6e5235'),
+    spear0: spear('#b89a6a'), spearB: spear('#e6dfcc'), waxe1: waxe(STONE_HEAD), waxe2: waxe(FLINT_HEAD), waxe3: waxe('#e6dfcc'), waxe4: waxe(IRON_HEAD),   // v170
+    sclub: club('#5e4630') + '<g fill="#4d5560"><path d="M14 3.2l1.2-2 .6 2.3zM20 7l2.2-.4-1.6 1.8zM19.5 12l1.8 1.3-2.3.1zM10.6 6l-2-.8 2.1-.6z"/></g>',
+    maul: '<path d="M5 20.5l8-10" stroke="#7a5a3a" stroke-width="2.4" stroke-linecap="round"/><rect x="11" y="3" width="10" height="8" rx="2.5" fill="#8d8b85" transform="rotate(-38 16 7)"/><path d="M12.4 10.4l2.6 2" stroke="#c8b07a" stroke-width="1.6"/>',
+    mace: '<path d="M5 20.5l7-9" stroke="#5a5a56" stroke-width="2.4" stroke-linecap="round"/><circle cx="15.5" cy="8.5" r="4.6" fill="#9aa0a6"/><g fill="#d8dce0"><path d="M15.5 1.8l1.2 2.4h-2.4zM22.2 8.5l-2.4 1.2V7.3zM15.5 15.2l-1.2-2.4h2.4zM9.3 6.5l2.4-.2-1.3 2z"/></g>',
+    knife1: knife(FLINT_HEAD), knife2: knife('#e6dfcc'), knife3: knife(IRON_HEAD), sword1: sword('#e6dfcc'), sword2: sword(IRON_HEAD),
     bonec: club('#e6dfcc') + '<g fill="#e6dfcc"><circle cx="19" cy="5" r="1.6"/><circle cx="20.5" cy="9.5" r="1.4"/><circle cx="13.5" cy="4" r="1.3"/></g><path d="M5 20.5l7-9" stroke="#a07850" stroke-width="2.6" stroke-dasharray="1.6 1.4"/>',
     sack: '<path d="M8 6.5c-3 3-4.2 7-4.2 10 0 3 3.2 4.8 8.2 4.8s8.2-1.8 8.2-4.8c0-3-1.2-7-4.2-10z" fill="#a8b86a"/><path d="M8 6.5h8" stroke="#6e7a3a" stroke-width="2.2"/><path d="M8.5 12c1 3 0 5-1 7M15.5 12c-1 3 0 5 1 7" stroke="#8a9a52" stroke-width=".9" fill="none"/>',
     pack: '<rect x="5" y="6.5" width="14" height="15" rx="3" fill="#a07850"/><rect x="7" y="12.5" width="10" height="6" rx="1.5" fill="#7a5232"/><path d="M8 6.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="#5a3e28" stroke-width="1.7" fill="none"/><path d="M5 10h14" stroke="#7a5232" stroke-width="1.4"/>',
@@ -9965,6 +10005,143 @@ function dayHoles(hole) {                                  // the fires, posts a
   if (dayTorch()) hole(S.p.x, S.p.y, 135 + Math.sin(S.t * 9) * 5, 0.7);   // a hand torch lights a ring round you as well
   if (D.died) hole(D.died.x, D.died.y, 60, 0.5, 0);
 }
+// ---- v170 Daylight weapons, stage 1 (Joe: "I especially want the game to be weapon heavy"; plan: Claude Doc 'Daylight Weapons Plan') ----
+// Five melee families, each swung with its own move set from the boss-weapon engine: spears (four jabs and a skewer, vault out of a
+// roll), war axes (heavy chops, a whirl and a cleave, a shoulder charge), clubs (wide sweeps that send them flying, a ground pound),
+// knives (five lightning cuts that make them bleed, a blink through them) and swords (cut, rising cut, thrust, a spinning cross cut).
+// Each has a special on the second button: throw the spear and go and get it back, whirl the axe, quake the ground with a club,
+// vanish with a knife for a backstab, or parry with a sword and cut back. Tiers within a family hit harder and last longer.
+const dayArmId = () => { if (!S || !S.day || !S.rg || (S.p && S.p.act)) return null; const T = heldIt(); if (!T || !T.fam) return null; if (!dArmInit.done) dArmInit(); return T.fam; };
+const dArmOn = () => !!dayArmId();
+const DSP = {   // each family's special: its name on the button, and how long before it's back
+  twin: { n: 'Throw', cool: 1.6, st: 14 }, axe: { n: 'Whirl', cool: 5, st: 24 }, club: { n: 'Quake', cool: 6, st: 28 },
+  knife: { n: 'Vanish', cool: 6, st: 18 }, sword: { n: 'Parry', cool: 1.3, st: 10 },
+};
+let WPH = null, WPB = null, WPS = null;   // while a Daylight weapon is drawn: its head or blade colour, a club's body, a club's studs
+function dArmInit() {
+  if (dArmInit.done) return; dArmInit.done = true;
+  wpPose('sparry', AK(0, GL0), AK(0.22, { ph: -0.7, ln: -1.5, cr: 3.5, st: 2, a: 1.0, R: 8, h: 5, ta: 1.5, tp: 0.7, la: -0.5, lR: 8, lh: 1 }, 'io'),
+    AK(0.8, { ph: -0.65, ln: -1.5, cr: 3.5, st: 2, a: 1.0, R: 8, h: 5, ta: 1.5, tp: 0.7, la: -0.5, lR: 8, lh: 1 }, 'io'), AK(1, GL0, 'io'));
+  const P = n => WPP[n];
+  ARMS.sword = { name: 'Sword', day: 1, col: '215,225,240', spName: 'Parry', spCool: 1.3, short: '', desc: '', trail: ['200,212,232', '255,255,255'], tint: STEEL, held: [-3, 27],
+    atk: [
+      { reach: 86, arc: 2.4, lunge: 26, moveT: [0.08, 0.18], dur: 0.34, hitAt: 0.17, dmg: 0.88, boss: 1.1, knock: 18, shake: 0.16, stop: 0.045, kick: 6, pose: P('gl0'), kh: 'slash' },
+      { reach: 86, arc: 2.2, lunge: 22, moveT: [0.08, 0.18], dur: 0.34, hitAt: 0.18, dmg: 0.94, boss: 1.15, knock: 20, shake: 0.16, stop: 0.045, kick: 6, pose: P('gl2'), side: -1, kh: 'slash' },
+      { reach: 120, arc: 0.55, lunge: 40, moveT: [0.12, 0.22], dur: 0.4, hitAt: 0.2, dmg: 1.2, boss: 1.4, knock: 26, shake: 0.2, stop: 0.05, kick: 8, pose: P('ln2'), thrust: 1, kh: 'thrust' },
+      { reach: 98, arc: 7, round: 1, lunge: 30, moveT: [0.1, 0.36], dur: 0.56, hitAt: 0.34, dmg: 1.85, boss: 2.3, knock: 44, shake: 0.45, stop: 0.1, kick: 10, pose: P('gl1'), kh: 'crosscut', fin: 'CROSS CUT' }],
+    dash: { dur: 0.4, pose: P('glD'), charge: 1, lunge: 165, moveT: [0.02, 0.3], reach: 44, arc: 7, round: 1, dmg: 1.1, boss: 1.4, knock: 46, shake: 0.24, stop: 0.05, kick: 8, kh: 'spin' } };
+  WREST.sword = (r, h) => { const H = [r + 6, 4.6, h - 10]; return [H, [r + 2.2, 6.6, h - 6.5], [H[0] + 4, 4.8, H[2] + 7]]; };   // low, point up
+  WJ.sword = [1.4, 1.6, 1.4];
+  WSND.sword = D => { if (!actx || !noiseBuf) return; const t = actx.currentTime, h = D.hitAt || 0.15;   // a clean steel shhing
+    noiseAt(t + Math.max(0, h - 0.08), 5200, 1500, 0.1, D.fin ? 0.42 : 0.3, sfxGain); toneAt(t + h, 1900 + Math.random() * 300, 0.12, 0.012, 'triangle', sfxGain); };
+  WHIT.sword = (D, n, a, hit) => {
+    wpSlash(D, a);
+    if (n && actx) { const t = actx.currentTime; noiseAt(t, 3800, 1200, 0.08, 0.34, sfxGain); toneAt(t, 1300, 0.1, 0.02, 'square', sfxGain); }
+    if (D.fin && n) wpRing(S.p.x, S.p.y, 90, '220,230,250', 0.4);
+  };
+  DSP_WHIRL.pose = P('gl3'); DSP_QUAKE.pose = P('pound'); DSP_RIPOSTE.pose = P('gl1');
+}
+const DSP_WHIRL = { dur: 0.95, lunge: 36, moveT: [0.1, 0.72], kh: 'whirl', hits: [
+  { at: 0.22, reach: 96, arc: 7, round: 1, dmg: 0.9, boss: 1.3, knock: 26, shake: 0.22, stop: 0.04, kick: 4 },
+  { at: 0.46, reach: 100, arc: 7, round: 1, dmg: 0.9, boss: 1.3, knock: 30, shake: 0.24, stop: 0.04, kick: 4 },
+  { at: 0.72, reach: 108, arc: 7, round: 1, dmg: 1.3, boss: 1.9, knock: 52, shake: 0.5, stop: 0.1, kick: 8, fin: 'WHIRL' }] };
+const DSP_QUAKE = { dur: 0.72, lunge: 40, moveT: [0.04, 0.3], hopT: [0.04, 0.33], hop: 40, hitAt: 0.34, slam: 1, reach: 150, arc: 7, round: 1, dmg: 1.4, boss: 2.2, knock: 70, shake: 0.75, stop: 0.14, kick: 8, kh: 'quake', fin: 'QUAKE', stun: 1.6 };
+const DSP_RIPOSTE = { dur: 0.42, lunge: 20, moveT: [0.02, 0.14], hitAt: 0.1, reach: 96, arc: 7, round: 1, dmg: 2.2, boss: 3.2, knock: 60, shake: 0.55, stop: 0.14, kick: 10, kh: 'riposte', fin: 'RIPOSTE' };
+function daySpecial() {
+  dArmInit();
+  const rg = S.rg, p = S.p, w = dayArmId(), D = S.day;
+  if (!w || !S.running || rg.phase !== 'fight' || rg.drink) return;
+  if ((rg.wspT || 0) > 0 || p.wact) return wpDenied();
+  const sp = DSP[w]; if (D.st < sp.st) { dayStam(sp.st); return wpDenied(); }
+  D.st = Math.max(0, D.st - sp.st); D.stT = 0;
+  if (p.atk) { p.atkLast = null; p.atk = null; p.hopZ = 0; }   // the special cuts a swing short
+  const a = S.aimW || 0;
+  if (w === 'twin') { p.wact = { pose: WPP.lnS, t: 0, dur: 0.4, rel: 0.19, a, fn: dayThrowSpear }; rg.wspT = sp.cool; }
+  else if (w === 'axe') { wpSwing(-2, DSP_WHIRL, false, 1, 'axeS'); rg.wspT = sp.cool; dayWear(); }
+  else if (w === 'club') { wpSwing(-2, DSP_QUAKE, false, 1, 'clubS'); rg.wspT = sp.cool; dayWear(); }
+  else if (w === 'knife') p.wact = { pose: WPP.vanish, t: 0, dur: 0.3, rel: 0.1, a, fn: () => { wpVanish(); rg.wspT = sp.cool; } };
+  else if (w === 'sword') {
+    p.wact = { pose: WPP.sparry, t: 0, dur: 0.42, rel: 0.01, a, fn: () => { rg.dparry = { t: 0, win: 0.4 }; } }; rg.wspT = sp.cool;
+    if (actx) { const t = actx.currentTime; toneAt(t, 900, 0.08, 0.02, 'square', sfxGain); noiseAt(t, 4000, 2000, 0.05, 0.15, sfxGain); }
+  }
+  wpUi(true);
+}
+function dayParry(e) {   // the blow meets your blade: nothing gets through, and you cut back all round
+  const rg = S.rg, p = S.p; rg.dparry = null; rg.inv = 0.5; p.wact = null; rg.wspT = 0;
+  hitStop(0.16); addShake(0.4); wjFlash('230,240,255', 0.18);
+  const o = e && (e.ref || (rg.enemies.includes(e) ? e : null));
+  if (o) { const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1; if (o.type !== 'tall') { o.x += dx / d * 30; o.y += dy / d * 30; } o.frozen = Math.max(o.frozen || 0, 0.9); }
+  if (actx) { const t = actx.currentTime; toneAt(t, 2400, 0.25, 0.05, 'triangle', sfxGain); toneAt(t + 0.01, 3600, 0.3, 0.03, 'sine', sfxGain); noiseAt(t, 6000, 1500, 0.08, 0.4, sfxGain); }
+  wpPop('PARRY', p.x, p.y, 70, '220,230,255', 1.1);
+  wpSwing(-3, DSP_RIPOSTE, false, 1, 'swordR');
+}
+function dayThrowSpear() {   // the spear leaves your hand: it goes through what it meets, and lands where you'll have to fetch it
+  const D = S.day, rg = S.rg, p = S.p, s = heldSlot(); if (!s || !DIT[s.id].fam) return;
+  const i = D.inv.indexOf(s); if (i < 0) return;
+  D.inv[i] = null; dayChanged();
+  const a = p.wact ? p.wact.a : S.aimW || 0;
+  (rg.dspears = rg.dspears || []).push({ x: p.x + Math.cos(a) * 12, y: p.y + Math.sin(a) * 12, a, d: 0, max: 430, v: 820, s, slot: i, hit: new Set(), z: 20 });
+  addShake(0.12); camKick(a, 8);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 2600, 900, 0.18, 0.4, sfxGain); }
+}
+function daySpearStep(dt) {
+  const rg = S.rg, p = S.p, D = S.day; if (!rg.dspears) return;
+  for (const q of rg.dspears) {
+    if (q.land) { q.land.t += dt; continue; }
+    const st = q.v * dt, n = Math.max(1, Math.ceil(st / 10));
+    for (let k = 0; k < n && !q.done; k++) {
+      q.x += Math.cos(q.a) * st / n; q.y += Math.sin(q.a) * st / n; q.d += st / n; q.z = 20 - 12 * (q.d / q.max) ** 2;
+      const T = DIT[q.s.id], dmg = 2.0 * T.dmg * (1 + 0.12 * sr('might'));
+      for (const o of rg.enemies) if (!o.dead && !q.hit.has(o) && Math.hypot(o.x - q.x, o.y - q.y) < (FOES[o.type] ? FOES[o.type].w : 12) + 6) {
+        q.hit.add(o); o.hp -= dmg; o.jit = 1; o.kHit = 'spear'; o.kHitT = S.t; o.swung = true; stkTouch();
+        if (o.type !== 'tall') { o.x += Math.cos(q.a) * 22; o.y += Math.sin(q.a) * 22; }
+        wjSpray(o, q.a, '220,225,200', 10); wjMark(o, q.a, '255,255,255', 34, 0.2, 1.5); hitStop(0.05); addShake(0.2);
+        q.s.d = Math.max(1, (q.s.d ?? T.dur) - 1);
+        if (actx) { const t = actx.currentTime; boomAt(t, 150, 50, 0.12, 0.5, sfxGain); noiseAt(t, 4200, 1400, 0.06, 0.3, sfxGain); }
+      }
+      for (const b of D.beasts) if (!b.dead && !q.hit.has(b) && Math.hypot(b.x - q.x, b.y - q.y) < BEAST[b.k].w + 6) {
+        q.hit.add(b); b.hp -= dmg * 1.4; b.flash = 1; if (b.hp <= 0) beastDie(b); else beastScare(b);
+      }
+      if (q.d >= q.max || wpSolidAt(q.x, q.y, 2)) q.done = true;
+    }
+    if (q.done) {   // it lands, point down, quivering
+      q.land = { t: 0 }; addShake(0.06);
+      if (actx) { const t = actx.currentTime; boomAt(t, 220, 120, 0.08, 0.3, sfxGain); }
+      const f = dayDrop(q.x, q.y, q.s.id, 1, q.s.d); f.x = q.x; f.y = q.y; f.thrown = 1; q.f = f;
+    }
+  }
+  for (const q of rg.dspears) if (q.f && !q.f.gone && Math.hypot(q.f.x - p.x, q.f.y - p.y) < 26) {   // walk over it and it's back in your hand
+    const f = q.f, it = DIT[f.it]; let at = q.slot;   // back where it came from if that's still free (in your hand if you were empty-handed), else anywhere in the pack
+    if (D.inv[at]) at = D.inv.findIndex(s => !s);
+    if (at < 0) continue;
+    D.inv[at] = { id: f.it, n: 1, d: f.ex ?? it.dur }; f.gone = true; D.drops = D.drops.filter(x => x !== f);
+    q.picked = true; dayChanged(); pickSnd(); exNote('spear back in hand');
+  }
+  rg.dspears = rg.dspears.filter(q => !q.picked && !(q.f && q.f.gone) && !(q.land && q.land.t > 600));
+}
+function dayArmTick(dt) {
+  dArmInit();
+  const rg = S.rg;
+  if (rg.dparry && (rg.dparry.t += dt) > rg.dparry.win) rg.dparry = null;
+  daySpearStep(dt);
+}
+function dayArmFx() {   // the thrown spear in flight
+  const rg = S.rg; if (!rg || !rg.dspears) return;
+  for (const q of rg.dspears) {
+    if (q.land) continue;
+    const T = DIT[q.s.id], [x, y] = toScreen(q.x, q.y), ux = Math.cos(q.a), uy = Math.sin(q.a), [x2, y2] = toScreen(q.x + ux, q.y + uy), dx = x2 - x, dy = y2 - y, l = Math.hypot(dx, dy) || 1;
+    const ex = dx / l, ey = dy / l, z = q.z * Z, L = 26 * Z, hx = x + ex * L * 0.5, hy = y + ey * L * 0.5 - z, bx = x - ex * L * 0.5, by = y - ey * L * 0.5 - z;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(240,240,220,0.25)'; ctx.lineWidth = 3 * Z; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bx - ex * 30 * Z, by - ey * 30 * Z); ctx.lineTo(bx, by); ctx.stroke(); ctx.restore();   // a streak behind it
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(x, y, 12 * Z, 2 * Z, Math.atan2(ey, ex), 0, 7); ctx.fill();
+    ctx.lineCap = 'round'; ctx.strokeStyle = EDGE_C; ctx.lineWidth = 3.6 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.strokeStyle = COLOUR ? '#a08a62' : '#77776f'; ctx.lineWidth = 1.8 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.fillStyle = COLOUR ? T.hc || '#c9ccd0' : '#bdbdb8'; ctx.beginPath(); ctx.moveTo(hx + ex * 7 * Z, hy + ey * 7 * Z); ctx.lineTo(hx - ey * 2.2 * Z, hy + ex * 2.2 * Z); ctx.lineTo(hx + ey * 2.2 * Z, hy - ex * 2.2 * Z); ctx.closePath(); ctx.fill();
+  }
+}
+function dayArmTint() {   // the held weapon's own materials, for the shared weapon drawings
+  const T = heldIt(); WPH = T && T.hc && COLOUR ? T.hc : null; WPB = T && T.bc ? (COLOUR ? T.bc : '#6a6a66') : null; WPS = T && T.spikes ? (COLOUR ? T.spikes : '#c8c8c2') : null;
+}
 // ---- v133 (Joe): animations for the tools and actions. Each tool swings its own way (an overhead chop, a pick driven
 // straight down, a low grab with the hand, a spear thrust), the tool is drawn in your hand, and eating, drinking, picking up,
 // crafting and building each have a short body animation. Struck trees, rocks and bushes shake and throw chips.
@@ -10294,11 +10471,12 @@ function wpOwn(id) {                              // the torch is yours; a boss 
   if (A.dune !== undefined) return (XS.dorbs || 0) > A.dune || (XS.dbBeat ?? -1) >= A.dune;
   return !!XS.lairs && XS.lairs.some(L => L.id === A.boss && L.beat);
 }
-const curW = () => wpOn() ? (XS.wsel && XS.wsel[XS.wcur | 0]) || 'torch' : 'torch';
+const curW = () => wpOn() ? (XS.wsel && XS.wsel[XS.wcur | 0]) || 'torch' : dayArmId() || 'torch';   // v170: in Daylight, the weapon in your hand
 let wpStanceOv = null;
 function wpStance() { return wpStanceOv || (S.rg && S.rg.wst) || 'spear'; }   // the Twins: still is the spear, moving is the bow
 function wpHand() {                               // what's in the torch hand instead of the torch
-  if (!wpOn()) return null; const w = curW(); if (w === 'torch') return null;
+  if (!wpOn()) return dayArmId();   // v170: a Daylight weapon sits in the hand the same way
+  const w = curW(); if (w === 'torch') return null;
   if (S.rg.wax || S.rg.worb) return 'none';       // thrown: the hand is empty
   return w === 'twin' && wpStance() === 'bow' ? 'bow' : w;
 }
@@ -10318,7 +10496,7 @@ function wpAxeShape(c, bx, by, hx, hy, side, sc, OUT) {   // haft from (bx,by) t
   c.strokeStyle = OUT ? 'rgba(239,239,234,0.2)' : C('#6b4a2e', '#5e5e5a'); c.lineWidth = (2.3 + (OUT ? 1.6 : 0)) * sc; c.beginPath(); c.moveTo(bx, by); c.lineTo(hx + ux * 1.5 * sc, hy + uy * 1.5 * sc); c.stroke();
   const head = () => { c.beginPath(); const p = [at(0.8, 1), at(2.8, 8.5), at(-1.6, 11)]; c.moveTo(...p[0]); c.lineTo(...p[1]); c.lineTo(...p[2]); c.quadraticCurveTo(...at(-7, 13.5), ...at(-11.5, 9)); c.lineTo(...at(-8.5, 4)); c.lineTo(...at(-4.5, 1)); c.lineTo(...at(-4.5, -3.2)); c.lineTo(...at(0.8, -3.2)); c.closePath(); };
   if (OUT) { head(); c.strokeStyle = 'rgba(239,239,234,0.2)'; c.lineWidth = 1.6 * sc; c.lineJoin = 'round'; c.stroke(); return; }
-  head(); c.fillStyle = C('#474c54', '#4a4a48'); c.fill();
+  head(); c.fillStyle = C(S && S.day && WPH || '#474c54', '#4a4a48'); c.fill();   // v170: stone, flint, bone or iron
   c.strokeStyle = C('#e4e8ee', '#d4d4d0'); c.lineWidth = 1.1 * sc; c.beginPath(); c.moveTo(...at(-1.6, 11)); c.quadraticCurveTo(...at(-7, 13.5), ...at(-11.5, 9)); c.stroke();   // the edge, ground bright
   c.strokeStyle = C('#2c2f34', '#2c2c2a'); c.lineWidth = 0.7 * sc; c.beginPath(); c.moveTo(...at(-1.5, 2)); c.lineTo(...at(-3.5, 7)); c.stroke();   // a dark weld line
   const g0 = L * 0.18 / sc, g1 = L * 0.38 / sc;   // a red leather grip wrap near the end of the haft
@@ -10345,7 +10523,7 @@ function wpShape(id, c, bx, by, hx, hy, side, sc, OUT) {   // v143: every weapon
   }
   if (id === 'twin' || id === 'spear') {          // the spear: a pale shaft, a long leaf blade, a lime binding
     shaft(2.1, C('#a08a62', '#77776f'));
-    poly([at(-1, 0), at(3.5, 1.8), at(11, 0), at(3.5, -1.8)], C('#c9ccd0', '#bdbdb8'));
+    poly([at(-1, 0), at(3.5, 1.8), at(11, 0), at(3.5, -1.8)], C(S && S.day && WPH || '#c9ccd0', '#bdbdb8'));
     if (!OUT) { shaft(2.4, C('#9fc04a', '#6a6a66'), ...at(-3.5, 0), ...at(-1, 0)); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 0.5 * sc; c.beginPath(); c.moveTo(...at(0, 0)); c.lineTo(...at(10, 0)); c.stroke(); }
     return;
   }
@@ -10358,17 +10536,26 @@ function wpShape(id, c, bx, by, hx, hy, side, sc, OUT) {   // v143: every weapon
   }
   if (id === 'knife') {                           // a short skinning knife: dark grip, a hooked steel blade
     shaft(2.1, C('#2a2a26', '#30302e'), bx, by, ...at(-L / sc + 4, 0));
-    poly([at(-L / sc + 4, -1), at(-L / sc + 4, 1.3), at(-2, 1.5), at(1.2, -0.6), at(-1, -1.2)], C('#cfd3d8', '#c4c4c0'));
+    poly([at(-L / sc + 4, -1), at(-L / sc + 4, 1.3), at(-2, 1.5), at(1.2, -0.6), at(-1, -1.2)], C(S && S.day && WPH || '#cfd3d8', '#c4c4c0'));
     if (!OUT) { c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 0.45 * sc; c.beginPath(); c.moveTo(...at(-L / sc + 5, 1.2)); c.lineTo(...at(-1.5, 1.4)); c.stroke(); }
     return;
   }
   if (id === 'club') {                            // a root-wood club: thin at the grip, swelling to a knotted head, with green moss
     const k = 1 - 0.16 * Math.min(3, (S.rg && S.rg.wclub) || 0), tip = at(-(1 - k) * L / sc, 0);
-    poly([at(-L / sc, -1.2), at(-L / sc, 1.2), [tip[0] + nx * 4.2 * sc - ux * 6 * sc, tip[1] + ny * 4.2 * sc - uy * 6 * sc], [tip[0] + nx * 3 * sc, tip[1] + ny * 3 * sc], [tip[0] - nx * 3 * sc, tip[1] - ny * 3 * sc], [tip[0] - nx * 4 * sc - ux * 7 * sc, tip[1] - ny * 4 * sc - uy * 7 * sc]], C('#4c3a26', '#4c4c49'));
-    if (!OUT) {
+    poly([at(-L / sc, -1.2), at(-L / sc, 1.2), [tip[0] + nx * 4.2 * sc - ux * 6 * sc, tip[1] + ny * 4.2 * sc - uy * 6 * sc], [tip[0] + nx * 3 * sc, tip[1] + ny * 3 * sc], [tip[0] - nx * 3 * sc, tip[1] - ny * 3 * sc], [tip[0] - nx * 4 * sc - ux * 7 * sc, tip[1] - ny * 4 * sc - uy * 7 * sc]], S && S.day && WPB || C('#4c3a26', '#4c4c49'));
+    if (!OUT && S && S.day && WPS) { c.fillStyle = WPS; for (const [a, n] of [[-3, 3.6], [-7, -4], [-10, 4.2], [-5, -0.4], [0.6, 2], [0.6, -2]]) { const [x, y] = [tip[0] + ux * a * sc + nx * n * sc, tip[1] + uy * a * sc + ny * n * sc]; c.beginPath(); c.moveTo(x + nx * 1.6 * sc * Math.sign(n || 1), y + ny * 1.6 * sc * Math.sign(n || 1)); c.lineTo(x + ux * 1.1 * sc, y + uy * 1.1 * sc); c.lineTo(x - ux * 1.1 * sc, y - uy * 1.1 * sc); c.closePath(); c.fill(); } }   // v170: spikes or flanges
+    if (!OUT && !(S && S.day && WPB)) {
       c.fillStyle = C('#5f7a3a', '#6a6a66'); for (const [a, n] of [[-5, 2.5], [-9, -3], [-2, -2]]) { c.beginPath(); c.arc(tip[0] + ux * a * sc + nx * n * sc, tip[1] + uy * a * sc + ny * n * sc, 1.4 * sc, 0, 7); c.fill(); }
       c.strokeStyle = C('#2c2016', '#2e2e2c'); c.lineWidth = 0.7 * sc; c.beginPath(); c.moveTo(tip[0] - ux * 3 * sc + nx * 2 * sc, tip[1] - uy * 3 * sc + ny * 2 * sc); c.lineTo(tip[0] - ux * 9 * sc - nx * sc, tip[1] - uy * 9 * sc - ny * sc); c.stroke();
     }
+    return;
+  }
+  if (id === 'sword') {                           // v170: a straight two-edged blade, a crossguard, a wrapped grip and a pommel
+    const g = -L / sc + 6;
+    shaft(1.9, C('#4a3424', '#3e3e3c'), bx, by, ...at(g, 0));
+    poly([at(g + 0.5, -1.7), at(g + 0.5, 1.7), at(-3, 1.4), at(1.5, 0), at(-3, -1.4)], C(S && S.day && WPH || '#cfd3d8', '#c4c4c0'));
+    shaft(1.3, C('#6a5a44', '#5a5a56'), ...at(g, -3.6), ...at(g, 3.6));
+    if (!OUT) { c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 0.5 * sc; c.beginPath(); c.moveTo(...at(g + 1.5, 0)); c.lineTo(...at(-1, 0)); c.stroke(); c.fillStyle = C('#8a7a5a', '#6a6a66'); c.beginPath(); c.arc(bx, by, 1.4 * sc, 0, 7); c.fill(); }
     return;
   }
   if (id === 'glaive') {                          // a long haft and a curved gold-edged blade
@@ -10523,6 +10710,8 @@ function wpHit(D, a) {                            // the blow goes through atkHi
   const hit = n ? rg.enemies.filter(o => o.kHitT === S.t && o.kHit === D2.kh) : [];
   if (n && trip > 1) wpTripSpent(p.x + Math.cos(a) * 40, p.y + Math.sin(a) * 40);
   if (back && n) wpBackstab();
+  if (D.stun && n) for (const o of hit) o.frozen = Math.max(o.frozen || 0, D.stun);   // v170: the quake leaves them reeling
+  if (S.day && A && !A.worn && n) { A.worn = true; dayWear(); }   // v170: a blow that lands wears the weapon, once a swing
   if (D.charge) return n;
   (WHIT[w] || WHIT.axe)(D, n, a, hit);
   if (WJ[w]) wjHit(w, D2, n, a, hit);   // v146
@@ -10615,7 +10804,7 @@ const WHIT = {                                    // each weapon's impact: what 
 // power climbs with the boss you took it from (woodcutter first, the Mirage last); the feel multipliers bring every weapon up to the axe's weight
 const WPOW = { torch: 1, axe: 1, hook: 1.12, twin: 1.25, knife: 1.38, club: 1.5, glaive: 1.65, fists: 1.8, lance: 2 };
 const WJ = { hook: [1.5, 1.7, 1.6], twin: [1.6, 2.2, 1.6], knife: [1.6, 1.9, 1.8], club: [1.25, 1.35, 1.3], glaive: [1.6, 1.7, 1.5], fists: [1.7, 1.8, 1.6], lance: [1.7, 1.9, 1.7] };   // shake, hit-stop, camera kick
-const wjPow = w => WPOW[w] || 1;
+const wjPow = w => S && S.day ? 1 : WPOW[w] || 1;   // v170: in Daylight the weapon's own tier sets its power
 function wjFeel(w, D2) {                          // the weapon's weight goes into the blow's shake, freeze and kick
   const J = WJ[w]; if (!J) return;
   const f = D2.fin ? 1.15 : 1;
@@ -10779,6 +10968,7 @@ function wpHitAt(x, y, r, dmg, bdmg, knock, set, kh, ox, oy) {
 }
 // ---- the special: every weapon's second button ----
 function wpSpecial() {
+  if (S && S.day) return daySpecial();   // v170
   if (!wpOn() || !S.running || S.rg.phase !== 'fight' || S.rg.drink) return;
   const rg = S.rg, p = S.p, w = curW();
   if (w === 'axe' && rg.wax) return wpRecall();
@@ -11154,7 +11344,7 @@ function wpClaim(D) {
 }
 // ---- the things that pull them off you: your lamps, your decoys, and the spot where you vanished ----
 function wpLure(e) {
-  const rg = S.rg; if (!wpOn()) return null;
+  const rg = S.rg; if (!wpOn() && !dArmOn()) return null;
   if (rg.wvan) { const v = rg.wvan, s = e.wseed ?? (e.wseed = Math.random() * 99); return { x: v.x + Math.cos(s + S.t * 0.8) * 80, y: v.y + Math.sin(s * 1.7 + S.t * 0.7) * 80 }; }
   let best = null, bd = Math.hypot(S.p.x - e.x, S.p.y - e.y) + 40;
   if (rg.wdecoys) for (const c of rg.wdecoys) { const d = Math.hypot(c.x - e.x, c.y - e.y); if (d < 280 && d < bd) { bd = d; best = c; } }
@@ -11163,11 +11353,11 @@ function wpLure(e) {
 }
 // ---- every frame ----
 function wpTick(dt) {
-  const rg = S.rg, p = S.p, on = wpOn();
+  const rg = S.rg, p = S.p, on = wpOn() || dArmOn();
   if (p.wact) { const w = p.wact; w.t += dt; if (w.fn && !w.done && w.t >= w.rel) { w.done = true; w.fn(); } if (w.fn2 && !w.done2 && w.t >= w.rel2) { w.done2 = true; w.fn2(); } if (w.t >= w.dur) p.wact = null; }
   if (rg.wspT > 0 && (rg.wspT -= dt) <= 0 && on) wpReady();
   if (rg.wswT > 0) rg.wswT -= dt;
-  if (on && curW() === 'twin' && !p.atk) {        // the Twins' stance follows your feet: still, the spear; moving, the bow
+  if (on && !S.day && curW() === 'twin' && !p.atk) {        // the Twins' stance follows your feet: still, the spear; moving, the bow
     const want = screenSpeed(p) > 40 ? 'bow' : 'spear';
     if (want !== rg.wst) { rg.wstT = (rg.wstT || 0) + dt; if (rg.wstT > 0.1 || !rg.wst) { rg.wst = want; rg.wstT = 0; if (actx) toneAt(actx.currentTime, want === 'bow' ? 520 : 390, 0.06, 0.02, 'triangle', sfxGain); } } else rg.wstT = 0;
   }
@@ -11236,28 +11426,28 @@ function wpHoles(hole) {                          // the weapons' own light in t
 const wspecBtn = document.getElementById('wspec'), wswapBtn = document.getElementById('wswap');
 let wpUiKey = '';
 function wpUi(force) {
-  const on = wpOn(), rg = S && S.rg, show = on && rg && rg.phase === 'fight';
+  const on = wpOn() || dArmOn(), rg = S && S.rg, show = on && rg && rg.phase === 'fight';
   document.body.classList.toggle('wp', !!show);
   if (!show) { wspecBtn.hidden = wswapBtn.hidden = true; wpUiKey = ''; return; }
-  const w = curW(), cool = Math.max(0, rg.wspT || 0) / ARMS[w].spCool, lbl = w === 'axe' && rg.wax ? 'Call' : w === 'glaive' && rg.worb ? 'Catch' : ARMS[w].spName;
+  const w = curW(), SPC = S.day ? DSP[w] : null, cool = Math.max(0, rg.wspT || 0) / (SPC ? SPC.cool : ARMS[w].spCool), lbl = SPC ? SPC.n : w === 'axe' && rg.wax ? 'Call' : w === 'glaive' && rg.worb ? 'Catch' : ARMS[w].spName;
   wspecBtn.style.setProperty('--cd', Math.min(1, cool).toFixed(3));
-  const key = w + lbl + (cool > 0 ? 1 : 0) + (XS.wsel[1] ? 1 : 0);
+  const two = !S.day && XS && XS.wsel && XS.wsel[1], key = w + lbl + (cool > 0 ? 1 : 0) + (two ? 1 : 0);
   if (!force && key === wpUiKey) return; wpUiKey = key;
   wspecBtn.hidden = false; wspecBtn.textContent = lbl; wspecBtn.dataset.cool = cool > 0 ? '1' : '0';
-  wswapBtn.hidden = !XS.wsel[1]; wswapBtn.textContent = 'Swap';
+  wswapBtn.hidden = !two; wswapBtn.textContent = 'Swap';
 }
 wspecBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSpecial(); });
 wswapBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSwap(); });
 addEventListener('keydown', e => {
-  if (e.repeat || !wpOn() || !S.running) return;
+  if (e.repeat || !(wpOn() || dArmOn()) || !S.running) return;
   const k = e.key.toLowerCase();
-  if (k === 'q') wpSwap();
+  if (k === 'q' && !S.day) wpSwap();
   if (k === 'k' || k === 'shift') wpSpecial();
 });
-cv.addEventListener('mousedown', e => { if (e.button === 1 && wpOn()) { e.preventDefault(); wpSpecial(); } });
+cv.addEventListener('mousedown', e => { if (e.button === 1 && (wpOn() || dArmOn())) { e.preventDefault(); wpSpecial(); } });
 // ---- the camp's weapon rack (the Shop's third door) ----
 function wpRack() {
-  return Object.keys(ARMS).map(id => {
+  return Object.keys(ARMS).filter(id => !ARMS[id].day).map(id => {
     const A = ARMS[id], own = wpOwn(id), slot = XS.wsel.indexOf(id), held = slot >= 0 && slot === (XS.wcur | 0);
     return { id: 'w_' + id, name: A.name, desc: A.desc, cls: own ? 'own' + (slot >= 0 ? ' on' : '') : '', have: 0, max: 0,
       lvl: own ? (slot >= 0 ? `Carried · slot ${slot + 1}${held ? ' · in your hand' : ''}` : 'On the rack') : `Locked · beat the ${A.bossName}${A.dune !== undefined ? ' in the Dunes' : ''}`,
@@ -15349,7 +15539,7 @@ function renderCamp() {
     w.append(
       tile('ember', 'embers', 'ember upgrades', `${XS.embers} embers`, 'Torch, kit and gear', () => { campCat = 'embers'; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); }),
       tile('wisp', 'wisp', 'wisp upgrades', `${ST.w} wisps`, 'Hearts, speed and power', () => openStats('camp')),
-      ...(WP_ON ? [tile('rack', 'w_rack', 'weapon rack', `${Object.keys(ARMS).filter(wpOwn).length} of ${Object.keys(ARMS).length} weapons`, 'Pick what you carry', () => { campCat = 'Weapons'; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); })] : []));
+      ...(WP_ON ? [tile('rack', 'w_rack', 'weapon rack', `${Object.keys(ARMS).filter(wpOwn).length} of ${Object.keys(ARMS).filter(id => !ARMS[id].day).length} weapons`, 'Pick what you carry', () => { campCat = 'Weapons'; campOpen = null; renderCamp(); body.querySelector('button').focus({ preventScroll: true }); })] : []));
     body.replaceChildren(w);
     return;
   }
