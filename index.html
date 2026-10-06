@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 166</p>
+      <p class="small" id="verLbl">Version 167</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -8077,7 +8077,7 @@ function drawDay() {                           // the sun: a warm wash from the 
   const g = ctx.createLinearGradient(0, 0, W * DPR * 0.4, H * DPR);
   const sun = COLOUR ? `rgba(${255},${Math.round(226 - 60 * set)},${Math.round(160 - 90 * set)}` : 'rgba(255,226,160';
   g.addColorStop(0, sun + ',0.5)'); g.addColorStop(1, sun + ',0)');
-  ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * lt;   // v166: no sun wash over the dark ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
+  ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * lt; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
   drawNight();
   drawDayFires(); drawDayChips(); drawFloat(); drawSiege();
@@ -11576,7 +11576,7 @@ function exStep(dt) {
   if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
   if (!rg.beyond) lifeMax('far', Math.round(d0));
   tipStep(rg, inCamp, d0);
-  campBtn.hidden = !inCamp; if (campBtn.textContent !== (S.day ? 'Wisps' : 'Shop')) campBtn.textContent = S.day ? 'Wisps' : 'Shop';   // v164: Daylight's camp sells wisp upgrades craftBtn.hidden = !S.day; useBtn.hidden = !S.day || !dayUseTarget(); dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
+  campBtn.hidden = !inCamp; if (campBtn.textContent !== (S.day ? 'Wisps' : 'Shop')) campBtn.textContent = S.day ? 'Wisps' : 'Shop'; craftBtn.hidden = !S.day; useBtn.hidden = !S.day || !dayUseTarget(); dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns; flaskBtn.hidden = inCamp;
   rg.lamps = exPathLamps();
   if (rg.carryOrb && dist2(p, TELE) < 46) exDeposit();                       // the green shrine, out on the portal ring
