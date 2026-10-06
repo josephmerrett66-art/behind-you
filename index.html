@@ -525,7 +525,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 172</p>
+      <p class="small" id="verLbl">Version 173</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -3091,24 +3091,57 @@ function weatherStep(dt) {
   w.k += (want - w.k) * Math.min(1, dt * 0.35); if (w.k < 0.003) { w.k = 0; if (w.st === 'clear') w.kind = null; }
   if (w.kind === 'storm' && w.k > 0.5 && (w.boltT -= dt) <= 0) {   // lightning: a double flash, the thunder a moment later
     w.boltT = 6 + Math.random() * 9; w.flash = 1; w.flash2 = S.t + 0.16 + Math.random() * 0.1; addShake(0.12);
-    const delay = 0.3 + Math.random() * 1.4; if (actx) { const t = actx.currentTime + delay; boomAt(t, 70, 26, 2.4, 0.7, sfxGain); noiseAt(t, 900, 80, 2.8, 0.55, sfxGain); noiseAt(t + 0.05, 3000, 300, 0.5, 0.25, sfxGain); }
+    const delay = 0.3 + Math.random() * 1.4; if (actx && !wxThunder(delay)) { const t = actx.currentTime + delay; boomAt(t, 70, 26, 2.4, 0.7, sfxGain); noiseAt(t, 900, 80, 2.8, 0.55, sfxGain); noiseAt(t + 0.05, 3000, 300, 0.5, 0.25, sfxGain); }
   }
   if (w.flash2 && S.t >= w.flash2) { w.flash2 = 0; w.flash = Math.max(w.flash, 0.8); }
   rainSound(inWoods() ? wxK('rain') * (w.kind === 'storm' ? 1.3 : 1) : 0);
 }
-const rainS = { g: null, at: 0 };
-function rainSound(k) {                          // a hiss of falling rain under the drips off the leaves
+// v173 (Joe): his own thunderstorm recording is the rain and the thunder. sounds/rain.mp3 is a seamless loop of its steady rain
+// (0.25 s of wrapped audio each side, like the music, so decoder offsets can't open a gap); thunder1 is its big rolling clap, thunder2
+// its sharp crack. Plain rain takes the low rumble down; a storm plays it full. Until the files load (or if the page isn't served) the old hiss stands in.
+const WX_SND = { rain: 'sounds/rain.mp3', L: 807030, P: 11025, thunder: [{ url: 'sounds/thunder1.mp3', lead: 0.55 }, { url: 'sounds/thunder2.mp3', lead: 0.1 }] };
+const wxS = { buf: null, th: [], tried: false };
+function wxLoad() {
+  if (wxS.tried || !actx) return; wxS.tried = true;
+  musLoad(WX_SND.rain).then(b => { wxS.buf = b; }).catch(() => {});
+  WX_SND.thunder.forEach((d, i) => musLoad(d.url).then(b => { wxS.th[i] = b; }).catch(() => {}));
+}
+function wxThunder(delay) {                      // the recording's thunder, its clap landing `delay` s after the flash; false if not loaded
+  const ok = WX_SND.thunder.map((d, i) => i).filter(i => wxS.th[i]); if (!ok.length || !sfxGain) return false;
+  const i = ok[Math.floor(Math.random() * ok.length)], src = actx.createBufferSource(), g = actx.createGain();
+  src.buffer = wxS.th[i]; src.playbackRate.value = 0.9 + Math.random() * 0.15; g.gain.value = 0.6 + Math.random() * 0.35;
+  src.connect(g); g.connect(sfxGain); src.start(actx.currentTime + Math.max(0.02, delay - WX_SND.thunder[i].lead));
+  return true;
+}
+const rainS = { g: null, at: 0, rec: null };
+function rainSound(k) {                          // the storm recording when it's loaded, else a hiss of falling rain under drips off the leaves
   if (!actx || !noiseBuf || !sfxGain) return;
+  wxLoad();
   if (!rainS.g) {
     const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
     const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
     rainS.g = actx.createGain(); rainS.g.gain.value = 0;
     src.connect(hp); hp.connect(lp); lp.connect(rainS.g); rainS.g.connect(sfxGain); src.start();
-    setInterval(() => { if (rainS.g && performance.now() - rainS.at > 400) rainS.g.gain.setTargetAtTime(0, actx.currentTime, 0.3); }, 250);
+    setInterval(() => { if (rainS.g && performance.now() - rainS.at > 400) { rainS.g.gain.setTargetAtTime(0, actx.currentTime, 0.3); if (rainS.rec) rainS.rec.g.gain.setTargetAtTime(0, actx.currentTime, 0.3); } }, 250);
+  }
+  if (!rainS.rec && wxS.buf) {                   // the recording takes over from the hiss, fading across
+    const src = actx.createBufferSource(); src.buffer = wxS.buf; src.loop = true;
+    src.loopStart = WX_SND.P / 44100; src.loopEnd = (WX_SND.P + WX_SND.L) / 44100;
+    const sh = actx.createBiquadFilter(); sh.type = 'lowshelf'; sh.frequency.value = 220;
+    const g = actx.createGain(); g.gain.value = 0;
+    src.connect(sh); sh.connect(g); g.connect(sfxGain); src.start(0, src.loopStart);
+    rainS.rec = { g, sh };
   }
   rainS.at = performance.now();
-  rainS.g.gain.setTargetAtTime(0.22 * k * (0.9 + 0.1 * Math.sin(S.t * 0.7)), actx.currentTime, 0.3);
+  const storm = S.wx && S.wx.kind === 'storm', now = actx.currentTime;
+  if (rainS.rec) {
+    rainS.g.gain.setTargetAtTime(0, now, 0.3);
+    rainS.rec.g.gain.setTargetAtTime(0.85 * k, now, 0.3);
+    rainS.rec.sh.gain.setTargetAtTime(storm ? 0 : -9, now, 0.5);   // plain rain: less rumble
+    return;
+  }
+  rainS.g.gain.setTargetAtTime(0.22 * k * (0.9 + 0.1 * Math.sin(S.t * 0.7)), now, 0.3);
   if (k > 0.2 && Math.random() < 0.08 * k) sfx(2 + Math.random() * 2, 0.06 * k, 'bandpass', 2500 + Math.random() * 3000, 0.08);   // a drip
 }
 function drawRain(lit) {                         // lit: drawn under the dark, so only rain in your light shows; else a faint veil over everything
