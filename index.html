@@ -496,7 +496,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 168</p>
+      <p class="small" id="verLbl">Version 169</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7638,8 +7638,9 @@ function dayStep(dt, inCamp) {
     if (g.fall < 1) { g.fall = Math.min(1, g.fall + dt * (0.5 + g.fall * 2.6)); if (g.fall >= 1) { addShake(0.35 * monNear(g, 500)); if (actx) boomAt(actx.currentTime, 70, 40, 0.5, 0.5 * monNear(g, 600), sfxGain); for (let i = 0; i < 5; i++) { ashBurst(g.bx + g.ux * g.len * i / 5, g.by + g.uy * g.len * i / 5, 4, 6); if (i > 1) dayChips(g.bx + g.ux * g.len * i / 5, g.by + g.uy * g.len * i / 5, 8, g.type === 'cherry' ? 'leaf' : 'wood', 4); } } }
     else if ((g.lie += dt) > 0.7 && (g.gone = (g.gone || 0) + dt * 2) >= 1) {
       g.done = true;
-      for (let i = 0; i < g.give.logs; i++) dayDrop(g.bx + g.ux * g.len * (0.3 + 0.5 * i / Math.max(1, g.give.logs)), g.by + g.uy * g.len * (0.3 + 0.5 * i / Math.max(1, g.give.logs)), 'logs', 1);
-      if (g.give.sticks) dayDrop(g.bx + g.ux * g.len * 0.85, g.by + g.uy * g.len * 0.85, 'sticks', g.give.sticks);
+      if (g.give.logs) dayGive('logs', g.give.logs, g.bx + g.ux * g.len * 0.5, g.by + g.uy * g.len * 0.5);   // v169: straight into the pack
+      if (g.give.sticks) dayGive('sticks', g.give.sticks, g.bx + g.ux * g.len * 0.85, g.by + g.uy * g.len * 0.85);
+      pickSnd();
     }
   }
   D.logs = D.logs.filter(g => !g.done);
@@ -7821,8 +7822,8 @@ function dayHarvest(Dk, a, inReach, spark) {
     if (actx) { const t = actx.currentTime; noiseAt(t, 4200, 1800, 0.12, 0.5, sfxGain); boomAt(t, 260, 140, 0.08, 0.3, sfxGain); }
     if (c >= need) {
       D.felled.add(best.key); ashBurst(best.x, best.y, 14, 14); addShake(0.25);
-      dayDrop(best.x, best.y, 'stones', 3); dayDrop(best.x, best.y, 'flint', T.tier > 1 ? 3 : 2);
-      if (Math.hypot(best.x, best.y) > IRON_FROM && T.tier > 1) { const n = (T.tier > 2 ? 2 : 1) + (Math.random() < 0.4 ? 1 : 0); dayDrop(best.x, best.y, 'ironore', n); exNote(`iron in the rock · ${n}`, true); }
+      dayGive('stones', 3, best.x, best.y); dayGive('flint', T.tier > 1 ? 3 : 2, best.x, best.y); pickSnd();   // v169: straight into the pack
+      if (Math.hypot(best.x, best.y) > IRON_FROM && T.tier > 1) { const n = (T.tier > 2 ? 2 : 1) + (Math.random() < 0.4 ? 1 : 0); dayGive('ironore', n, best.x, best.y, true); exNote(`iron in the rock · ${n}`, true); }
     } else exNote(`crack · ${need - c} more`);
   } else if (best.t === 'grass') {
     best.gone = true; dayGive('fibre', tool === 'hand' ? 2 : 3, best.x, best.y); chips('leaf');
@@ -7904,7 +7905,7 @@ function beastScare(b) {
 function beastDie(b) {
   b.dead = true; b.dieT = 0; addShake(0.2); hitStop(0.06); ashBurst(b.x, b.y, 6, BEAST[b.k].h * 0.6); dayKillLog(b.k);
   const drop = Object.assign({}, BEAST[b.k].drop); if (drop.hide && Math.random() < 0.3 * sr('skinner')) drop.hide++;   // v164: Skinner
-  for (const [k, n] of Object.entries(drop)) dayDrop(b.x, b.y, k, n);
+  for (const [k, n] of Object.entries(drop)) dayGive(k, n, b.x, b.y, true);   // v169: straight into the pack
   exNote(`a ${b.k} · ${Object.entries(drop).map(([k, n]) => `${n} ${DIT[k].n.toLowerCase()}`).join(' · ')}`, true);
 }
 function dayChest(c) {                         // a cache: food and a few useful bits, once
