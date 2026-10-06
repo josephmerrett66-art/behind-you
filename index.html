@@ -594,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 190</p>
+      <p class="small" id="verLbl">Version 191</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1797,7 +1797,7 @@ function atkHit(D, a) {                          // everything in reach takes th
     if (o.dead || A.hit.has(o) || !inReach(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
     A.hit.add(o); hits++; o.swung = true; o.kHit = D.kh || (D.slam ? 'slam' : D.dash ? 'dash' : 'swing'); o.kHitT = S.t; stkTouch();
     o.hp -= D.dmg * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')) * dayK(); o.jit = 1;
-    if (S.day) dayInfHit(o, dayInf());   // v190: an infused weapon
+    if (S.day) { dayInfHit(o, dayInf()); dayNamedTouch(o); }   // v190: an infused weapon (v191: and the Ash Crown Blade)
     foeSwBreak(o);   // v183
     if (o.type !== 'tall' && (o.type !== 'brute' || D.slam || D.dash)) push(o, D.knock);   // v123: brutes have poise; only the slam or the dash strike moves them
     spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.slam ? 14 : 9);
@@ -5190,7 +5190,7 @@ function killFoe(e) {
   if (lv('feast')) { const n = [20, 20, 14, 10][Math.min(3, lv('feast'))]; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; } }
   stkKill(e);
   dropWisps(e);
-  if (S.day) { dayRareDrop(e); dayInfKill(e); }   // v190
+  if (S.day) { dayRareDrop(e); dayInfKill(e); dayCapDrop(e); }   // v190, v191
 }
 // ---- v134 the Streak (Joe: fighting should feel arcadey and intense; every kill goes bzing, numbers climbing, multipliers, bonuses) ----
 // Kills close together build a streak: each one pops its points out of the body in that enemy's colour and flies them into a counter
@@ -8084,7 +8084,7 @@ function dayUseTarget() {                        // the nearest thing in reach y
   for (const o of dayNodesNear(p.x, p.y, 60)) if ((o.t === 'sticks' || o.t === 'stones' || o.t === 'shroom') && !o.gone) { const d = dist2(o, p); if (d < bd) { bd = d; best = o; } }
   for (const c of exChestsNear(p.x, p.y, 60)) if (!S.rg.looted.has(c.key)) { const d = dist2(c, p) - 8; if (d < bd) { bd = d; best = c; } }
   for (const B of D.builds) if (B.t === 'chest' || B.t === 'plot' || B.t === 'signal' || B.t === 'tpost' || STN_N[B.t]) { const d = dist2(B, p) - (B.t === 'plot' ? 22 : B.t === 'signal' ? 24 : STN_N[B.t] ? 16 : 12); if (d < bd) { bd = d; best = B; } }   // v163: stations too
-  for (const o of dayCampsNear(p.x, p.y, 70)) if (o.sub === 'relic') { const d = dist2(o, p) - 12; if (d < bd) { bd = d; best = o; } }   // v155: the relic on its cairn
+  for (const o of dayCampsNear(p.x, p.y, 70)) if (o.sub === 'relic' || (o.sub === 'wrack' && !dNamed()['rack' + o.ci])) { const d = dist2(o, p) - 12; if (d < bd) { bd = d; best = o; } }   // v155: the relic on its cairn
   { const P = lakeAt(p.x, p.y, 30); if (P && (D.water < FOOD_MAX - 2 || D.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS))) { const d = Math.max(0, Math.hypot(P.x - p.x, P.y - p.y) - P.rad); if (d < bd) { bd = d; best = P; } } }
   if (S.rg.inCamp) {
     { const d = dist2(CAMP_BOX, p) - 14; if (d < bd) { bd = d; best = CAMP_BOX; } }
@@ -8095,7 +8095,7 @@ function dayUseTarget() {                        // the nearest thing in reach y
   return best;
 }
 const STN_N = { bench: 'Workbench', furnace: 'Furnace', rack: 'Drying rack', fire: 'Fire', anvil: 'Forge' };   // v163: walk up to a station and Use opens its recipes
-const useLabel = o => o === EX_FIRE ? 'Wisps' : STN_N[o.t] ? 'Use' : o.kind === 'dcamp' ? (dayCampLive(o.ci) ? 'Guarded' : 'Take') : o.t === 'signal' ? (S.day.siege ? 'Burning' : 'Light it') : o.t === 'tpost' ? 'Feed' : o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
+const useLabel = o => o === EX_FIRE ? 'Wisps' : STN_N[o.t] ? 'Use' : o.kind === 'dcamp' ? (dayCampLive(o.ci) ? 'Guarded' : o.sub === 'wrack' ? 'Loot' : 'Take') : o.t === 'signal' ? (S.day.siege ? 'Burning' : 'Light it') : o.t === 'tpost' ? 'Feed' : o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
 function openStation(t) {                         // v163: the craft tab, opened on what this station makes (ready ones first)
   const D = S.day, at = t === 'fire' ? 'fire' : t, known = DREC.filter(r => D.known.has(r.id) && r.at === at);
   const pick = known.find(r => canCraft(r) === true) || known[0];
@@ -8110,7 +8110,7 @@ function dayUse() {
   if (o === CAMP_BARREL) { dayDrink(); return; }
   if (o.kind === 'dlake') { dayPondFill(); return; }
   if (o.t === 'plot') { dayPlotPlant(o); return; }
-  if (o.kind === 'dcamp') { dayRelicTake(o); return; }
+  if (o.kind === 'dcamp') { if (o.sub === 'wrack') dayRackLoot(o); else dayRelicTake(o); return; }
   if (o.t === 'signal') { if (!S.day.siege) daySignalLight(o); else dayNote('burning', 'it is already burning', 2); return; }
   if (o.t === 'tpost') { dayPostFeed(o); return; }
   if (o === CAMP_BOX || o.t === 'chest') { openCraft(o); return; }
@@ -8285,6 +8285,7 @@ function beastDie(b) {
   b.dead = true; b.dieT = 0; addShake(0.2); hitStop(0.06); ashBurst(b.x, b.y, 6, BEAST[b.k].h * 0.6); dayKillLog(b.k);
   const drop = Object.assign({}, BEAST[b.k].drop); if (drop.hide && Math.random() < 0.3 * sr('skinner')) drop.hide++;   // v164: Skinner
   if (b.k === 'wolf' && Math.random() < 0.6) drop.fang = 1; else if (b.k === 'bear') drop.fang = 2; else if (b.k === 'deer' && Math.random() < 0.4) drop.antler = 1;   // v190: for the forge
+  if (b.k === 'bear' && Math.hypot(b.x, b.y) > 2400 && !dNamed().nfang) dayNamedFound('nfang', b.x, b.y);   // v191: the deep woods' bear has the Wolfmother's Fang in it
   for (const [k, n] of Object.entries(drop)) dayGive(k, n, b.x, b.y, true);   // v169: straight into the pack
   exNote(`a ${b.k} · ${Object.entries(drop).map(([k, n]) => `${n} ${DIT[k].n.toLowerCase()}`).join(' · ')}`, true);
 }
@@ -8301,7 +8302,7 @@ function dayChest(c) {                         // a cache: food and a few useful
 }
 function dayRaid() {
   const rg = S.rg, D = S.day, ring = Math.min(3, exRing(Math.hypot(S.p.x, S.p.y)) + (D.n > 6 ? 1 : 0) + ((D.heat || 0) > 2 ? 1 : 0)), n = dayRaidSize();
-  for (let i = 0; i < n; i++) exSpawn(exPickFoe(ring));
+  for (let i = 0; i < n; i++) exSpawn(D.n >= 3 && Math.random() < 0.2 ? (Math.random() < 0.6 ? 'archer' : 'spear') : exPickFoe(ring));   // v191: from day 3 some raiders shoot
   if ((D.heat || 0) >= 2) { const e = rg.enemies[rg.enemies.length - 1]; if (e) { e.cap = 1; e.hp = e.maxHp = e.maxHp * 1.4; } }   // v155: once they are hunting you, one of them leads
   D.raidSeen = 1;
   rg.ringMsg = { text: `day ${D.n}`, sub: `A raid · ${n} of them${(D.heat || 0) > 1 ? ' · they are ' + HEAT_NAME[Math.min(4, D.heat)] : ''}`, t: 0 }; playRingSting(); addShake(0.35);
@@ -8394,6 +8395,10 @@ const ICON = (() => {
     pbomb: '<ellipse cx="12" cy="14.5" rx="6.6" ry="6" fill="#3a2a1a"/><path d="M9 8.6h6v2.2H9z" fill="#5e3e24"/><path d="M12 8.6c0-2 .8-3.6 2.6-4.6" stroke="#c8b07a" stroke-width="1.2" fill="none"/><circle cx="15" cy="3.8" r="1.6" fill="#ffb050"/><path d="M8.5 13c1-1.6 2.6-2.4 4.4-2.4" stroke="#7a5a3a" stroke-width="1" fill="none"/>',
     flash: '<path d="M7 9c-1.6 2.6-1.8 6 0 8.4 2.4 2.6 7.6 2.6 10 0 1.8-2.4 1.6-5.8 0-8.4z" fill="#efe6d2"/><path d="M7 9h10" stroke="#bfb8a6" stroke-width="1.8"/><path d="M12 2.5l.9 2.6 2.6.1-2.1 1.6.8 2.6-2.2-1.5-2.2 1.5.8-2.6-2.1-1.6 2.6-.1z" fill="#fff4c8"/>',
     knife1: knife(FLINT_HEAD), knife2: knife('#e6dfcc'), knife3: knife(IRON_HEAD), sword1: sword('#e6dfcc'), sword2: sword(IRON_HEAD),
+    nbow: bow('#4a2e18', '#d8b050') + '<path d="M20 1.2l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" fill="#ffd27a"/>', nfang: knife('#f4ecd8') + '<path d="M20 1.2l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" fill="#ffd27a"/>', nash: sword('#e6e0f8') + '<path d="M14.5 2.5l1.2 1.6 1.4-1.6 1 1.8 1.6-1.2-.4 2.6h-4.6z" fill="#d8d0f0"/>' + '<path d="M20 1.2l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" fill="#ffd27a"/>',   // v191: named
+    nglaive: spear('#e2cc9e') + '<path d="M17 7c1.6-.4 3-1.6 3.6-3.2M15.5 8.5c.2-1.8-.4-3.4-1.6-4.6" stroke="#d6ba8c" stroke-width="1.4" fill="none" stroke-linecap="round"/>' + '<path d="M20 1.2l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" fill="#ffd27a"/>',
+    nbell: '<path d="M5 20.5l7-9" stroke="#5a4a32" stroke-width="2.6" stroke-linecap="round"/><path d="M15.4 3.6c2.8.6 4.6 3.2 4.2 6l-.6 3.6 1.4 1.2-7.6-1.4.9-1.6.7-3.6c.4-2.8.6-4.6 1-4.2z" fill="#b8903c"/><circle cx="16.6" cy="14.6" r="1.2" fill="#d8b050"/>' + '<path d="M20 1.2l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" fill="#ffd27a"/>',
+    nlant: '<path d="M5 20.5l7-9" stroke="#3a3d42" stroke-width="2.6" stroke-linecap="round"/><circle cx="15.5" cy="8.5" r="4.6" fill="#3a3d42"/><circle cx="15.5" cy="8.5" r="2.6" fill="#ffb050"/><circle cx="15.5" cy="8.5" r="1.2" fill="#fff0c0"/>' + '<path d="M20 1.2l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" fill="#ffd27a"/>',
     bonec: club('#e6dfcc') + '<g fill="#e6dfcc"><circle cx="19" cy="5" r="1.6"/><circle cx="20.5" cy="9.5" r="1.4"/><circle cx="13.5" cy="4" r="1.3"/></g><path d="M5 20.5l7-9" stroke="#a07850" stroke-width="2.6" stroke-dasharray="1.6 1.4"/>',
     sack: '<path d="M8 6.5c-3 3-4.2 7-4.2 10 0 3 3.2 4.8 8.2 4.8s8.2-1.8 8.2-4.8c0-3-1.2-7-4.2-10z" fill="#a8b86a"/><path d="M8 6.5h8" stroke="#6e7a3a" stroke-width="2.2"/><path d="M8.5 12c1 3 0 5-1 7M15.5 12c-1 3 0 5 1 7" stroke="#8a9a52" stroke-width=".9" fill="none"/>',
     pack: '<rect x="5" y="6.5" width="14" height="15" rx="3" fill="#a07850"/><rect x="7" y="12.5" width="10" height="6" rx="1.5" fill="#7a5232"/><path d="M8 6.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="#5a3e28" stroke-width="1.7" fill="none"/><path d="M5 10h14" stroke="#7a5232" stroke-width="1.4"/>',
@@ -8957,7 +8962,7 @@ function dayClearSave() { try { localStorage.removeItem(dayKey()); } catch (e) {
 function daySave() {
   const D = S && S.day, rg = S && S.rg; if (!D || !rg || rg.phase !== 'fight' || S.mode !== 'expedition') return;
   const keep = ['t', 'n', 'food', 'water', 'st', 'sick', 'warn', 'raidDue', 'hot', 'inv', 'box', 'gear', 'told', 'baseHp', 'bed', 'piece', 'died', 'deaths', 'warm', 'bleed', 'ph',
-    'heat', 'raids', 'caught', 'away', 'jlog', 'bag', 'siege', 'won', 'raidSeen', 'scoutT'];   // v155
+    'heat', 'raids', 'caught', 'away', 'jlog', 'bag', 'siege', 'won', 'raidSeen', 'scoutT', 'named'];   // v155
   const d = {}; for (const k of keep) d[k] = D[k];
   d.seen = [...D.seen]; d.known = [...D.known]; d.fresh = [...D.fresh];
   d.felled = [...D.felled]; d.cut = [...D.cut]; d.bchunks = [...D.bchunks];
@@ -10061,12 +10066,12 @@ function beastCall(b) {                          // one wolf opens up and the pa
 }
 function tameStep(b, dt) {                       // your wolf: it goes for whatever is coming for you, and otherwise keeps close
   const p = S.p, B = BEAST[b.k];
-  let tgt = null, td = 420;
-  for (const e of S.rg.enemies) if (!e.dead) { const d = dist2(e, p); if (d < td) { td = d; tgt = e; } }
+  let tgt = b.fangTgt && !b.fangTgt.dead ? b.fangTgt : null, td = 420;   // v191: with the Wolfmother's Fang it goes for what you just struck
+  if (!tgt) { b.fangTgt = null; for (const e of S.rg.enemies) if (!e.dead) { const d = dist2(e, p); if (d < td) { td = d; tgt = e; } } }
   if (tgt) {
-    const d = dist2(b, tgt); b.dir = Math.atan2(tgt.y - b.y, tgt.x - b.x); b.sp = B.sp * 0.95;
+    const d = dist2(b, tgt), fg = tgt === b.fangTgt; b.dir = Math.atan2(tgt.y - b.y, tgt.x - b.x); b.sp = B.sp * (fg ? 1.5 : 0.95);
     if (d < 24 && (b.bite = (b.bite || 0) - dt) <= 0) {
-      b.bite = 0.9; tgt.hp -= 1.1; tgt.flash = 1; tgt.jit = 1; ashBurst(tgt.x, tgt.y, 4, 14);
+      b.bite = 0.9; tgt.hp -= fg ? 1.8 : 1.1; if (fg) { b.fangTgt = null; wpEmbers(tgt.x, tgt.y, 16, 6, '240,232,214'); addShake(0.05); } tgt.flash = 1; tgt.jit = 1; ashBurst(tgt.x, tgt.y, 4, 14);
       if (actx && monNear(b, 500) > 0) noiseAt(actx.currentTime, 1400, 500, 0.12, 0.3 * monNear(b, 500), sfxGain);
       if (tgt.hp <= 0 && !tgt.dead) { tgt.dead = true; tgt.dieT = 0; S.rg.kills = (S.rg.kills || 0) + 1; }
     }
@@ -10200,6 +10205,7 @@ function dayCampList() {
     }
     for (let k = 0; k < 7; k++) { const t = hash(C.i + k * 3, k * 5) * 6.3, r = 26 + hash(k, C.i) * 60; put('dirt', Math.cos(t) * r, Math.sin(t) * r * 0.7); }
     for (let k = 0; k < 5; k++) { const t = hash(C.i + k * 9, k * 2) * 6.3, r = 34 + hash(k + 2, C.i) * 56; put('bones', Math.cos(t) * r, Math.sin(t) * r * 0.7); }
+    put('wrack', -24, -46, { r: 12 });   // v191: the weapon rack
     return Object.assign({}, C, { x, y, parts });
   });
   return campCache;
@@ -10219,7 +10225,7 @@ function dayCampStep(dt) {
     if (d < CAMP_WAKE && !st.up && !dayCampLive(C.i)) {   // the watch gets up
       st.up = 1;
       for (let k = 0; k < C.n; k++) { const t = Math.random() * 6.3, r = 40 + Math.random() * CAMP_RAD;
-        spawnFoe(k ? exPickFoe(Math.min(2, exRing(C.d))) : C.cap, { x: C.x + Math.cos(t) * r, y: C.y + Math.sin(t) * r * 0.7, d: 400 });
+        spawnFoe(k ? (Math.random() < 0.3 ? (Math.random() < 0.6 ? 'archer' : 'spear') : exPickFoe(Math.min(2, exRing(C.d)))) : C.cap, { x: C.x + Math.cos(t) * r, y: C.y + Math.sin(t) * r * 0.7, d: 400 });
         const e = S.rg.enemies[S.rg.enemies.length - 1]; e.ci = C.i;
         if (!k) { e.cap = 1; e.hp = e.maxHp = e.maxHp * 1.5; }
       }
@@ -10385,6 +10391,7 @@ function dayJournalHtml() {
 // ---- drawing the camps, the pyre, the posts and the effigy ----
 function dayDrawCamp(o, c, sx, sy) {
   const C = (col, grey) => COLOUR ? col : grey;
+  if (o.sub === 'wrack') return dayDrawRack(o, c, C);   // v191
   if (o.sub === 'stake') {
     isoBox(c, o.x, o.y, 0.3, 5, 5, 34 + o.seed * 10, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'));
     if (o.skull) {
@@ -10595,7 +10602,7 @@ function drawSunShadows(items) {
     else if (o.kind === 'beast') col(sx, sy, BEAST[o.k].w * 0.45 * Z, BEAST[o.k].h * 0.8 * Z);
     else if (o.kind === 'dst' && (o.done || o.put)) { const P = PC(o.id); if (P.sh === 'edge') { const L = (P.L || GRID) / 2, ux = Math.cos(o.a) * L, uy = Math.sin(o.a) * L; slab(o.x - ux, o.y - uy, o.x + ux, o.y + uy, (P.k === 'window' ? 30 : P.H || 36) * Z * (o.done ? 1 : 0.4)); } else if (P.H && P.lay !== 'mount') col(sx, sy, (P.r || 6) * 0.7 * Z, P.H * Z * (o.done ? 1 : 0.4)); }
     else if (o.kind === 'dbuild') col(sx, sy, (o.sub === 'signal' ? 18 : o.sub === 'chest' || o.sub === 'bench' ? 10 : 5) * Z, (o.sub === 'signal' ? 60 : o.sub === 'tpost' ? 46 : o.sub === 'effigy' ? 44 : o.sub === 'furnace' ? 30 : 16) * Z);
-    else if (o.kind === 'dcamp' && (o.sub === 'stake' || o.sub === 'relic' || o.sub === 'tent')) col(sx, sy, (o.sub === 'tent' ? 12 : 4) * Z, (o.sub === 'relic' ? 70 : o.sub === 'tent' ? 26 : 38) * Z);
+    else if (o.kind === 'dcamp' && (o.sub === 'stake' || o.sub === 'relic' || o.sub === 'tent' || o.sub === 'wrack')) col(sx, sy, (o.sub === 'tent' ? 12 : o.sub === 'wrack' ? 10 : 4) * Z, (o.sub === 'relic' ? 70 : o.sub === 'tent' ? 26 : 38) * Z);
     else if (o.camp) col(sx, sy, 5 * Z, 26 * Z);
   }
   { const [px, py] = toScreen(S.p.x, S.p.y); col(px, py, 5.5 * Z, 34 * Z); }   // you
@@ -11091,6 +11098,8 @@ function dayHoles(hole) {                                  // the fires, posts a
     else if (B.t === 'furnace') hole(B.x, B.y, 70, 0.45);
   }
   if (dayTorch()) hole(S.p.x, S.p.y, 135 + Math.sin(S.t * 9) * 5, 0.7);   // a hand torch lights a ring round you as well
+  else if (heldNamed() === 'nlant') hole(S.p.x, S.p.y, 120 + Math.sin(S.t * 11) * 4, 0.6);   // v191: so does the Lantern Mace
+  if (S.rg.ltrail) for (const q of S.rg.ltrail) hole(q.x, q.y, 6 + 30 * (1 - q.t / q.life), 0.4);
   if (D.died) hole(D.died.x, D.died.y, 60, 0.5, 0);
 }
 // ---- v170 Daylight weapons, stage 1 (Joe: "I especially want the game to be weapon heavy"; plan: Claude Doc 'Daylight Weapons Plan') ----
@@ -11213,11 +11222,12 @@ function dayArmTick(dt) {
   dArmInit();
   const rg = S.rg;
   dayDrawTick(dt); if (rg.rngCd > 0 && !rg.dshots) rg.rngCd -= dt; dayShotStep(dt);   // v189
+  dayNamedTick(dt);   // v191
   if (rg.dparry && (rg.dparry.t += dt) > rg.dparry.win) rg.dparry = null;
   daySpearStep(dt);
 }
 function dayArmFx() {   // the thrown spear in flight
-  dayShotFx();   // v189
+  dayShotFx(); dayNamedFx();   // v189, v191
   const rg = S.rg; if (!rg || !rg.dspears) return;
   for (const q of rg.dspears) {
     if (q.land) continue;
@@ -11289,7 +11299,7 @@ function dayLoose(kind, s, c, a, spread, kk) {   // one arrow or one stone, from
   const am = s.id === 'stones' ? 0.8 : A.am || 1, dmg = R.base * (T ? T.dmg * dayFgDmg() : 1) * am * (0.4 + 0.6 * c) * kk * (1 + 0.12 * sr('might'));
   const sp = R.sp[0] + (R.sp[1] - R.sp[0]) * c, max = R.rng[0] + (R.rng[1] - R.rng[0]) * c, b = a + spread;
   (S.rg.dshots = S.rg.dshots || []).push({ kind: kind === 'bow' ? 'arrow' : 'stone', id: s.id, x: p.x + Math.cos(b) * 12, y: p.y + Math.sin(b) * 12, z: 22, a: b, d: 0, max, sp, dmg, c,
-    inf: dayInf(), pierce: A.pierce ? 1 : 0, fire: !!A.fire, bleed: !!A.bleed, stun: kind === 'sling' ? (0.25 + 0.4 * c) * kk : 0, knock: kind === 'sling' ? 10 + 22 * c * kk : 6 + 8 * c, hit: new Set(), t: 0, tr: [] });
+    inf: dayInf(), named: T === DIT.nbow, pierce: T === DIT.nbow && c >= 0.95 ? 99 : A.pierce ? 1 : 0, fire: !!A.fire, bleed: !!A.bleed, stun: kind === 'sling' ? (0.25 + 0.4 * c) * kk : 0, knock: kind === 'sling' ? 10 + 22 * c * kk : 6 + 8 * c, hit: new Set(), t: 0, tr: [] });
   dayAmmoUse(s);
   camKick(a, kind === 'bow' ? -2 - 3 * c : -2); addShake(0.04 + 0.08 * c);
   if (actx) { const t = actx.currentTime;
@@ -11552,6 +11562,10 @@ function fgDo(s, k) {                             // one upgrade, on one thing y
   pkSay(`${F.n.toLowerCase()} · ${DIT[s.id].n.toLowerCase()} · upgrade ${n + 1} of ${FG_MAX}`); exNote(`${F.n.toLowerCase()} · upgrade ${n + 1} of ${FG_MAX}`, true);
   dayChanged();
 }
+function fgRepair(s) {
+  const c = { iron: 2, hide: 1 }; if (!stationHere('anvil') || !DIT[s.id].named || s.d >= slotDur(s) || !fgCan(c)) return;
+  fgSpend(c); s.d = slotDur(s); fgFx('rf'); pkSay(`${DIT[s.id].n.toLowerCase()} · mended`); exNote('mended', true); dayChanged();
+}
 function fgInfuse(s, id) {                        // one infusion, for good
   const I = INF[id]; if (!stationHere('anvil') || s.inf || !fgCan(I.cost)) return;
   fgSpend(I.cost); s.inf = id; fgFx('inf', I.col); wjFlash(I.col, 0.12);
@@ -11583,6 +11597,7 @@ function forgeRow(s, i, here) {
   row.append(top);
   if (open) {
     const det = el('div', 'fgdet');
+    if (DIT[s.id].named) det.append(fgLine('Repair', s.d < slotDur(s) ? `${s.d} of ${slotDur(s)} uses → all ${slotDur(s)}` : 'good as new', s.d < slotDur(s) ? { iron: 2, hide: 1 } : null, here, 'Repair', () => fgRepair(s)));   // v191: named weapons can be mended
     for (const F of FG) det.append(fgLine(F.n, fgNow(s, F.k), n < FG_MAX ? F.cost[n] : null, here, F.n, () => fgDo(s, F.k)));
     if (s.inf) det.append(el('p', 'fgh', `Infused with ${INF[s.inf].n.toLowerCase()} · ${INF[s.inf].b}`));
     else { det.append(el('p', 'fgh', 'Infuse it · one infusion to a weapon, for good')); for (const [id, I] of Object.entries(INF)) det.append(fgLine(I.n, I.b, I.cost, here, 'Infuse', () => fgInfuse(s, id))); }
@@ -11621,6 +11636,139 @@ function dayRareDrop(e) {                         // now and then the night's de
   const big = e.type === 'tall' ? 2 : e.type === 'brute' ? 1 : 0;
   if (Math.random() < [0.05, 0.18, 0.4][big]) dayDrop(e.x, e.y, 'ember', 1);
   if (Math.random() < [0.06, 0.25, 0.6][big]) dayDrop(e.x, e.y, 'ash', big > 1 ? 2 : 1);
+}
+// ---- v191 (Joe): weapons stage 4, named weapons. Six that can't be made, only found, each with one rule nothing else has. The four
+// raider camp captains carry one each (the first time you put them down), the first bear you kill out in the deep woods has the
+// Wolfmother's Fang in it, and the Lantern Mace turns up, rarely, on a camp's weapon rack. Every camp now has a rack to loot once the
+// watch is dead, raid captains drop what they fought with, and some raiders come with bows and javelins. Named weapons last longer
+// and are the only ones the forge can repair.
+Object.assign(DIT, {
+  nbow: { n: 'Hunter\'s Longbow', c: '#7a5230', st: 1, k: 'tool', tool: 'bow', rng: 'bow', bw: '#4a2e18', named: 1, dmg: 2.1, dur: 520, b: 'Named · a full draw goes through every one of them in a line' },
+  nbell: { n: 'Bell Hammer', c: '#b8903c', st: 1, k: 'tool', tool: 'weapon', wpn: 'club', fam: 'club', bc: '#5a4a32', spikes: '#d8b050', named: 1, dmg: 2.2, dur: 520, b: 'Named · every third blow rings out and stuns everything near' },
+  nglaive: { n: 'Antler Glaive', c: '#d6ba8c', st: 1, k: 'tool', tool: 'weapon', wpn: 'spear', fam: 'twin', hc: '#e2cc9e', named: 1, dmg: 2.0, r: 26, dur: 520, b: 'Named · while you run it spins round you and cuts what it meets' },
+  nash: { n: 'Ash Crown Blade', c: '#d8d0f0', st: 1, k: 'tool', tool: 'weapon', wpn: 'sword', fam: 'sword', hc: '#e6e0f8', named: 1, dmg: 2.3, dur: 520, b: 'Named · at night it burns like your torch: every hit is a burn' },
+  nfang: { n: 'Wolfmother\'s Fang', c: '#efe6d2', st: 1, k: 'tool', tool: 'weapon', wpn: 'knife', fam: 'knife', hc: '#f4ecd8', named: 1, dmg: 2.0, dur: 520, b: 'Named · your tamed wolves strike with you' },
+  nlant: { n: 'Lantern Mace', c: '#ffb050', st: 1, k: 'tool', tool: 'weapon', wpn: 'club', fam: 'club', bc: '#3a3d42', spikes: '#ffb050', named: 1, dmg: 2.2, dur: 520, b: 'Named · it lights the dark, and every swing leaves a trail of burning light' },
+});
+const NAMED_CAMP = ['nbow', 'nbell', 'nglaive', 'nash'];
+const dNamed = () => S.day.named || (S.day.named = {});
+const RACK_LOOT = [
+  { w: ['spear2', 'waxe2', 'knife2', 'bow1', 'sling1'], am: ['arrows', 8], th: 'jav' },
+  { w: ['sword1', 'bow2', 'waxe3', 'sclub', 'sling2'], am: ['arrowsB', 8], th: 'jav' },
+  { w: ['spear3', 'knife3', 'bow2', 'maul', 'waxe3'], am: ['arrowsI', 6], th: 'taxe' },
+  { w: ['sword2', 'mace', 'bow3', 'waxe4', 'spear3'], am: ['arrowsF', 6], th: 'pbomb' },
+];
+function dayNamedFound(id, x, y) {                // a named weapon comes loose: on the ground, glowing, with its name across the screen
+  dNamed()[id] = 1; const f = dayDrop(x, y, id, 1, DIT[id].dur); f.keep = 1;
+  S.rg.ringMsg = { text: DIT[id].n.toLowerCase(), sub: DIT[id].b.replace(/^Named · /, ''), t: 0 }; playRingSting(); addShake(0.4); hitStop(0.08);
+  wpRing(x, y, 70, '255,210,120', 0.8); wpEmbers(x, y, 20, 26, '255,210,120'); dayJLog(`found ${DIT[id].n}`);
+  if (actx) { const t = actx.currentTime; [523, 659, 784, 1047].forEach((f, i) => toneAt(t + i * 0.09, f, 0.7, 0.04, 'triangle', sfxGain)); }
+}
+function dayCapDrop(e) {                          // a captain goes down
+  if (!e.cap) return;
+  if (e.ci !== undefined) { const id = NAMED_CAMP[e.ci]; if (id && !dNamed()[id]) return dayNamedFound(id, e.x, e.y); }
+  if (Math.random() < (e.ci !== undefined ? 0.5 : 0.6)) {   // otherwise: what it fought with, worn
+    const T = RACK_LOOT[Math.min(3, e.ci !== undefined ? e.ci : Math.floor((S.day.n - 1) / 3))].w, id = T[Math.floor(Math.random() * T.length)];
+    dayDrop(e.x, e.y, id, 1, Math.round(DIT[id].dur * (0.35 + Math.random() * 0.4))); exNote(`the captain dropped a ${DIT[id].n.toLowerCase()}`, true);
+  }
+}
+function dayRackLoot(o) {                         // a raider camp's weapon rack, once the watch is dead
+  const D = S.day, N = dNamed(), key = 'rack' + o.ci, L = RACK_LOOT[o.ci];
+  if (dayCampLive(o.ci)) { dayNote('guard', 'the watch is still standing', 1.4); return; }
+  if (N[key]) return;
+  N[key] = 1; dayAct(8, 0.7); addShake(0.2); ashBurst(o.x, o.y, 8, 20); playChestOpen(1);
+  const pool = L.w.slice(), got = [];
+  for (let k = 0; k < 2; k++) { const id = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; dayDrop(o.x, o.y, id, 1, Math.round(DIT[id].dur * (0.5 + Math.random() * 0.3))); got.push(DIT[id].n.toLowerCase()); }
+  dayDrop(o.x, o.y, L.am[0], L.am[1]); dayDrop(o.x, o.y, L.th, 2);
+  const left = [0, 1, 2, 3].filter(i => !N['rack' + i]).length;
+  if (!N.nlant && (Math.random() < [0.12, 0.18, 0.25, 0.4][o.ci] || left === 0)) dayNamedFound('nlant', o.x, o.y);   // rare, but the last rack always has it
+  else exNote(`the rack · ${got.join(' · ')}`, true);
+  dayChanged();
+}
+const heldNamed = () => { const T = S && S.day && heldIt(); return T && T.named ? heldSlot().id : null; };
+function dayNamedHit(hit, a) {                    // a blow from a named weapon has landed
+  const id = heldNamed(), rg = S.rg, p = S.p; if (!id || !hit.length) return;
+  if (id === 'nbell' && (rg.bellN = (rg.bellN || 0) + 1) % 3 === 0) {   // the third blow rings the bell
+    for (const o of rg.enemies) if (!o.dead && Math.hypot(o.x - p.x, o.y - p.y) < 130) { o.frozen = Math.max(o.frozen || 0, 1.3); o.jit = 1; foeSwBreak(o); }
+    for (const b of S.day.beasts) if (!b.dead && !b.tame && Math.hypot(b.x - p.x, b.y - p.y) < 160) beastScare(b);
+    wpRing(p.x, p.y, 130, '255,214,130', 0.7); wpRing(p.x, p.y, 80, '255,240,200', 0.5); wpPop('BELL', p.x, p.y, 70, '255,214,130', 1); addShake(0.35); hitStop(0.07); padRumble(0.6, 180);
+    if (actx) { const t = actx.currentTime; for (const [f, g, l] of [[392, 0.07, 2.2], [784, 0.04, 1.6], [1176, 0.025, 1.2], [988, 0.02, 1]]) toneAt(t, f, l, g, 'sine', sfxGain); boomAt(t, 140, 60, 0.25, 0.4, sfxGain); }
+  }
+  if (id === 'nfang') for (const b of S.day.beasts) if (b.tame && !b.dead && Math.hypot(b.x - p.x, b.y - p.y) < 420) { b.fangTgt = hit[0]; b.bite = 0; if (!b.howl || S.t - b.howl > 3) { b.howl = S.t; wpPop('PACK', b.x, b.y, 30, '240,232,214', 0.7); } }
+}
+function dayNamedTouch(o) {                       // per enemy struck: the Ash Crown Blade's burn at night
+  if (heldNamed() !== 'nash' || !dayDark()) return;
+  o.hp -= 0.5 * dayK(); o.wburn = Math.max(o.wburn || 0, 2.5); o.wburnK = 1.5;
+  wpEmbers(o.x, o.y, 30, 8, '240,232,255'); if (Math.random() < 0.3) wpPop('BURN', o.x, o.y, (FOES[o.type] ? FOES[o.type].h : 30) + 8, '240,232,255', 0.6);
+}
+function dayNamedTick(dt) {
+  const id = heldNamed(), rg = S.rg, p = S.p;
+  if (id === 'nglaive') {                         // running with it: the glaive turns round you
+    const run = Math.hypot(p.vx, p.vy) > 70 && !p.atk && !p.wact && !p.roll && rg.phase === 'fight';
+    rg.gsK = Math.max(0, Math.min(1, (rg.gsK || 0) + (run ? dt * 4 : -dt * 5))); rg.gsA = (rg.gsA || 0) + dt * 13 * rg.gsK;
+    if (rg.gsK > 0.6 && (rg.gsT = (rg.gsT || 0) - dt) <= 0) {
+      rg.gsT = 0.28; let n = 0;
+      for (const o of rg.enemies) if (!o.dead && Math.hypot(o.x - p.x, o.y - p.y) < 50 + (FOES[o.type] ? FOES[o.type].w * 0.5 : 6)) {
+        o.hp -= 0.55 * dayK(); o.jit = 1; o.flash = 1; o.kHit = 'glaive'; o.kHitT = S.t; stkTouch(); dayInfHit(o, dayInf()); n++;
+        const d = Math.hypot(o.x - p.x, o.y - p.y) || 1; if (o.type !== 'tall' && o.type !== 'brute') { o.x += (o.x - p.x) / d * 10; o.y += (o.y - p.y) / d * 10; }
+        wpEmbers(o.x, o.y, 24, 4, '240,225,190');
+      }
+      for (const b of S.day.beasts) if (!b.dead && !b.tame && Math.hypot(b.x - p.x, b.y - p.y) < 50 + BEAST[b.k].w * 0.5) { b.hp -= 0.55 * dayK(); b.flash = 1; n++; if (b.hp <= 0) beastDie(b); else beastScare(b); }
+      if (n) { addShake(0.06); if ((rg.gsW = (rg.gsW || 0) + 1) % 4 === 0) dayWear(); if (actx) noiseAt(actx.currentTime, 3800, 1400, 0.06, 0.25, sfxGain); }
+      else if (actx && rg.gsK > 0.9) noiseAt(actx.currentTime, 2200, 900, 0.1, 0.08, sfxGain);
+    }
+  } else rg.gsK = 0;
+  if (id === 'nlant' && p.atk && (rg.ltT = (rg.ltT || 0) - dt) <= 0) {   // the lantern's swing leaves light behind it
+    rg.ltT = 0.035; const A = p.atk, u = Math.min(1, A.t / (A.dur || 0.3)), b = A.a + (A.side || 1) * (0.9 - 1.8 * u), r = 26;
+    (rg.ltrail = rg.ltrail || []).push({ x: p.x + Math.cos(b) * r, y: p.y + Math.sin(b) * r, t: 0, life: 1.6 });
+  }
+  if (rg.ltrail) {
+    for (const q of rg.ltrail) { q.t += dt; if ((q.hT = (q.hT || 0) - dt) <= 0) { q.hT = 0.2; for (const o of rg.enemies) if (!o.dead && Math.hypot(o.x - q.x, o.y - q.y) < 20) { o.wburn = Math.max(o.wburn || 0, 1.4); o.wburnK = 1; } } }
+    rg.ltrail = rg.ltrail.filter(q => q.t < q.life);
+    if (rg.ltrail.length > 80) rg.ltrail.splice(0, rg.ltrail.length - 80);
+  }
+}
+function dayNamedFx() {
+  const id = heldNamed(), rg = S.rg, p = S.p; if (!rg) return;
+  if (rg.ltrail && rg.ltrail.length) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const q of rg.ltrail) { const [x, y] = toScreen(q.x, q.y), f = 1 - q.t / q.life, fl = 0.8 + 0.2 * Math.sin(S.t * 30 + q.x);
+      const g = ctx.createRadialGradient(x, y - 14 * Z, 0, x, y - 14 * Z, 14 * Z * (0.6 + f * 0.6)); g.addColorStop(0, `rgba(255,220,140,${0.55 * f * fl})`); g.addColorStop(1, 'rgba(255,140,50,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 14 * Z, 14 * Z * (0.6 + f * 0.6), 0, 7); ctx.fill(); }
+    ctx.restore();
+  }
+  if (id === 'nlant' && S.wpHead) {               // the lamp in its cage, at the head of the mace
+    const [x, y] = S.wpHead, fl = 0.85 + 0.15 * Math.sin(S.t * 23) * Math.sin(S.t * 7);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 22 * Z); g.addColorStop(0, `rgba(255,226,150,${0.7 * fl})`); g.addColorStop(0.35, `rgba(255,160,60,${0.25 * fl})`); g.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 22 * Z, 0, 7); ctx.fill(); ctx.restore();
+  }
+  if (id === 'nglaive' && rg.gsK > 0.05) {         // the turning glaive: a blade going round you, and the blur it leaves
+    const [px, py] = toScreen(p.x, p.y), R = 46 * K(), a = rg.gsA, k = rg.gsK, h = 18 * Z;
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(240,225,190,${0.22 * k})`; ctx.lineWidth = 5 * Z;
+    ctx.beginPath(); ctx.ellipse(px, py - h, R, R / 2, 0, a - 2.2, a); ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    const tx = px + Math.cos(a) * R, ty = py - h + Math.sin(a) * R / 2, bx = px + Math.cos(a) * R * 0.25, by = py - h + Math.sin(a) * R / 8;
+    ctx.globalAlpha = k; ctx.strokeStyle = EDGE_C; ctx.lineWidth = 3.4 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.strokeStyle = COLOUR ? '#8a6a44' : '#7a7a74'; ctx.lineWidth = 1.8 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.fillStyle = COLOUR ? '#e2cc9e' : '#d0d0ca'; ctx.beginPath(); ctx.arc(tx, ty, 3 * Z, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+function dayDrawRack(o, c, C) {                    // a camp's weapon rack: two posts, a bar, weapons leant on it (until you take them)
+  const a = 0.5, ux = Math.cos(a), uy = Math.sin(a);
+  for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 14, o.y + uy * k * 14, a, 3.5, 3.5, 26, C('#6e5232', '#6a6a63'), C('#543e24', '#52524c'), C('#3e2c18', '#3c3c38'));
+  isoBox(c, o.x, o.y, a, 34, 3, 3, C('#8a6a44', '#76766f'), C('#6a4e30', '#5e5e58'), C('#4a3620', '#4a4a46'), 22);
+  if (S.day && dNamed()['rack' + o.ci]) return;
+  for (let i = 0; i < 4; i++) {                    // spears and axes leant on the bar
+    const f = (i - 1.5) / 1.5, [x0, y0] = toScreen(o.x + ux * f * 12 + 6, o.y + uy * f * 12 + 6), [x1, y1] = toScreen(o.x + ux * f * 12, o.y + uy * f * 12);
+    c.lineCap = 'round'; c.strokeStyle = EDGE_C; c.lineWidth = 2.8 * Z; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1 - 30 * Z); c.stroke();
+    c.strokeStyle = C('#a08a62', '#8a8a84'); c.lineWidth = 1.4 * Z; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1 - 30 * Z); c.stroke();
+    c.fillStyle = C(i % 2 ? STONE_HEAD : IRON_HEAD, '#9a9a96');
+    if (i % 2) { c.beginPath(); c.moveTo(x1, y1 - 30 * Z); c.lineTo(x1 + 5 * Z, y1 - 27 * Z); c.lineTo(x1 + 4 * Z, y1 - 22 * Z); c.lineTo(x1, y1 - 25 * Z); c.closePath(); c.fill(); }
+    else { c.beginPath(); c.moveTo(x1, y1 - 36 * Z); c.lineTo(x1 + 2 * Z, y1 - 30 * Z); c.lineTo(x1 - 2 * Z, y1 - 30 * Z); c.closePath(); c.fill(); }
+  }
 }
 // ---- v172 (Joe): controller support. Any gamepad the browser sees (Xbox, PlayStation, Switch Pro, most others in the standard layout).
 // In play: left stick runs that way, right stick aims the torch, RT or A attacks, B dodges, X uses, Y is the weapon's special,
@@ -12361,6 +12509,7 @@ function wpHit(D, a) {                            // the blow goes through atkHi
   if (back && n) wpBackstab();
   if (D.stun && n) for (const o of hit) o.frozen = Math.max(o.frozen || 0, D.stun);   // v170: the quake leaves them reeling
   if (S.day && A && !A.worn && n) { A.worn = true; dayWear(); }   // v170: a blow that lands wears the weapon, once a swing
+  if (S.day && n) dayNamedHit(hit, a);   // v191: named weapons' rules
   if (D.charge) return n;
   (WHIT[w] || WHIT.axe)(D, n, a, hit);
   if (WJ[w]) wjHit(w, D2, n, a, hit);   // v146
