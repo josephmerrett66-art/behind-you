@@ -136,7 +136,20 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #buildbar .bp.sel { border: 2px solid #ffcf8a; background: rgba(255,190,120,0.2); color: var(--bone); }
 #buildbar .bp.short { opacity: 0.42; }
 @media (max-width: 560px) and (min-height: 521px) { #buildbar { left: 10px; transform: none; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); gap: 3px; padding: 3px; } #buildbar .bp { width: 45px; padding: 4px 1px 3px; } #buildbar .bp svg { width: 22px; height: 22px; } }
-#craft .pk { margin-block: auto; width: 100%; max-width: 34rem; display: grid; gap: 0.8rem; padding-bottom: 16rem; }
+#craft .pk { margin-block: auto; width: 100%; max-width: 34rem; display: grid; gap: 0.6rem; }
+#craft.carded .pk { padding-bottom: 12rem; }   /* v180: room under the item card only while it's up */
+@media (min-width: 760px) { #craft .pk { max-width: 62rem; } }
+#craft .pkcols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 1.4rem; align-items: start; }
+#craft .pkcol { display: grid; gap: 0.3rem; min-width: 0; align-content: start; }
+#craft .pkduo { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 0 0.9rem; }
+@media (max-width: 759px) { #craft .pkduo { grid-template-columns: minmax(0, 1fr); } }
+#craft .pkduo > div { min-width: 0; }
+#craft .pkcard.inline { margin-top: 0.4rem; padding: 0.8rem; border: 1px solid rgba(255,207,138,0.35); border-radius: 12px; background: rgba(16,14,12,0.9); }
+#craft .pkcard.inline .pkchead { display: flex; gap: 0.7rem; align-items: center; } #craft .pkcard.inline .pkcicon { width: 44px; height: 44px; flex: none; border-radius: 10px; background: rgba(239,239,234,0.08); display: grid; place-items: center; } #craft .pkcard.inline .pkcicon svg { width: 72%; height: 72%; }
+#craft .pkcard.inline .pkctext { display: grid; gap: 0.1rem; min-width: 0; } #craft .pkcard.inline .pkctext b { font: 600 0.88rem var(--mono); color: var(--bone); } #craft .pkcard.inline .pkctext .sh { font-size: 0.74rem; color: var(--ash); } #craft .pkcard.inline .pkctext .st { font: 0.68rem var(--mono); color: #ffcf8a; }
+#craft .pkcard.inline .pkacts { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
+#craft .pkcard.inline .pkhint { margin: 0.5rem 0 0; font: 0.66rem var(--mono); color: var(--ash); }
+@media (max-height: 560px) { #craft .pkhead h2 { display: none; } #craft .pkneeds { display: none; } #craft { --slot: 36px; } #craft { padding-block: calc(10px + env(safe-area-inset-top, 0px)) 10px; } #craft .pktab { padding: 0.45rem; } }
 #craft .pkhead { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
 #craft .pkhead h2 { margin: 0; font: 400 clamp(1.7rem, 7vw, 2.3rem) var(--display); }
 #craft .pkhead button { padding: 0.55rem 0.9rem; font-size: 0.7rem; }
@@ -155,19 +168,24 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #craft h3 { margin: 0.3rem 0 0; font: 600 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); display: flex; justify-content: space-between; gap: 1rem; }
 #craft h3 span { color: var(--ash); font-weight: 400; letter-spacing: 0.04em; text-transform: none; }
 #craft p.none { margin: 0; color: var(--ash); }
-#craft .pkgear { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; padding: 0.6rem 0.5rem 0.5rem; border-radius: 12px; background: rgba(239,239,234,0.03); border: 1px solid rgba(239,239,234,0.1); }
+#craft .pkgrid.pkgear { grid-template-columns: repeat(4, var(--slot)); }
+#craft .pkgrid.pkhotg { grid-template-columns: repeat(6, var(--slot)); }
 #craft .gslot { display: grid; justify-items: center; gap: 0.3rem; font: 0.6rem var(--mono); color: var(--ash); text-align: center; min-width: 0; }
 #craft .gslot span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #craft .gslot .slot { width: min(100%, 62px); }
-#craft .pkgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; }
+#craft { --slot: 42px; }
+@media (max-width: 759px) { #craft { --slot: 37px; } }
+#craft .pkgrid { display: grid; grid-template-columns: repeat(auto-fill, var(--slot)); gap: 4px; }
+#craft .pkfoldbody > .pkgrid { padding-left: 0.15rem; }
 #craft .slot { all: unset; box-sizing: border-box; position: relative; aspect-ratio: 1; width: 100%; border-radius: 9px; background: rgba(239,239,234,0.07); border: 1px solid rgba(239,239,234,0.24); display: grid; place-items: center; cursor: pointer; color: rgba(239,239,234,0.3); transition: transform 0.08s, border-color 0.12s, background 0.12s; }
-#craft .slot svg { width: 66%; height: 66%; }
+#craft .slot svg { width: 70%; height: 70%; }
+#craft .slot { border-radius: 7px; }
 #craft .slot.empty { background: rgba(239,239,234,0.025); border-style: dashed; border-color: rgba(239,239,234,0.13); }
 #craft .slot.bag { background: rgba(168,184,106,0.07); }
 #craft .slot.held { border-color: rgba(255,207,138,0.7); }
 #craft .slot.drop { border-color: rgba(255,207,138,0.4); background: rgba(255,190,120,0.05); }
 #craft .slot.sel { border: 2px solid #ffcf8a; background: rgba(255,190,120,0.2); transform: scale(1.07); z-index: 1; }
-#craft .slot .n { position: absolute; right: 4px; bottom: 2px; font: 600 0.62rem var(--mono); color: var(--bone); text-shadow: 0 1px 2px #000; }
+#craft .slot .n { position: absolute; right: 3px; bottom: 1px; font: 600 0.58rem var(--mono); color: var(--bone); text-shadow: 0 1px 2px #000; }
 #craft .slot .k { position: absolute; left: 4px; top: 2px; font: 600 0.52rem var(--mono); color: var(--ash); }
 #craft .pkgrid.cont .slot { background: rgba(160,120,80,0.08); }
 #craft .pkgrid.cont .slot.empty { background: rgba(160,120,80,0.03); }
@@ -199,14 +217,14 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #craft .pkcat b { position: absolute; top: 3px; right: 6px; font: 600 0.6rem var(--mono); color: #9fd27a; }
 #craft .new { position: absolute; top: 6px; left: 6px; width: 7px; height: 7px; border-radius: 50%; background: #ffcf8a; box-shadow: 0 0 6px #ffcf8a; }
 #craft .pkrecs { display: grid; gap: 0.45rem; }
-#craft .pkfold { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 0.55rem; width: 100%; padding: 0.6rem 0.5rem; margin-top: 0.2rem; border-top: 1px solid rgba(239,239,234,0.14); font: 600 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); }
+#craft .pkfold { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 0.55rem; width: 100%; padding: 0.45rem 0.4rem; margin-top: 0.1rem; border-top: 1px solid rgba(239,239,234,0.14); font: 600 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); }
 #craft .pkfold svg { width: 1.15rem; height: 1.15rem; flex: none; }
 #craft .pkfold em { font-style: normal; flex: 1; }
 #craft .pkfold span { color: var(--ash); font-weight: 400; letter-spacing: 0.04em; text-transform: none; }
 #craft .pkfold .chev { width: 0.5rem; height: 0.5rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; flex: none; margin: 0 0.15rem; }
 #craft .pkfold.open .chev { transform: rotate(45deg); }
 #craft .pkfold:hover, #craft .pkfold:focus-visible { background: rgba(239,239,234,0.05); }
-#craft .pkfoldbody { display: grid; gap: 0.45rem; padding-bottom: 0.4rem; }
+#craft .pkfoldbody { display: grid; gap: 0.4rem; padding-bottom: 0.3rem; }
 #craft .bkrow { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.55rem 0.6rem; border: 1px solid rgba(239,239,234,0.14); border-radius: 10px; }
 #craft .bkrow.unseen { opacity: 0.5; }
 #craft .bktext { display: grid; gap: 0.2rem; font-size: 0.72rem; } #craft .bktext b { font-size: 0.8rem; color: var(--bone); }
@@ -551,7 +569,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 179</p>
+      <p class="small" id="verLbl">Version 180</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -8689,31 +8707,41 @@ function renderPack() {
   for (const b of document.querySelectorAll('#craft .pktab')) { b.setAttribute('aria-pressed', b.dataset.tab === PK.tab ? 'true' : 'false'); if (b.dataset.tab === 'craft') b.querySelector('span').textContent = fresh ? fresh + ' new' : ''; }
   const out = [];
   if (PK.flash && performance.now() - PK.flash.at < 2600) out.push(el('p', 'pkflash', PK.flash.t));
+  const wide = innerWidth >= 760;   // v180 (Joe): no scrolling. Wide screens put the chest (and the item card) in a column beside your pack
+  let side = null;
   if (PK.tab === 'pack') {
+    const mine = [], theirs = [];
     if (PK.cont) {   // the chest or box you opened sits at the top, where you're looking
       const g = el('div', 'pkgrid cont'); PK.cont.inv.forEach((s, i) => g.append(pkSlot(s, 'cont', i)));
       const sa = el('button', 'alt pkstore', 'Store all materials'); sa.addEventListener('click', () => { for (let i = HOTN; i < D.inv.length; i++) if (D.inv[i] && DIT[D.inv[i].id].k === 'mat') pkQuick('inv', i); });
-      out.push(...pkFold('p:cont', PK.cont.name, PK.cont.box ? `${PK.cont.inv.filter(Boolean).length} used · no limit` : `${PK.cont.inv.filter(Boolean).length} of ${PK.cont.inv.length}`, [g, sa], true, PK.cont.box ? 'chest' : 'chest'));
+      theirs.push(...pkFold('p:cont', PK.cont.name, PK.cont.box ? `${PK.cont.inv.filter(Boolean).length} used · no limit` : `${PK.cont.inv.filter(Boolean).length} of ${PK.cont.inv.length}`, [g, sa], true, 'chest'));
     }
-    const gear = el('div', 'pkgear');
+    const gear = el('div', 'pkgrid pkgear');
     for (const [k, name, ic] of [['head', 'Head', 'head'], ['body', 'Body', 'body'], ['legs', 'Legs', 'legsE'], ['back', 'Back', 'back']]) {
-      const w = el('div', 'gslot'), b = pkSlot(D.gear[k], 'gear', k, 'gear');
+      const b = pkSlot(D.gear[k], 'gear', k, 'gear');
       if (!D.gear[k]) b.innerHTML = iconSvg(ic);
-      w.append(b, el('span', '', D.gear[k] ? DIT[D.gear[k].id].n : name)); gear.append(w);
+      b.title = D.gear[k] ? DIT[D.gear[k].id].n : name; gear.append(b);
     }
-    out.push(...pkFold('p:gear', 'Wearing', Object.values(D.gear).filter(Boolean).length + ' of 4', [gear], true, 'vest'));
-    const hot = el('div', 'pkgrid'); for (let i = 0; i < HOTN; i++) hot.append(pkSlot(D.inv[i], 'inv', i));
-    out.push(...pkFold('p:hot', 'Hotbar', D.inv.slice(0, HOTN).filter(Boolean).length + ' of ' + HOTN, [hot], true, 'hand'));
+    const hot = el('div', 'pkgrid pkhotg'); for (let i = 0; i < HOTN; i++) hot.append(pkSlot(D.inv[i], 'inv', i));
+    const duo = el('div', 'pkduo');
+    duo.append(el('div', '', ''), el('div', '', ''));
+    duo.children[0].append(...pkFold('p:gear', 'Wearing', Object.values(D.gear).filter(Boolean).length + '/4', [gear], true, 'vest'));
+    duo.children[1].append(...pkFold('p:hot', 'Hotbar', D.inv.slice(0, HOTN).filter(Boolean).length + '/' + HOTN, [hot], true, 'hand'));
+    mine.push(duo);
     const used = D.inv.filter(Boolean).length;
     const pk = el('div', 'pkgrid'); for (let i = HOTN; i < D.inv.length; i++) pk.append(pkSlot(D.inv[i], 'inv', i, i >= BASE_SLOTS ? 'bag' : ''));
-    out.push(...pkFold('p:pockets', 'Pockets', `${used} of ${D.inv.length} slots${D.gear.back ? '' : ' · wear a bag for more'}`, [pk], true, 'back'));
+    mine.push(...pkFold('p:pockets', 'Pockets', `${used} of ${D.inv.length}${D.gear.back ? '' : ' · wear a bag for more'}`, [pk], true, 'back'));
     const wHere = dayWaterHere();
     if (wHere) {
       const r = el('div', 'pkwater'); r.append(el('span', '', `Water · ${wHere}`));
       const d = el('button', 'act', 'Drink'); d.disabled = D.water >= FOOD_MAX; d.addEventListener('click', () => dayDrink()); r.append(d);
       if (D.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS)) { const f = el('button', 'act', 'Fill waterskins'); f.addEventListener('click', dayFill); r.append(f); }
-      out.push(r);
+      mine.push(r);
     }
+    if (wide) {
+      const cols = el('div', 'pkcols'), a = el('div', 'pkcol'), b = el('div', 'pkcol'); a.append(...mine); b.append(...theirs); side = b;
+      cols.append(a, b); out.push(cols);
+    } else out.push(...theirs, ...mine);
   } else if (PK.tab === 'log') {
     out.push(...dayJournalHtml());
   } else if (PK.tab === 'book') {
@@ -8721,8 +8749,11 @@ function renderPack() {
   } else out.push(...craftHtml());   // v171: one list per place
   root.replaceChildren(...out);
   const card = PK.tab === 'pack' ? pkCard() : null, cw = document.getElementById('pkCard');
-  cw.replaceChildren(...(card ? [card] : [])); cw.hidden = !card;
+  if (card && side) { side.append(card); card.classList.add('inline'); cw.replaceChildren(); cw.hidden = true; }   // v180: beside the grid, nothing covered
+  else { cw.replaceChildren(...(card ? [card] : [])); cw.hidden = !card; }
+  craftEl.classList.toggle('carded', !cw.hidden);
 }
+addEventListener('resize', () => { if (S && S.day && !craftEl.hidden) renderPack(); });   // v180: turning the tablet re-lays the pack
 for (const b of document.querySelectorAll('#craft .pktab')) b.addEventListener('click', () => { if (b.dataset.tab === 'craft' && PK.tab !== 'craft') PK.at = craftPlaceNow(); PK.tab = b.dataset.tab; PK.sel = null; renderPack(); craftEl.scrollTop = 0; });
 
 // ---- v132 (Joe): Daylight saves. Each save slot keeps one run; it saves every few seconds and when you leave, and your
