@@ -128,10 +128,11 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #craft .pkhead { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
 #craft .pkhead h2 { margin: 0; font: 400 clamp(1.7rem, 7vw, 2.3rem) var(--display); }
 #craft .pkhead button { padding: 0.55rem 0.9rem; font-size: 0.7rem; }
-#craft .pkneeds { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1rem; }
-#craft .need { display: grid; grid-template-columns: 3.9rem 1fr 2.8rem; align-items: center; gap: 0.45rem; font: 0.64rem var(--mono); color: var(--ash); text-transform: uppercase; letter-spacing: 0.08em; }
-#craft .need i { height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--c) calc(var(--f) * 100%), rgba(239,239,234,0.12) 0); }
-#craft .need b { font-weight: 600; color: var(--bone); text-align: right; letter-spacing: 0; text-transform: none; font-size: 0.72rem; }
+#craft .pkneeds { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.3rem 0.55rem; }
+#craft .need { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 0.2rem 0.2rem; font: 0.52rem var(--mono); color: var(--ash); text-transform: uppercase; letter-spacing: 0.02em; min-width: 0; }
+#craft .need span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#craft .need i { grid-column: 1 / -1; grid-row: 2; height: 4px; border-radius: 3px; background: linear-gradient(90deg, var(--c) calc(var(--f) * 100%), rgba(239,239,234,0.12) 0); }
+#craft .need b { font-weight: 600; color: var(--bone); text-align: right; letter-spacing: 0; text-transform: none; font-size: 0.6rem; }
 #craft .need.low span, #craft .need.low b { color: #e2543c; }
 #craft .pktabs { display: flex; gap: 0.4rem; }
 #craft .pktab { flex: 1; justify-self: stretch; padding: 0.7rem; font-size: 0.74rem; background: transparent; color: var(--ash); border: 1px solid rgba(239,239,234,0.25); border-radius: 10px; }
@@ -221,6 +222,30 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #craft .jlog p { margin: 0; font-size: 12.5px; color: rgba(239,239,234,.72); }
 #craft .jlog b { display: inline-block; min-width: 52px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: rgba(239,239,234,.38); font-weight: 600; }
 #craft h3 em { margin-right: auto; }
+body.pkopen #hotbar, body.pkopen #buildbar { display: none !important; }
+#craft .pkplaces { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.35rem; }
+#craft .pkplace { all: unset; box-sizing: border-box; position: relative; display: grid; justify-items: center; gap: 0.2rem; padding: 0.5rem 0.1rem 0.4rem; border-radius: 10px; border: 1px solid rgba(239,239,234,0.18); color: var(--ash); font: 600 0.56rem var(--mono); text-transform: uppercase; letter-spacing: 0.03em; cursor: pointer; min-width: 0; }
+#craft .pkplace span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#craft .pkplace svg { width: 26px; height: 26px; opacity: 0.55; }
+#craft .pkplace.here svg { opacity: 1; }
+#craft .pkplace.here::after { content: ''; position: absolute; left: 6px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: #9fd27a; box-shadow: 0 0 6px #9fd27a; }
+#craft .pkplace[aria-pressed="true"] { border-color: #ffcf8a; background: rgba(255,190,120,0.14); color: var(--bone); }
+#craft .pkplace b { position: absolute; top: 3px; right: 5px; font: 600 0.6rem var(--mono); color: #9fd27a; }
+#craft .pkwhere { margin: 0; padding: 0.55rem 0.75rem; border-radius: 9px; font: 0.7rem var(--mono); color: #f0c090; background: rgba(240,170,90,0.1); border: 1px dashed rgba(240,170,90,0.45); }
+#craft .pkwhere.ok { color: #b6dc96; background: rgba(159,210,122,0.08); border: 1px solid rgba(159,210,122,0.35); }
+#craft .rec.away { opacity: 0.62; }
+#craft .rec .rgo1 { flex: none; padding: 0.5rem 0.8rem; font-size: 0.68rem; }
+#craft .rec:not(.ready) .rgo1 { opacity: 0.45; }
+#craft .rneed { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0 0.7rem 0.55rem calc(0.7rem + 40px + 0.7rem); }
+#craft .need1 { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.12rem 0.4rem 0.12rem 0.2rem; border-radius: 99px; background: rgba(159,210,122,0.12); color: #b6dc96; font: 600 0.62rem var(--mono); }
+#craft .need1 svg { width: 16px; height: 16px; }
+#craft .need1 i { font-style: normal; font-size: 0.6rem; }
+#craft .need1.no { background: rgba(226,84,60,0.16); color: #f0a090; }
+#craft .rlong { margin: 0; font-size: 0.74rem; color: var(--bone); line-height: 1.45; }
+#craft .rlong em { font-style: normal; color: #f0a090; }
+#craft .pkinfo { display: grid; gap: 0.3rem; padding: 0.55rem 0.7rem; border-radius: 9px; background: rgba(239,239,234,0.05); }
+#craft .pkinfo p { margin: 0; font-size: 0.74rem; color: var(--bone); line-height: 1.4; }
+#craft .pkinfo b { display: block; font: 600 0.58rem var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ash); }
 #useBtn { right: 112px; bottom: calc(300px + env(safe-area-inset-bottom, 0px)); }
 @media (max-height: 520px) { #useBtn { right: 204px; bottom: calc(304px + env(safe-area-inset-bottom, 0px)); } }
 @media (max-height: 520px) {   /* v141: the weapon special sits on the top row over the dodge; the rest of that row steps left */
@@ -496,7 +521,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 170</p>
+      <p class="small" id="verLbl">Version 171</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7780,6 +7805,7 @@ function openStation(t) {                         // v163: the craft tab, opened
   const D = S.day, at = t === 'fire' ? 'fire' : t, known = DREC.filter(r => D.known.has(r.id) && r.at === at);
   const pick = known.find(r => canCraft(r) === true) || known[0];
   PK.tab = 'craft'; PK.open = null; if (pick) PK.cat = pick.g;
+  PK.at = at; PK.atLock = true;   // v171: straight onto this station's own list
   openCraft();
 }
 function dayUse() {
@@ -8351,19 +8377,21 @@ function renderHotbar() {
 function dayChanged() { if (!S || !S.day) return; renderHotbar(); renderBuildBar(); if (!craftEl.hidden) renderPack(); }
 // ---- the pack screen: Pack (your slots, your gear, a chest or the box beside you) and Craft (the recipe book) ----
 const craftEl = document.getElementById('craft'), craftBtn = document.getElementById('craftBtn'), useBtn = document.getElementById('useBtn');
-const PK = { tab: 'pack', sel: null, cat: null, open: null, cont: null, flash: null };
+const PK = { tab: 'pack', sel: null, cat: null, open: null, cont: null, flash: null, at: 'hand', atLock: false };
 function openCraft(target) {
   const rg = S && S.rg; if (!S || !S.day || !rg || rg.phase !== 'fight' || !S.running) return;
   const conts = dayConts(70);
   PK.cont = target ? conts.find(c => c.box ? target === CAMP_BOX : c.B === target) || null : conts[0] || null;
   if (PK.cont && PK.cont.B) { PK.cont.B.openT = 9e9; if (actx) { const t = actx.currentTime; noiseAt(t, 700, 300, 0.25, 0.3, sfxGain); } }
   PK.sel = null; if (target) PK.tab = 'pack';
+  if (!target && PK.tab === 'craft' && !PK.atLock) PK.at = craftPlaceNow();   // v171: the Craft tab opens on where you're standing
+  PK.atLock = false; document.body.classList.add('pkopen');
   S.running = false; menuBtn.hidden = true; craftBtn.hidden = true; craftEl.hidden = false; renderPack();
   sfx(0.9, 0.3, 'bandpass', 520, 0.3);
 }
 function closeCraft() {
   if (PK.cont && PK.cont.B) PK.cont.B.openT = 0.25;
-  craftEl.hidden = true; menuBtn.hidden = false; craftBtn.hidden = false; PK.sel = null; renderHotbar(); S.running = true; last = performance.now();
+  document.body.classList.remove('pkopen'); craftEl.hidden = true; menuBtn.hidden = false; craftBtn.hidden = false; PK.sel = null; renderHotbar(); S.running = true; last = performance.now();
 }
 const pkArr = w => w === 'inv' ? S.day.inv : w === 'cont' ? PK.cont.inv : null;
 const pkGet = (w, i) => w === 'gear' ? S.day.gear[i] : pkArr(w)[i];
@@ -8448,6 +8476,9 @@ function pkCard() {                             // the card for the selected ite
   if (T.k === 'place') stat.push('hold it, then Place');
   if (stat.length) tx.append(el('span', 'st', stat.join(' · ')));
   head.append(ic, tx); card.append(head);
+  { const g = itemGet(s.id), u = itemUses(s.id);   // v171 (Joe): what it's for and where more comes from
+    if (g || u) { const info = el('div', 'pkinfo'), line = (h, t) => { const q = el('p'); q.append(el('b', '', h), el('span', '', t[0].toUpperCase() + t.slice(1))); info.append(q); };
+      if (g) line('Get more', g); if (u) line('Makes', u); card.append(info); } }
   const acts = el('div', 'pkacts'), btn = (t, fn, main) => { const b = el('button', main ? 'act main' : 'act', t); b.addEventListener('click', fn); acts.append(b); };
   const arr = sel.w !== 'gear' ? pkArr(sel.w) : null;
   if (T.eat && arr) btn('Eat', () => { dayEat(arr, sel.i); if (!arr[sel.i]) PK.sel = null; dayChanged(); }, true);
@@ -8540,48 +8571,12 @@ function renderPack() {
     }
   } else if (PK.tab === 'log') {
     out.push(...dayJournalHtml());
-  } else {
-    const known = DREC.filter(r => D.known.has(r.id));
-    const cats = el('div', 'pkcats'), ready = c => known.filter(r => r.g === c && canCraft(r) === true).length;
-    const has = DCATS.filter(c => known.some(r => r.g === c.id));
-    if (!PK.cat || !has.some(c => c.id === PK.cat)) PK.cat = (has.find(c => ready(c.id)) || has[0] || {}).id;
-    for (const c of has) {
-      const b = el('button', 'pkcat'); b.setAttribute('aria-pressed', PK.cat === c.id ? 'true' : 'false');
-      const n = ready(c.id), nw = known.some(r => r.g === c.id && D.fresh.has(r.id));
-      b.innerHTML = iconSvg(c.icon) + `<span>${c.n}</span>` + (n ? `<b>${n}</b>` : '') + (nw ? '<i class="new"></i>' : '');
-      b.addEventListener('click', () => { PK.cat = c.id; PK.open = null; renderPack(); }); cats.append(b);
-    }
-    out.push(cats);
-    if (!known.length) out.push(el('p', 'small none', 'Nothing yet. Pick up sticks, stones and fibre to learn your first recipes.'));
-    const list = el('div', 'pkrecs');
-    for (const r of known.filter(r => r.g === PK.cat)) {
-      const can = canCraft(r), open = PK.open === r.id, row = el('div', 'rec' + (can === true ? ' ready' : '') + (open ? ' open' : '') + (PK.flash && PK.flash.rid === r.id && performance.now() - PK.flash.at < 700 ? ' made' : ''));
-      const top = el('button', 'rtop'), ic = el('span', 'ricon'); ic.innerHTML = iconSvg(r.icon || r.out);
-      const tx = el('span', 'rtext'); tx.append(el('b', '', recName(r) + (r.n > 1 ? ` ×${r.n}` : '')), el('span', 'sh', recBlurb(r)));
-      const st = el('span', 'rst', can === true ? 'ready' : can || 'missing'); if (D.fresh.has(r.id)) top.append(el('i', 'new'));
-      top.append(ic, tx, st);
-      top.addEventListener('click', () => { PK.open = open ? null : r.id; D.fresh.delete(r.id); renderPack(); });
-      row.append(top);
-      if (open) {
-        const det = el('div', 'rdet'), costs = el('div', 'rcost');
-        for (const [k, n] of Object.entries(r.cost)) { const h = dayHave(k), c = el('span', 'chip' + (h < n ? ' no' : '')); c.innerHTML = iconSvg(k) + `<span>${DIT[k].n}</span><b>×${n}</b><i>${h < n ? `only ${h}` : `have ${h}`}</i>`; costs.append(c); }
-        const where = el('span', 'chip at' + (stationHere(r.at) ? '' : ' no')); where.innerHTML = iconSvg(r.at === 'fire' ? 'campfire' : r.at === 'bench' ? 'bench' : r.at === 'furnace' ? 'furnace' : r.at === 'rack' ? 'rack' : 'hand') + `<span>${AT_NAME[r.at]}</span>`; costs.append(where);
-        det.append(costs);
-        const go = el('div', 'rgo'), b1 = el('button', 'act main', 'Craft'); b1.disabled = can !== true; b1.addEventListener('click', () => dayCraft(r.id)); go.append(b1);
-        if (r.out && DIT[r.out].st > 1) { const b5 = el('button', 'act', 'Craft ×5'); b5.disabled = can !== true; b5.addEventListener('click', () => dayCraft(r.id, 5)); go.append(b5); }
-        det.append(go); row.append(det);
-      }
-      list.append(row);
-    }
-    out.push(list);
-    const left = DREC.length - known.length;
-    if (left) out.push(el('p', 'small none', `${left} more recipe${left > 1 ? 's' : ''} to find · new things you pick up teach you more`));
-  }
+  } else out.push(...craftHtml());   // v171: one list per place
   root.replaceChildren(...out);
   const card = PK.tab === 'pack' ? pkCard() : null, cw = document.getElementById('pkCard');
   cw.replaceChildren(...(card ? [card] : [])); cw.hidden = !card;
 }
-for (const b of document.querySelectorAll('#craft .pktab')) b.addEventListener('click', () => { PK.tab = b.dataset.tab; PK.sel = null; renderPack(); craftEl.scrollTop = 0; });
+for (const b of document.querySelectorAll('#craft .pktab')) b.addEventListener('click', () => { if (b.dataset.tab === 'craft' && PK.tab !== 'craft') PK.at = craftPlaceNow(); PK.tab = b.dataset.tab; PK.sel = null; renderPack(); craftEl.scrollTop = 0; });
 
 // ---- v132 (Joe): Daylight saves. Each save slot keeps one run; it saves every few seconds and when you leave, and your
 // death ends the run and clears it (your best day is kept). Continue it from the Extras tile. v151: save version 2, the slot pack;
@@ -8640,6 +8635,88 @@ function dayLoad(sv) {                          // pick a saved run back up wher
 }
 addEventListener('pagehide', () => daySave());
 document.addEventListener('visibilitychange', () => { if (document.hidden) daySave(); });
+
+// ---- v171 (Joe): crafting you can read at a glance. One list per place (by hand, fire, workbench, furnace, rack), every
+// material shown with have/need on the row, ready things first, and a line saying how to get a station you haven't got ----
+const PLACES = [{ at: 'hand', n: 'Hand', ic: 'hand' }, { at: 'fire', n: 'Fire', ic: 'campfire' }, { at: 'bench', n: 'Workbench', ic: 'bench' }, { at: 'furnace', n: 'Furnace', ic: 'furnace' }, { at: 'rack', n: 'Rack', ic: 'rack' }];
+const PLACE_BUILD = { bench: 'bench', furnace: 'furnace', rack: 'rack', fire: 'campfire' };   // the recipe that makes each station
+function craftPlaceNow() {   // the station you're standing at, if any: the best one first
+  for (const at of ['furnace', 'bench', 'rack', 'fire']) if (stationHere(at) && DREC.some(r => r.at === at && S.day.known.has(r.id))) return at;
+  return 'hand';
+}
+function placeHint(at) {   // you're not at it: how to get there
+  if (at === 'fire') return 'Stand by a campfire, or in camp, to cook';
+  const n = { bench: 'workbench', furnace: 'furnace', rack: 'drying rack' }[at];
+  if (S.day.builds.some(B => B.t === at)) return `Walk up to your ${n} and press Use`;
+  const r = DREC.find(x => x.id === PLACE_BUILD[at]), where = r ? AT_NAME[r.at].toLowerCase() : '';
+  return `You haven't built a ${n} yet · make one ${where}, under Stations`;
+}
+function craftHtml() {
+  const D = S.day, el = pkEl, out = [], known = DREC.filter(r => D.known.has(r.id));
+  if (!known.length) return [el('p', 'small none', 'Nothing yet. Pick up sticks, stones and fibre to learn your first recipes.')];
+  const places = PLACES.filter(P => known.some(r => r.at === P.at));
+  if (!places.some(P => P.at === PK.at)) PK.at = places[0].at;
+  const bar = el('div', 'pkplaces');
+  for (const P of places) {
+    const here = stationHere(P.at), n = known.filter(r => r.at === P.at && canCraft(r) === true).length, nw = known.some(r => r.at === P.at && D.fresh.has(r.id));
+    const b = el('button', 'pkplace' + (here ? ' here' : '')); b.setAttribute('aria-pressed', PK.at === P.at ? 'true' : 'false');
+    b.innerHTML = iconSvg(P.ic) + `<span>${P.n}</span>` + (n ? `<b>${n}</b>` : '') + (nw ? '<i class="new"></i>' : '');
+    b.addEventListener('click', () => { PK.at = P.at; PK.open = null; renderPack(); }); bar.append(b);
+  }
+  out.push(bar);
+  const at = PK.at, here = stationHere(at), P = PLACES.find(x => x.at === at);
+  out.push(el('p', 'pkwhere' + (here ? ' ok' : ''), here ? (at === 'hand' ? 'Made anywhere, from what you carry' : `You're at the ${P.n.toLowerCase()}`) : placeHint(at)));
+  const rank = r => { const c = canCraft(r); return c === true ? 0 : c === '' ? 1 + craftShort(r) / 100 : 3; };
+  for (const C of DCATS) {
+    const list = known.filter(r => r.at === at && r.g === C.id).sort((x, y) => rank(x) - rank(y));
+    if (!list.length) continue;
+    out.push(el('h3', '', C.n));
+    const box = el('div', 'pkrecs');
+    for (const r of list) box.append(craftRow(r, here));
+    out.push(box);
+  }
+  const left = DREC.length - known.length;
+  if (left) out.push(el('p', 'small none', `${left} more recipe${left > 1 ? 's' : ''} to find · new things you pick up teach you more`));
+  return out;
+}
+const craftShort = r => Object.entries(r.cost).reduce((a, [k, n]) => a + Math.max(0, n - dayHave(k)), 0);
+function craftRow(r, here) {
+  const D = S.day, el = pkEl, can = canCraft(r), open = PK.open === r.id;
+  const row = el('div', 'rec' + (can === true ? ' ready' : '') + (open ? ' open' : '') + (here ? '' : ' away') + (PK.flash && PK.flash.rid === r.id && performance.now() - PK.flash.at < 700 ? ' made' : ''));
+  const top = el('div', 'rtop'), ic = el('span', 'ricon'); ic.innerHTML = iconSvg(r.icon || r.out);
+  const tx = el('span', 'rtext'); tx.append(el('b', '', recName(r) + (r.n > 1 ? ` ×${r.n}` : '')), el('span', 'sh', recBlurb(r)));
+  if (D.fresh.has(r.id)) top.append(el('i', 'new'));
+  const go = el('button', 'act main rgo1', 'Craft'); go.disabled = can !== true;
+  if (can === 'pack full' || can === 'not now') go.textContent = can === 'pack full' ? 'Full' : 'Not now';
+  go.addEventListener('click', e => { e.stopPropagation(); D.fresh.delete(r.id); dayCraft(r.id); });
+  top.append(ic, tx, go);
+  top.addEventListener('click', () => { PK.open = open ? null : r.id; D.fresh.delete(r.id); renderPack(); });
+  const costs = el('div', 'rneed');
+  for (const [k, n] of Object.entries(r.cost)) { const h = dayHave(k), c = el('span', 'need1' + (h < n ? ' no' : '')); c.title = DIT[k].n; c.innerHTML = iconSvg(k) + (h < n ? `<span>${h}/${n}</span>` : `<span>${n}</span><i>✓</i>`); costs.append(c); }
+  row.append(top, costs);
+  if (open) {
+    const det = el('div', 'rdet'), T = r.out && DIT[r.out];
+    const names = Object.entries(r.cost).map(([k, n]) => { const h = dayHave(k); return `${n} ${DIT[k].n.toLowerCase()}${h < n ? ` <em>(need ${n - h} more)</em>` : ''}`; }).join(', ');
+    const p = el('p', 'rlong'); p.innerHTML = `Takes ${names}.` + (T && T.dmg && T.tool === 'weapon' ? ` Damage ×${T.dmg}.` : '') + (T && T.dur ? ` Lasts ${T.dur} uses.` : ''); det.append(p);
+    if (r.out && DIT[r.out].st > 1) { const g2 = el('div', 'rgo'), b5 = el('button', 'act', 'Craft ×5'); b5.disabled = can !== true; b5.addEventListener('click', () => dayCraft(r.id, 5)); g2.append(b5); det.append(g2); }
+    row.append(det);
+  }
+  return row;
+}
+const MAT_GET = { sticks: 'pick them up off the ground, or chop down a tree', stones: 'pick them up off the ground, or break a rock', fibre: 'hit tall grass',
+  logs: 'chop down a tree with an axe', flint: 'break a rock with a pick', hide: 'hunt deer, boar, wolves or bears', bone: 'hunt boar, wolves or bears',
+  ironore: 'break rock in the deep woods with a flint pick or better', meat: 'hunt animals', fish: 'fish at a pond with a rod', berries: 'pick them from bushes' };
+function itemGet(id) {   // where more of this comes from
+  const r = DREC.find(x => x.out === id && S.day.known.has(x.id)), bits = [];
+  if (MAT_GET[id]) bits.push(MAT_GET[id]);
+  if (r) bits.push(`make it ${AT_NAME[r.at].toLowerCase()}`);
+  return bits.length ? bits.join(', or ') : '';
+}
+function itemUses(id) {   // what you can make with it (that you know of)
+  const L = DREC.filter(r => S.day.known.has(r.id) && r.cost[id]).map(recName);
+  if (!L.length) return '';
+  return L.slice(0, 5).join(', ') + (L.length > 5 ? ` and ${L.length - 5} more` : '');
+}
 // ---- v152 stage 2 (Joe): the base builder. Hold the hammer and pieces snap to a grid: floors in a cell, walls, doorways and
 // windows on a cell's edge. What you put down is a blueprint, and every swing of the hammer works one more material into it until it
 // stands, the way The Forest builds a shelter. Three tiers of wall, each far tougher. Raiders come for your walls and doors.
