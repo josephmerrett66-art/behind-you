@@ -582,7 +582,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 188</p>
+      <p class="small" id="verLbl">Version 189</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7665,6 +7665,22 @@ const DIT = {
   knife3: { n: 'Iron knife', c: IRON_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'knife', fam: 'knife', hc: IRON_HEAD, dmg: 1.45, dur: 280, b: 'Knife · a hunter\'s blade' },
   sword1: { n: 'Bone sword', c: '#e6dfcc', st: 1, k: 'tool', tool: 'weapon', wpn: 'sword', fam: 'sword', hc: '#e6dfcc', dmg: 1.45, dur: 160, b: 'Sword · cuts both ways, then a spin · parry' },
   sword2: { n: 'Iron sword', c: IRON_HEAD, st: 1, k: 'tool', tool: 'weapon', wpn: 'sword', fam: 'sword', hc: IRON_HEAD, dmg: 1.9, dur: 340, b: 'Sword · the all-rounder, in good iron · parry' },
+  bow1: { n: 'Short bow', c: '#9a7040', st: 1, k: 'tool', tool: 'bow', rng: 'bow', bw: '#9a7040', dmg: 1.0, dur: 90, b: 'Bow · hold to draw, let go to loose · needs arrows' },   // v189: weapons stage 2, ranged
+  bow2: { n: 'Bone bow', c: '#d8cfb8', st: 1, k: 'tool', tool: 'bow', rng: 'bow', bw: '#cfc6ae', dmg: 1.35, dur: 170, b: 'Bow · horn and bone, a hard pull and a long flight' },
+  bow3: { n: 'War bow', c: '#6e4a2c', st: 1, k: 'tool', tool: 'bow', rng: 'bow', bw: '#5e3e24', tip: IRON_HEAD, dmg: 1.8, dur: 300, b: 'Bow · iron-tipped yew, it drops a raider at forty paces' },
+  sling1: { n: 'Hide sling', c: '#a07850', st: 1, k: 'tool', tool: 'sling', rng: 'sling', dmg: 0.85, dur: 90, b: 'Sling · hold to whirl it, let go to throw · stones or sling shot' },
+  sling2: { n: 'Braided sling', c: '#c8b07a', st: 1, k: 'tool', tool: 'sling', rng: 'sling', dmg: 1.2, dur: 200, b: 'Sling · a long braided cord, it hurls hard and stuns' },
+  arrows: { n: 'Flint arrows', c: FLINT_HEAD, st: 20, k: 'mat', ammo: 'bow', am: 1, b: 'Arrows · for any bow · the first arrows in your pack are the ones you shoot' },
+  arrowsB: { n: 'Bone arrows', c: '#e6dfcc', st: 20, k: 'mat', ammo: 'bow', am: 1.2, bleed: 1, b: 'Arrows · barbed bone, they bleed' },
+  arrowsI: { n: 'Iron arrows', c: IRON_HEAD, st: 20, k: 'mat', ammo: 'bow', am: 1.55, pierce: 1, b: 'Arrows · bodkin points, they go through one and on into the next' },
+  arrowsF: { n: 'Fire arrows', c: '#e2763a', st: 20, k: 'mat', ammo: 'bow', am: 1.1, fire: 1, b: 'Arrows · pitch-soaked, they set what they hit alight' },
+  shot: { n: 'Sling shot', c: '#9a9893', st: 20, k: 'mat', ammo: 'sling', am: 1.25, b: 'Round stones for a sling · plain stones fly too, but not as true' },
+  quiver: { n: 'Quiver', c: '#8a5a3a', st: 1, k: 'mat', b: 'Carried in your pack, arrows stack 60 to a slot instead of 20' },
+  pouch: { n: 'Shot pouch', c: '#a07850', st: 1, k: 'mat', b: 'Carried in your pack, sling shot stacks 60 to a slot instead of 20' },
+  jav: { n: 'Javelin', c: FLINT_HEAD, st: 4, k: 'tool', tool: 'throw', thr: 'jav', dmg: 2.4, b: 'Throw it · it goes through the first one · go and get it back' },
+  taxe: { n: 'Throwing axe', c: STONE_HEAD, st: 3, k: 'tool', tool: 'throw', thr: 'taxe', dmg: 3.0, b: 'Throw it · it spins end over end and hits like a felling blow' },
+  pbomb: { n: 'Pitch bomb', c: '#3a2a1a', st: 5, k: 'tool', tool: 'throw', thr: 'bomb', dmg: 1, b: 'Throw it · it bursts into a pool of fire' },
+  flash: { n: 'Flash powder', c: '#efe6d2', st: 5, k: 'tool', tool: 'throw', thr: 'flash', dmg: 2, b: 'Throw it · a white burst that burns everything near and stuns it' },
   sack: { n: 'Grass sack', c: '#a8b86a', st: 1, k: 'gear', slot: 'back', bag: 8, b: 'Wear on your back · 8 more slots' },
   pack: { n: 'Hide pack', c: '#a07850', st: 1, k: 'gear', slot: 'back', bag: 16, b: 'Wear on your back · 16 more slots' },
   hood: { n: 'Hide hood', c: '#a07850', st: 1, k: 'gear', slot: 'head', arm: 1, b: 'Armour · soaks one hit, then mends' },
@@ -7711,6 +7727,22 @@ const DREC = [
   { id: 'knife3', g: 'wpn', out: 'knife3', at: 'furnace', cost: { iron: 2, hide: 1 } },
   { id: 'sword1', g: 'wpn', out: 'sword1', at: 'bench', cost: { bone: 6, planks: 1, hide: 2, rope: 1 } },
   { id: 'sword2', g: 'wpn', out: 'sword2', at: 'furnace', cost: { iron: 5, planks: 1, hide: 1 } },
+  { id: 'bow1', g: 'wpn', out: 'bow1', at: 'hand', cost: { sticks: 3, rope: 2 } },   // v189: ranged
+  { id: 'bow2', g: 'wpn', out: 'bow2', at: 'bench', cost: { planks: 2, bone: 3, rope: 2 } },
+  { id: 'bow3', g: 'wpn', out: 'bow3', at: 'furnace', cost: { iron: 2, planks: 3, hide: 1, rope: 2 } },
+  { id: 'sling1', g: 'wpn', out: 'sling1', at: 'hand', cost: { hide: 1, fibre: 3 } },
+  { id: 'sling2', g: 'wpn', out: 'sling2', at: 'bench', cost: { rope: 3, hide: 2 } },
+  { id: 'arrows', g: 'wpn', out: 'arrows', n: 6, at: 'hand', cost: { sticks: 3, flint: 1, fibre: 2 } },
+  { id: 'arrowsB', g: 'wpn', out: 'arrowsB', n: 6, at: 'bench', cost: { sticks: 3, bone: 1, fibre: 2 } },
+  { id: 'arrowsI', g: 'wpn', out: 'arrowsI', n: 8, at: 'furnace', cost: { sticks: 4, iron: 1 } },
+  { id: 'arrowsF', g: 'wpn', out: 'arrowsF', n: 4, at: 'fire', cost: { arrows: 4, fibre: 2, logs: 1 } },
+  { id: 'shot', g: 'wpn', out: 'shot', n: 5, at: 'hand', cost: { stones: 3 } },
+  { id: 'quiver', g: 'gear', out: 'quiver', at: 'bench', cost: { hide: 2, rope: 1, sticks: 2 } },
+  { id: 'pouch', g: 'gear', out: 'pouch', at: 'hand', cost: { hide: 1, fibre: 3 } },
+  { id: 'jav', g: 'wpn', out: 'jav', n: 2, at: 'hand', cost: { sticks: 4, flint: 2, fibre: 2 } },
+  { id: 'taxe', g: 'wpn', out: 'taxe', n: 2, at: 'bench', cost: { planks: 1, flint: 3, rope: 1 } },
+  { id: 'pbomb', g: 'wpn', out: 'pbomb', n: 2, at: 'fire', cost: { logs: 1, fibre: 3, hide: 1 } },
+  { id: 'flash', g: 'wpn', out: 'flash', n: 2, at: 'fire', cost: { bone: 2, flint: 1, fibre: 1 } },
   { id: 'sack', g: 'gear', out: 'sack', at: 'hand', cost: { fibre: 10, rope: 2 } },
   { id: 'skin', g: 'gear', out: 'skin', at: 'hand', cost: { hide: 2, rope: 1 } },
   { id: 'pack', g: 'gear', out: 'pack', at: 'bench', cost: { hide: 4, rope: 3, sticks: 4 } },
@@ -7781,7 +7813,7 @@ function dayStam(cost) {                       // spend stamina, or say you're s
   if (D.st < cost) { dayNote('tired', 'too tired', 1.5); sfx(0.6, 0.25, 'lowpass', 300, 0.2); return false; }
   D.st -= cost; D.stT = 0; return true;
 }
-const dayMoveK = () => (S.day && S.day.st < 15 ? 0.78 : 1) * (S.day && S.day.crouch ? SNEAK_SPEED : 1);   // v178: crouched, you creep
+const dayMoveK = () => (S.day && S.day.st < 15 ? 0.78 : 1) * (S.day && S.day.crouch ? SNEAK_SPEED : 1) * (S.day && S.day.draw ? 0.55 : 1);   // v189: you walk while you draw   // v178: crouched, you creep
 
 // ---- slots: { id, n } and, for things that wear, d (uses left); a waterskin keeps w (drinks in it) ----
 const invSize = (D = S.day) => BASE_SLOTS + (D.gear.back ? DIT[D.gear.back.id].bag : 0);
@@ -7983,6 +8015,8 @@ function dayFill() {                             // every waterskin you carry, f
 // ---- the button you press: on what's in your hand ----
 function dayVerb() {
   const T = heldIt(); if (!T) return 'Attack';
+  if (T.rng) return S.day.draw ? 'Loose' : T.rng === 'bow' ? 'Draw' : 'Whirl';   // v189
+  if (T.thr) return 'Throw';
   if (T.tool === 'build') { const D = S.day; if (D.bdel) return stAimed() ? 'Pull down' : 'Point at it'; const g = stGhost(); if (g && g.ok) return 'Place'; const o = stWorkTarget(); return o ? (o.done ? 'Mend' : 'Build') : 'Place'; }
   if (T.tool === 'rod') { const F = S.day.fish; return F ? (F.st === 'bite' ? 'Pull!' : 'Reel in') : 'Cast'; }
   if (T.k === 'med') return 'Bind';
@@ -7990,6 +8024,8 @@ function dayVerb() {
 }
 function dayPrimary() {                          // true when what you hold is used, not swung
   const D = S.day, T = heldIt(); if (!T) return false;
+  if (T.rng) return dayDrawStart();               // v189: bows and slings are drawn, not swung
+  if (T.thr) return dayThrowStart();
   if (S.p.act && (T.k === 'food' || T.k === 'drink')) return true;   // one mouthful at a time
   if (T.tool === 'build') {                       // the hammer: lay out a blueprint, work a material into one, or mend what's standing
     if (S.p.act) return true;
@@ -8305,6 +8341,9 @@ const ICON = (() => {
   const waxe = h => `<path d="M5 21.5L17.5 5" stroke="#6b4a2e" stroke-width="2.3" stroke-linecap="round"/><path d="M13.5 2.5c4.2 0 7.6 2.6 8.4 6.6l-6.4 2.4-4.6-5.4z" fill="${h}"/><path d="M16 11.3l5.8-2.2" stroke="#fff" stroke-width=".8" opacity=".6"/><path d="M7 18.5l2 1.6" stroke="#8a2f22" stroke-width="2.6"/>`;
   const knife = h => `<path d="M4 20l5-5" stroke="#3a2a1a" stroke-width="2.6" stroke-linecap="round"/><path d="M8.5 15.5l9.5-11c1.6 2.6 1 6-1.4 8.6l-6 4.3z" fill="${h}"/><path d="M10 15l8-10" stroke="#fff" stroke-width=".6" opacity=".6"/>`;
   const sword = h => `<path d="M3.8 20.2l3.4-3.4" stroke="#3a2a1a" stroke-width="2.6" stroke-linecap="round"/><path d="M4.6 14.2l5.2 5.2" stroke="#8a7a5a" stroke-width="1.8" stroke-linecap="round"/><path d="M8.6 16.6L20.5 3.5l-.4 2.8L10.2 18.2z" fill="${h}"/><circle cx="3.4" cy="20.6" r="1.3" fill="#8a7a5a"/>`;
+  const bow = (c, t) => `<path d="M6 3.5c7 2.5 9.5 9.5 5.5 17" stroke="${c}" stroke-width="2.2" fill="none" stroke-linecap="round"/>${t ? `<g fill="${t}"><circle cx="6" cy="3.5" r="1.2"/><circle cx="11.5" cy="20.5" r="1.2"/></g>` : ''}<path d="M6 3.5L11.5 20.5" stroke="#efe6d2" stroke-width=".7"/><path d="M8.6 12.2l11-3.2" stroke="#a08a62" stroke-width="1.1"/><path d="M19.6 9l-2.4-.9.7 2.5z" fill="#4d5560"/>`;   // v189
+  const sling = c => `<path d="M4 4.5c2 5 5 8.5 8 10.5M20 4.5c-2 5-5 8.5-8 10.5" stroke="${c}" stroke-width="1.5" fill="none"/><ellipse cx="12" cy="16.5" rx="4" ry="2.8" fill="${c}"/><circle cx="12" cy="16" r="1.8" fill="#9a9893"/><circle cx="4" cy="4.5" r="1.4" fill="${c}"/>`;
+  const arrows = h => `<g stroke="#a08a62" stroke-width="1.3" stroke-linecap="round"><path d="M4 20L17 7"/><path d="M7 21.5L19.5 9"/><path d="M3 17L15 5"/></g><g fill="${h}"><path d="M17 7l3.2-2.6-.8 3.8zM19.5 9l3-2.4-.7 3.6zM15 5l3-2.6-.7 3.6z"/></g><g fill="#efe6d2"><path d="M4 20l-1.6-.2.4-1.6 1.8.6zM7 21.5l-1.6-.2.4-1.6 1.8.6zM3 17l-1.6-.2.4-1.6 1.8.6z"/></g>`;
   const club = c => `<path d="M5 20.5l7-9" stroke="${c}" stroke-width="2.6" stroke-linecap="round"/><path d="M11 12.5c-1.5-3.5 1-7.5 4.3-8.5s5.6 2 4.6 5.4-5.3 5.4-8.9 3.1z" fill="${c}"/>`;
   return {
     sticks: '<g stroke="#8a6a44" stroke-width="2.2" stroke-linecap="round"><path d="M4 18L19 7"/><path d="M5 20.5l14.5-4.5"/><path d="M5.5 12.5l11 5"/></g><path d="M9.5 14.2l-1.5-2.4" stroke="#8a6a44" stroke-width="1.4" stroke-linecap="round"/>',
@@ -8329,6 +8368,16 @@ const ICON = (() => {
     sclub: club('#5e4630') + '<g fill="#4d5560"><path d="M14 3.2l1.2-2 .6 2.3zM20 7l2.2-.4-1.6 1.8zM19.5 12l1.8 1.3-2.3.1zM10.6 6l-2-.8 2.1-.6z"/></g>',
     maul: '<path d="M5 20.5l8-10" stroke="#7a5a3a" stroke-width="2.4" stroke-linecap="round"/><rect x="11" y="3" width="10" height="8" rx="2.5" fill="#8d8b85" transform="rotate(-38 16 7)"/><path d="M12.4 10.4l2.6 2" stroke="#c8b07a" stroke-width="1.6"/>',
     mace: '<path d="M5 20.5l7-9" stroke="#5a5a56" stroke-width="2.4" stroke-linecap="round"/><circle cx="15.5" cy="8.5" r="4.6" fill="#9aa0a6"/><g fill="#d8dce0"><path d="M15.5 1.8l1.2 2.4h-2.4zM22.2 8.5l-2.4 1.2V7.3zM15.5 15.2l-1.2-2.4h2.4zM9.3 6.5l2.4-.2-1.3 2z"/></g>',
+    bow1: bow('#9a7040'), bow2: bow('#cfc6ae'), bow3: bow('#5e3e24', '#b8bcc0'),   // v189
+    sling1: sling('#a07850'), sling2: sling('#c8b07a'),
+    arrows: arrows('#4d5560'), arrowsB: arrows('#e6dfcc'), arrowsI: arrows('#b8bcc0'), arrowsF: arrows('#e2763a') + '<g fill="#ffb050"><path d="M5 9c1-1.5 2.4-1.8 2-3.4 1.4 1 1.6 2.6.6 3.8z"/><path d="M9 7c1-1.5 2.4-1.8 2-3.4 1.4 1 1.6 2.6.6 3.8z"/></g>',
+    shot: '<g fill="#9a9893"><circle cx="8" cy="15" r="3.2"/><circle cx="15.5" cy="15.5" r="3"/><circle cx="12" cy="9.5" r="3.1"/></g><g fill="#c8c6c0" opacity=".7"><circle cx="7" cy="14" r="1"/><circle cx="14.6" cy="14.5" r=".9"/><circle cx="11" cy="8.5" r="1"/></g>',
+    quiver: '<path d="M7 4.5l9 1.5-1.8 15.5H8.4z" fill="#8a5a3a"/><path d="M7.5 9l8.5 1.4M8 16l7 1" stroke="#5e3e24" stroke-width="1.2"/><g stroke="#c8b07a" stroke-width="1.1"><path d="M9 4.5l-.8-3M11.5 4.8l.2-3.3M14 5.2l1.2-3"/></g><g fill="#e2dccb"><path d="M7 1.5l1.6-.6.4 1.8zM10.8 1.4l1.6.1-.6 1.6zM14.6 2.1l1.6.6-1.1 1.3z"/></g>',
+    pouch: '<path d="M6 8.5c-1.8 3-2 7 0 9.6 2.6 2.8 9.4 2.8 12 0 2-2.6 1.8-6.6 0-9.6z" fill="#a07850"/><path d="M6 8.5h12" stroke="#6e5235" stroke-width="2"/><path d="M8 8.5c0-2.4 1.6-4 4-4s4 1.6 4 4" stroke="#c8b07a" stroke-width="1.2" fill="none"/><g fill="#9a9893"><circle cx="10" cy="14" r="1.5"/><circle cx="13.8" cy="14.8" r="1.3"/></g>',
+    jav: spear('#4d5560') + '<path d="M2.5 21.5l2.5-1.2-1.2 2.5z" fill="#c8b07a"/>',
+    taxe: '<path d="M7 20l7.5-10.5" stroke="#7a5a3a" stroke-width="2" stroke-linecap="round"/><path d="M12.5 6.5c2.8-1.2 6-.4 7.6 2l-4 3.6-3.6-3.2z" fill="#8d8b85"/><path d="M5.2 13.5a8 8 0 0 1 3.4-6.8M17.5 18.5a8 8 0 0 1-6.6 2.2" stroke="#efe6d2" stroke-width="1" fill="none" opacity=".55" stroke-dasharray="1.4 1.6"/>',
+    pbomb: '<ellipse cx="12" cy="14.5" rx="6.6" ry="6" fill="#3a2a1a"/><path d="M9 8.6h6v2.2H9z" fill="#5e3e24"/><path d="M12 8.6c0-2 .8-3.6 2.6-4.6" stroke="#c8b07a" stroke-width="1.2" fill="none"/><circle cx="15" cy="3.8" r="1.6" fill="#ffb050"/><path d="M8.5 13c1-1.6 2.6-2.4 4.4-2.4" stroke="#7a5a3a" stroke-width="1" fill="none"/>',
+    flash: '<path d="M7 9c-1.6 2.6-1.8 6 0 8.4 2.4 2.6 7.6 2.6 10 0 1.8-2.4 1.6-5.8 0-8.4z" fill="#efe6d2"/><path d="M7 9h10" stroke="#bfb8a6" stroke-width="1.8"/><path d="M12 2.5l.9 2.6 2.6.1-2.1 1.6.8 2.6-2.2-1.5-2.2 1.5.8-2.6-2.1-1.6 2.6-.1z" fill="#fff4c8"/>',
     knife1: knife(FLINT_HEAD), knife2: knife('#e6dfcc'), knife3: knife(IRON_HEAD), sword1: sword('#e6dfcc'), sword2: sword(IRON_HEAD),
     bonec: club('#e6dfcc') + '<g fill="#e6dfcc"><circle cx="19" cy="5" r="1.6"/><circle cx="20.5" cy="9.5" r="1.4"/><circle cx="13.5" cy="4" r="1.3"/></g><path d="M5 20.5l7-9" stroke="#a07850" stroke-width="2.6" stroke-dasharray="1.6 1.4"/>',
     sack: '<path d="M8 6.5c-3 3-4.2 7-4.2 10 0 3 3.2 4.8 8.2 4.8s8.2-1.8 8.2-4.8c0-3-1.2-7-4.2-10z" fill="#a8b86a"/><path d="M8 6.5h8" stroke="#6e7a3a" stroke-width="2.2"/><path d="M8.5 12c1 3 0 5-1 7M15.5 12c-1 3 0 5 1 7" stroke="#8a9a52" stroke-width=".9" fill="none"/>',
@@ -8636,6 +8685,7 @@ function daySelect(i) {
 function slotInner(s) {
   if (!s) return '';
   const T = DIT[s.id];
+  if (T.rng && S && S.day) return iconSvg(s.id) + `<span class="n">${dayAmmoN(T.rng)}</span>` + (s.d !== undefined ? `<i class="dur${s.d / T.dur < 0.25 ? ' low' : ''}" style="--f:${Math.max(0.02, s.d / T.dur).toFixed(3)}"></i>` : '');   // v189: a bow shows the arrows you carry
   return iconSvg(s.id) + (s.n > 1 ? `<span class="n">${s.n}</span>` : '') + (T.k === 'drink' ? `<span class="n">${s.w}/${SKIN_SIPS}</span>` : '')
     + (s.d !== undefined ? `<i class="dur${s.d / T.dur < 0.25 ? ' low' : ''}" style="--f:${Math.max(0.02, s.d / T.dur).toFixed(3)}"></i>` : '');
 }
@@ -10438,7 +10488,7 @@ function drawPickHints(px, py) {
     const s = 17 * Z, by = y - (17 + 2.5 * Math.sin(S.t * 2.5 + o.x)) * Z;
     ctx.globalAlpha = (how === 'take' ? 0.4 : 0.25) + 0.55 * f; ctx.drawImage(img, x - s / 2, by - s, s, s); ctx.globalAlpha = 1;
   }
-  if (!tgt) {                                    // nothing to take: name the grass or bush a swing would gather from
+  if (!tgt && !(heldIt() && (heldIt().rng || heldIt().thr))) {   // nothing to take: name the grass or bush a swing would gather from (not with a bow or a throwable in hand, v189)
     const h = dayHitTarget();
     if (h) { const [x, y] = toScreen(h.x, h.y); dayTag(x, y - 20 * Z, (PAD.on || COARSE() ? '' : 'CLICK · ') + 'HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES'), 'rgba(200,235,180,0.92)'); if (PAD.on) { ctx.font = '600 10px "IBM Plex Mono", monospace'; padGlyph(0, x - (ctx.measureText('HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES')).width + 8) / 2 - 13, y - 20 * Z - 7); } }
   }
@@ -11018,6 +11068,7 @@ const dArmOn = () => !!dayArmId();
 const DSP = {   // each family's special: its name on the button, and how long before it's back
   twin: { n: 'Throw', cool: 1.6, st: 14 }, axe: { n: 'Whirl', cool: 5, st: 24 }, club: { n: 'Quake', cool: 6, st: 28 },
   knife: { n: 'Vanish', cool: 6, st: 18 }, sword: { n: 'Parry', cool: 1.3, st: 10 },
+  bow: { n: 'Volley', cool: 6, st: 20 }, sling: { n: 'Heavy', cool: 5, st: 18 },   // v189
 };
 let WPH = null, WPB = null, WPS = null;   // while a Daylight weapon is drawn: its head or blade colour, a club's body, a club's studs
 function dArmInit() {
@@ -11051,6 +11102,7 @@ const DSP_QUAKE = { dur: 0.72, lunge: 40, moveT: [0.04, 0.3], hopT: [0.04, 0.33]
 const DSP_RIPOSTE = { dur: 0.42, lunge: 20, moveT: [0.02, 0.14], hitAt: 0.1, reach: 96, arc: 7, round: 1, dmg: 2.2, boss: 3.2, knock: 60, shake: 0.55, stop: 0.14, kick: 10, kh: 'riposte', fin: 'RIPOSTE' };
 function daySpecial() {
   dArmInit();
+  { const rk = dayRngId(); if (rk) return daySpecialRng(rk); }   // v189
   const rg = S.rg, p = S.p, w = dayArmId(), D = S.day;
   if (!w || !S.running || rg.phase !== 'fight' || rg.drink) return;
   if ((rg.wspT || 0) > 0 || p.wact) return wpDenied();
@@ -11124,10 +11176,12 @@ function daySpearStep(dt) {
 function dayArmTick(dt) {
   dArmInit();
   const rg = S.rg;
+  dayDrawTick(dt); if (rg.rngCd > 0 && !rg.dshots) rg.rngCd -= dt; dayShotStep(dt);   // v189
   if (rg.dparry && (rg.dparry.t += dt) > rg.dparry.win) rg.dparry = null;
   daySpearStep(dt);
 }
 function dayArmFx() {   // the thrown spear in flight
+  dayShotFx();   // v189
   const rg = S.rg; if (!rg || !rg.dspears) return;
   for (const q of rg.dspears) {
     if (q.land) continue;
@@ -11144,6 +11198,252 @@ function dayArmFx() {   // the thrown spear in flight
 function dayArmTint() {   // the held weapon's own materials, for the shared weapon drawings
   const T = heldIt(); WPH = T && T.hc && COLOUR ? T.hc : null; WPB = T && T.bc ? (COLOUR ? T.bc : '#6a6a66') : null; WPS = T && T.spikes ? (COLOUR ? T.spikes : '#c8c8c2') : null;
 }
+// ---- v189 Daylight weapons, stage 2: the ranged weapons. Bows and slings are held and loosed: press to draw (or to start the sling
+// whirling), hold to build the shot, let go to fire. The longer the draw, the harder and further it goes; a full draw flashes and
+// ticks so you can feel it without looking. Arrows and shot come out of your pack (the first stack of them), a miss can often be
+// picked back up, and a quiver or a pouch carried in the pack lets them stack three times as deep. Throwables sit in the hotbar
+// beside them: javelins and throwing axes you go and fetch, pitch bombs that burst into fire, and flash powder that burns and stuns.
+// Second button: the bow looses a volley of three, the sling a heavy stunning shot.
+const RNG = {
+  bow: { full: 0.75, base: 1.7, sp: [620, 1180], rng: [250, 600], st: 6, snd: 'bow' },
+  sling: { full: 0.55, base: 1.35, sp: [520, 900], rng: [210, 440], st: 5, snd: 'sling' },
+};
+const AMMO = { bow: ['arrows', 'arrowsB', 'arrowsI', 'arrowsF'], sling: ['shot', 'stones'] };
+for (const [k, holder] of [['arrows', 'quiver'], ['arrowsB', 'quiver'], ['arrowsI', 'quiver'], ['arrowsF', 'quiver'], ['shot', 'pouch']])   // a quiver or a pouch in the pack: three times as many to a slot
+  Object.defineProperty(DIT[k], 'st', { get: () => (S && S.day && S.day.inv && S.day.inv.some(s => s && s.id === holder)) ? 60 : 20, configurable: true });
+const dayRngId = () => { if (!S || !S.day || !S.rg) return null; const T = heldIt(); return T && T.rng ? T.rng : null; };
+function dayAmmo(kind) {                          // the first stack of shot this weapon takes, in pack order (so you choose by where you keep them)
+  const D = S.day, ids = AMMO[kind];
+  for (const s of D.inv) if (s && ids.includes(s.id) && s.n > 0) return s;
+  return null;
+}
+const dayAmmoN = kind => S.day.inv.reduce((a, s) => a + (s && AMMO[kind].includes(s.id) ? s.n : 0), 0);
+function dayAmmoUse(s) { s.n--; if (s.n <= 0) { const i = S.day.inv.indexOf(s); if (i >= 0) S.day.inv[i] = null; } dayChanged(); }
+function dayDrawStart() {                         // press: nock an arrow, or start the sling turning
+  const D = S.day, p = S.p, kind = dayRngId(); if (!kind || D.draw || p.act) return true;
+  if ((S.rg.rngCd || 0) > 0) return true;
+  if (!dayAmmo(kind)) { dayNote('noammo', kind === 'bow' ? 'no arrows · make some at a fire or a bench' : 'nothing to throw · stones or sling shot', 2); if (actx) toneAt(actx.currentTime, 300, 0.08, 0.04, 'square', sfxGain); return true; }
+  if (D.st < RNG[kind].st) { dayStam(RNG[kind].st); return true; }
+  D.draw = { kind, t: 0, full: false, a: S.aimW || 0 };
+  p.wact = { pose: kind === 'bow' ? WPP.bow0 : WPP.lnS, t: 0, dur: 1, a: D.draw.a, hold: 1 };
+  if (actx) { const t = actx.currentTime; if (kind === 'bow') { noiseAt(t, 900, 400, 0.25, 0.12, sfxGain); toneAt(t, 140, 0.25, 0.02, 'triangle', sfxGain); } else noiseAt(t, 500, 300, 0.12, 0.1, sfxGain); }
+  return true;
+}
+function dayDrawTick(dt) {                        // held: the draw builds; the bow creaks, the sling hums faster and faster
+  const D = S.day, p = S.p, W = D.draw; if (!W) return;
+  if (dayRngId() !== W.kind || p.act || S.rg.phase !== 'fight') { D.draw = null; if (p.wact && p.wact.hold) p.wact = null; return; }
+  const R = RNG[W.kind]; W.t += dt; W.a = S.aimW || 0;
+  const c = Math.min(1, W.t / R.full); W.spin = (W.spin || 0) + dt * (9 + 15 * c);
+  if (p.wact && p.wact.hold) { p.wact.a = W.a; p.wact.t = W.kind === 'bow' ? 0.04 + 0.36 * c : 0.1 + 0.08 * Math.sin(W.t * (10 + 16 * c)); }
+  if (W.kind === 'sling' && actx && (W.hum = (W.hum || 0) - dt) <= 0) { W.hum = 0.42 - 0.26 * c; noiseAt(actx.currentTime, 600 + 900 * c, 300, 0.1, 0.06 + 0.08 * c, sfxGain); }
+  if (c >= 1 && !W.full) { W.full = true; padRumble(0.25, 60); if (actx) { const t = actx.currentTime; toneAt(t, 1320, 0.07, 0.035, 'square', sfxGain); toneAt(t + 0.05, 1760, 0.1, 0.03, 'square', sfxGain); } }
+}
+function dayDrawRelease() {                       // let go: it flies
+  const D = S.day; if (!D || !D.draw) return;
+  const W = D.draw, R = RNG[W.kind]; D.draw = null;
+  const p = S.p; if (p.wact && p.wact.hold) p.wact = { pose: W.kind === 'bow' ? WPP.bow0 : WPP.lnS, t: W.kind === 'bow' ? 0.12 : 0.17, dur: 0.3, a: W.a };
+  const c = Math.max(0.25, Math.min(1, W.t / R.full));
+  const s = dayAmmo(W.kind); if (!s) return;
+  D.st = Math.max(0, D.st - R.st); D.stT = 0;
+  dayLoose(W.kind, s, c, W.a, 0, 1);
+  dayWear(); S.rg.rngCd = W.kind === 'bow' ? 0.18 : 0.14;
+}
+function dayLoose(kind, s, c, a, spread, kk) {   // one arrow or one stone, from the stack s, drawn to c (0..1)
+  const T = heldIt(), A = DIT[s.id], R = RNG[kind], p = S.p;
+  const am = s.id === 'stones' ? 0.8 : A.am || 1, dmg = R.base * (T ? T.dmg : 1) * am * (0.4 + 0.6 * c) * kk * (1 + 0.12 * sr('might'));
+  const sp = R.sp[0] + (R.sp[1] - R.sp[0]) * c, max = R.rng[0] + (R.rng[1] - R.rng[0]) * c, b = a + spread;
+  (S.rg.dshots = S.rg.dshots || []).push({ kind: kind === 'bow' ? 'arrow' : 'stone', id: s.id, x: p.x + Math.cos(b) * 12, y: p.y + Math.sin(b) * 12, z: 22, a: b, d: 0, max, sp, dmg, c,
+    pierce: A.pierce ? 1 : 0, fire: !!A.fire, bleed: !!A.bleed, stun: kind === 'sling' ? (0.25 + 0.4 * c) * kk : 0, knock: kind === 'sling' ? 10 + 22 * c * kk : 6 + 8 * c, hit: new Set(), t: 0, tr: [] });
+  dayAmmoUse(s);
+  camKick(a, kind === 'bow' ? -2 - 3 * c : -2); addShake(0.04 + 0.08 * c);
+  if (actx) { const t = actx.currentTime;
+    if (kind === 'bow') { toneAt(t, 150 + 60 * c, 0.16, 0.05 + 0.04 * c, 'triangle', sfxGain); noiseAt(t, 3200, 1200, 0.1, 0.22 + 0.14 * c, sfxGain); }
+    else { noiseAt(t, 1400, 600, 0.12, 0.3, sfxGain); toneAt(t, 220, 0.06, 0.03, 'square', sfxGain); } }
+}
+function dayThrowStart() {                        // a throwable in your hand: it goes where you point
+  const D = S.day, p = S.p, s = heldSlot(), T = s && DIT[s.id]; if (!T || !T.thr || p.wact || p.act) return true;
+  if ((S.rg.rngCd || 0) > 0) return true;
+  if (D.st < 8) { dayStam(8); return true; }
+  D.st -= 8; D.stT = 0; S.rg.rngCd = 0.45;
+  const A = dayThrowPt(), a = Math.atan2(A.y - p.y, A.x - p.x);
+  p.wact = { pose: WPP.lnS, t: 0, dur: 0.38, rel: 0.17, a, fn: () => dayThrowGo(s, T, A, a) };
+  return true;
+}
+function dayThrowPt() {                           // the cursor where there is one, else a long throw ahead of you
+  const p = S.p, a = S.aimW || 0;
+  if (S.curT && !PAD.on && document.body.classList.contains('mouse') && performance.now() - S.curT < 6000) {
+    const k = K(), u = (S.curX - W / 2) / k, v = (S.curY - H / 2) * 2 / k, wx = S.cam.x + (u + v) / 2 - p.x, wy = S.cam.y + (v - u) / 2 - p.y, d = Math.hypot(wx, wy) || 1, dd = Math.max(60, Math.min(320, d));
+    return { x: p.x + wx / d * dd, y: p.y + wy / d * dd };
+  }
+  return { x: p.x + Math.cos(a) * 220, y: p.y + Math.sin(a) * 220 };
+}
+function dayThrowGo(s, T, A, a) {
+  const D = S.day, p = S.p; if (!D.inv.includes(s) || s.n <= 0) return;
+  s.n--; if (s.n <= 0) D.inv[D.inv.indexOf(s)] = null; dayChanged();
+  const lob = T.thr === 'bomb' || T.thr === 'flash', dist = Math.max(40, Math.hypot(A.x - p.x, A.y - p.y));
+  (S.rg.dshots = S.rg.dshots || []).push({ kind: T.thr, id: s.id, x: p.x + Math.cos(a) * 12, y: p.y + Math.sin(a) * 12, z: 24, a, d: 0, max: lob ? dist : T.thr === 'jav' ? 470 : 330, sp: lob ? 380 : T.thr === 'jav' ? 760 : 560,
+    dmg: T.dmg * 1.15 * (1 + 0.12 * sr('might')), pierce: T.thr === 'jav' ? 1 : 0, knock: T.thr === 'taxe' ? 34 : 18, hit: new Set(), t: 0, lob, tr: [], spin: 0 });
+  addShake(0.1); camKick(a, 6);
+  if (actx) { const t = actx.currentTime; noiseAt(t, lob ? 900 : 2400, 700, 0.18, 0.34, sfxGain); }
+}
+function dayShotHit(q, o, beast) {               // a shot lands on something alive
+  const f = beast ? null : FOES[o.type], h = beast ? BEAST[o.k].h || 20 : f ? f.h : 30;
+  if (beast) { o.hp -= q.dmg * 1.4 * sneakHit(o); o.flash = 1; if (o.hp <= 0) beastDie(o); else beastScare(o); }
+  else {
+    o.hp -= q.dmg; o.jit = 1; o.flash = 1; o.kHit = q.kind; o.kHitT = S.t; o.swung = true; stkTouch();
+    if (q.stun) o.frozen = Math.max(o.frozen || 0, q.stun);
+    if (q.fire) { o.wburn = Math.max(o.wburn || 0, 3); o.wburnK = 1; wpEmbers(o.x, o.y, 26, 8, '255,150,60'); }
+    if (q.bleed) { o.wbleed = Math.min(4, (o.wbleed || 0) + 1); o.wbleedT = 3; o.wbleedK = 1; }
+    if (o.type !== 'tall' && (o.type !== 'brute' || q.kind === 'taxe' || q.stun > 1)) { o.x += Math.cos(q.a) * q.knock; o.y += Math.sin(q.a) * q.knock; }
+    foeSwBreak(o);
+  }
+  wjSpray(o, q.a, q.kind === 'stone' ? '200,200,190' : '220,225,200', q.kind === 'arrow' ? 5 : 8);
+  hitStop(q.kind === 'taxe' || q.c >= 1 ? 0.06 : 0.03); addShake(q.kind === 'taxe' ? 0.28 : 0.08 + 0.1 * (q.c || 0)); padRumble(0.3, 70);
+  if (q.c >= 1 && !beast) wpPop(q.kind === 'arrow' ? 'FULL DRAW' : 'CRACK', o.x, o.y, h + 10, '255,230,170', 0.75);
+  if (actx) { const t = actx.currentTime;
+    if (q.kind === 'stone') { boomAt(t, 180, 70, 0.08, 0.45, sfxGain); noiseAt(t, 2000, 700, 0.05, 0.3, sfxGain); }
+    else if (q.kind === 'taxe') { boomAt(t, 130, 45, 0.18, 0.6, sfxGain); noiseAt(t, 3600, 1000, 0.08, 0.4, sfxGain); }
+    else { noiseAt(t, 4200, 1600, 0.05, 0.3, sfxGain); boomAt(t, 220, 90, 0.05, 0.3, sfxGain); } }
+}
+function dayBurst(q) {                            // a lobbed pot breaks where it lands
+  const rg = S.rg, D = S.day;
+  if (q.kind === 'bomb') {
+    for (let k = 0; k < 7; k++) { const b = k / 7 * Math.PI * 2, r = k ? 26 : 0; rg.fires.push({ x: q.x + Math.cos(b) * r, y: q.y + Math.sin(b) * r, r: 26, life: 6, max: 6, seed: Math.random() * 9 }); }
+    for (const o of rg.enemies) if (!o.dead && Math.hypot(o.x - q.x, o.y - q.y) < 64) { o.hp -= 0.8; o.wburn = Math.max(o.wburn || 0, 3.5); o.wburnK = 1; o.jit = 1; o.kHit = 'bomb'; o.kHitT = S.t; }
+    wpEmbers(q.x, q.y, 20, 30, '255,150,60'); ashBurst(q.x, q.y, 14, 30); addShake(0.35); hitStop(0.05); wpRing(q.x, q.y, 70, '255,160,80', 0.5);
+    if (actx) { const t = actx.currentTime; boomAt(t, 110, 40, 0.4, 0.7, sfxGain); noiseAt(t, 1200, 300, 0.6, 0.5, sfxGain); noiseAt(t + 0.05, 5200, 2000, 0.1, 0.25, sfxGain); }
+  } else {
+    for (const o of rg.enemies) if (!o.dead && Math.hypot(o.x - q.x, o.y - q.y) < 130) { o.hp -= q.dmg; o.frozen = Math.max(o.frozen || 0, 1.4); o.wburn = Math.max(o.wburn || 0, 1.2); o.wburnK = 1; o.jit = 1; o.kHit = 'flash'; o.kHitT = S.t; }
+    for (const b of D.beasts) if (!b.dead && Math.hypot(b.x - q.x, b.y - q.y) < 150) beastScare(b);
+    rg.flares.push({ x: q.x, y: q.y, r: 110, life: 2, t: 0 });
+    wjFlash('255,250,225', 0.5); wpRing(q.x, q.y, 140, '255,250,220', 0.55); addShake(0.45); hitStop(0.08); padRumble(0.6, 160);
+    if (actx) { const t = actx.currentTime; noiseAt(t, 7000, 2500, 0.3, 0.6, sfxGain); boomAt(t, 300, 60, 0.3, 0.5, sfxGain); toneAt(t, 2600, 0.5, 0.05, 'sine', sfxGain); }
+  }
+}
+function dayShotStep(dt) {
+  const rg = S.rg, D = S.day, p = S.p; if (!rg.dshots) return;
+  if (rg.rngCd > 0) rg.rngCd -= dt;
+  for (const q of rg.dshots) {
+    q.t += dt; if (q.land) { q.land.t += dt; continue; }
+    const st = q.sp * dt, n = Math.max(1, Math.ceil(st / 9));
+    for (let k = 0; k < n && !q.done; k++) {
+      q.x += Math.cos(q.a) * st / n; q.y += Math.sin(q.a) * st / n; q.d += st / n;
+      const u = Math.min(1, q.d / q.max); q.z = q.lob ? 24 + 70 * 4 * u * (1 - u) - 20 * u : 22 - (q.kind === 'stone' ? 14 : 10) * u * u;
+      if (q.lob) { if (u >= 1) q.done = true; continue; }
+      for (const o of rg.enemies) if (!o.dead && !q.hit.has(o) && Math.hypot(o.x - q.x, o.y - q.y) < (FOES[o.type] ? FOES[o.type].w : 12) * 0.6 + 5) {
+        q.hit.add(o); dayShotHit(q, o, false); if (q.pierce-- <= 0) { q.done = q.stop = true; break; }
+      }
+      if (!q.done) for (const b of D.beasts) if (!b.dead && !b.tame && !q.hit.has(b) && Math.hypot(b.x - q.x, b.y - q.y) < BEAST[b.k].w * 0.6 + 5) {
+        q.hit.add(b); dayShotHit(q, b, true); if (q.pierce-- <= 0) { q.done = q.stop = true; break; }
+      }
+      if (!q.done && (q.d >= q.max || wpSolidAt(q.x, q.y, 2))) q.done = true;
+    }
+    if (q.t % 0.02 < dt) { q.tr.push([q.x, q.y, q.z]); if (q.tr.length > 6) q.tr.shift(); }
+    if (q.done && !q.land) {
+      q.land = { t: 0 };
+      if (q.lob) { dayBurst(q); q.gone = true; continue; }
+      const keep = q.kind === 'jav' || q.kind === 'taxe' ? true : q.kind === 'arrow' ? Math.random() < (q.stop ? 0.3 : 0.65) : q.id === 'shot' && Math.random() < 0.5;
+      if (keep) { const f = dayDrop(q.x, q.y, q.id, 1); f.x = q.x; f.y = q.y; f.thrown = 1; q.f = f; }
+      if (!q.stop && actx) { const t = actx.currentTime; if (q.kind === 'stone') noiseAt(t, 1400, 500, 0.06, 0.18, sfxGain); else boomAt(t, 260, 120, 0.06, 0.25, sfxGain); }
+    }
+  }
+  for (const q of rg.dshots) if (q.f && !q.f.gone && Math.hypot(q.f.x - p.x, q.f.y - p.y) < 22) {   // walk over what you threw and it's back
+    const f = q.f, got = dayGive(f.it, f.n, f.x, f.y, true); if (got) { f.gone = true; D.drops = D.drops.filter(x => x !== f); pickSnd(); q.gone = true; }
+  }
+  rg.dshots = rg.dshots.filter(q => !q.gone && !(q.f && q.f.gone) && !(q.land && !q.f && q.land.t > 0.6) && !(q.land && q.land.t > 600));
+}
+function daySpecialRng(kind) {                    // the bow's volley, the sling's heavy shot
+  const D = S.day, rg = S.rg, sp = DSP[kind];
+  if ((rg.wspT || 0) > 0) return wpDenied();
+  const s = dayAmmo(kind); if (!s) { dayNote('noammo', kind === 'bow' ? 'no arrows' : 'nothing to throw', 2); return wpDenied(); }
+  if (D.st < sp.st) { dayStam(sp.st); return wpDenied(); }
+  D.st = Math.max(0, D.st - sp.st); D.stT = 0; D.draw = null; rg.wspT = sp.cool;
+  const a = S.aimW || 0;
+  if (kind === 'bow') {
+    S.p.wact = { pose: WPP.bow2, t: 0, dur: 0.42, rel: 0.2, a, fn: () => {
+      for (const sp of [-0.13, 0, 0.13]) { const st = dayAmmo('bow'); if (st) dayLoose('bow', st, 1, a, sp, 0.9); }
+      wpPop('VOLLEY', S.p.x, S.p.y, 66, '220,240,170', 0.9); dayWear(); } };
+  } else {
+    S.p.wact = { pose: WPP.lnS, t: 0, dur: 0.5, rel: 0.3, a, fn: () => { const st = dayAmmo('sling'); if (st) dayLoose('sling', st, 1, a, 0, 2.2); wpPop('HEAVY SHOT', S.p.x, S.p.y, 66, '230,230,220', 0.9); addShake(0.25); dayWear(); } };
+    if (actx) { const t = actx.currentTime; for (let i = 0; i < 4; i++) noiseAt(t + i * 0.07, 900 + i * 300, 400, 0.08, 0.15, sfxGain); }
+  }
+  wpUi(true);
+}
+function dayShotFx() {                           // shots in flight, and the line of a draw
+  const rg = S.rg, D = S.day, p = S.p;
+  if (D && D.draw) {                              // the draw: a dotted line to where a shot this strong would fall, and a ring that fills
+    const W = D.draw, R = RNG[W.kind], c = Math.min(1, W.t / R.full), reach = R.rng[0] + (R.rng[1] - R.rng[0]) * c;
+    const [x0, y0] = toScreen(p.x + Math.cos(W.a) * 18, p.y + Math.sin(W.a) * 18), [x1, y1] = toScreen(p.x + Math.cos(W.a) * reach, p.y + Math.sin(W.a) * reach);
+    ctx.save(); ctx.setLineDash([3 * Z, 7 * Z]); ctx.lineCap = 'round'; ctx.strokeStyle = W.full ? 'rgba(255,236,190,0.55)' : `rgba(255,236,200,${0.12 + 0.25 * c})`; ctx.lineWidth = 1.6 * Z;
+    ctx.beginPath(); ctx.moveTo(x0, y0 - 20 * Z); ctx.lineTo(x1, y1 - 8 * Z); ctx.stroke(); ctx.setLineDash([]);
+    const [px, py] = toScreen(p.x, p.y), rr = 15 * Z;
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 3 * Z; ctx.beginPath(); ctx.ellipse(px, py, rr * 1.6, rr * 0.8, 0, 0, 7); ctx.stroke();
+    ctx.strokeStyle = W.full ? `rgba(255,236,170,${0.75 + 0.25 * Math.sin(S.t * 20)})` : 'rgba(255,220,160,0.7)'; ctx.lineWidth = 2 * Z;
+    ctx.beginPath(); ctx.ellipse(px, py, rr * 1.6, rr * 0.8, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  if (!rg || !rg.dshots) return;
+  for (const q of rg.dshots) {
+    if (q.land && (q.f || q.gone)) continue;
+    const [x, y] = toScreen(q.x, q.y), ux = Math.cos(q.a), uy = Math.sin(q.a), [x2, y2] = toScreen(q.x + ux, q.y + uy), dx = x2 - x, dy = y2 - y, l = Math.hypot(dx, dy) || 1, ex = dx / l, ey = dy / l, z = q.z * Z;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(x, y, (q.lob ? 5 : 8) * Z, 1.8 * Z, Math.atan2(ey, ex), 0, 7); ctx.fill();   // its shadow on the ground
+    if (q.tr.length > 1) { ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.strokeStyle = q.kind === 'arrow' ? (q.fire ? 'rgba(255,150,60,0.45)' : 'rgba(240,240,220,0.3)') : 'rgba(220,220,210,0.18)'; ctx.lineWidth = (q.kind === 'arrow' ? 2 : 3) * Z;
+      ctx.beginPath(); q.tr.forEach(([wx, wy, wz], j) => { const [sx, sy] = toScreen(wx, wy); j ? ctx.lineTo(sx, sy - wz * Z) : ctx.moveTo(sx, sy - wz * Z); }); ctx.lineTo(x, y - z); ctx.stroke(); ctx.globalCompositeOperation = 'source-over'; }
+    const C = (c, g) => COLOUR ? c : g;
+    if (q.kind === 'arrow') {
+      const L = 14 * Z, hx = x + ex * L / 2, hy = y + ey * L / 2 - z, bx = x - ex * L / 2, by = y - ey * L / 2 - z;
+      ctx.lineCap = 'round'; ctx.strokeStyle = EDGE_C; ctx.lineWidth = 2.6 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = C('#a08a62', '#8a8a84'); ctx.lineWidth = 1.2 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = C(DIT[q.id].c, '#c8c8c2'); ctx.beginPath(); ctx.moveTo(hx + ex * 3.5 * Z, hy + ey * 3.5 * Z); ctx.lineTo(hx - ey * 1.6 * Z, hy + ex * 1.6 * Z); ctx.lineTo(hx + ey * 1.6 * Z, hy - ex * 1.6 * Z); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = C('#efe6d2', '#d8d8d2'); for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx - ex * 3 * Z + ey * s * 2 * Z, by - ey * 3 * Z - ex * s * 2 * Z); ctx.lineTo(bx + ex * 2 * Z, by + ey * 2 * Z); ctx.closePath(); ctx.fill(); }
+      if (q.fire) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,150,60,0.8)'; ctx.beginPath(); ctx.arc(hx, hy, 2.6 * Z, 0, 7); ctx.fill(); }
+    } else if (q.kind === 'stone') {
+      ctx.fillStyle = EDGE_C; ctx.beginPath(); ctx.arc(x, y - z, 3 * Z, 0, 7); ctx.fill(); ctx.fillStyle = C('#a19f98', '#a0a09a'); ctx.beginPath(); ctx.arc(x, y - z, 2.1 * Z, 0, 7); ctx.fill();
+    } else if (q.kind === 'jav') {
+      const L = 26 * Z, hx = x + ex * L / 2, hy = y + ey * L / 2 - z, bx = x - ex * L / 2, by = y - ey * L / 2 - z;
+      ctx.lineCap = 'round'; ctx.strokeStyle = EDGE_C; ctx.lineWidth = 3.4 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = C('#a08a62', '#8a8a84'); ctx.lineWidth = 1.7 * Z; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = C(FLINT_HEAD, '#5a5a58'); ctx.beginPath(); ctx.moveTo(hx + ex * 6 * Z, hy + ey * 6 * Z); ctx.lineTo(hx - ey * 2.2 * Z, hy + ex * 2.2 * Z); ctx.lineTo(hx + ey * 2.2 * Z, hy - ex * 2.2 * Z); ctx.closePath(); ctx.fill();
+    } else if (q.kind === 'taxe') {
+      const r = q.t * 22, cx = x, cy = y - z;
+      ctx.translate(cx, cy); ctx.rotate(r); ctx.lineCap = 'round'; ctx.strokeStyle = EDGE_C; ctx.lineWidth = 3.4 * Z; ctx.beginPath(); ctx.moveTo(-7 * Z, 0); ctx.lineTo(7 * Z, 0); ctx.stroke();
+      ctx.strokeStyle = C('#7a5a3a', '#6a6a66'); ctx.lineWidth = 1.8 * Z; ctx.beginPath(); ctx.moveTo(-7 * Z, 0); ctx.lineTo(7 * Z, 0); ctx.stroke();
+      ctx.fillStyle = C(STONE_HEAD, '#8a8a86'); ctx.beginPath(); ctx.moveTo(4 * Z, -1 * Z); ctx.lineTo(8 * Z, -6 * Z); ctx.lineTo(10 * Z, 1 * Z); ctx.closePath(); ctx.fill();
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(240,240,220,0.18)'; ctx.lineWidth = 1.4 * Z; ctx.beginPath(); ctx.arc(cx, cy, 10 * Z, r, r + 2.2); ctx.stroke();
+    } else {                                      // a pot in the air: pitch or powder, turning
+      ctx.fillStyle = EDGE_C; ctx.beginPath(); ctx.arc(x, y - z, 4.6 * Z, 0, 7); ctx.fill();
+      ctx.fillStyle = q.kind === 'bomb' ? C('#3a2a1a', '#3a3a38') : C('#efe6d2', '#e0e0da'); ctx.beginPath(); ctx.arc(x, y - z, 3.6 * Z, 0, 7); ctx.fill();
+      if (q.kind === 'bomb') { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,180,80,${0.6 + 0.4 * Math.sin(q.t * 40)})`; ctx.beginPath(); ctx.arc(x + Math.cos(q.t * 9) * 3 * Z, y - z - 4 * Z, 1.8 * Z, 0, 7); ctx.fill(); }
+      const [tx, ty] = toScreen(q.x + Math.cos(q.a) * (q.max - q.d), q.y + Math.sin(q.a) * (q.max - q.d));   // where it will come down
+      ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = q.kind === 'bomb' ? 'rgba(255,150,80,0.45)' : 'rgba(255,250,220,0.45)'; ctx.lineWidth = 1.4 * Z; ctx.setLineDash([3 * Z, 3 * Z]);
+      const R = (q.kind === 'bomb' ? 60 : 130) * K(); ctx.beginPath(); ctx.ellipse(tx, ty, R, R / 2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+}
+function dayHeldSling(P, hand, OUT) {            // the sling: cords from the fist to a pouch, hanging, or whirling over your head as you wind it
+  const [x, y] = P(...hand), W = S.day && S.day.draw, T = heldIt() || DIT.sling1;
+  let px, py;
+  if (W) { const c = Math.min(1, W.t / RNG.sling.full), r = (9 + 4 * c) * Z, a = W.spin || 0; px = x + Math.cos(a) * r; py = y - 7 * Z + Math.sin(a) * r * 0.45; }
+  else { px = x + 1.2 * Z + Math.sin(S.t * 2.2) * 0.8 * Z; py = y + 10 * Z; }
+  ctx.lineCap = 'round';
+  if (OUT) { ctx.strokeStyle = 'rgba(239,239,234,0.2)'; ctx.lineWidth = 2 * Z; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(px, py); ctx.stroke(); return; }
+  if (W) { const c = Math.min(1, W.t / RNG.sling.full); ctx.strokeStyle = `rgba(230,225,210,${0.08 + 0.18 * c})`; ctx.lineWidth = 1.2 * Z; ctx.beginPath(); ctx.ellipse(x, y - 7 * Z, (9 + 4 * c) * Z, (9 + 4 * c) * Z * 0.45, 0, 0, 7); ctx.stroke(); }
+  const nx = -(py - y), ny = px - x, nl = Math.hypot(nx, ny) || 1;
+  ctx.strokeStyle = COLOUR ? '#6b4a2e' : '#66665f'; ctx.lineWidth = 0.7 * Z;
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(px + nx / nl * s * 1.6 * Z, py + ny / nl * s * 1.6 * Z); ctx.stroke(); }
+  ctx.fillStyle = EDGE_C; ctx.beginPath(); ctx.ellipse(px, py, 3 * Z, 2.2 * Z, Math.atan2(py - y, px - x), 0, 7); ctx.fill();
+  ctx.fillStyle = COLOUR ? T.c : '#8a8a84'; ctx.beginPath(); ctx.ellipse(px, py, 2.2 * Z, 1.5 * Z, Math.atan2(py - y, px - x), 0, 7); ctx.fill();
+  if (dayAmmoN('sling')) { ctx.fillStyle = COLOUR ? '#a19f98' : '#a0a09a'; ctx.beginPath(); ctx.arc(px, py - 0.8 * Z, 1.2 * Z, 0, 7); ctx.fill(); }
+  S.wpHead = [px, py];
+}
+function dayRngUp() { if (S && S.day && S.day.draw) dayDrawRelease(); }   // any let-go: mouse, finger, key or pad
+addEventListener('mouseup', e => { if (e.button === 0) dayRngUp(); });
+addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') dayRngUp(); });
+addEventListener('pointercancel', () => dayRngUp());
+addEventListener('keyup', e => { if (e.key.toLowerCase() === 'j') dayRngUp(); });
+addEventListener('blur', () => dayRngUp());
 // ---- v172 (Joe): controller support. Any gamepad the browser sees (Xbox, PlayStation, Switch Pro, most others in the standard layout).
 // In play: left stick runs that way, right stick aims the torch, RT or A attacks, B dodges, X uses, Y is the weapon's special,
 // LB/RB step along the hotbar (Expedition: LB swaps weapons), d-pad up drinks a flask, down lights the recall flare, left plants a lantern,
@@ -11186,6 +11486,7 @@ function padPoll() {
   if (lMove && S.autoRun) S.autoRun = false;
   PAD.run = lMove;
   if (down(0) || down(7)) attack();                     // A or RT
+  if ((PAD.prev[0] && !B[0]) || (PAD.prev[7] && !B[7])) dayRngUp();   // v189: let go of the bow
   if (down(1)) dodge();                                 // B
   if (down(2)) { if (S.day) dayUse(); else if (S.mode === 'expedition') padKey('e'); }   // X: use, take, open
   const hb = S.day && dayTool() === 'build';           // v186: with the hammer the d-pad turns and picks pieces
@@ -11642,7 +11943,7 @@ const curW = () => wpOn() ? (XS.wsel && XS.wsel[XS.wcur | 0]) || 'torch' : dayAr
 let wpStanceOv = null;
 function wpStance() { return wpStanceOv || (S.rg && S.rg.wst) || 'spear'; }   // the Twins: still is the spear, moving is the bow
 function wpHand() {                               // what's in the torch hand instead of the torch
-  if (!wpOn()) return dayArmId();   // v170: a Daylight weapon sits in the hand the same way
+  if (!wpOn()) return dayArmId() || dayRngId();   // v170: a Daylight weapon sits in the hand the same way (v189: a bow or a sling too)
   const w = curW(); if (w === 'torch') return null;
   if (S.rg.wax || S.rg.worb) return 'none';       // thrown: the hand is empty
   return w === 'twin' && wpStance() === 'bow' ? 'bow' : w;
@@ -11755,6 +12056,7 @@ const WREST = {                                   // how each weapon sits in the
   lance: (r, h) => { const H = [r + 6, 4.4, h - 10]; return [H, [r + 2, 6.4, h - 7], [H[0] + 7, 4.2, H[2] + 0.5]]; },       // level, pointed at them
 };
 function wpHeld(wh, P, hand, tip, near, OUT, lHa) {   // in the hand: from the grip along the weapon to its head
+  if (wh === 'sling') { dayHeldSling(P, hand, OUT); return; }   // v189
   const A = ARMS[wh === 'bow' ? 'twin' : wh], d = [tip[0] - hand[0], tip[1] - hand[1], tip[2] - hand[2]], dl = Math.hypot(...d) || 1, u = d.map(v => v / dl);
   const at = k => P(hand[0] + u[0] * k, hand[1] + u[1] * k, hand[2] + u[2] * k);
   const [fx, fy] = toScreen(S.p.x + Math.cos(S.aimW || 0) * 20, S.p.y + Math.sin(S.aimW || 0) * 20), [px, py] = toScreen(S.p.x, S.p.y);
@@ -11764,9 +12066,11 @@ function wpHeld(wh, P, hand, tip, near, OUT, lHa) {   // in the hand: from the g
   if (wh === 'bow') {                             // the bow: a curve through the hand, the string drawn back to the other hand
     const [x, y] = P(...hand), [tx, ty] = at(8), ax = tx - x, ay = ty - y, al = Math.hypot(ax, ay) || 1, nx = -ay / al, ny = ax / al, R = 11 * Z;
     const e0 = [x + nx * R - ax / al * 3 * Z, y + ny * R - ay / al * 3 * Z - 3 * Z], e1 = [x - nx * R - ax / al * 3 * Z, y - ny * R - ay / al * 3 * Z + 3 * Z];
-    ctx.lineCap = 'round'; ctx.strokeStyle = OUT ? 'rgba(239,239,234,0.2)' : (COLOUR ? '#9a7040' : '#77776f'); ctx.lineWidth = (2.5 + (OUT ? 1.6 : 0)) * Z;
+    const DB = S.day && heldIt(), dw = DB && S.day.draw ? Math.min(1, S.day.draw.t / RNG.bow.full) : 0;   // v189: a Daylight bow, in its own wood
+    ctx.lineCap = 'round'; ctx.strokeStyle = OUT ? 'rgba(239,239,234,0.2)' : (COLOUR ? (DB && DB.bw) || '#9a7040' : '#77776f'); ctx.lineWidth = (2.5 + (OUT ? 1.6 : 0)) * Z;
     ctx.beginPath(); ctx.moveTo(...e0); ctx.quadraticCurveTo(x + ax / al * 5 * Z, y + ay / al * 5 * Z, ...e1); ctx.stroke();
     if (!OUT) { const [sx, sy] = lHa ? P(...lHa) : [x - ax / al * 3 * Z, y - ay / al * 3 * Z]; ctx.strokeStyle = 'rgba(230,230,220,0.75)'; ctx.lineWidth = 0.5 * Z; ctx.beginPath(); ctx.moveTo(...e0); ctx.lineTo(sx, sy); ctx.lineTo(...e1); ctx.stroke(); S.wpHead = [tx, ty];
+      if (dw > 0) { ctx.strokeStyle = 'rgba(220,210,180,0.95)'; ctx.lineWidth = 0.9 * Z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tx + ax / al * 4 * Z, ty + ay / al * 4 * Z); ctx.stroke(); }
       const A0 = S.p.atk; if (A0 && A0.wd && A0.wd.proj && !A0.done) { ctx.strokeStyle = 'rgba(220,240,180,0.9)'; ctx.lineWidth = 0.8 * Z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tx + ax / al * 4 * Z, ty + ay / al * 4 * Z); ctx.stroke(); } }   // an arrow nocked
     return;
   }
@@ -12520,7 +12824,7 @@ function wpLure(e) {
 }
 // ---- every frame ----
 function wpTick(dt) {
-  const rg = S.rg, p = S.p, on = wpOn() || dArmOn();
+  const rg = S.rg, p = S.p, on = wpOn() || dArmOn() || !!dayRngId();
   if (p.wact) { const w = p.wact; w.t += dt; if (w.fn && !w.done && w.t >= w.rel) { w.done = true; w.fn(); } if (w.fn2 && !w.done2 && w.t >= w.rel2) { w.done2 = true; w.fn2(); } if (w.t >= w.dur) p.wact = null; }
   if (rg.wspT > 0 && (rg.wspT -= dt) <= 0 && on) wpReady();
   if (rg.wswT > 0) rg.wswT -= dt;
@@ -12593,10 +12897,10 @@ function wpHoles(hole) {                          // the weapons' own light in t
 const wspecBtn = document.getElementById('wspec'), wswapBtn = document.getElementById('wswap');
 let wpUiKey = '';
 function wpUi(force) {
-  const on = wpOn() || dArmOn(), rg = S && S.rg, show = on && rg && rg.phase === 'fight';
+  const on = wpOn() || dArmOn() || !!dayRngId(), rg = S && S.rg, show = on && rg && rg.phase === 'fight';
   document.body.classList.toggle('wp', !!show);
   if (!show) { wspecBtn.hidden = wswapBtn.hidden = true; wpUiKey = ''; return; }
-  const w = curW(), SPC = S.day ? DSP[w] : null, cool = Math.max(0, rg.wspT || 0) / (SPC ? SPC.cool : ARMS[w].spCool), lbl = SPC ? SPC.n : w === 'axe' && rg.wax ? 'Call' : w === 'glaive' && rg.worb ? 'Catch' : ARMS[w].spName;
+  const w = dayRngId() || curW(), SPC = S.day ? DSP[w] : null, cool = Math.max(0, rg.wspT || 0) / (SPC ? SPC.cool : ARMS[w].spCool), lbl = SPC ? SPC.n : w === 'axe' && rg.wax ? 'Call' : w === 'glaive' && rg.worb ? 'Catch' : ARMS[w].spName;
   wspecBtn.style.setProperty('--cd', Math.min(1, cool).toFixed(3));
   const two = !S.day && XS && XS.wsel && XS.wsel[1], key = w + lbl + (cool > 0 ? 1 : 0) + (two ? 1 : 0);
   if (!force && key === wpUiKey) return; wpUiKey = key;
