@@ -582,7 +582,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 186</p>
+      <p class="small" id="verLbl">Version 187</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -6044,19 +6044,21 @@ function updateSurvive(dt) {
       if (rg.embers.length < 320 && Math.random() < dt * (7 + 10 * burnt) * sc) rg.embers.push({ x: e.x, y: e.y, z: f.h * (0.5 + Math.random() * 0.5), vz: 18 + Math.random() * 14, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 0.9 + Math.random() * 0.7, r: 2 + Math.random() * 3 });
     }
     // reaching for you when close in the dark
-    const reachTo = e.type === 'kamikaze' ? (e.ai === 'run' ? 1 : 0.4) : (!e.lit && d < 140 && !NO_TOUCH[e.type] && !SCR_FACE[e.type] && !(e.type === 'laser' && e.ai !== 'move')) ? 1 : 0;
+    const reachTo = e.type === 'kamikaze' ? (e.ai === 'run' ? 1 : 0.4) : (!e.lit && d < 140 && !(e.roam && e.st2 !== 'hunt') && !NO_TOUCH[e.type] && !SCR_FACE[e.type] && !(e.type === 'laser' && e.ai !== 'move')) ? 1 : 0;
     e.reach = (e.reach || 0) + (reachTo - (e.reach || 0)) * Math.min(1, dt * 6);
     e.kick = Math.max(0, (e.kick || 0) - dt * 4);
     const farOff = !e.lit && d > Math.max(700, (e.spawnD || 500) + 300) && !seenAt(e.x, e.y);   // well out of reach and out of sight
     if (S.mode === 'expedition' && farOff && d > 900 && !e.guard) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
-    if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; if (e.type === 'spear') spearInit(e); if (e.type === 'archer') archerInit(e); continue; }   // left far behind: bring it back around you
+    if (farOff && !e.guard && !(e.roam && e.st2 !== 'hunt')) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; if (e.type === 'spear') spearInit(e); if (e.type === 'archer') archerInit(e); continue; }   // left far behind: bring it back around you
     let sp = f.sp * (inBeyond() ? DUNE_SP : 1) * (pact('hunted') ? 1.3 : 1) * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1) * (e.mire > S.t ? 0.4 : 1);
     if (S.mode === 'expedition' && !inBeyond()) { const k = EX_PACE[exRing(Math.hypot(S.p.x, S.p.y))]; sp = e.type === 'kamikaze' ? sp * k : Math.min(sp * k, Math.max(sp, EX_PACE_MAX)); }   // v122: deeper woods, quicker hunters (never quite your sprint)
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
     const LU = S.mode === 'expedition' && wpLure(e), px0 = p.x, py0 = p.y; if (LU) { p.x = LU.x; p.y = LU.y; }   // v143: drawn off you to a lamp, a decoy, or where you vanished
-    const swung = !LU && foeMelee(e, d, dt);    // v183: winding up, striking or getting its feet back
+    const RM = !!e.roam && rmStep(e, f, d, dt);   // v187: still roaming, wary or searching, not hunting you
+    const swung = !RM && !LU && foeMelee(e, d, dt);    // v183: winding up, striking or getting its feet back
     if (swung) { const [sx0] = toScreen(e.x, e.y), [sx1] = toScreen(p.x, p.y); e.face = sx1 > sx0 ? 1 : -1; }
+    else if (RM) {}
     else if (FOE_AI[e.type]) FOE_AI[e.type](e, sp, d, dt);
     else chase(e, sp, d, dt);
     if (LU) { p.x = px0; p.y = py0; }
@@ -6065,7 +6067,7 @@ function updateSurvive(dt) {
       if (od < min && od > 0) { e.x = o.x + ox / od * min; e.y = o.y + oy / od * min; }
     }
     if (safe) { const cd = Math.hypot(e.x - safe.x, e.y - safe.y) || 1; if (cd < safe.r) { e.x = safe.x + (e.x - safe.x) * safe.r / cd; e.y = safe.y + (e.y - safe.y) * safe.r / cd; } }   // can't step inside
-    if (!NO_TOUCH[e.type] && !MELEE[e.type] && !e.dead && d < 14 + f.w * 0.45 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);   // v183: the fighters hurt you only with a swing now
+    if (!RM && !NO_TOUCH[e.type] && !MELEE[e.type] && !e.dead && d < 14 + f.w * 0.45 && rg.inv <= 0 && rg.phase === 'fight') hurt(e);   // v183: the fighters hurt you only with a swing now
   }
   updateShells(dt); updateDarts(dt);
   for (const e of rg.enemies) if (e.hp <= 0 && !e.dead) killFoe(e);
@@ -8495,7 +8497,7 @@ function drawDay() {                           // the sun: a warm wash from the 
   ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * lt; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
   drawNight();
-  drawDayFires(); stFlames(); drawDayChips(); drawFloat(); drawSiege();
+  drawDayFires(); stFlames(); drawRoamFx(); drawDayChips(); drawFloat(); drawSiege();
 }
 function dayBar(px, py) {                      // stamina, food and water over your head
   const D = S.day, tw = 46, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
@@ -10836,7 +10838,128 @@ function dayTorchOn() {                                    // the beam comes on 
   const want = dayLight() < 0.7;
   if (want !== !!S.torchOn) { S.torchOn = want; if (want && S.running) exNote('your torch is lit', true); }
 }
-const dayCapK = () => dayNight() ? 1.3 : 0.55;            // the dark brings far more of them out
+const dayCapK = () => dayNight() ? 1.3 : 1;               // the dark brings far more of them out (v187: by day they roam in bands, so more of them can be out)
+// ---- v187 (Joe): by day the woods are full of hunters, but they roam in small bands and have to find you first. Each one looks
+// the way it faces (nothing drawn: you read it from how it stands); trees, rocks and your own walls block its view. Out in the open,
+// close and in front of it, it knows you in a moment; far off, crouched, or behind it, it may never. A '?' over its head fills as it
+// notices; full, it shouts and its whole band comes. Break their line of sight long enough and they lose you: they search where you
+// were, then drift off again. A blow from hiding lands hard. At night the dark is still theirs: whatever comes then hunts you.
+const RM_SEE = 330, RM_HALF = 1.05, RM_HEAR = 70, RM_LOSE = 4.5, RM_SEARCH = 7, RM_GRP_R = 240;
+const rmOn = () => S.day && !dayNight();
+function rmBlocked(e) {                           // trees, rocks and your own standing walls between it and you
+  const p = S.p, dx = p.x - e.x, dy = p.y - e.y, L = Math.hypot(dx, dy) || 1, mx = (p.x + e.x) / 2, my = (p.y + e.y) / 2;
+  for (const o of propsNear(mx, my, L / 2 + 30)) {
+    const c = caster(o); if (!c || o.kind === 'post') continue;
+    const t = ((o.x - e.x) * dx + (o.y - e.y) * dy) / (L * L); if (t < 0.04 || t > 0.96) continue;
+    if (Math.hypot(e.x + dx * t - o.x, e.y + dy * t - o.y) < c.r * 1.15 + 3) return true;
+  }
+  for (const o of stNear(mx, my, L / 2 + 20)) {
+    const P = PC(o.id); if (!o.done || P.sh !== 'edge' || P.k === 'fence' || (P.H || 36) < 30) continue;
+    if (stDoorish(P) && o.open > 0.5) continue;
+    const f = stFoot(o), cr = (ax, ay, bx, by, cx, cy) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    if (cr(e.x, e.y, p.x, p.y, f.ax, f.ay) * cr(e.x, e.y, p.x, p.y, f.bx, f.by) < 0 && cr(f.ax, f.ay, f.bx, f.by, e.x, e.y) * cr(f.ax, f.ay, f.bx, f.by, p.x, p.y) < 0) return true;
+  }
+  return false;
+}
+function rmSees(e, d) {                           // how fast it is noticing you right now (0: not at all)
+  const p = S.p, D = S.day, sp = Math.hypot(p.vx, p.vy), loud = (p.atk || p.act) && !D.crouch;
+  const look = Math.abs(angDiff(e.look, Math.atan2(p.y - e.y, p.x - e.x)));
+  const crouch = D.crouch ? (sp > 10 ? 0.5 : 0.38) : 1, alert = e.st2 === 'search' ? 1.3 : e.st2 === 'sus' ? 1.15 : 1;
+  const hear = (loud ? 170 : sp > 60 ? 110 : RM_HEAR) * (D.crouch ? 0.35 : 1);
+  let k = 0;
+  if (look < RM_HALF && d < RM_SEE * crouch * alert && !rmBlocked(e)) k = (0.35 + 2.4 * (1 - d / (RM_SEE * crouch * alert))) * (look < RM_HALF * 0.5 ? 1 : 0.6) * (D.crouch ? 0.7 : 1);
+  if (d < hear) k = Math.max(k, 1.2 * (1 - d / hear) + 0.3);
+  return k * alert;
+}
+function rmGroup(rg, x, y) { const g = { x, y, a: Math.random() * 7, t: 0, id: (rg.rmN = (rg.rmN || 0) + 1) }; return g; }
+function rmMark(e, g) {                           // a hunter put out to roam with its band
+  e.roam = g; e.st2 = 'roam'; e.aw = 0; e.look = Math.random() * 7; e.wt = 0; e.lastHp = e.hp; e.lostT = 0;
+  e.ox = (Math.random() - 0.5) * 110; e.oy = (Math.random() - 0.5) * 110;
+}
+function rmSpawn(ring, n) {                       // a band, set down out of sight, somewhere ahead or round about, not looking at you
+  const rg = S.rg, p = S.p;
+  for (let k = 0; k < 10; k++) {
+    const a = Math.random() * Math.PI * 2, d = 520 + Math.random() * 380, x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d;
+    if (seenAt(x, y) || exSafeAt(x, y, 320) || Math.hypot(x, y) < CAMP_R + 260 || stNear(x, y, 200).length) continue;
+    const g = rmGroup(rg, x, y), away = Math.atan2(y - p.y, x - p.x);
+    g.a = away + (Math.random() - 0.5) * 2;
+    for (let i = 0; i < n; i++) { spawnFoe(exPickFoe(ring), { x: x + (Math.random() - 0.5) * 90, y: y + (Math.random() - 0.5) * 90, d }); const e = rg.enemies[rg.enemies.length - 1]; rmMark(e, g); e.look = g.a + (Math.random() - 0.5) * 1.6; if (ring === 0) { e.maxHp *= 0.65; e.hp = Math.min(e.hp, e.maxHp); e.lastHp = e.hp; } }
+    return true;
+  }
+  return false;
+}
+function rmAlert(e, why) {                        // it has you: a shout, and its band comes with it
+  const rg = S.rg, first = !rg.enemies.some(o => o.roam && o.st2 === 'hunt' && !o.dead);
+  for (const o of rg.enemies) if (o.roam && !o.dead && o.st2 !== 'hunt' && (o === e || o.roam === e.roam || Math.hypot(o.x - e.x, o.y - e.y) < 140)) {
+    o.st2 = 'hunt'; o.aw = 1; o.lostT = 0; o.bang = S.t + (o === e ? 0 : 0.15 + Math.random() * 0.25);
+  }
+  e.bang = S.t;
+  if (actx) { const t = actx.currentTime, m = Math.max(0.35, monNear(e, 700)); toneAt(t, 880, 0.08, 0.12 * m, 'square', sfxGain); toneAt(t + 0.07, 1320, 0.2, 0.12 * m, 'square', sfxGain); boomAt(t, 120, 60, 0.3, 0.3 * m, sfxGain); }
+  if (first) { addShake(0.18); padRumble(0.4, 120); exNote(why === 'hit' ? 'they know you\'re here' : 'spotted', true); dayNote('rmlose', 'break their line of sight to lose them', 600); }
+}
+function rmStep(e, f, d, dt) {                    // true while it is roaming, wary or searching (it moves itself); false once it hunts you
+  const g = e.roam, rg = S.rg, p = S.p;
+  if (e.hp < e.lastHp - 0.001) {                  // struck from hiding: it lands hard, and it knows
+    if (e.st2 !== 'hunt') { const mine = S.t - (e.kHitT || -9) < 0.25, extra = mine ? (e.lastHp - e.hp) * (S.day.crouch ? 3 : 1) : 0; e.hp -= extra; if (mine && S.day.crouch && e.hp > 0) exNote('sneak attack'); if (e.hp > 0) rmAlert(e, 'hit'); else if (mine) { exNote('sneak kill', true); hitStop(0.08); addShake(0.25); } }
+    else e.lostT = 0;
+  }
+  e.lastHp = e.hp;
+  if (!rmOn()) { if (e.st2 !== 'hunt') { e.st2 = 'hunt'; } return false; }   // the night is theirs
+  if (e.st2 === 'hunt') {                         // it can lose you: out of its sight long enough, or left far behind
+    const lost = d > 560 || rmBlocked(e) || (S.day.crouch && d > 200);
+    e.lostT = lost ? e.lostT + dt : Math.max(0, e.lostT - dt * 2);
+    if (e.lostT > RM_LOSE) { e.st2 = 'search'; e.wt = RM_SEARCH; e.aw = 0.55; e.sx = p.x + (Math.random() - 0.5) * 60; e.sy = p.y + (Math.random() - 0.5) * 60; e.look = Math.atan2(e.sy - e.y, e.sx - e.x);
+      if (!rg.enemies.some(o => o !== e && o.roam && o.st2 === 'hunt' && !o.dead)) { exNote('they lost you', true); if (actx) toneAt(actx.currentTime, 520, 0.25, 0.08, 'triangle', sfxGain); } }
+    return e.st2 !== 'hunt';
+  }
+  // noticing you
+  const k = rmSees(e, d);
+  if (k > 0) { e.aw = Math.min(1, e.aw + k * dt); if (e.aw > 0.3) { e.look += angDiff(Math.atan2(p.y - e.y, p.x - e.x), e.look) * Math.min(1, dt * 3); if (e.st2 === 'roam') { e.st2 = 'sus'; e.huh = S.t; if (actx && monNear(e, 600) > 0) { const t = actx.currentTime; toneAt(t, 660, 0.08, 0.06 * monNear(e, 600), 'square', sfxGain); toneAt(t + 0.07, 990, 0.12, 0.06 * monNear(e, 600), 'square', sfxGain); } } e.sx = p.x; e.sy = p.y; } }
+  else e.aw = Math.max(0, e.aw - dt * (e.st2 === 'search' ? 0.08 : 0.3));
+  if (e.aw >= 1) { rmAlert(e, 'seen'); return false; }
+  // where it goes
+  let tx, ty, spd = f.sp * 0.32;
+  if (e.st2 === 'sus') {                          // wary: it stops, turns to where it heard you, and edges that way
+    if (e.aw <= 0.02) e.st2 = 'roam';
+    tx = e.sx; ty = e.sy; spd = k > 0 ? f.sp * 0.08 : f.sp * 0.3;
+  } else if (e.st2 === 'search') {                // searching where it last had you, looking round
+    e.wt -= dt; if (e.wt <= 0) { e.st2 = 'roam'; e.aw = 0; g.x = e.x; g.y = e.y; }
+    if (Math.hypot(e.sx - e.x, e.sy - e.y) < 20) { e.sx += (Math.random() - 0.5) * 140; e.sy += (Math.random() - 0.5) * 140; }
+    tx = e.sx; ty = e.sy; spd = f.sp * 0.45;
+  } else {                                        // roaming: the band drifts through the woods together, each wandering near it
+    if (e === rg.enemies.find(o => o.roam === g && !o.dead)) { g.t -= dt; if (g.t <= 0) { g.t = 3 + Math.random() * 5; g.a += (Math.random() - 0.5) * 1.8; if (Math.hypot(g.x, g.y) < CAMP_R + 360) g.a = Math.atan2(g.y, g.x); g.stop = Math.random() < 0.35; } if (!g.stop) { g.x += Math.cos(g.a) * 26 * dt; g.y += Math.sin(g.a) * 26 * dt; } }
+    if ((e.wt -= dt) <= 0) { e.wt = 1.5 + Math.random() * 3.5; e.ox = (Math.random() - 0.5) * 120; e.oy = (Math.random() - 0.5) * 120; e.idle = Math.random() < 0.3; if (e.idle) e.lookTo = e.look + (Math.random() - 0.5) * 2.4; }
+    tx = g.x + e.ox; ty = g.y + e.oy; if (e.idle) { tx = e.x; ty = e.y; e.look += angDiff(e.lookTo, e.look) * Math.min(1, dt * 1.5); }
+  }
+  const dx = tx - e.x, dy = ty - e.y, L = Math.hypot(dx, dy);
+  if (L > 6 && spd > 0) { const m = Math.min(L, spd * dt); e.x += dx / L * m; e.y += dy / L * m; e.phase += dt * spd * 0.25; if (e.st2 !== 'sus' || k <= 0) e.look += angDiff(Math.atan2(dy, dx), e.look) * Math.min(1, dt * 4); }
+  { const [s0] = toScreen(e.x, e.y), [s1] = toScreen(e.x + Math.cos(e.look) * 10, e.y + Math.sin(e.look) * 10); if (Math.abs(s1 - s0) > 1) e.face = s1 > s0 ? 1 : -1; }
+  e.reach = Math.max(0, (e.reach || 0) - dt * 6);
+  return true;
+}
+function drawRoamFx() {                           // the '?' that fills as one notices you, and the '!' when it has you
+  const rg = S.rg; if (!S.day || !rg) return;
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const e of rg.enemies) {
+    if (!e.roam || e.dead) continue;
+    const bangT = e.bang ? S.t - e.bang : 9, show = e.st2 !== 'hunt' && e.aw > 0.04;
+    if (!show && !(bangT >= 0 && bangT < 1.4)) continue;
+    const [sx, sy0] = toScreen(e.x, e.y); if (sx < -40 || sx > W + 40 || sy0 < -40 || sy0 > H + 80) continue;
+    const y = sy0 - ((FOES[e.type] ? FOES[e.type].h : 38) * (e.k || 1) + 18) * Z;
+    if (bangT >= 0 && bangT < 1.4) {               // '!' slams in, then fades
+      const s = spotPop(bangT), a = Math.min(1, (1.4 - bangT) / 0.3);
+      stkText('!', sx, y - 4 * Z, 26 * Z * s, '255,70,50', a);
+      continue;
+    }
+    const R = 8.5 * Z, a = Math.min(1, e.aw * 4), col = e.st2 === 'search' ? '255,190,80' : e.aw > 0.6 ? '255,120,70' : '255,226,150';
+    ctx.globalAlpha = a; ctx.fillStyle = 'rgba(10,8,6,0.6)'; ctx.beginPath(); ctx.arc(sx, y, R + 2.5 * Z, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 2.4 * Z; ctx.beginPath(); ctx.arc(sx, y, R, 0, 7); ctx.stroke();
+    ctx.strokeStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(sx, y, R, -Math.PI / 2, -Math.PI / 2 + e.aw * Math.PI * 2); ctx.stroke();
+    const pop = e.huh && S.t - e.huh < 0.3 ? 1 + 0.5 * (1 - (S.t - e.huh) / 0.3) : 1;
+    ctx.fillStyle = `rgb(${col})`; ctx.font = `700 ${Math.round(12 * Z * pop)}px "IBM Plex Mono", monospace`; ctx.fillText(e.st2 === 'search' ? '…' : '?', sx, y + 0.5 * Z);
+  }
+  ctx.restore();
+}
 function dayDawn() {                                       // first light: whatever is still out in the open burns up
   const rg = S.rg; let n = 0;
   for (const e of rg.enemies) if (!e.dead && e.ci === undefined && !e.cap) {   // the raider camps keep their watch
@@ -12916,7 +13039,8 @@ function exStep(dt) {
     const cap = Math.round((EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1) * (S.day ? dayCrowd() * dayCapK() : 1));   // v166: fewer by day, far more by night   // Horde: twice as many   // and so does a heavy pack
     if (rg.spawnT <= 0) {
       rg.spawnT = EX_GAP[ring] * (rg.carryOrb || rg.carryDorb ? 0.55 : 1) * (pact('horde') ? 0.5 : 1) * (0.6 + Math.random() * 0.8);
-      if (rg.enemies.length < cap) { if (ring > 0 && Math.random() < 0.25 && cap - rg.enemies.length >= 3) exPack(ring, Math.min(cap - rg.enemies.length, 3 + (Math.random() < 0.5 ? 1 : 0))); else exSpawn(exPickFoe(ring)); }   // v123: sometimes a pack
+      if (rg.enemies.length < cap && S.day && rmOn()) rmSpawn(ring, Math.min(cap - rg.enemies.length, 1 + Math.floor(Math.random() * 3) + (ring > 1 && Math.random() < 0.5 ? 1 : 0)));   // v187: a band out roaming
+      else if (rg.enemies.length < cap) { if (ring > 0 && Math.random() < 0.25 && cap - rg.enemies.length >= 3) exPack(ring, Math.min(cap - rg.enemies.length, 3 + (Math.random() < 0.5 ? 1 : 0))); else exSpawn(exPickFoe(ring)); }   // v123: sometimes a pack
     }
   }
   if (ring === 3 && !bossLive() && !rg.cleared && (!srchOn() || rg.alarm) && !rg.enemies.some(e => e.type === 'tall') && (rg.tallCd -= dt) <= 0) {
