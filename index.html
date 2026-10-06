@@ -130,12 +130,25 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #hotbar .dur, #craft .slot .dur { position: absolute; left: 14%; right: 14%; bottom: 4px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, #9fd27a calc(var(--f) * 100%), rgba(0,0,0,0.55) 0); }
 #hotbar .dur.low, #craft .slot .dur.low { background: linear-gradient(90deg, #e2843c calc(var(--f) * 100%), rgba(0,0,0,0.55) 0); }
 @media (max-width: 560px) and (min-height: 521px) { #hotbar { left: 10px; transform: none; gap: 4px; padding: 4px; } #hotbar .hot { width: 42px; height: 42px; } #hotbar .hot svg { width: 27px; height: 27px; } }   /* a phone held upright: the bar sits left, clear of your aiming thumb */
-#buildbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(74px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 4px; padding: 4px; border-radius: 11px; background: rgba(5,5,5,0.5); border: 1px solid rgba(239,239,234,0.14); touch-action: manipulation; z-index: 3; }
-#buildbar .bp { width: 54px; padding: 5px 2px 4px; border-radius: 9px; display: grid; justify-items: center; gap: 1px; color: var(--ash); background: rgba(239,239,234,0.06); border: 1px solid rgba(239,239,234,0.2); font: 600 0.48rem var(--mono); letter-spacing: 0.05em; text-transform: uppercase; }
+#buildbar { position: fixed; left: 0; right: 0; margin: 0 auto; width: max-content; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 4px; padding: 5px; border-radius: 12px; background: rgba(5,5,5,0.62); border: 1px solid rgba(239,239,234,0.14); touch-action: manipulation; z-index: 3; max-width: calc(100vw - 150px); }
+#buildbar .bprow { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+#buildbar .bptop { justify-content: space-between; align-items: center; gap: 3px; padding-bottom: 4px; border-bottom: 1px solid rgba(239,239,234,0.1); }
+#buildbar .bptools { display: flex; gap: 3px; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(239,239,234,0.14); }
+#buildbar button { color: var(--ash); background: rgba(239,239,234,0.06); border: 1px solid rgba(239,239,234,0.2); cursor: pointer; }
+#buildbar .bc, #buildbar .bt { width: 34px; height: 30px; padding: 0; border-radius: 8px; display: grid; place-items: center; }
+#buildbar .bc svg, #buildbar .bt svg { width: 20px; height: 20px; }
+#buildbar .bc.sel { border: 2px solid #ffcf8a; background: rgba(255,190,120,0.2); }
+#buildbar .bc.short { opacity: 0.45; }
+#buildbar .bt.on { border-color: #9fe08a; background: rgba(140,220,120,0.18); color: #c8f0b8; }
+#buildbar .bt.del.on { border-color: #f08a74; background: rgba(240,110,90,0.22); color: #ffc8b8; }
+#buildbar .bp { width: 54px; padding: 5px 2px 4px; border-radius: 9px; display: grid; justify-items: center; gap: 1px; font: 600 0.48rem var(--mono); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
 #buildbar .bp svg { width: 26px; height: 26px; }
 #buildbar .bp.sel { border: 2px solid #ffcf8a; background: rgba(255,190,120,0.2); color: var(--bone); }
-#buildbar .bp.short { opacity: 0.42; }
-@media (max-width: 560px) and (min-height: 521px) { #buildbar { left: 10px; transform: none; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); gap: 3px; padding: 3px; } #buildbar .bp { width: 45px; padding: 4px 1px 3px; } #buildbar .bp svg { width: 22px; height: 22px; } }
+#buildbar .bp.short { opacity: 0.5; }
+#buildbar .bp.locked { opacity: 0.3; }
+#buildbar .bpname { font: 600 0.58rem var(--mono); letter-spacing: 0.04em; color: var(--ash); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) and (min-height: 521px) { #buildbar { left: 8px; right: 8px; width: auto; max-width: none; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); gap: 3px; padding: 4px; } #buildbar .bprow { flex-wrap: nowrap; gap: 2px; } #buildbar .bp { width: 41px; padding: 4px 0 3px; font-size: 0.42rem; } #buildbar .bp svg { width: 20px; height: 20px; } #buildbar .bc, #buildbar .bt { width: 26px; height: 27px; } #buildbar .bc svg, #buildbar .bt svg { width: 17px; height: 17px; } #buildbar .bptools { gap: 2px; margin-left: 3px; padding-left: 3px; } }
+@media (max-height: 520px) { #buildbar { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); gap: 2px; padding: 3px; max-width: calc(100vw - 170px); } #buildbar .bp { width: 42px; padding: 3px 1px 2px; } #buildbar .bp svg { width: 19px; height: 19px; } #buildbar .bc, #buildbar .bt { width: 27px; height: 24px; } #buildbar .bc svg, #buildbar .bt svg { width: 17px; height: 17px; } #buildbar .bpname { display: none; } }
 #craft .pk { margin-block: auto; width: 100%; max-width: 34rem; display: grid; gap: 0.6rem; }
 #craft.carded .pk { padding-bottom: 12rem; }   /* v180: room under the item card only while it's up */
 @media (min-width: 760px) { #craft .pk { max-width: 62rem; } }
@@ -569,7 +582,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 185</p>
+      <p class="small" id="verLbl">Version 186</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -729,6 +742,7 @@ cv.addEventListener('mousemove', e => {
   if (!S) return;
   const [sx, sy] = toScreen(S.p.x, S.p.y);
   S.aim = Math.atan2(e.clientY - sy, e.clientX - sx); // aim is a screen angle, so the beam looks the same every way
+  S.curX = e.clientX; S.curY = e.clientY; S.curT = performance.now();   // v186: where the cursor is, for laying out a piece
 });
 const sticks = {};
 cv.addEventListener('touchstart', e => {
@@ -4232,8 +4246,9 @@ function renderScene() {
   const lights = lightsNear(S.cam.x, S.cam.y, viewR() + 200);
   const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(decorInView(lights), lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : [], S.mode === 'expedition' && S.rg ? S.rg.enemies.concat(exItems()) : []).map(o => ({ o, k: o.x + o.y }));
   items.sort((a, b) => a.k - b.k);
-  if (S.day) drawSunShadows(items);   // v158: the sun's shadows, on the floor before anything stands on it
+  if (S.day) { stDrawFlat(); drawSunShadows(items); }   // v186: floors under everything   // v158: the sun's shadows, on the floor before anything stands on it
   for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : it.o.kind === 'searcher' ? drawSearcher(it.o) : drawProp(it.o);
+  if (S.day) stDrawRoofs();   // v186: roofs over everything
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
   airStep(); snowStep(frameDt); sparkFires(lights); drawMistLow(); drawMoths(); drawSnowfall();
@@ -6035,7 +6050,7 @@ function updateSurvive(dt) {
     const farOff = !e.lit && d > Math.max(700, (e.spawnD || 500) + 300) && !seenAt(e.x, e.y);   // well out of reach and out of sight
     if (S.mode === 'expedition' && farOff && d > 900 && !e.guard) { e.dead = e.gone = true; continue; }   // left far behind: gone, others will come
     if (farOff && !e.guard) { const at = spawnSpot(); e.x = at.x; e.y = at.y; e.spawnD = at.d; if (e.type === 'bomber') { e.ang = undefined; bomberReset(e); } if (e.type === 'laser' && e.ai !== 'fire') e.ai = 'move'; if (e.type === 'spear') spearInit(e); if (e.type === 'archer') archerInit(e); continue; }   // left far behind: bring it back around you
-    let sp = f.sp * (inBeyond() ? DUNE_SP : 1) * (pact('hunted') ? 1.3 : 1) * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1);
+    let sp = f.sp * (inBeyond() ? DUNE_SP : 1) * (pact('hunted') ? 1.3 : 1) * (1 + 0.03 * Math.min(rg.wave, 15)) * (e.scarred ? Math.pow(0.8, lv('scar')) : 1) * (e.mire > S.t ? 0.4 : 1);
     if (S.mode === 'expedition' && !inBeyond()) { const k = EX_PACE[exRing(Math.hypot(S.p.x, S.p.y))]; sp = e.type === 'kamikaze' ? sp * k : Math.min(sp * k, Math.max(sp, EX_PACE_MAX)); }   // v122: deeper woods, quicker hunters (never quite your sprint)
     if (!e.lit && !seenAt(e.x, e.y)) sp *= 3;   // out of sight they close in quicker, so off-screen spawns don't slow the pace
     if (e.lit) sp *= f.lightSp;
@@ -7921,7 +7936,7 @@ function dayStep(dt, inCamp) {
   dayWarmStep(dt); dayBleedStep(dt); dayFishStep(dt); dayTorchStep(dt); dayPlotStep(dt);
   { const o = dayUseTarget(), lab = o ? useLabel(o) : 'Take'; if (useBtn.textContent !== lab) useBtn.textContent = lab; }
   { const v = dayVerb(); if (attackBtn.textContent !== v) attackBtn.textContent = v; }
-  { const on = dayTool() === 'build'; if (on !== !!D.barOn) { D.barOn = on; renderBuildBar(); layoutBtns(); if (on) dayNote('bhint', 'pick a piece, lay it out, then hammer it up', 999); } }
+  { const on = dayTool() === 'build'; if (on !== !!D.barOn) { D.barOn = on; renderBuildBar(); layoutBtns(); if (on) dayNote('bhint', 'point and press Attack to lay a piece · it snaps to what you built · Use (E) builds it', 999); } }
   if (!D.told.packHint && D.known.size >= 2) { D.told.packHint = 1; }
 }
 function pickSnd() { sfx(1.5, 0.15, 'bandpass', 1600, 0.15); }
@@ -7955,7 +7970,7 @@ function dayFill() {                             // every waterskin you carry, f
 // ---- the button you press: on what's in your hand ----
 function dayVerb() {
   const T = heldIt(); if (!T) return 'Attack';
-  if (T.tool === 'build') { const o = stAimed(); return !o ? 'Lay out' : o.done ? (o.hp < o.max ? 'Mend' : 'Built') : 'Build'; }
+  if (T.tool === 'build') { const D = S.day; if (D.bdel) return stAimed() ? 'Pull down' : 'Point at it'; const g = stGhost(); if (g && g.ok) return 'Place'; const o = stWorkTarget(); return o ? (o.done ? 'Mend' : 'Build') : 'Place'; }
   if (T.tool === 'rod') { const F = S.day.fish; return F ? (F.st === 'bite' ? 'Pull!' : 'Reel in') : 'Cast'; }
   if (T.k === 'med') return 'Bind';
   return T.k === 'food' ? 'Eat' : T.k === 'drink' ? 'Drink' : T.k === 'place' ? 'Place' : T.k === 'gear' ? 'Wear' : T.tool === 'axe' ? 'Chop' : T.tool === 'pick' ? 'Mine' : 'Attack';
@@ -7965,7 +7980,9 @@ function dayPrimary() {                          // true when what you hold is u
   if (S.p.act && (T.k === 'food' || T.k === 'drink')) return true;   // one mouthful at a time
   if (T.tool === 'build') {                       // the hammer: lay out a blueprint, work a material into one, or mend what's standing
     if (S.p.act) return true;
-    const o = stAimed();
+    const D = S.day;
+    if (D.bdel) { const o = stAimed(); if (o) { dayAct(10, 0.45); stRemove(o); } else dayNote('nodel', 'point at a piece to pull it down', 1.5); return true; }
+    const g = stGhost(), o = g && g.ok ? null : stWorkTarget();
     if (!o) { stPlace(); return true; }
     if (!dayStam(STA_CHOP)) return true;
     dayAct(10, 0.5); S.p.vx *= 0.4; S.p.vy *= 0.4;
@@ -8011,6 +8028,7 @@ function dayUseTarget() {                        // the nearest thing in reach y
     { const d = dist2(EX_FIRE, p) - 24; if (d < bd) { bd = d; best = EX_FIRE; } }   // v164: the camp fire sells wisp upgrades
     { const d = dist2(CAMP_BARREL, p) - 10; if (d < bd && D.water < FOOD_MAX - 2) { bd = d; best = CAMP_BARREL; } }
   }
+  if (dayTool() === 'build') for (const o of stNear(p.x, p.y, 60)) if (stNeedsWork(o)) { const d = stDistTo(o, p.x, p.y) - 4; if (d < bd) { bd = d; best = o; } }   // v186: Use works your blueprints up
   return best;
 }
 const STN_N = { bench: 'Workbench', furnace: 'Furnace', rack: 'Drying rack', fire: 'Fire' };   // v163: walk up to a station and Use opens its recipes
@@ -8034,6 +8052,7 @@ function dayUse() {
   if (o.t === 'tpost') { dayPostFeed(o); return; }
   if (o === CAMP_BOX || o.t === 'chest') { openCraft(o); return; }
   if (STN_N[o.t]) { openStation(o.t); return; }   // v163
+  if (o.kind === 'dst') { if (!S.p.act && dayStam(STA_CHOP)) { dayAct(10, 0.5); S.p.vx *= 0.4; S.p.vy *= 0.4; if (stHammer(o)) dayWear(); } return; }   // v186
   if (o === EX_FIRE) { dayWispShop(); return; }   // v164
   dayAct(7, 0.42); S.p.vx *= 0.3; S.p.vy *= 0.3;
   if (o.kind === 'dday') { const got = dayGive(o.it, o.n, o.x, o.y, true, o.ex); if (got) { exNote(`+${got} ${DIT[o.it].n.toLowerCase()}`); pickSnd(); } o.n -= got; if (o.n <= 0) o.gone = true; D.drops = D.drops.filter(f => !f.gone); }
@@ -8258,11 +8277,11 @@ function dayCard() {
 function dayItems() {                          // drawn in with the trees
   const D = S.day; if (!D) return [];
   const R = viewR(), cx = S.cam.x, cy = S.cam.y, near = o => Math.abs(o.x - cx) < R && Math.abs(o.y - cy) < R;
-  const out = dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts), [...D.bld.values()].filter(near));
+  const out = dayNodesNear(cx, cy, R).concat(D.beasts.filter(near), D.drops.filter(near), D.logs, D.builds.filter(near).flatMap(B => B.parts), [...D.bld.values()].filter(o => near(o) && !stFlat(PC(o.id))));
   for (const P of lakesNear(cx, cy, R)) out.push(P);
   for (const o of dayCampsNear(cx, cy, R)) out.push(o);   // v155: the raider camps
   const g = dayGhost(); if (g) out.push(g);
-  const sg = stGhost(); if (sg) out.push(sg);
+  const sg = stGhost(); if (sg && !stFlat(PC(sg.id))) out.push(sg);
   return out;
 }
 // ---- item icons: one small picture per item, used in the pack, on the hotbar and for things lying on the ground ----
@@ -8476,7 +8495,7 @@ function drawDay() {                           // the sun: a warm wash from the 
   ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * lt; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
   drawNight();
-  drawDayFires(); drawDayChips(); drawFloat(); drawSiege();
+  drawDayFires(); stFlames(); drawDayChips(); drawFloat(); drawSiege();
 }
 function dayBar(px, py) {                      // stamina, food and water over your head
   const D = S.day, tw = 46, x0 = px - tw / 2, y0 = py - 50 * Z - 4;
@@ -8865,7 +8884,7 @@ function daySave() {
   d.nodes = [...D.nodes].map(([k, L]) => [k, L.filter(o => !o.gone).map(o => ({ t: o.t, x: Math.round(o.x), y: Math.round(o.y), n: o.n, ber: o.ber, berT: o.berT, seed: o.seed }))]);
   d.drops = D.drops.map(f => ({ it: f.it, n: f.n, ex: f.ex, x: Math.round(f.x), y: Math.round(f.y), t: f.t, keep: f.keep }));
   d.camps = [...D.camps].map(([i, c]) => [i, { seen: c.seen, took: c.took }]);
-  d.bld = [...D.bld.values()].map(o => ({ id: o.id, i: o.i, j: o.j, s: o.s, a: o.a, hp: Math.round(o.hp * 10) / 10, need: o.need, done: o.done }));
+  d.bld = [...D.bld.values()].map(stOut); d.brot = D.brot || 0; d.bsnap = D.bsnap !== false;
   d.logs = D.logs.flatMap(g => [['logs', g.give.logs], ['sticks', g.give.sticks]].filter(([, n]) => n).map(([it, n]) => ({ it, n, x: Math.round(g.bx + g.ux * g.len / 2), y: Math.round(g.by + g.uy * g.len / 2), t: 0 })));   // a tree still falling is saved as its logs
   d.beasts = D.beasts.filter(b => !b.dead).map(b => ({ k: b.k, x: Math.round(b.x), y: Math.round(b.y), hp: b.hp, stag: b.stag, chunk: b.chunk, tame: b.tame, fed: b.fed }));
   d.builds = D.builds.map(B => ({ t: B.t, x: B.x, y: B.y, a: B.a, hp: B.hp, uses: B.uses, inv: B.inv, crop: B.crop, sown: B.sown, grown: B.grown, fuel: B.fuel, lit: B.lit }));
@@ -9025,76 +9044,234 @@ function itemUses(id) {   // what you can make with it (that you know of)
   if (!L.length) return '';
   return L.slice(0, 5).join(', ') + (L.length > 5 ? ` and ${L.length - 5} more` : '');
 }
-// ---- v152 stage 2 (Joe): the base builder. Hold the hammer and pieces snap to a grid: floors in a cell, walls, doorways and
-// windows on a cell's edge. What you put down is a blueprint, and every swing of the hammer works one more material into it until it
-// stands, the way The Forest builds a shelter. Three tiers of wall, each far tougher. Raiders come for your walls and doors.
-// A bed makes the place yours: die with one built and you wake there, with everything you carried left in a bag where you fell.
-const GRID = 56, STK_R = 11;
-const PIECES = [
-  { id: 'floorW', k: 'floor', s: 'Floor', n: 'Wood floor', b: 'A clean floor to build on', cost: { planks: 3 }, hp: 30, tier: 1 },
-  { id: 'wallT', k: 'wall', s: 'Thatch', n: 'Thatch wall', b: 'Quick cover · goes down fast', cost: { fibre: 4, sticks: 2 }, hp: 14, tier: 0 },
-  { id: 'wallW', k: 'wall', s: 'Log', n: 'Log wall', b: 'Holds against a raid', cost: { logs: 4 }, hp: 48, tier: 1 },
-  { id: 'wallS', k: 'wall', s: 'Stone', n: 'Stone wall', b: 'They batter it all night and fail', cost: { stones: 5, planks: 2 }, hp: 140, tier: 2 },
-  { id: 'door', k: 'door', s: 'Door', n: 'Doorway', b: 'Swings open for you, not for them', cost: { planks: 4, rope: 1 }, hp: 44, tier: 1 },
-  { id: 'window', k: 'window', s: 'Window', n: 'Window', b: 'See out · a spear reaches over it', cost: { planks: 3 }, hp: 30, tier: 1 },
-  { id: 'bed', k: 'bed', s: 'Bed', n: 'Bed', b: 'Die with one and you wake here', cost: { planks: 4, hide: 4, fibre: 4 }, hp: 20, tier: 1 },
+// ---- v186 (Joe: a full pass on building, after Grounded): no grid. A piece goes where you point, turned however you like, and when it
+// comes near something you've already built it snaps to it: floors edge to edge, walls along a floor's edges or on from the end of
+// another wall, posts on corners, roofs over floors, lamps and trophies onto a wall's face. Crouch (or Snap off) to place it freely.
+// What you put down is still a blueprint: Use (E, X) works one more material into it, the way The Forest raises a shelter. Eight
+// kinds of piece, about fifty in all: floors, walls, doors and windows, roofs, defences, lights, furniture and decoration.
+// A bed makes the place yours: die with one built and you wake there, with everything you carried left where you fell.
+const GRID = 56, STK_R = 11, SNAP_R = 30, ROOF_H = 46, ROT_STEP = Math.PI / 12, TRI_IN = GRID / (2 * Math.sqrt(3)), TRI_R = GRID / Math.sqrt(3);
+const BCATS = [
+  { id: 'floor', n: 'Floors' }, { id: 'wall', n: 'Walls' }, { id: 'door', n: 'Doors' }, { id: 'roof', n: 'Roofs' },
+  { id: 'def', n: 'Defence' }, { id: 'light', n: 'Light' }, { id: 'furn', n: 'Furniture' }, { id: 'decor', n: 'Decor' },
 ];
-const PC = id => PIECES.find(p => p.id === id);
-const bKey = p => p.k === 'floor' || p.k === 'bed' ? `c${p.i},${p.j}` : `e${p.i},${p.j},${p.s}`;
-const edgePos = (i, j, s) => s ? { x: (i + 0.5) * GRID, y: (j + 1) * GRID, a: 0 } : { x: (i + 1) * GRID, y: (j + 0.5) * GRID, a: Math.PI / 2 };
-const cellPos = (i, j) => ({ x: (i + 0.5) * GRID, y: (j + 0.5) * GRID, a: 0 });
+// sh: how it snaps ('sq' square, 'tri' triangle, 'edge' a wall-like run of length L, 'post', 'mount' on a wall's face, 'free'); lay: what
+// it can't share space with; m: what it's made of (its colours); k: how it's drawn. blk: stands in the way. r: how much room it takes.
+const PIECES = [
+  // floors
+  { id: 'floorT', cat: 'floor', sh: 'sq', lay: 'floor', k: 'floor', m: 'thatch', s: 'Mat', n: 'Woven mat floor', b: 'Grass matting · quick and cheap', cost: { fibre: 6 }, hp: 14 },
+  { id: 'floorW', cat: 'floor', sh: 'sq', lay: 'floor', k: 'floor', m: 'wood', s: 'Wood', n: 'Wood floor', b: 'A clean floor to build on', cost: { planks: 3 }, hp: 30 },
+  { id: 'floorS', cat: 'floor', sh: 'sq', lay: 'floor', k: 'floor', m: 'stone', s: 'Stone', n: 'Flagstone floor', b: 'Heavy slabs, laid to last', cost: { stones: 6 }, hp: 90 },
+  { id: 'floorWT', cat: 'floor', sh: 'tri', lay: 'floor', k: 'floor', m: 'wood', s: 'Wood ◢', n: 'Wood corner floor', b: 'A triangle, for angled rooms', cost: { planks: 2 }, hp: 20 },
+  { id: 'floorST', cat: 'floor', sh: 'tri', lay: 'floor', k: 'floor', m: 'stone', s: 'Stone ◢', n: 'Stone corner floor', b: 'A triangle of flagstones', cost: { stones: 4 }, hp: 60 },
+  // walls
+  { id: 'wallT', cat: 'wall', sh: 'edge', L: GRID, lay: 'edge', k: 'wall', m: 'thatch', blk: 1, H: 36, s: 'Thatch', n: 'Thatch wall', b: 'Quick cover · goes down fast', cost: { fibre: 4, sticks: 2 }, hp: 14 },
+  { id: 'wallW', cat: 'wall', sh: 'edge', L: GRID, lay: 'edge', k: 'wall', m: 'wood', blk: 1, H: 36, s: 'Log', n: 'Log wall', b: 'Holds against a raid', cost: { logs: 4 }, hp: 48 },
+  { id: 'wallS', cat: 'wall', sh: 'edge', L: GRID, lay: 'edge', k: 'wall', m: 'stone', blk: 1, H: 36, s: 'Stone', n: 'Stone wall', b: 'They batter it all night and fail', cost: { stones: 5, planks: 2 }, hp: 140 },
+  { id: 'wallI', cat: 'wall', sh: 'edge', L: GRID, lay: 'edge', k: 'wall', m: 'iron', blk: 1, H: 38, s: 'Iron', n: 'Iron-bound wall', b: 'Planks behind iron plate · near unbreakable', cost: { iron: 2, planks: 3 }, hp: 260 },
+  { id: 'halfW', cat: 'wall', sh: 'edge', L: GRID, lay: 'edge', k: 'half', m: 'wood', blk: 1, H: 18, s: 'Low log', n: 'Low log wall', b: 'Waist high · keeps them out, lets you see', cost: { logs: 2 }, hp: 30 },
+  { id: 'halfS', cat: 'wall', sh: 'edge', L: GRID, lay: 'edge', k: 'half', m: 'stone', blk: 1, H: 18, s: 'Low stone', n: 'Low stone wall', b: 'A dry-stone wall, waist high', cost: { stones: 3 }, hp: 80 },
+  { id: 'post', cat: 'wall', sh: 'post', lay: 'post', k: 'post', m: 'wood', blk: 1, r: 6, H: 40, s: 'Post', n: 'Wood post', b: 'A corner post · walls meet on it', cost: { logs: 1 }, hp: 30 },
+  { id: 'pillar', cat: 'wall', sh: 'post', lay: 'post', k: 'pillar', m: 'stone', blk: 1, r: 8, H: 42, s: 'Pillar', n: 'Stone pillar', b: 'A squared stone corner', cost: { stones: 3 }, hp: 90 },
+  // doors and windows
+  { id: 'door', cat: 'door', sh: 'edge', L: GRID, lay: 'edge', k: 'door', m: 'wood', blk: 1, H: 42, s: 'Door', n: 'Doorway', b: 'Swings open for you, not for them', cost: { planks: 4, rope: 1 }, hp: 44 },
+  { id: 'doorS', cat: 'door', sh: 'edge', L: GRID, lay: 'edge', k: 'door', m: 'stone', blk: 1, H: 42, s: 'Stone door', n: 'Stone doorway', b: 'A stone frame round a heavy door', cost: { stones: 4, planks: 3, rope: 1 }, hp: 110 },
+  { id: 'doorI', cat: 'door', sh: 'edge', L: GRID, lay: 'edge', k: 'door', m: 'iron', blk: 1, H: 42, s: 'Iron door', n: 'Iron door', b: 'Studded and banded · the last door you need', cost: { iron: 2, planks: 3 }, hp: 220 },
+  { id: 'gate', cat: 'door', sh: 'edge', L: GRID * 2, lay: 'edge', k: 'gate', m: 'wood', blk: 1, H: 44, s: 'Gate', n: 'Double gate', b: 'Two leaves, two walls wide', cost: { logs: 4, planks: 4, rope: 2 }, hp: 90 },
+  { id: 'window', cat: 'door', sh: 'edge', L: GRID, lay: 'edge', k: 'window', m: 'wood', blk: 1, H: 42, s: 'Window', n: 'Window', b: 'See out · a spear reaches over it', cost: { planks: 3 }, hp: 30 },
+  { id: 'windowS', cat: 'door', sh: 'edge', L: GRID, lay: 'edge', k: 'window', m: 'stone', blk: 1, H: 42, s: 'Stone win.', n: 'Stone window', b: 'An arrow slit in stone', cost: { stones: 4, planks: 1 }, hp: 100 },
+  { id: 'arch', cat: 'door', sh: 'edge', L: GRID, lay: 'edge', k: 'arch', m: 'wood', H: 42, s: 'Opening', n: 'Open doorway', b: 'A frame with no door · for inside rooms', cost: { planks: 2 }, hp: 30 },
+  // roofs
+  { id: 'roofT', cat: 'roof', sh: 'sq', lay: 'roof', k: 'roof', m: 'thatch', s: 'Thatch', n: 'Thatch roof', b: 'Keeps the rain off · counts as indoors', cost: { fibre: 5, sticks: 3 }, hp: 20 },
+  { id: 'roofW', cat: 'roof', sh: 'sq', lay: 'roof', k: 'roof', m: 'wood', s: 'Plank', n: 'Plank roof', b: 'Boards overlapped like shingles', cost: { planks: 3, sticks: 2 }, hp: 40 },
+  { id: 'roofS', cat: 'roof', sh: 'sq', lay: 'roof', k: 'roof', m: 'stone', s: 'Slate', n: 'Slate roof', b: 'Split stone on a timber frame', cost: { stones: 4, planks: 2 }, hp: 80 },
+  { id: 'roofTT', cat: 'roof', sh: 'tri', lay: 'roof', k: 'roof', m: 'thatch', s: 'Thatch ◢', n: 'Thatch corner roof', b: 'For the triangle floors', cost: { fibre: 3, sticks: 2 }, hp: 14 },
+  { id: 'roofWT', cat: 'roof', sh: 'tri', lay: 'roof', k: 'roof', m: 'wood', s: 'Plank ◢', n: 'Plank corner roof', b: 'For the triangle floors', cost: { planks: 2, sticks: 1 }, hp: 28 },
+  // defence
+  { id: 'fence', cat: 'def', sh: 'edge', L: GRID, lay: 'edge', k: 'fence', m: 'wood', blk: 1, H: 20, s: 'Fence', n: 'Stick fence', b: 'A rough fence · slows the first rush', cost: { sticks: 6, rope: 1 }, hp: 18 },
+  { id: 'palis', cat: 'def', sh: 'edge', L: GRID, lay: 'edge', k: 'palis', m: 'wood', blk: 1, H: 46, thorn: 1, s: 'Palisade', n: 'Palisade', b: 'Sharpened logs · whatever batters it bleeds', cost: { logs: 5, rope: 1 }, hp: 70 },
+  { id: 'stakes', cat: 'def', sh: 'free', lay: 'free', k: 'stakes', m: 'wood', blk: 1, r: 16, H: 22, thorn: 1, s: 'Stakes', n: 'Stake barricade', b: 'Crossed stakes · they hurt to push through', cost: { logs: 2, sticks: 4 }, hp: 40 },
+  { id: 'spikeF', cat: 'def', sh: 'free', lay: 'flat', k: 'spikeF', m: 'wood', r: 18, trap: 1, s: 'Spike pit', n: 'Spike strip', b: 'Hidden spikes · cuts whatever walks over', cost: { sticks: 6, flint: 2 }, hp: 30 },
+  { id: 'thorns', cat: 'def', sh: 'free', lay: 'free', k: 'thorns', m: 'thatch', r: 18, mire: 1, s: 'Thorns', n: 'Thorn hedge', b: 'Bramble · they wade through it slowly', cost: { fibre: 6, sticks: 3 }, hp: 24 },
+  { id: 'chimes', cat: 'def', sh: 'free', lay: 'free', k: 'chimes', m: 'bone', r: 8, H: 40, s: 'Chimes', n: 'Bone chimes', b: 'Ring when something comes close at night', cost: { bone: 3, rope: 1, sticks: 2 }, hp: 10 },
+  // light
+  { id: 'sconce', cat: 'light', sh: 'mount', lay: 'mount', k: 'sconce', m: 'iron', light: 90, s: 'Sconce', n: 'Wall sconce', b: 'A torch on the wall · lights at dusk', cost: { sticks: 2, fibre: 2 }, hp: 10 },
+  { id: 'lamp', cat: 'light', sh: 'free', lay: 'free', k: 'lamp', m: 'wood', blk: 1, r: 5, H: 50, light: 150, s: 'Lamp post', n: 'Lamp post', b: 'A lantern on a pole · lights at dusk', cost: { logs: 1, rope: 1, fibre: 2 }, hp: 20 },
+  { id: 'brazier', cat: 'light', sh: 'free', lay: 'free', k: 'brazier', m: 'stone', blk: 1, r: 9, H: 18, light: 125, warm: 1, s: 'Brazier', n: 'Brazier', b: 'A fire in a stone bowl · light and warmth', cost: { stones: 4, sticks: 4 }, hp: 40 },
+  { id: 'candles', cat: 'light', sh: 'free', lay: 'free', k: 'candles', m: 'bone', r: 5, light: 55, s: 'Candles', n: 'Candles', b: 'A little light for inside', cost: { fibre: 2, bone: 1 }, hp: 4 },
+  // furniture
+  { id: 'bed', cat: 'furn', sh: 'free', lay: 'free', k: 'bed', m: 'wood', blk: 0, r: 18, s: 'Bed', n: 'Bed', b: 'Die with one and you wake here', cost: { planks: 4, hide: 4, fibre: 4 }, hp: 20 },
+  { id: 'table', cat: 'furn', sh: 'free', lay: 'free', k: 'table', m: 'wood', blk: 1, r: 14, H: 16, s: 'Table', n: 'Table', b: 'A plank table', cost: { planks: 3, sticks: 2 }, hp: 20 },
+  { id: 'stool', cat: 'furn', sh: 'free', lay: 'free', k: 'stool', m: 'wood', blk: 1, r: 6, H: 10, s: 'Stool', n: 'Stool', b: 'Three legs and a seat', cost: { planks: 1, sticks: 2 }, hp: 8 },
+  { id: 'seat', cat: 'furn', sh: 'free', lay: 'free', k: 'seat', m: 'wood', blk: 1, r: 14, H: 10, s: 'Bench', n: 'Bench', b: 'A long seat by the fire', cost: { planks: 2, sticks: 2 }, hp: 14 },
+  { id: 'shelf', cat: 'furn', sh: 'mount', lay: 'mount', k: 'shelf', m: 'wood', s: 'Shelf', n: 'Shelf', b: 'Pots and jars on the wall', cost: { planks: 2 }, hp: 10 },
+  { id: 'wrack', cat: 'furn', sh: 'free', lay: 'free', k: 'wrack', m: 'wood', blk: 1, r: 12, H: 34, s: 'Arms rack', n: 'Weapon rack', b: 'Spears stood ready', cost: { logs: 1, sticks: 4 }, hp: 14 },
+  { id: 'barrel', cat: 'furn', sh: 'free', lay: 'free', k: 'barrel', m: 'wood', blk: 1, r: 8, H: 18, s: 'Barrel', n: 'Barrel', b: 'Hooped staves', cost: { planks: 3, rope: 1 }, hp: 16 },
+  { id: 'crate', cat: 'furn', sh: 'free', lay: 'free', k: 'crate', m: 'wood', blk: 1, r: 9, H: 14, s: 'Crate', n: 'Crate', b: 'Stacked stores', cost: { planks: 2 }, hp: 12 },
+  // decoration
+  { id: 'rug', cat: 'decor', sh: 'free', lay: 'flat', k: 'rug', m: 'cloth', r: 20, s: 'Rug', n: 'Woven rug', b: 'Grass woven in bands', cost: { fibre: 6 }, hp: 6 },
+  { id: 'pelt', cat: 'decor', sh: 'free', lay: 'flat', k: 'pelt', m: 'hide', r: 18, s: 'Pelt', n: 'Pelt rug', b: 'A hide on the floor', cost: { hide: 2 }, hp: 6 },
+  { id: 'logs', cat: 'decor', sh: 'free', lay: 'free', k: 'woodpile', m: 'wood', blk: 1, r: 12, H: 16, s: 'Log pile', n: 'Log pile', b: 'Firewood stacked for winter', cost: { logs: 3 }, hp: 20 },
+  { id: 'banner', cat: 'decor', sh: 'free', lay: 'free', k: 'banner', m: 'cloth', blk: 1, r: 4, H: 54, s: 'Banner', n: 'Banner', b: 'Your colours on a pole', cost: { sticks: 3, hide: 1, fibre: 2 }, hp: 10 },
+  { id: 'trophy', cat: 'decor', sh: 'mount', lay: 'mount', k: 'trophy', m: 'bone', s: 'Trophy', n: 'Antler trophy', b: 'Antlers mounted on the wall', cost: { bone: 3, planks: 1 }, hp: 8 },
+  { id: 'skulls', cat: 'decor', sh: 'free', lay: 'free', k: 'skulls', m: 'bone', blk: 1, r: 5, H: 36, s: 'Totem', n: 'Skull totem', b: 'A warning on a stake', cost: { bone: 4, sticks: 2 }, hp: 10 },
+  { id: 'flowers', cat: 'decor', sh: 'free', lay: 'free', k: 'flowers', m: 'stone', r: 6, H: 10, s: 'Flowers', n: 'Flower pot', b: 'Something living', cost: { stones: 2, berries: 1 }, hp: 4 },
+  { id: 'firepit', cat: 'decor', sh: 'free', lay: 'flat', k: 'ring', m: 'stone', r: 16, s: 'Stone ring', n: 'Stone ring', b: 'A ring of stones · a place to gather', cost: { stones: 5 }, hp: 30 },
+];
+const PC = id => PIECES.find(p => p.id === id) || PIECES[1];
+const LEGACY_POS = sv => sv.s === undefined || sv.s < 0 ? { x: (sv.i + 0.5) * GRID, y: (sv.j + 0.5) * GRID, a: 0 }   // v152 saves sat on the old grid
+  : sv.s ? { x: (sv.i + 0.5) * GRID, y: (sv.j + 1) * GRID, a: 0 } : { x: (sv.i + 1) * GRID, y: (sv.j + 0.5) * GRID, a: Math.PI / 2 };
+let stUid = 1;
+const bKey = o => o.key;
+const stDoorish = P => P.k === 'door' || P.k === 'gate';
+const stFlat = P => P.sh === 'sq' || P.sh === 'tri' || P.lay === 'flat';
 function stAt(D, k) { return D.bld.get(k); }
-function stSnap(t, x, y, aim) {                  // the slot nearest the point you're aiming at
-  const i = Math.floor(x / GRID), j = Math.floor(y / GRID);
-  if (t === 'floor' || t === 'bed') { const p = cellPos(i, j); return { i, j, s: -1, x: p.x, y: p.y, a: Math.round((aim || 0) / (Math.PI / 2)) * (Math.PI / 2) }; }
-  let best = null, bd = 1e9;
-  for (const [ii, jj, s] of [[i, j, 0], [i - 1, j, 0], [i, j, 1], [i, j - 1, 1]]) {
-    const p = edgePos(ii, jj, s), d = Math.hypot(p.x - x, p.y - y);
-    if (d < bd) { bd = d; best = { i: ii, j: jj, s, x: p.x, y: p.y, a: p.a }; }
-  }
-  return best;
+// ---- shapes: corners, edges and ends of a piece on the ground ----
+function stCorners(o) {
+  const P = PC(o.id);
+  if (P.sh === 'sq') { const ux = Math.cos(o.a) * GRID / 2, uy = Math.sin(o.a) * GRID / 2, vx = -uy, vy = ux; return [[o.x - ux - vx, o.y - uy - vy], [o.x + ux - vx, o.y + uy - vy], [o.x + ux + vx, o.y + uy + vy], [o.x - ux + vx, o.y - uy + vy]]; }
+  if (P.sh === 'tri') return [0, 1, 2].map(k => [o.x + Math.cos(o.a + k * 2.0944) * TRI_R, o.y + Math.sin(o.a + k * 2.0944) * TRI_R]);
+  return [];
 }
-function stSolids(o) {                           // the bump circles a standing piece puts in your way
-  if (!o.done || o.k === 'floor' || o.k === 'bed' || (o.k === 'door' && o.open > 0.5)) return [];
-  const ux = Math.cos(o.a), uy = Math.sin(o.a), out = [];
-  for (let k = -2; k <= 2; k++) out.push({ x: o.x + ux * k * 13, y: o.y + uy * k * 13, r: STK_R, s: 1, st: o });
+function stEdges(o) {                          // each side of a floor: its middle, the way it runs, and which way is out
+  const c = stCorners(o), out = [];
+  for (let k = 0; k < c.length; k++) {
+    const [ax, ay] = c[k], [bx, by] = c[(k + 1) % c.length], mx = (ax + bx) / 2, my = (ay + by) / 2, a = Math.atan2(by - ay, bx - ax);
+    let nx = mx - o.x, ny = my - o.y; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+    out.push({ x: mx, y: my, a, nx, ny });
+  }
+  return out;
+}
+function stEnds(o) { const P = PC(o.id), h = (P.L || GRID) / 2, ux = Math.cos(o.a), uy = Math.sin(o.a); return [[o.x - ux * h, o.y - uy * h, o.a + Math.PI], [o.x + ux * h, o.y + uy * h, o.a]]; }
+const segD = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)); return Math.hypot(px - ax - dx * t, py - ay - dy * t); };
+const stFoot = o => { const P = PC(o.id); if (P.sh === 'edge') { const [[ax, ay], [bx, by]] = stEnds(o); return { ax, ay, bx, by }; } return null; };
+function stDistTo(o, x, y) {                   // how far a point is from the piece itself (its run, for a wall)
+  const P = PC(o.id), f = stFoot(o);
+  if (f) return segD(x, y, f.ax, f.ay, f.bx, f.by);
+  return Math.max(0, Math.hypot(o.x - x, o.y - y) - (P.sh === 'sq' ? GRID * 0.45 : P.sh === 'tri' ? TRI_IN : P.r || 6));
+}
+// ---- the snap points: where a piece of kind P could sit against piece o ----
+const TAU = Math.PI * 2, ang = a => ((a % TAU) + TAU) % TAU;
+function stSockets(o, P) {
+  const Q = PC(o.id), out = [];
+  const sqAcross = (e, fl) => out.push({ x: e.x + e.nx * GRID / 2, y: e.y + e.ny * GRID / 2, a: e.a, fl });
+  const triAcross = (e, fl) => { const phi = Math.atan2(-e.ny, -e.nx); out.push({ x: e.x + e.nx * TRI_IN, y: e.y + e.ny * TRI_IN, a: phi - Math.PI / 3 + Math.PI, fl }); };
+  const flo = Q.sh === 'sq' || Q.sh === 'tri';
+  if (P.sh === 'sq' || P.sh === 'tri') {
+    if (flo && Q.lay === P.lay) for (const e of stEdges(o)) (P.sh === 'sq' ? sqAcross : triAcross)(e);
+    if (flo && P.lay === 'roof' && Q.lay === 'floor' && Q.sh === P.sh) out.push({ x: o.x, y: o.y, a: o.a, over: 1 });   // a roof straight over a floor
+    if (Q.sh === 'edge' && (Q.L || GRID) === GRID) for (const s of [-1, 1]) { const nx = -Math.sin(o.a) * s, ny = Math.cos(o.a) * s; (P.sh === 'sq' ? sqAcross : triAcross)({ x: o.x, y: o.y, a: o.a, nx, ny }); }
+  } else if (P.sh === 'edge') {
+    const L = P.L || GRID;
+    if (flo) for (const e of stEdges(o)) {
+      if (L === GRID) out.push({ x: e.x, y: e.y, a: e.a });
+      else for (const s of [-1, 1]) out.push({ x: e.x + Math.cos(e.a) * s * GRID / 2, y: e.y + Math.sin(e.a) * s * GRID / 2, a: e.a });
+    }
+    if (Q.sh === 'edge') for (const [ex, ey, ea] of stEnds(o)) for (const d of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3]) {
+      const t = ea + d; out.push({ x: ex + Math.cos(t) * L / 2, y: ey + Math.sin(t) * L / 2, a: t });
+    }
+    if (Q.sh === 'post') for (let k = 0; k < 8; k++) { const t = o.a + k * Math.PI / 4; out.push({ x: o.x + Math.cos(t) * L / 2, y: o.y + Math.sin(t) * L / 2, a: t }); }
+  } else if (P.sh === 'post') {
+    if (flo && Q.lay === 'floor') for (const [x, y] of stCorners(o)) out.push({ x, y, a: o.a });
+    if (Q.sh === 'edge') for (const [x, y] of stEnds(o)) out.push({ x, y, a: o.a });
+  } else if (P.sh === 'mount') {
+    if (Q.sh === 'edge' && (Q.k === 'wall' || Q.k === 'palis' || Q.k === 'half')) for (const s of [-1, 1]) for (const f of [-0.27, 0, 0.27]) {
+      const nx = -Math.sin(o.a) * s, ny = Math.cos(o.a) * s, L = Q.L || GRID;
+      out.push({ x: o.x + Math.cos(o.a) * f * L + nx * 6, y: o.y + Math.sin(o.a) * f * L + ny * 6, a: Math.atan2(ny, nx) - Math.PI / 2, on: o });
+    }
+  }
   return out;
 }
 function stNear(x, y, R) { const D = S.day, out = []; if (!D) return out; for (const o of D.bld.values()) if (Math.abs(o.x - x) < R + GRID && Math.abs(o.y - y) < R + GRID) out.push(o); return out; }
-function stCanPlace(t, sp) {
-  const D = S.day;
-  if (D.bld.has(bKey({ k: t, i: sp.i, j: sp.j, s: sp.s }))) return 'already something there';
-  const d = Math.hypot(sp.x, sp.y);
-  if (d < CAMP_R + 60) return 'not against the old camp';
-  if (inPlaza(sp.x, sp.y) || [TELE, TELE2].some(o => dist2(o, sp) < 90)) return 'not on the shrines';
-  for (const o of propsNear(sp.x, sp.y, 60)) if ((o.kind === 'tree' || o.kind === 'rock') && dist2(o, sp) < (o.r || 8) * (o.s || 1) + (t === 'floor' || t === 'bed' ? 22 : 16)) return t === 'floor' ? 'a tree is in the way' : 'a tree is in the way';
-  for (const B of D.builds) if (B.parts.some(q => dist2(q, sp) < (t === 'floor' || t === 'bed' ? 30 : 22))) return 'something is in the way';
-  if (t !== 'floor' && dist2(sp, S.p) < 16) return 'step back';
+function stAimPt() {                             // where you're pointing: the mouse, or a stride ahead of you
+  const p = S.p, a = S.aimW || 0;
+  if (S.curT && !PAD.on && document.body.classList.contains('mouse') && performance.now() - S.curT < 6000) {
+    const k = K(), u = (S.curX - W / 2) / k, v = (S.curY - H / 2) * 2 / k, wx = S.cam.x + (u + v) / 2 - p.x, wy = S.cam.y + (v - u) / 2 - p.y, d = Math.hypot(wx, wy) || 1, dd = Math.max(34, Math.min(150, d));
+    return { x: p.x + wx / d * dd, y: p.y + wy / d * dd };
+  }
+  return { x: p.x + Math.cos(a) * 58, y: p.y + Math.sin(a) * 58 };
+}
+function stSnap(P, A) {                          // the nearest snap point to where you're pointing, or free placement
+  const D = S.day, free = { x: A.x, y: A.y, a: (D.brot || 0) + (P.sh === 'edge' || P.sh === 'mount' ? 0 : 0), snap: false };
+  if (D.bsnap === false || D.crouch) return free;
+  let best = null, bd = P.sh === 'mount' ? 22 : P.sh === 'edge' ? SNAP_R + 8 : SNAP_R;
+  for (const o of stNear(A.x, A.y, 130)) for (const s of stSockets(o, P)) { const d = Math.hypot(s.x - A.x, s.y - A.y); if (d < bd && stFree(P, s) === true) { bd = d; best = s; } }
+  if (!best) for (const o of stNear(A.x, A.y, 130)) for (const s of stSockets(o, P)) { const d = Math.hypot(s.x - A.x, s.y - A.y); if (d < bd) { bd = d; best = s; } }
+  return best ? { x: best.x, y: best.y, a: best.a, snap: true, on: best.on } : free;
+}
+function stOverlap(P, sp, o) {                   // would P at sp clash with what's already standing at o?
+  const Q = PC(o.id), d = Math.hypot(o.x - sp.x, o.y - sp.y);
+  const inr = X => X.sh === 'sq' ? GRID / 2 : X.sh === 'tri' ? TRI_IN : 0;
+  if ((P.lay === 'floor' || P.lay === 'roof') && Q.lay === P.lay) return d < (inr(P) + inr(Q)) * 0.85;
+  if (P.lay === 'edge' && Q.lay === 'edge') {      // two walls along the same line, overlapping
+    const da = Math.abs(Math.sin(sp.a - o.a)); if (da > 0.25) return false;
+    const ux = Math.cos(o.a), uy = Math.sin(o.a), rx = sp.x - o.x, ry = sp.y - o.y, along = rx * ux + ry * uy, perp = Math.abs(-rx * uy + ry * ux);
+    return perp < 8 && Math.abs(along) < ((P.L || GRID) + (Q.L || GRID)) / 2 - 10;
+  }
+  if (P.lay === 'post' && Q.lay === 'post') return d < 12;
+  if (P.lay === 'mount' && Q.lay === 'mount') return d < 14;
+  if (P.lay === 'flat' && Q.lay === 'flat') return d < ((P.r || 10) + (Q.r || 10)) * 0.7;
+  const solidP = P.lay === 'free', solidQ = Q.lay === 'free' || Q.lay === 'post';
+  if (solidP && (solidQ || Q.lay === 'edge')) return stDistTo(o, sp.x, sp.y) < (P.r || 8) * 0.8 + (Q.lay === 'free' ? -2 : 3);
+  if (P.lay === 'edge' && (Q.lay === 'free' || Q.lay === 'post') && Q.blk && Q.lay !== 'post') { const f = stFoot({ id: P.id, x: sp.x, y: sp.y, a: sp.a }); return segD(o.x, o.y, f.ax, f.ay, f.bx, f.by) < (Q.r || 8) * 0.8; }
+  return false;
+}
+function stFree(P, sp) {                         // is there room for it? true, or why not
+  const D = S.day, pts = [[sp.x, sp.y]];
+  if (P.sh === 'mount' && !sp.on) return 'point at a wall';
+  if (P.lay === 'roof' && !sp.snap) return 'a roof needs a floor under it';
+  if (P.sh === 'edge') { const f = stFoot({ id: P.id, x: sp.x, y: sp.y, a: sp.a }); pts.push([f.ax, f.ay], [f.bx, f.by]); }
+  if (P.sh === 'sq' || P.sh === 'tri') pts.push(...stCorners({ id: P.id, x: sp.x, y: sp.y, a: sp.a }).map(([x, y]) => [(x + sp.x) / 2, (y + sp.y) / 2]));
+  for (const [x, y] of pts) {
+    if (Math.hypot(x, y) < CAMP_R + 60) return 'not against the old camp';
+    if (inPlaza(x, y) || [TELE, TELE2].some(o => Math.hypot(o.x - x, o.y - y) < 90)) return 'not on the shrines';
+    if (P.lay !== 'roof') for (const o of propsNear(x, y, 60)) if ((o.kind === 'tree' || o.kind === 'rock') && Math.hypot(o.x - x, o.y - y) < (o.r || 8) * (o.s || 1) + (P.lay === 'flat' || P.sh === 'sq' ? 14 : 10)) return 'a tree is in the way';
+    if (P.lay !== 'roof' && P.lay !== 'flat' && P.lay !== 'mount') for (const B of D.builds) if (B.parts.some(q => Math.hypot(q.x - x, q.y - y) < (P.sh === 'sq' ? 26 : 20))) return 'something is in the way';
+  }
+  for (const o of stNear(sp.x, sp.y, (P.L || GRID) + 20)) if (stOverlap(P, sp, o)) return 'already something there';
+  if (P.blk) {                                   // don't wall yourself in where you stand
+    const f = P.sh === 'edge' ? stFoot({ id: P.id, x: sp.x, y: sp.y, a: sp.a }) : null;
+    const d = f ? segD(S.p.x, S.p.y, f.ax, f.ay, f.bx, f.by) : Math.hypot(S.p.x - sp.x, S.p.y - sp.y) - (P.r || 6);
+    if (d < 12) return 'step back';
+  }
   return true;
 }
-function stPlace() {                             // put down the blueprint you're holding the hammer for
-  const D = S.day, P = PC(D.piece), p = S.p, a = S.aimW || 0;
-  const sp = stSnap(P.k, p.x + Math.cos(a) * 42, p.y + Math.sin(a) * 42, a), why = stCanPlace(P.k, sp);
+function stCanPlace(P, sp) { return stFree(P, sp); }
+// ---- solid parts: what stops you and them ----
+function stSolids(o) {
+  const P = PC(o.id); if (!o.done || !P.blk) return [];
+  if (P.sh === 'post' || P.sh === 'free') return [{ x: o.x, y: o.y, r: P.r || 6, s: 1, st: o }];
+  const L = P.L || GRID, ux = Math.cos(o.a), uy = Math.sin(o.a), out = [];
+  if (stDoorish(P) && o.open > 0.5) { for (const s of [-1, 1]) out.push({ x: o.x + ux * s * (L / 2 - 4), y: o.y + uy * s * (L / 2 - 4), r: 6, s: 1, st: o }); return out; }
+  const n = Math.max(2, Math.round(L / 13));
+  for (let k = 0; k <= n; k++) { const f = k / n - 0.5; out.push({ x: o.x + ux * f * L, y: o.y + uy * f * L, r: STK_R, s: 1, st: o }); }
+  return out;
+}
+// ---- putting it down, building it up, pulling it down ----
+function stPlace() {
+  const D = S.day, P = PC(D.piece), sp = stSnap(P, stAimPt()), why = stFree(P, sp);
+  if (!stKnown(P)) return;
   if (why !== true) { dayNote('nost', why, 1.2); if (actx) noiseAt(actx.currentTime, 600, 300, 0.1, 0.25, sfxGain); return; }
-  const o = { kind: 'dst', id: P.id, k: P.k, tier: P.tier, i: sp.i, j: sp.j, s: sp.s, x: sp.x, y: sp.y, a: sp.a, r: 10,
-    need: Object.assign({}, P.cost), hp: P.hp, max: P.hp, done: false, open: 0, put: 0, seed: Math.random() * 9 };
-  D.bld.set(bKey(o), o);
-  dayAct(10, 0.7); ashBurst(sp.x, sp.y, 6, 6);
-  exNote(`blueprint · ${P.n.toLowerCase()}`, true); dayNote('bphint', 'swing the hammer at it to build it', 30);
-  if (actx) { const t = actx.currentTime; noiseAt(t, 900, 400, 0.12, 0.25, sfxGain); }
+  const o = { kind: 'dst', key: 'b' + (stUid++), id: P.id, k: P.k, x: sp.x, y: sp.y, a: sp.a, r: 10, need: Object.assign({}, P.cost), hp: P.hp, max: P.hp, done: false, open: 0, put: 0, seed: Math.random() * 9 };
+  D.bld.set(o.key, o);
+  dayAct(10, 0.45); ashBurst(sp.x, sp.y, 6, 6); o.dropT = S.t;
+  exNote(`blueprint · ${P.n.toLowerCase()}`, true); dayNote('bphint', 'Use (E) on a blueprint to build it', 30);
+  if (actx) { const t = actx.currentTime; noiseAt(t, 900, 400, 0.12, 0.25, sfxGain); if (sp.snap) setTimeout(() => sfx(2.4, 0.08, 'bandpass', 3200, 0.12), 40); }
   dayChanged();
 }
 const stNeedLeft = o => Object.values(o.need).reduce((a, n) => a + n, 0);
 function stHammer(o) {                           // one swing: a material worked in, or a repair
-  const D = S.day, P = PC(o.id);
+  const D = S.day, P = PC(o.id), chip = P.m === 'stone' ? 'stone' : P.m === 'thatch' ? 'leaf' : 'wood';
   if (!o.done) {
     const k = Object.keys(o.need).find(k => o.need[k] > 0);
     if (!k) return stFinish(o);
     if (!takeFrom(D.inv, k, 1, [...Array(D.inv.length).keys()].reverse())) {
-      for (const c of dayConts()) if (takeFrom(c.inv, k, 1)) { o.need[k]--; break; }
-      if (o.need[k] === P.cost[k]) { dayNote('needmat', `you need ${DIT[k].n.toLowerCase()}`, 2); return false; }
-    } else o.need[k]--;
-    o.put++; o.shakeT = S.t; dayChips(o.x, o.y, 14, k === 'stones' ? 'stone' : k === 'fibre' ? 'leaf' : 'wood', 6);
+      let got = false;
+      for (const c of dayConts()) if (takeFrom(c.inv, k, 1)) { got = true; break; }
+      if (!got) { dayNote('needmat', `you need ${DIT[k].n.toLowerCase()}`, 2); return false; }
+    }
+    o.need[k]--;
+    o.put++; o.shakeT = S.t; dayChips(o.x, o.y, 14, chip, 6);
     if (actx) { const t = actx.currentTime; boomAt(t, 220, 110, 0.1, 0.4, sfxGain); noiseAt(t, 1800, 600, 0.09, 0.3, sfxGain); }
     addShake(0.1);
     if (stNeedLeft(o) <= 0) stFinish(o); else exNote(`${stNeedLeft(o)} more`);
@@ -9103,7 +9280,7 @@ function stHammer(o) {                           // one swing: a material worked
   if (o.hp < o.max) {                            // mending what the night knocked about
     const k = Object.keys(P.cost)[0];
     if (!takeFrom(D.inv, k, 1, [...Array(D.inv.length).keys()].reverse())) { dayNote('needmat', `you need ${DIT[k].n.toLowerCase()}`, 2); return false; }
-    o.hp = Math.min(o.max, o.hp + o.max / 3); o.shakeT = S.t; dayChips(o.x, o.y, 14, 'wood', 5);
+    o.hp = Math.min(o.max, o.hp + o.max / 3); o.shakeT = S.t; dayChips(o.x, o.y, 14, chip, 5);
     exNote(o.hp >= o.max ? 'mended' : 'mending'); sfx(1.1, 0.3, 'bandpass', 900, 0.25); dayChanged(); return true;
   }
   dayNote('whole', 'it\'s sound', 1.5); return false;
@@ -9115,174 +9292,448 @@ function stFinish(o) {
   else exNote(`built · ${PC(o.id).n.toLowerCase()}`, true);
   if (actx) { const t = actx.currentTime; boomAt(t, 150, 70, 0.3, 0.5, sfxGain); setTimeout(() => sfx(1.6, 0.35, 'bandpass', 1600, 0.3), 90); }
 }
-function stRemove(o) {                           // pull it down: half the materials come back
-  const D = S.day, P = PC(o.id);
+function stGone(o) { const D = S.day; D.bld.delete(o.key); if (o.k === 'bed' && D.bed && Math.abs(D.bed.x - o.x) < 1 && Math.abs(D.bed.y - o.y) < 1) D.bed = null; for (const q of D.bld.values()) if (q.on === o.key) stGone(q); }
+function stRemove(o) {                           // pull it down: half the materials come back (all of them from a blueprint)
+  const P = PC(o.id);
   for (const [k, n] of Object.entries(P.cost)) { const back = o.done ? Math.floor(n / 2) : n - (o.need[k] || 0); if (back > 0) dayGive(k, back, o.x, o.y, true); }
-  D.bld.delete(bKey(o)); if (o.k === 'bed' && D.bed && D.bed.x === o.x) D.bed = null;
-  ashBurst(o.x, o.y, 8, 20); addShake(0.2); dayChips(o.x, o.y, 14, 'wood', 8); exNote('pulled down');
+  stGone(o);
+  ashBurst(o.x, o.y, 8, 20); addShake(0.2); dayChips(o.x, o.y, 14, P.m === 'stone' ? 'stone' : P.m === 'thatch' ? 'leaf' : 'wood', 8); exNote('pulled down');
   if (actx) { const t = actx.currentTime; noiseAt(t, 700, 200, 0.3, 0.35, sfxGain); }
   dayChanged();
 }
-function stMake(sv) {                             // a piece read back out of a saved run
-  const P = PC(sv.id); if (!P) return null;
-  const s = sv.s === undefined ? -1 : sv.s, pos = s < 0 ? cellPos(sv.i, sv.j) : edgePos(sv.i, sv.j, s);
-  const o = { kind: 'dst', id: sv.id, k: P.k, tier: P.tier, i: sv.i, j: sv.j, s, x: pos.x, y: pos.y, a: sv.a !== undefined ? sv.a : pos.a, r: 10,
-    need: Object.assign({}, P.cost, sv.need || {}), hp: sv.hp !== undefined ? sv.hp : P.hp, max: P.hp, done: !!sv.done, open: 0, put: 0, seed: Math.random() * 9, rise: 1 };
-  S.day.bld.set(bKey(o), o);
+function stMake(sv) {                            // a piece read back out of a saved run (v152 grid saves carry over)
+  const P = PIECES.find(p => p.id === sv.id); if (!P) return null;
+  const pos = sv.x !== undefined ? sv : LEGACY_POS(sv);
+  const o = { kind: 'dst', key: 'b' + (stUid++), id: sv.id, k: P.k, x: pos.x, y: pos.y, a: sv.a !== undefined ? sv.a : pos.a, r: 10,
+    need: Object.assign({}, P.cost, sv.need || {}), hp: sv.hp !== undefined ? sv.hp : P.hp, max: P.hp, done: !!sv.done, open: 0, put: 0, seed: Math.random() * 9, rise: 1, fuel: sv.fuel };
+  S.day.bld.set(o.key, o);
   if (o.done && o.k === 'bed') S.day.bed = { x: o.x, y: o.y };
   return o;
 }
-function stAimed() {                             // the piece your hammer would land on
-  const p = S.p, a = S.aimW || 0, tx = p.x + Math.cos(a) * 34, ty = p.y + Math.sin(a) * 34;
-  let best = null, bd = 44;
-  for (const o of stNear(tx, ty, 60)) { const d = Math.min(dist2(o, { x: tx, y: ty }), dist2(o, p) - 12); if (d < bd) { bd = d; best = o; } }
+const stOut = o => ({ id: o.id, x: Math.round(o.x * 10) / 10, y: Math.round(o.y * 10) / 10, a: Math.round(o.a * 1000) / 1000, hp: Math.round(o.hp * 10) / 10, need: o.need, done: o.done });
+function stAimed(pred) {                         // the piece you're pointing at (the nearest to where you point, in reach)
+  const p = S.p, A = stAimPt(); let best = null, bd = 30;
+  if (Math.hypot(A.x - p.x, A.y - p.y) > 90) { const a = S.aimW || 0; A.x = p.x + Math.cos(a) * 90; A.y = p.y + Math.sin(a) * 90; }
+  for (const o of stNear(A.x, A.y, 70)) { if (pred && !pred(o)) continue; const d = Math.min(stDistTo(o, A.x, A.y), stDistTo(o, p.x, p.y) + 6); if (d < bd) { bd = d; best = o; } }
   return best;
 }
+const stNeedsWork = o => !o.done || o.hp < o.max;
+function stWorkTarget() { return S.day && dayTool() === 'build' ? stAimed(stNeedsWork) : null; }
 function stGhost() {
-  const D = S.day; if (!D || dayTool() !== 'build' || !S.running || S.rg.phase !== 'fight') return null;
-  if (stAimed()) return null;                    // aiming at something you've already put down: no ghost, the swing works on it
-  const P = PC(D.piece), a = S.aimW || 0, sp = stSnap(P.k, S.p.x + Math.cos(a) * 42, S.p.y + Math.sin(a) * 42, a);
-  const why = stCanPlace(P.k, sp);
-  return { kind: 'dstg', id: P.id, k: P.k, tier: P.tier, x: sp.x, y: sp.y, a: sp.a, ok: why === true, why: why === true ? '' : why, r: 0, s: 1, need: PC(P.id).cost, done: false, open: 0 };
+  const D = S.day; if (!D || dayTool() !== 'build' || !S.running || S.rg.phase !== 'fight' || D.bdel) return null;
+  const P = PC(D.piece); if (!stKnown(P)) return null;
+  const sp = stSnap(P, stAimPt()), why = stFree(P, sp);
+  return { kind: 'dstg', id: P.id, k: P.k, x: sp.x, y: sp.y, a: sp.a, ok: why === true, why: why === true ? '' : why, snap: sp.snap, r: 0, s: 1, need: P.cost, done: false, open: 0, seed: 3 };
 }
+// ---- the living base: doors swing, raiders batter, thorns bite, lights come on, chimes ring ----
 function stStep(dt) {
-  const D = S.day, rg = S.rg, p = S.p;
+  const D = S.day, rg = S.rg, p = S.p, night = dayNight();
   for (const o of D.bld.values()) {
+    const P = PC(o.id);
     if (o.rise !== undefined && o.rise < 1) o.rise = Math.min(1, o.rise + dt * 3);
-    if (o.k === 'door') {                         // the door swings for you, and for nothing else
-      const want = o.done && dist2(o, p) < 46 ? 1 : 0;
+    if (stDoorish(P)) {                          // the door swings for you, and for nothing else
+      const want = o.done && Math.hypot(o.x - p.x, o.y - p.y) < (P.L || GRID) / 2 + 22 ? 1 : 0;
       if (want !== (o.want || 0)) { o.want = want; if (actx && monNear(o, 500) > 0) noiseAt(actx.currentTime, want ? 500 : 300, 180, 0.3, 0.2 * monNear(o, 500), sfxGain); }
       o.open += ((o.want || 0) - o.open) * Math.min(1, dt * 7);
     }
     if (!o.done) continue;
     o.hitT = Math.max(0, (o.hitT || 0) - dt);
-    for (const e of rg.enemies) {                 // raiders batter whatever stands between them and you
-      if (e.dead || dist2(e, o) > 30) continue;
-      if (dist2(p, o) < dist2(p, e) - 8 || o.k === 'door') {
-        o.hp -= dt * (e.type === 'brute' || e.type === 'tall' ? 3.5 : 1.3) * (o.tier === 0 ? 2 : 1);
+    if (P.light) o.lit = night;
+    if (P.k === 'chimes') o.ring = Math.max(0, (o.ring || 0) - dt);
+    for (const e of rg.enemies) {
+      if (e.dead || Math.abs(e.x - o.x) > 80 || Math.abs(e.y - o.y) > 80) continue;
+      const ed = stDistTo(o, e.x, e.y);
+      if (P.blk && ed < 18 && (stDistTo(o, p.x, p.y) < Math.hypot(p.x - e.x, p.y - e.y) - 8 || stDoorish(P))) {   // raiders batter whatever stands between them and you
+        o.hp -= dt * (e.type === 'brute' || e.type === 'tall' ? 3.5 : 1.3) * (P.m === 'thatch' ? 2 : 1);
         o.hitT = 0.15; e.wallT = 0.3;
-        if (Math.random() < dt * 5) { dayChips(o.x, o.y, 16, o.tier === 2 ? 'stone' : o.tier === 0 ? 'leaf' : 'wood', 2); if (actx && monNear(o, 600) > 0) boomAt(actx.currentTime, 140, 70, 0.08, 0.25 * monNear(o, 600), sfxGain); }
+        if (Math.random() < dt * 5) { dayChips(o.x, o.y, 16, P.m === 'stone' || P.m === 'iron' ? 'stone' : P.m === 'thatch' ? 'leaf' : 'wood', 2); if (actx && monNear(o, 600) > 0) boomAt(actx.currentTime, 140, 70, 0.08, 0.25 * monNear(o, 600), sfxGain); }
       }
+      if ((P.thorn && ed < 20) || (P.trap && ed < 4)) {   // stakes and spikes bite back
+        if ((e.thornT = (e.thornT || 0) - dt) <= 0) { e.thornT = 0.8; e.hp -= P.trap ? 1 : 0.6; e.jit = 1; ashBurst(e.x, e.y, 3, 14); if (P.trap) o.hp -= 1; if (actx && monNear(e, 600) > 0) noiseAt(actx.currentTime, 2600, 900, 0.1, 0.25 * monNear(e, 600), sfxGain); }
+      }
+      if (P.mire && ed < 6) { e.mire = S.t + 0.25; if (Math.random() < dt * 2) e.hp -= 0.1; }   // the hedge drags at them
+      if (P.k === 'chimes' && night && ed < 220 && !(o.ring > 0)) { o.ring = 6; exNote('the chimes are ringing', true); if (actx) { const t = actx.currentTime; for (let i = 0; i < 4; i++) setTimeout(() => sfx(2.2 + Math.random() * 1.2, 0.5, 'bandpass', 2600 + Math.random() * 1800, 0.18), i * 120); } }
     }
     if (o.hp <= 0) {
-      D.bld.delete(bKey(o)); if (o.k === 'bed' && D.bed && D.bed.x === o.x) D.bed = null;
+      stGone(o);
       for (let i = 0; i < 3; i++) ashBurst(o.x + (Math.random() - 0.5) * 40, o.y + (Math.random() - 0.5) * 40, 6, 22);
-      addShake(0.3 * monNear(o, 600)); exNote(`they broke through your ${PC(o.id).n.toLowerCase()}`, true);
+      addShake(0.3 * monNear(o, 600)); exNote(P.trap ? `your ${P.n.toLowerCase()} is spent` : `they broke through your ${P.n.toLowerCase()}`, true);
       if (actx) boomAt(actx.currentTime, 90, 40, 0.4, 0.5 * monNear(o, 600), sfxGain);
     }
   }
 }
-// ---- the build bar: the pieces, shown above the hotbar whenever the hammer is in your hand ----
-function stPick(id) { const D = S.day; if (!D || D.piece === id) return; D.piece = id; exNote(PC(id).n.toLowerCase()); sfx(1.6, 0.12, 'bandpass', 2200, 0.12); renderBuildBar(); }
-const stKnown = p => { const D = S.day; return Object.keys(p.cost).every(k => D.seen.has(k)); };
+const stWarmNear = (x, y) => { for (const o of stNear(x, y, 90)) if (o.done && PC(o.id).warm && Math.hypot(o.x - x, o.y - y) < 85) return true; return false; };
+const stRoofOver = (x, y) => { for (const o of stNear(x, y, 40)) { const P = PC(o.id); if (P.lay === 'roof' && Math.hypot(o.x - x, o.y - y) < (P.sh === 'sq' ? GRID * 0.62 : TRI_R * 0.9)) return o; } return null; };
+function stHoles(hole) {                         // the lamps you've built, cut out of the dark
+  if (!S.day || dayLight() > 0.6) return;
+  for (const o of stNear(S.cam.x, S.cam.y, viewR() + 200)) { const P = PC(o.id); if (P.light && o.done) hole(o.x, o.y, P.light * (1 + 0.04 * Math.sin(S.t * 7 + o.seed * 3)), P.k === 'candles' ? 0.5 : 0.75); }
+}
+function stFlames() {                            // the flames on lamps, sconces, candles and braziers, drawn over the dark
+  const D = S.day; if (!D) return;
+  const lt = dayLight(); if (lt > 0.85) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const o of stNear(S.cam.x, S.cam.y, viewR() + 100)) {
+    const P = PC(o.id); if (!P.light || !o.done) continue;
+    const [x0, y0] = P.k === 'lamp' ? toScreen(o.x + Math.cos(o.a) * 8, o.y + Math.sin(o.a) * 8) : toScreen(o.x, o.y), z = P.k === 'lamp' ? 42 : P.k === 'sconce' ? 34 : P.k === 'brazier' ? 13 : 10, x = x0, y = y0 - z * Z;
+    if (x < -80 || x > W + 80 || y < -80 || y > H + 80) continue;
+    const big = P.k === 'brazier' ? 1.6 : P.k === 'candles' ? 0.5 : 0.8;
+    for (let i = 0; i < 4; i++) {
+      const h = (10 + 5 * Math.sin(S.t * 9 + i * 2 + o.seed)) * Z * big, w = (4.5 - i) * Z * big, ox = Math.sin(S.t * 5 + i * 1.7 + o.seed) * 1.6 * Z;
+      ctx.fillStyle = ['rgba(255,120,40,0.75)', 'rgba(255,170,60,0.7)', 'rgba(255,215,120,0.65)', 'rgba(255,245,200,0.6)'][i];
+      ctx.beginPath(); ctx.moveTo(x - w + ox, y); ctx.quadraticCurveTo(x + ox, y - h * 1.4, x + w + ox, y); ctx.closePath(); ctx.fill();
+    }
+    softGlow(ctx, x, y - 4 * Z, (P.k === 'candles' ? 22 : 46) * Z * big, '255,170,80', 0.3 * (1 - lt));
+  }
+  ctx.restore();
+}
+// ---- the build bar: kinds along the top, the pieces of that kind under them, and rotate / snap / pull down ----
+const stKnown = P => { const D = S.day; return Object.keys(P.cost).every(k => D.seen.has(k)); };
+function stPick(id) { const D = S.day; if (!D || D.piece === id) return; D.piece = id; D.bdel = false; const P = PC(id); D.bcat = P.cat; exNote(P.n.toLowerCase()); sfx(1.6, 0.12, 'bandpass', 2200, 0.12); renderBuildBar(); }
+function stCat(c) { const D = S.day; if (!D) return; D.bcat = c; const L = PIECES.filter(p => p.cat === c), k = L.find(stKnown) || L[0]; D.piece = k.id; D.bdel = false; sfx(1.4, 0.12, 'bandpass', 1900, 0.12); renderBuildBar(); }
+function stRot(dir) { const D = S.day; if (!D) return; D.brot = ((D.brot || 0) + dir * ROT_STEP) % TAU; sfx(2, 0.06, 'bandpass', 2600, 0.1); }
+function stSnapToggle() { const D = S.day; if (!D) return; D.bsnap = D.bsnap === false; exNote(D.bsnap === false ? 'snapping off · place freely' : 'snapping on'); renderBuildBar(); }
+function stDelToggle() { const D = S.day; if (!D) return; D.bdel = !D.bdel; exNote(D.bdel ? 'pull down · point at a piece' : 'building'); renderBuildBar(); }
+function stCycle(dir) { const D = S.day; if (!D) return; const L = PIECES.filter(p => p.cat === (D.bcat || PC(D.piece).cat) && stKnown(p)); if (!L.length) return; const i = L.findIndex(p => p.id === D.piece); stPick(L[(i + dir + L.length) % L.length].id); }
+function stCatCycle(dir) { const D = S.day; if (!D) return; const i = BCATS.findIndex(c => c.id === (D.bcat || PC(D.piece).cat)); stCat(BCATS[(i + dir + BCATS.length) % BCATS.length].id); }
 function renderBuildBar() {
   const bar = document.getElementById('buildbar'), D = S && S.day;
   const on = !!D && dayTool() === 'build' && S.running && S.rg && S.rg.phase === 'fight';
   bar.hidden = !on; if (!on) return;
-  const list = PIECES.filter(stKnown);
-  if (!list.some(p => p.id === D.piece)) D.piece = (list[0] || PIECES[1]).id;
-  bar.replaceChildren(...list.map(P => {
-    const b = document.createElement('button'), can = Object.entries(P.cost).every(([k, n]) => dayHave(k) >= 1);
-    b.className = 'bp' + (D.piece === P.id ? ' sel' : '') + (can ? '' : ' short');
-    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${BPIC[P.k]}</svg><span>${P.s}</span>`;
-    b.title = P.n + ' · ' + P.b;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); stPick(P.id); });
+  if (!D.bcat) D.bcat = PC(D.piece).cat;
+  const btn = (cls, svg, label, title, fn) => {
+    const b = document.createElement('button'); b.className = cls; b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg>${label ? `<span>${label}</span>` : ''}`; b.title = title;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fn(); });
     return b;
-  }));
+  };
+  const top = document.createElement('div'); top.className = 'bprow bptop';
+  for (const c of BCATS) {
+    const any = PIECES.some(p => p.cat === c.id && stKnown(p));
+    top.append(btn('bc' + (D.bcat === c.id ? ' sel' : '') + (any ? '' : ' short'), BCIC[c.id], '', c.n, () => stCat(c.id)));
+  }
+  const tools = document.createElement('div'); tools.className = 'bptools';
+  tools.append(btn('bt', BTIC.rl, '', 'Turn left (Z)', () => stRot(-1)), btn('bt', BTIC.rr, '', 'Turn right (X)', () => stRot(1)),
+    btn('bt' + (D.bsnap === false ? '' : ' on'), BTIC.snap, '', 'Snap to other pieces (V)', stSnapToggle), btn('bt del' + (D.bdel ? ' on' : ''), BTIC.del, '', 'Pull down (B)', stDelToggle));
+  top.append(tools);
+  const row = document.createElement('div'); row.className = 'bprow';
+  for (const P of PIECES.filter(p => p.cat === D.bcat)) {
+    const known = stKnown(P), can = known && Object.entries(P.cost).every(([k, n]) => dayHave(k) >= n);
+    const b = btn('bp' + (D.piece === P.id && !D.bdel ? ' sel' : '') + (known ? can ? '' : ' short' : ' locked'), known ? BPIC[P.id] || BPIC[P.k] || BPIC.wall : BTIC.lock, P.s,
+      P.n + ' · ' + P.b + ' · ' + Object.entries(P.cost).map(([k, n]) => `${n} ${DIT[k].n.toLowerCase()}`).join(', ') + (known ? '' : ' · find the materials to learn it'), () => { if (known) stPick(P.id); else exNote('find ' + Object.keys(P.cost).filter(k => !D.seen.has(k)).map(k => DIT[k].n.toLowerCase()).join(' and ') + ' to learn this'); });
+    row.append(b);
+  }
+  const cat = BCATS.find(c => c.id === D.bcat), lab = document.createElement('div'); lab.className = 'bpname';
+  const P = PC(D.piece); lab.textContent = D.bdel ? 'Pull down · point at a piece and press Attack · half the materials come back' : `${cat.n} · ${P.n} · ${Object.entries(P.cost).map(([k, n]) => `${dayHave(k)}/${n} ${DIT[k].n.toLowerCase()}`).join(' · ')}`;
+  bar.replaceChildren(top, row, lab);
 }
-const BPIC = {
-  floor: '<path d="M12 4l9 5-9 5-9-5z" fill="#b08a58"/><path d="M3 9v6l9 5 9-5V9" fill="none" stroke="#7a5232" stroke-width="1.4"/><path d="M7.5 6.5l9 5M16.5 6.5l-9 5" stroke="#8a6a44" stroke-width=".9"/>',
-  wall: '<g fill="#7a5232"><path d="M3.5 20V8l2.3-2.4L8.1 8v12z"/><path d="M9.6 20V6.5l2.4-2.4 2.4 2.4V20z"/><path d="M15.9 20V8l2.3-2.4L20.5 8v12z"/></g><path d="M3 12h18M3 16.5h18" stroke="#3a2a1a" stroke-width="1.2"/>',
-  door: '<path d="M3.5 20V7l3-2.5V20zM17.5 20V4.5l3 2.5v13z" fill="#7a5232"/><path d="M7.5 20V6h9v14z" fill="#a07850"/><circle cx="14.5" cy="13.5" r="1.1" fill="#3a2a1a"/>',
-  window: '<path d="M3 20V7l3-2.5V20zM18 20V4.5L21 7v13z" fill="#7a5232"/><path d="M6 20v-5h12v5z" fill="#a07850"/><path d="M6 6.5h12v6H6z" fill="none" stroke="#a07850" stroke-width="1.6"/><path d="M12 6.5v6M6 9.5h12" stroke="#a07850" stroke-width="1.1"/>',
-  bed: '<rect x="2.5" y="11" width="19" height="7" rx="1.5" fill="#8a6440"/><path d="M2.5 13h8v-2a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 21.5 11v2" fill="#b0784a"/><rect x="3.5" y="9.5" width="7" height="3.5" rx="1.5" fill="#efe6d2"/><path d="M4 18v2.5M20 18v2.5" stroke="#5a3e28" stroke-width="1.6"/>',
+const BTIC = {
+  rl: '<path d="M8 7H4V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 7A8 8 0 1 1 4 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  rr: '<path d="M16 7h4V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.5 7A8 8 0 1 0 20 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  snap: '<path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z" fill="currentColor"/><path d="M6 4h4v3H6zM14 4h4v3h-4z" fill="#e2543c"/>',
+  del: '<path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10.5 10.5v6.5M13.5 10.5v6.5" stroke="currentColor" stroke-width="1.5"/>',
+  lock: '<rect x="6" y="11" width="12" height="9" rx="1.5" fill="#6a6a64"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" fill="none" stroke="#6a6a64" stroke-width="2"/>',
 };
-// ---- drawing: a piece standing, or the frame of one still going up ----
-function stDraw(o, c, sx, sy, ghost) {
-  const C = (col, grey) => COLOUR ? col : grey, P = PC(o.id), done = o.done;
-  const rise = done ? (o.rise === undefined ? 1 : 0.6 + 0.4 * o.rise) : 1;
-  const tone = o.tier === 0 ? [C('#b5a86a', '#8e8e88'), C('#8e8248', '#6e6e68'), C('#6d6336', '#585852')]
-    : o.tier === 2 ? [C('#8e8c86', '#8a8a86'), C('#6e6c67', '#676762'), C('#54524e', '#4c4c48')]
-    : [C('#a07a4c', '#7e7e78'), C('#7a5232', '#62625d', 1), C('#5a3a20', '#4a4a46')];
-  const hurt = o.hitT > 0 ? 0.5 : 0, sh = o.shakeT !== undefined && S.t - o.shakeT < 0.3 ? Math.sin((S.t - o.shakeT) * 60) * (1 - (S.t - o.shakeT) / 0.3) * 2.5 * Z : 0;
-  c.save(); if (sh) c.translate(sh, 0);
-  if (!ghost && o.k !== 'floor' && o.k !== 'bed' && o.y > S.p.y + 10 && Math.abs(o.x - S.p.x) < 95 && o.y - S.p.y < 130) c.globalAlpha *= 0.4;   // a wall between you and the camera turns to glass, so you can see yourself indoors
-  if (ghost) { c.globalAlpha *= 0.4; }
-  else if (!done) { c.globalAlpha *= 0.3 + 0.5 * (1 - stNeedLeft(o) / Object.values(P.cost).reduce((a, n) => a + n, 0)); }
-  const faceA = hurt ? '#efe0d4' : tone[0], faceB = hurt ? '#d8cabc' : tone[1];
-  if (o.k === 'floor') {
-    const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => toScreen(o.x + i * GRID / 2, o.y + j * GRID / 2));
-    c.fillStyle = faceB; c.beginPath(); q.forEach(([x, y], k) => k ? c.lineTo(x, y + 3 * Z) : c.moveTo(x, y + 3 * Z)); c.closePath(); c.fill();
-    c.fillStyle = faceA; c.beginPath(); q.forEach(([x, y], k) => k ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill();
-    c.strokeStyle = tone[2]; c.lineWidth = 1 * Z; c.beginPath();
-    for (let k = 1; k < 5; k++) { const f = k / 5, [x0, y0] = toScreen(o.x - GRID / 2 + f * GRID, o.y - GRID / 2), [x1, y1] = toScreen(o.x - GRID / 2 + f * GRID, o.y + GRID / 2); c.moveTo(x0, y0); c.lineTo(x1, y1); }
-    c.stroke();
-  } else if (o.k === 'bed') {
-    const a = o.a;
-    isoBox(c, o.x, o.y, a, 40, 24, 5, faceB, tone[1], tone[2]);
-    const t = isoBox(c, o.x + Math.cos(a) * 3, o.y + Math.sin(a) * 3, a, 34, 20, 4, C('#8a5a4a', '#7a7a74'), C('#6e4438', '#5e5e58'), C('#55342a', '#4a4a46'), 5);
-    const mid = (p, q, f) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
-    const [px, py] = mid(mid(t[0], t[1], 0.16), mid(t[3], t[2], 0.16), 0.5);
-    c.fillStyle = C('#efe6d2', '#dcdcd6'); c.beginPath(); c.ellipse(px, py, 8 * Z, 4.5 * Z, 0, 0, 7); c.fill();
-  } else {
-    const ux = Math.cos(o.a), uy = Math.sin(o.a), H = (o.k === 'window' ? 16 : 36) * rise;
-    if (o.k === 'door') {
-      for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 25, o.y + uy * k * 25, o.a, 8, 8, 42 * rise, faceA, faceB, tone[2]);   // the posts
-      isoBox(c, o.x, o.y, o.a, GRID - 8, 7, 6 * rise, faceA, faceB, tone[2], 39 * rise);                                        // the lintel
-      const sw = o.open, hx = o.x + ux * 21, hy = o.y + uy * 21, aa = o.a + sw * 1.5;   // the leaf swings in on its hinge
-      const lx = hx - Math.cos(aa) * 19, ly = hy - Math.sin(aa) * 19;
-      isoBox(c, lx, ly, aa, 38, 5, 36 * rise, C('#9a7448', '#7a7a74'), C('#7a5232', '#62625d'), tone[2]);
-      if (!COLOUR || true) { const [kx, ky] = toScreen(lx - Math.cos(aa) * 13, ly - Math.sin(aa) * 13); c.fillStyle = tone[2]; c.beginPath(); c.ellipse(kx, ky - 20 * rise * Z, 1.8 * Z, 1.8 * Z, 0, 0, 7); c.fill(); }   // the latch
-    } else if (o.k === 'window') {
-      for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 25, o.y + uy * k * 25, o.a, 8, 8, 42 * rise, faceA, faceB, tone[2]);
-      isoBox(c, o.x, o.y, o.a, GRID - 8, 7, H, faceA, faceB, tone[2]);
-      isoBox(c, o.x, o.y, o.a, GRID - 8, 7, 6 * rise, faceA, faceB, tone[2], 39 * rise);
-    } else if (o.tier === 0) {                     // thatch: bundles lashed to a frame
-      for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 24, o.y + uy * k * 24, o.a, 6, 6, 36 * rise, faceB, tone[1], tone[2]);
-      c.strokeStyle = faceA; c.lineWidth = 2.4 * Z; c.lineCap = 'round'; c.beginPath();
-      for (let k = -4; k <= 4; k++) { const [x, y] = toScreen(o.x + ux * k * 6, o.y + uy * k * 6); c.moveTo(x, y); c.lineTo(x + Math.sin(k * 1.7 + o.seed) * 2.5 * Z, y - 35 * rise * Z); }
-      c.stroke();
-      c.strokeStyle = tone[2]; c.lineWidth = 1.4 * Z; c.beginPath();
-      for (const h of [11, 26]) { const [x0, y0] = toScreen(o.x - ux * 25, o.y - uy * 25), [x1, y1] = toScreen(o.x + ux * 25, o.y + uy * 25); c.moveTo(x0, y0 - h * rise * Z); c.lineTo(x1, y1 - h * rise * Z); }
-      c.stroke();
-    } else {
-      isoBox(c, o.x, o.y, o.a, GRID - 2, 8, H, faceA, faceB, tone[2]);
-      c.strokeStyle = tone[2]; c.lineWidth = 1.1 * Z; c.beginPath();   // the courses, and a few pegs
-      for (const h of [12, 26]) { const [x0, y0] = toScreen(o.x - ux * 26, o.y - uy * 26), [x1, y1] = toScreen(o.x + ux * 26, o.y + uy * 26); c.moveTo(x0, y0 - h * rise * Z); c.lineTo(x1, y1 - h * rise * Z); }
-      c.stroke();
-      if (o.tier === 2) { c.fillStyle = tone[1]; for (let k = -2; k <= 2; k++) { const [x, y] = toScreen(o.x + ux * k * 11, o.y + uy * k * 11); c.beginPath(); c.ellipse(x, y - (8 + 12 * ((k + 2) % 2)) * rise * Z, 3.6 * Z, 2.3 * Z, 0, 0, 7); c.fill(); } }
+const BCIC = {
+  floor: '<path d="M12 4l9 5-9 5-9-5z" fill="#b08a58"/><path d="M3 9v6l9 5 9-5V9" fill="none" stroke="#7a5232" stroke-width="1.4"/>',
+  wall: '<g fill="#8a6440"><path d="M3.5 20V8l2.3-2.4L8.1 8v12z"/><path d="M9.6 20V6.5l2.4-2.4 2.4 2.4V20z"/><path d="M15.9 20V8l2.3-2.4L20.5 8v12z"/></g>',
+  door: '<path d="M5 21V4h14v17" fill="none" stroke="#8a6440" stroke-width="2"/><path d="M7.5 21V6.5h9V21z" fill="#a07850"/><circle cx="14.4" cy="14" r="1.1" fill="#3a2a1a"/>',
+  roof: '<path d="M2.5 13L12 4.5l9.5 8.5" fill="none" stroke="#c8a860" stroke-width="2.6" stroke-linejoin="round"/><path d="M5.5 12.5V20h13v-7.5" fill="none" stroke="#8a6440" stroke-width="1.8"/>',
+  def: '<path d="M4 21L8.5 6M10 21l2-16M14 21l-2-16M20 21L15.5 6" stroke="#a07850" stroke-width="2.2" stroke-linecap="round"/><path d="M3 15h18" stroke="#6a4a2a" stroke-width="1.6"/>',
+  light: '<path d="M12 3c2.6 3 3.8 5.1 3.8 7.2A3.8 3.8 0 0 1 8.2 10.2C8.2 8.1 9.4 6 12 3z" fill="#ffb050"/><path d="M12 7.5c1.1 1.4 1.6 2.3 1.6 3.2a1.6 1.6 0 0 1-3.2 0c0-.9.5-1.8 1.6-3.2z" fill="#fff0c0"/><path d="M8 15h8l-1.2 6H9.2z" fill="#8a8a84"/>',
+  furn: '<path d="M3 10h18v3H3z" fill="#a07850"/><path d="M5 13v7M19 13v7" stroke="#7a5232" stroke-width="2.2"/><path d="M8 7h8" stroke="#a07850" stroke-width="2"/>',
+  decor: '<path d="M7 21V4" stroke="#7a5232" stroke-width="1.8"/><path d="M7.5 4.5h11l-3 4 3 4h-11z" fill="#b8483c"/>',
+};
+const BPIC = {
+  floor: BCIC.floor,
+  floorT: '<path d="M12 4l9 5-9 5-9-5z" fill="#c4b47a"/><path d="M6 7.5l9 5M9 6l9 5M3 9l9 5" stroke="#8e8248" stroke-width=".9"/>',
+  floorS: '<path d="M12 4l9 5-9 5-9-5z" fill="#9a9893"/><path d="M7.5 6.5l9 5M16.5 6.5l-9 5" stroke="#5a5852" stroke-width="1"/>',
+  floorWT: '<path d="M4 18L12 5l8 13z" fill="#b08a58"/><path d="M8 18l4-6.5L16 18" fill="none" stroke="#7a5232" stroke-width=".9"/>',
+  floorST: '<path d="M4 18L12 5l8 13z" fill="#9a9893"/><path d="M8 11.5h8M6 15h12" stroke="#5a5852" stroke-width=".9"/>',
+  wallT: '<g stroke="#b5a86a" stroke-width="2" stroke-linecap="round"><path d="M5 20V6M8.5 20V5M12 20V6M15.5 20V5M19 20V6"/></g><path d="M3 10h18M3 15h18" stroke="#6d6336" stroke-width="1.4"/>',
+  wallW: BCIC.wall,
+  wallS: '<path d="M3 6h18v14H3z" fill="#8e8c86"/><path d="M3 10.5h18M3 15h18M8 6v4.5M15 6v4.5M11 10.5V15M18 10.5V15M6 15v5M14 15v5" stroke="#54524e" stroke-width="1.1"/>',
+  wallI: '<path d="M3 6h18v14H3z" fill="#7a5232"/><path d="M3 9h18M3 17h18" stroke="#5c6066" stroke-width="2.6"/><g fill="#aab0b6"><circle cx="6" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="18" cy="9" r="1"/><circle cx="6" cy="17" r="1"/><circle cx="12" cy="17" r="1"/><circle cx="18" cy="17" r="1"/></g>',
+  halfW: '<g fill="#8a6440"><path d="M3.5 20v-8h17v8z"/></g><path d="M3.5 16h17" stroke="#3a2a1a" stroke-width="1.2"/>',
+  halfS: '<path d="M3.5 20v-8h17v8z" fill="#8e8c86"/><path d="M3.5 16h17M9 12v4M15 16v4" stroke="#54524e" stroke-width="1.1"/>',
+  post: '<path d="M10 21V5l2-2 2 2v16z" fill="#8a6440"/><path d="M10 9h4M10 15h4" stroke="#5a3a20" stroke-width="1"/>',
+  pillar: '<path d="M8.5 21V4h7v17z" fill="#8e8c86"/><path d="M7 4h10M7 21h10M8.5 10h7M8.5 15.5h7" stroke="#54524e" stroke-width="1.2"/>',
+  door: BCIC.door,
+  doorS: '<path d="M4 21V4h16v17" fill="none" stroke="#8e8c86" stroke-width="2.6"/><path d="M7.5 21V6.5h9V21z" fill="#7a5232"/><circle cx="14.4" cy="14" r="1.1" fill="#d0c8b0"/>',
+  doorI: '<path d="M5 21V4h14v17" fill="none" stroke="#5c6066" stroke-width="2"/><path d="M7.5 21V6.5h9V21z" fill="#7a5232"/><path d="M7.5 10h9M7.5 17h9" stroke="#5c6066" stroke-width="1.8"/><circle cx="14.4" cy="13.5" r="1.1" fill="#d0d4d8"/>',
+  gate: '<path d="M2.5 21V5M21.5 21V5" stroke="#7a5232" stroke-width="2.2"/><path d="M4 20V7h7.5v13zM12.5 20V7H20v13z" fill="#a07850"/><path d="M4 9l7.5 9M12.5 18L20 9" stroke="#6a4a2a" stroke-width="1.2"/>',
+  window: '<path d="M3 20V7l3-2.5V20zM18 20V4.5L21 7v13z" fill="#7a5232"/><path d="M6 20v-5h12v5z" fill="#a07850"/><path d="M6 6.5h12v6H6z" fill="none" stroke="#a07850" stroke-width="1.6"/><path d="M12 6.5v6M6 9.5h12" stroke="#a07850" stroke-width="1.1"/>',
+  windowS: '<path d="M3 4h18v16H3z" fill="#8e8c86"/><path d="M10.5 6.5h3v9h-3z" fill="#1a1a18"/><path d="M3 9h18M3 14h18" stroke="#54524e" stroke-width="1"/>',
+  arch: '<path d="M5 21V8a7 5 0 0 1 14 0v13" fill="none" stroke="#8a6440" stroke-width="2.6"/>',
+  roofT: '<path d="M2.5 14L12 5l9.5 9z" fill="#c4b47a"/><path d="M6 11.5l1 3M9 9l1.2 5.5M12 6.5l.3 7.5M15 9l-1.2 5.5M18 11.5l-1 3" stroke="#8e8248" stroke-width=".9"/><path d="M5.5 14V20h13v-6" fill="none" stroke="#7a5232" stroke-width="1.6"/>',
+  roofW: '<path d="M2.5 14L12 5l9.5 9z" fill="#a07a4c"/><path d="M5 12h14M7.5 9.5h9M10 7h4" stroke="#5a3a20" stroke-width="1"/><path d="M5.5 14V20h13v-6" fill="none" stroke="#7a5232" stroke-width="1.6"/>',
+  roofS: '<path d="M2.5 14L12 5l9.5 9z" fill="#7e7c77"/><path d="M5 12h14M7.5 9.5h9M10 7h4" stroke="#4c4a46" stroke-width="1"/><path d="M5.5 14V20h13v-6" fill="none" stroke="#7a5232" stroke-width="1.6"/>',
+  roofTT: '<path d="M4 18L12 5l8 13z" fill="#c4b47a"/><path d="M12 5v13M8 18l4-13M16 18l-4-13" stroke="#8e8248" stroke-width=".9"/>',
+  roofWT: '<path d="M4 18L12 5l8 13z" fill="#a07a4c"/><path d="M7 14h10M9.5 10h5" stroke="#5a3a20" stroke-width="1"/>',
+  fence: '<path d="M5 21V7M10 21V6M15 21V7M20 21V6" stroke="#8a6440" stroke-width="1.8" stroke-linecap="round"/><path d="M3 11l18-1M3 16l18-1" stroke="#a07850" stroke-width="1.6"/>',
+  palis: '<g fill="#8a6440"><path d="M3.5 21V8l1.9-4 1.9 4v13z"/><path d="M8.6 21V7l1.9-4 1.9 4v14z"/><path d="M13.7 21V8l1.9-4 1.9 4v13z"/><path d="M18.8 21V7l1.4-3 .3 3v14z"/></g><path d="M3 15h18" stroke="#3a2a1a" stroke-width="1.4"/>',
+  stakes: BCIC.def,
+  spikeF: '<path d="M3 17l9-5 9 5-9 4z" fill="#6a5a44"/><path d="M7 16l1-5 1 5M11 18l1-6 1 6M15 16l1-5 1 5" fill="#d8d0b8"/>',
+  thorns: '<path d="M4 18c2-6 5-8 8-8s6 2 8 8" fill="#5a6a34"/><path d="M6 15l-1.5-1M9 12l-.5-2M12 11l.5-2M15 12l1.2-1.6M18 15l1.6-.8" stroke="#3a4420" stroke-width="1.3"/><circle cx="10" cy="15" r="1" fill="#b8323a"/><circle cx="15" cy="16" r="1" fill="#b8323a"/>',
+  chimes: '<path d="M4 5h16" stroke="#8a6440" stroke-width="2"/><path d="M7 5v4M11 5v7M15 5v5M18 5v8" stroke="#a0a09a" stroke-width=".9"/><g fill="#e2dccb"><rect x="6" y="9" width="2" height="6" rx="1"/><rect x="10" y="12" width="2" height="7" rx="1"/><rect x="14" y="10" width="2" height="6" rx="1"/><rect x="17" y="13" width="2" height="6" rx="1"/></g>',
+  sconce: '<path d="M12 21v-6" stroke="#5c6066" stroke-width="2"/><path d="M8.5 13h7l-1.5 2.5h-4z" fill="#5c6066"/><path d="M12 4c2 2.4 3 4 3 5.6a3 3 0 0 1-6 0C9 8 10 6.4 12 4z" fill="#ffb050"/>',
+  lamp: '<path d="M12 21V8M12 8h5v2" stroke="#7a5232" stroke-width="1.8" fill="none"/><rect x="14.5" y="10" width="5" height="6" rx="1" fill="#ffcf70" stroke="#5c6066" stroke-width="1"/>',
+  brazier: '<path d="M5 12h14l-2 5H7z" fill="#8e8c86"/><path d="M8 17l-1.5 4M16 17l1.5 4" stroke="#5c6066" stroke-width="1.6"/><path d="M12 3c2.6 2.6 3.8 4.6 3.8 6.4a3.8 3.8 0 0 1-7.6 0C8.2 7.6 9.4 5.6 12 3z" fill="#ffb050"/>',
+  candles: '<rect x="6" y="11" width="3" height="9" fill="#efe6d2"/><rect x="11" y="8" width="3" height="12" fill="#efe6d2"/><rect x="16" y="13" width="3" height="7" fill="#efe6d2"/><g fill="#ffb050"><ellipse cx="7.5" cy="9.3" rx="1" ry="1.6"/><ellipse cx="12.5" cy="6.3" rx="1" ry="1.6"/><ellipse cx="17.5" cy="11.3" rx="1" ry="1.6"/></g>',
+  bed: '<rect x="2.5" y="11" width="19" height="7" rx="1.5" fill="#8a6440"/><path d="M2.5 13h8v-2a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 21.5 11v2" fill="#b0784a"/><rect x="3.5" y="9.5" width="7" height="3.5" rx="1.5" fill="#efe6d2"/><path d="M4 18v2.5M20 18v2.5" stroke="#5a3e28" stroke-width="1.6"/>',
+  table: BCIC.furn,
+  stool: '<ellipse cx="12" cy="9" rx="6" ry="2.4" fill="#a07850"/><path d="M8 10l-2 10M16 10l2 10M12 11.5V20" stroke="#7a5232" stroke-width="1.8"/>',
+  seat: '<path d="M2.5 11h19v3h-19z" fill="#a07850"/><path d="M5 14v6M19 14v6M12 14v6" stroke="#7a5232" stroke-width="2"/>',
+  shelf: '<path d="M3 10h18M3 17h18" stroke="#8a6440" stroke-width="2"/><rect x="5" y="5" width="3" height="5" rx="1" fill="#b8483c"/><rect x="10" y="6.5" width="4" height="3.5" rx="1.5" fill="#c8b07a"/><rect x="15.5" y="12" width="3" height="5" rx="1" fill="#6a8a9a"/><rect x="6" y="13" width="4" height="4" rx="2" fill="#a0a09a"/>',
+  wrack: '<path d="M3 20h18M4 20V9h16v11" fill="none" stroke="#7a5232" stroke-width="1.8"/><path d="M7 21V3M12 21V2.5M17 21V3" stroke="#a07850" stroke-width="1.4"/><path d="M6 3l1-2 1 2M11 2.5l1-2 1 2M16 3l1-2 1 2" fill="#c0c4c8"/>',
+  barrel: '<path d="M7 4h10c1.6 5 1.6 11 0 16H7c-1.6-5-1.6-11 0-16z" fill="#8a6440"/><path d="M6 8h12M6 16h12" stroke="#5c6066" stroke-width="1.6"/>',
+  crate: '<path d="M4 6h16v14H4z" fill="#a07850"/><path d="M4 6l16 14M20 6L4 20" stroke="#6a4a2a" stroke-width="1.4"/><path d="M4 6h16v14H4z" fill="none" stroke="#5a3a20" stroke-width="1.6"/>',
+  rug: '<path d="M12 5l10 5.5-10 5.5L2 10.5z" fill="#b8483c"/><path d="M12 7.5l6 3-6 3-6-3z" fill="none" stroke="#e2c070" stroke-width="1.1"/>',
+  pelt: '<path d="M12 4c3 0 4 2 6 2.5s3 2 1.5 3.5 1 3-1 4.5-4 1.5-6.5 3.5-4.5-.5-6.5-2-3-3.5-1.5-5 0-3 2.5-4.5S9 4 12 4z" fill="#a88a66"/><path d="M9 10c1.5-1 4.5-1 6 0" stroke="#7a6248" stroke-width="1"/>',
+  woodpile: '<g fill="#8a6440" stroke="#5a3a20" stroke-width=".8"><circle cx="7" cy="17" r="3"/><circle cx="13" cy="17" r="3"/><circle cx="19" cy="17" r="2.6"/><circle cx="10" cy="12" r="3"/><circle cx="16" cy="12" r="3"/><circle cx="13" cy="7" r="2.8"/></g><g fill="#c8a870"><circle cx="7" cy="17" r="1.2"/><circle cx="13" cy="17" r="1.2"/><circle cx="10" cy="12" r="1.2"/><circle cx="16" cy="12" r="1.2"/><circle cx="13" cy="7" r="1.1"/></g>',
+  banner: BCIC.decor,
+  trophy: '<path d="M9 13h6v4H9z" fill="#7a5232"/><path d="M11 13c-3-1-5-4-5-8M13 13c3-1 5-4 5-8M7 8l-2-1M8 6l-1-2.5M17 8l2-1M16 6l1-2.5" fill="none" stroke="#e2dccb" stroke-width="1.6" stroke-linecap="round"/><ellipse cx="12" cy="14" rx="2" ry="2.6" fill="#e2dccb"/>',
+  skulls: '<path d="M12 21V9" stroke="#7a5232" stroke-width="2"/><circle cx="12" cy="6.5" r="3.5" fill="#e2dccb"/><circle cx="10.7" cy="6.3" r=".9" fill="#2a2a28"/><circle cx="13.3" cy="6.3" r=".9" fill="#2a2a28"/><circle cx="12" cy="13" r="2.4" fill="#e2dccb"/>',
+  flowers: '<path d="M8 15h8l-1 6H9z" fill="#9a6a4a"/><path d="M12 15V9M10 15l-2-4M14 15l2-4" stroke="#5a7a34" stroke-width="1.3"/><circle cx="12" cy="8" r="2" fill="#e2c070"/><circle cx="8" cy="10.5" r="1.7" fill="#c8507a"/><circle cx="16" cy="10.5" r="1.7" fill="#d87a5a"/>',
+  ring: '<g fill="#8e8c86"><circle cx="12" cy="6" r="2.3"/><circle cx="17.5" cy="9" r="2.3"/><circle cx="17.5" cy="15" r="2.3"/><circle cx="12" cy="18" r="2.3"/><circle cx="6.5" cy="15" r="2.3"/><circle cx="6.5" cy="9" r="2.3"/></g>',
+};
+// ---- drawing: a piece standing, the frame of one still going up, or the ghost of where one would go ----
+const MTONE = {
+  thatch: ['#b5a86a', '#8e8248', '#6d6336'], wood: ['#a07a4c', '#7a5232', '#5a3a20'], stone: ['#8e8c86', '#6e6c67', '#54524e'],
+  iron: ['#7d8288', '#5c6066', '#41454a'], hide: ['#a88a66', '#86684a', '#5e4a36'], bone: ['#e2dccb', '#bfb8a6', '#8e8878'], cloth: ['#a8443a', '#843228', '#5e2219'],
+};
+const greyOf = h => { const n = parseInt(h.slice(1), 16), v = Math.round(((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11)); return `rgb(${v},${v},${v - 4})`; };
+const stTone = m => { const t = MTONE[m] || MTONE.wood; return COLOUR ? t : t.map(greyOf); };
+function stPoly(c, pts, z, fill, stroke, lw) { c.beginPath(); pts.forEach(([x, y], k) => { const [sx, sy] = toScreen(x, y); k ? c.lineTo(sx, sy - z * Z) : c.moveTo(sx, sy - z * Z); }); c.closePath(); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = (lw || 1) * Z; c.stroke(); } }
+function stLine(c, x0, y0, z0, x1, y1, z1, col, lw) { const [a, b] = toScreen(x0, y0), [d, e] = toScreen(x1, y1); c.strokeStyle = col; c.lineWidth = lw * Z; c.lineCap = 'round'; c.beginPath(); c.moveTo(a, b - z0 * Z); c.lineTo(d, e - z1 * Z); c.stroke(); }
+function stPostDraw(c, x, y, a, w, h, T, z0 = 0) { isoBox(c, x, y, a, w, w, h, T[0], T[1], T[2], z0); }
+function stDrawFloor(o, c, P, T) {               // a floor (or a flat thing on it)
+  const pts = stCorners(o);
+  stPoly(c, pts.map(([x, y]) => [x, y]), -2.5, T[2]); stPoly(c, pts, 0, T[0]);
+  c.strokeStyle = T[2]; c.lineWidth = 0.9 * Z; c.beginPath();
+  if (P.m === 'stone') {                         // flagstones
+    const n = P.sh === 'sq' ? 3 : 2, ux = Math.cos(o.a), uy = Math.sin(o.a), vx = -uy, vy = ux;
+    for (let k = 1; k < n; k++) { const f = (k / n - 0.5) * GRID; for (const [px, py, qx, qy] of [[ux, uy, vx, vy], [vx, vy, ux, uy]]) { const [x0, y0] = toScreen(o.x + px * f - qx * GRID / 2, o.y + py * f - qy * GRID / 2), [x1, y1] = toScreen(o.x + px * f + qx * GRID / 2, o.y + py * f + qy * GRID / 2); if (P.sh === 'sq') { c.moveTo(x0, y0); c.lineTo(x1, y1); } } }
+    if (P.sh === 'tri') { const [a, b, d] = pts, m = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; for (const [p, q] of [[m(a, b), m(b, d)], [m(b, d), m(d, a)], [m(d, a), m(a, b)]]) { const [x0, y0] = toScreen(...p), [x1, y1] = toScreen(...q); c.moveTo(x0, y0); c.lineTo(x1, y1); } }
+  } else {                                       // boards, or woven bands
+    const n = P.m === 'thatch' ? 7 : 5, ux = Math.cos(o.a), uy = Math.sin(o.a), vx = -uy, vy = ux;
+    for (let k = 1; k < n; k++) {
+      const f = (k / n - 0.5) * GRID;
+      if (P.sh === 'sq') { const [x0, y0] = toScreen(o.x + ux * f - vx * GRID / 2, o.y + uy * f - vy * GRID / 2), [x1, y1] = toScreen(o.x + ux * f + vx * GRID / 2, o.y + uy * f + vy * GRID / 2); c.moveTo(x0, y0); c.lineTo(x1, y1); }
+      else { const [a, b, d] = pts, t = k / n, p = [a[0] + (d[0] - a[0]) * t, a[1] + (d[1] - a[1]) * t], q = [b[0] + (d[0] - b[0]) * t, b[1] + (d[1] - b[1]) * t], [x0, y0] = toScreen(...p), [x1, y1] = toScreen(...q); c.moveTo(x0, y0); c.lineTo(x1, y1); }
     }
   }
+  c.stroke();
+}
+function stDrawRoof(o, c, P, T, rise) {         // a roof that joins its neighbours: where another roof meets an edge the ridge runs on across it,
+  const cor = stCorners(o), E = stEdges(o), n = cor.length, z = ROOF_H * rise, up = P.sh === 'sq' ? 15 : 12;   // so a block of them reads as one hipped roof
+  const inner = E.map(e => { for (const q of stNear(e.x, e.y, 10)) if (q !== o && PC(q.id).lay === 'roof' && stEdges(q).some(f => Math.abs(f.x - e.x) < 3 && Math.abs(f.y - e.y) < 3)) return true; return false; });
+  const eave = 1.08, out = (x, y, k) => [o.x + (x - o.x) * k, o.y + (y - o.y) * k];
+  const pc = cor.map(([x, y], k) => { const hi = inner[k] && inner[(k + n - 1) % n]; const any = inner[k] || inner[(k + n - 1) % n]; return { p: hi ? [x, y] : any ? [x, y] : out(x, y, eave), h: hi ? z + up : z }; });
+  const pm = E.map((e, k) => ({ p: inner[k] ? [e.x, e.y] : out(e.x, e.y, eave), h: inner[k] ? z + up : z }));
+  const ctr = { p: [o.x, o.y], h: z + up };
+  const S2 = (q) => { const [x, y] = toScreen(q.p[0], q.p[1]); return [x, y - q.h * Z]; };
+  stPoly(c, pc.map(q => q.p), z - 3, T[2]);   // the underside of the eaves
+  const tris = [];
+  for (let k = 0; k < n; k++) { tris.push([ctr, pc[k], pm[k]]); tris.push([ctr, pm[k], pc[(k + 1) % n]]); }
+  for (const t of tris) {
+    const lows = t.filter(q => q.h < z + up - 0.5);
+    let fill = T[0];
+    if (lows.length) { const mx = lows.reduce((a, q) => a + q.p[0], 0) / lows.length - o.x, my = lows.reduce((a, q) => a + q.p[1], 0) / lows.length - o.y; fill = mx + my > 0 ? T[0] : T[1]; }
+    else fill = T[0];
+    const pts = t.map(S2);
+    c.beginPath(); c.moveTo(...pts[0]); c.lineTo(...pts[1]); c.lineTo(...pts[2]); c.closePath(); c.fillStyle = fill; c.fill();
+    c.strokeStyle = fill; c.lineWidth = 0.6; c.stroke();   // close the hairline seams between facets
+  }
+  c.strokeStyle = T[2]; c.lineWidth = 0.8 * Z; c.beginPath();   // courses of thatch, boards or slates, parallel to the eaves
+  for (let k = 0; k < n; k++) {
+    if (inner[k]) continue;
+    const a0 = pc[k], a1 = pc[(k + 1) % n];
+    for (let s = 1; s < 4; s++) { const f = s / 4, m = (q, r) => ({ p: [q.p[0] + (r.p[0] - q.p[0]) * f, q.p[1] + (r.p[1] - q.p[1]) * f], h: q.h + (r.h - q.h) * f });
+      const A = S2(m(a0, a0.h > z ? a0 : ctr)), B = S2(m(a1, a1.h > z ? a1 : ctr)), M = S2(m(pm[k], ctr)); c.moveTo(...A); c.lineTo(...M); c.lineTo(...B); }
+  }
+  c.stroke();
+  if (P.m === 'thatch') { c.strokeStyle = COLOUR ? 'rgba(90,80,40,0.5)' : 'rgba(80,80,76,0.5)'; c.lineWidth = 0.7 * Z; c.beginPath(); for (let k = 0; k < n; k++) if (!inner[k]) for (let s = 1; s < 6; s++) { const f = s / 6, A = S2({ p: [pc[k].p[0] + (pc[(k + 1) % n].p[0] - pc[k].p[0]) * f, pc[k].p[1] + (pc[(k + 1) % n].p[1] - pc[k].p[1]) * f], h: z }); c.moveTo(A[0], A[1]); c.lineTo(A[0], A[1] + 3 * Z); } c.stroke(); }   // ragged eaves
+}
+function stDrawEdge(o, c, P, T, rise, faceA, faceB) {   // walls, doors, windows, fences and palisades
+  const ux = Math.cos(o.a), uy = Math.sin(o.a), L = P.L || GRID, h2 = L / 2, H = (P.H || 36) * rise;
+  if (P.k === 'door' || P.k === 'gate') {
+    const postW = P.m === 'stone' ? 10 : 8, pT = P.m === 'stone' ? stTone('stone') : P.m === 'iron' ? stTone('iron') : T;
+    for (const k of [-1, 1]) isoBox(c, o.x + ux * k * (h2 - 3), o.y + uy * k * (h2 - 3), o.a, postW, postW, 46 * rise, pT[0], pT[1], pT[2]);
+    isoBox(c, o.x, o.y, o.a, L - 6, 7, 6 * rise, pT[0], pT[1], pT[2], 41 * rise);   // the lintel
+    const leaves = P.k === 'gate' ? [[1, h2 - 6, 1], [-1, h2 - 6, -1]] : [[1, h2 - 6, 1]];
+    const wood = P.m === 'iron' ? stTone('wood') : stTone(P.m === 'stone' ? 'wood' : P.m);
+    for (const [side, len, dir] of leaves) {
+      const hx = o.x + ux * side * (h2 - 6), hy = o.y + uy * side * (h2 - 6), aa = o.a + (side > 0 ? 0 : Math.PI) + o.open * 1.5 * dir;
+      const lw = P.k === 'gate' ? len : L - 14, lx = hx - Math.cos(aa) * lw / 2, ly = hy - Math.sin(aa) * lw / 2;
+      const top = isoBox(c, lx, ly, aa, lw, 5, 38 * rise, wood[0], wood[1], wood[2]);
+      if (P.m === 'iron' || P.k === 'gate') for (const zz of [10, 28]) stLine(c, hx - Math.cos(aa) * 1, hy - Math.sin(aa) * 1, zz * rise, hx - Math.cos(aa) * (lw - 2), hy - Math.sin(aa) * (lw - 2), zz * rise, P.m === 'iron' ? stTone('iron')[1] : wood[2], 2.2);
+      const [kx, ky] = toScreen(lx - Math.cos(aa) * lw * 0.32, ly - Math.sin(aa) * lw * 0.32); c.fillStyle = P.m === 'iron' ? '#c8ccd0' : wood[2]; c.beginPath(); c.ellipse(kx, ky - 20 * rise * Z, 1.8 * Z, 1.8 * Z, 0, 0, 7); c.fill();
+    }
+    return;
+  }
+  if (P.k === 'arch') {
+    for (const k of [-1, 1]) isoBox(c, o.x + ux * k * (h2 - 4), o.y + uy * k * (h2 - 4), o.a, 8, 8, 44 * rise, faceA, faceB, T[2]);
+    isoBox(c, o.x, o.y, o.a, L - 4, 8, 7 * rise, faceA, faceB, T[2], 40 * rise);
+    for (const k of [-1, 1]) stLine(c, o.x + ux * k * (h2 - 8), o.y + uy * k * (h2 - 8), 33 * rise, o.x + ux * k * (h2 - 16), o.y + uy * k * (h2 - 16), 40 * rise, T[2], 2);
+    return;
+  }
+  if (P.k === 'window') {
+    if (P.m === 'stone') {
+      isoBox(c, o.x - ux * 15, o.y - uy * 15, o.a, L / 2 - 4, 9, H, faceA, faceB, T[2]); isoBox(c, o.x + ux * 15, o.y + uy * 15, o.a, L / 2 - 4, 9, H, faceA, faceB, T[2]);
+      isoBox(c, o.x, o.y, o.a, 8, 9, 14 * rise, faceA, faceB, T[2]); isoBox(c, o.x, o.y, o.a, 8, 9, 8 * rise, faceA, faceB, T[2], 34 * rise);   // a slit to shoot through
+      return;
+    }
+    for (const k of [-1, 1]) isoBox(c, o.x + ux * k * (h2 - 3), o.y + uy * k * (h2 - 3), o.a, 8, 8, 42 * rise, faceA, faceB, T[2]);
+    isoBox(c, o.x, o.y, o.a, L - 8, 7, 16 * rise, faceA, faceB, T[2]);
+    isoBox(c, o.x, o.y, o.a, L - 8, 7, 6 * rise, faceA, faceB, T[2], 39 * rise);
+    stLine(c, o.x, o.y, 16 * rise, o.x, o.y, 39 * rise, T[2], 1.6); stLine(c, o.x - ux * (h2 - 6), o.y - uy * (h2 - 6), 28 * rise, o.x + ux * (h2 - 6), o.y + uy * (h2 - 6), 28 * rise, T[2], 1.4);
+    return;
+  }
+  if (P.k === 'fence') {
+    for (let k = -2; k <= 2; k++) { const x = o.x + ux * k * 13, y = o.y + uy * k * 13, lean = Math.sin(o.seed * 3 + k) * 2; stLine(c, x, y, 0, x + lean * 0.3, y, H + Math.sin(k * 2.1 + o.seed) * 3, T[1], 2.6); }
+    for (const z of [8, 15]) stLine(c, o.x - ux * h2, o.y - uy * h2, z * rise, o.x + ux * h2, o.y + uy * h2, (z + 1) * rise, T[0], 2);
+    return;
+  }
+  if (P.k === 'palis') {                          // sharpened logs, lashed
+    for (let k = -2; k <= 2; k++) {
+      const x = o.x + ux * k * 11, y = o.y + uy * k * 11, hh = H + Math.sin(k * 1.9 + o.seed) * 4;
+      isoBox(c, x, y, o.a, 10, 10, hh - 6, faceA, faceB, T[2]);
+      const [sx, sy] = toScreen(x, y); c.fillStyle = faceA; c.beginPath(); c.moveTo(sx - 5 * Z, sy - (hh - 6) * Z); c.lineTo(sx, sy - (hh + 4) * Z); c.lineTo(sx + 5 * Z, sy - (hh - 6) * Z); c.closePath(); c.fill();
+      c.fillStyle = COLOUR ? '#d8c8a0' : '#cfcfc8'; c.beginPath(); c.moveTo(sx - 1.6 * Z, sy - (hh + 0.5) * Z); c.lineTo(sx, sy - (hh + 4) * Z); c.lineTo(sx + 1.6 * Z, sy - (hh + 0.5) * Z); c.closePath(); c.fill();
+    }
+    stLine(c, o.x - ux * h2, o.y - uy * h2, 14 * rise, o.x + ux * h2, o.y + uy * h2, 14 * rise, T[2], 1.8);
+    return;
+  }
+  if (P.m === 'thatch') {                        // bundles lashed to a frame
+    for (const k of [-1, 1]) isoBox(c, o.x + ux * k * 24, o.y + uy * k * 24, o.a, 6, 6, H, faceB, T[1], T[2]);
+    c.strokeStyle = faceA; c.lineWidth = 2.4 * Z; c.lineCap = 'round'; c.beginPath();
+    for (let k = -4; k <= 4; k++) { const [x, y] = toScreen(o.x + ux * k * 6, o.y + uy * k * 6); c.moveTo(x, y); c.lineTo(x + Math.sin(k * 1.7 + o.seed) * 2.5 * Z, y - (H - 1) * Z); }
+    c.stroke();
+    for (const h of [11, 26]) stLine(c, o.x - ux * 25, o.y - uy * 25, h * rise, o.x + ux * 25, o.y + uy * 25, h * rise, T[2], 1.4);
+    return;
+  }
+  isoBox(c, o.x, o.y, o.a, L - 2, P.k === 'half' ? 9 : 8, H, faceA, faceB, T[2]);
+  c.strokeStyle = T[2]; c.lineWidth = 1.1 * Z; c.beginPath();   // the courses
+  const rows = P.k === 'half' ? [9] : [12, 26];
+  for (const h of rows) { const [x0, y0] = toScreen(o.x - ux * (h2 - 1), o.y - uy * (h2 - 1)), [x1, y1] = toScreen(o.x + ux * (h2 - 1), o.y + uy * (h2 - 1)); c.moveTo(x0, y0 - h * rise * Z); c.lineTo(x1, y1 - h * rise * Z); }
+  c.stroke();
+  if (P.m === 'stone') { c.fillStyle = T[1]; for (let k = -2; k <= 2; k++) { const [x, y] = toScreen(o.x + ux * k * 11, o.y + uy * k * 11); c.beginPath(); c.ellipse(x, y - (P.k === 'half' ? 5 + 6 * ((k + 2) % 2) : 8 + 12 * ((k + 2) % 2)) * rise * Z, 3.6 * Z, 2.3 * Z, 0, 0, 7); c.fill(); } }
+  if (P.m === 'iron') { for (const h of [8, 30]) stLine(c, o.x - ux * (h2 - 1), o.y - uy * (h2 - 1), h * rise, o.x + ux * (h2 - 1), o.y + uy * (h2 - 1), h * rise, stTone('iron')[1], 3.2);
+    c.fillStyle = COLOUR ? '#c8ccd0' : '#d0d0cc'; for (let k = -2; k <= 2; k++) for (const h of [8, 30]) { const [x, y] = toScreen(o.x + ux * k * 11 - Math.sin(o.a) * 4, o.y + uy * k * 11 + Math.cos(o.a) * 4); c.beginPath(); c.arc(x, y - h * rise * Z, 1.1 * Z, 0, 7); c.fill(); } }
+}
+function stDrawThing(o, c, P, T, rise, faceA, faceB) {   // posts, lights, furniture and decoration
+  const a = o.a, ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux, at = (f, r) => [o.x + ux * f + vx * r, o.y + uy * f + vy * r];
+  const W = stTone('wood'), St = stTone('stone'), Ir = stTone('iron'), Bo = stTone('bone'), Cl = stTone('cloth'), Hi = stTone('hide');
+  switch (P.k) {
+    case 'post': isoBox(c, o.x, o.y, a, 9, 9, 40 * rise, faceA, faceB, T[2]); stLine(c, o.x, o.y, 30, o.x, o.y, 30, T[2], 0); break;
+    case 'pillar': isoBox(c, o.x, o.y, a, 14, 14, 4 * rise, faceA, faceB, T[2]); isoBox(c, o.x, o.y, a, 11, 11, 36 * rise, faceA, faceB, T[2], 4 * rise); isoBox(c, o.x, o.y, a, 14, 14, 4 * rise, faceA, faceB, T[2], 40 * rise); break;
+    case 'stakes':
+      for (const s of [-1, 1]) for (let k = -1; k <= 1; k++) { const [bx, by] = at(k * 10, -s * 8), [tx, ty] = at(k * 10 + s * 2, s * 10); stLine(c, bx, by, 0, tx, ty, 22 * rise, W[1], 3.2); const [px, py] = toScreen(tx, ty); c.fillStyle = COLOUR ? '#d8c8a0' : '#cfcfc8'; c.beginPath(); c.arc(px, py - 22 * rise * Z, 1.6 * Z, 0, 7); c.fill(); }
+      stLine(c, ...at(-14, 0), 9, ...at(14, 0), 9, W[2], 2.4); break;
+    case 'spikeF': { const pts = [at(-18, -12), at(18, -12), at(18, 12), at(-18, 12)]; stPoly(c, pts, 0, COLOUR ? 'rgba(70,52,34,0.75)' : 'rgba(60,60,58,0.75)');
+      for (let i = -2; i <= 2; i++) for (let j = -1; j <= 1; j++) { const [x, y] = toScreen(...at(i * 7 + (j % 2) * 3, j * 7)); c.fillStyle = COLOUR ? '#d8d0b8' : '#d0d0ca'; c.beginPath(); c.moveTo(x - 1.6 * Z, y); c.lineTo(x, y - 7 * Z); c.lineTo(x + 1.6 * Z, y); c.closePath(); c.fill(); } break; }
+    case 'thorns': for (let i = 0; i < 9; i++) { const t = i * 0.7 + o.seed, [x, y] = toScreen(...at(Math.cos(t) * 12 * ((i % 3) / 3 + 0.4), Math.sin(t * 1.3) * 12 * ((i % 2) / 2 + 0.5))), r = (7 + (i % 3) * 2) * Z;
+      c.fillStyle = i % 2 ? (COLOUR ? '#4e5e2e' : '#5c5c58') : (COLOUR ? '#3c4a22' : '#4a4a46'); c.beginPath(); c.ellipse(x, y - r * 0.6, r, r * 0.7, 0, 0, 7); c.fill(); if (COLOUR && i % 3 === 0) { c.fillStyle = '#b8323a'; c.beginPath(); c.arc(x + 2 * Z, y - r * 0.9, 1.2 * Z, 0, 7); c.fill(); } } break;
+    case 'chimes': { stLine(c, o.x, o.y, 0, o.x, o.y, 40, W[1], 2.6); stLine(c, ...at(-9, 0), 40, ...at(9, 0), 40, W[2], 2.2);
+      const sw = (o.ring > 0 ? 3 : 0.8) * Math.sin(S.t * (o.ring > 0 ? 14 : 2) + o.seed);
+      for (let k = -2; k <= 2; k++) { if (!k) continue; const [x, y] = toScreen(...at(k * 4.2, 0)), len = (8 + Math.abs(k) * 2) * Z, dx = sw * (k % 2 ? 1 : -1) * Z; c.strokeStyle = 'rgba(160,160,150,0.8)'; c.lineWidth = 0.7 * Z; c.beginPath(); c.moveTo(x, y - 40 * Z); c.lineTo(x + dx, y - 40 * Z + len); c.stroke(); c.fillStyle = Bo[0]; c.fillRect(x + dx - 1.1 * Z, y - 40 * Z + len, 2.2 * Z, 6 * Z); } break; }
+    case 'sconce': { const [x, y] = toScreen(o.x, o.y); c.fillStyle = Ir[1]; c.fillRect(x - 1.2 * Z, y - 30 * Z, 2.4 * Z, 10 * Z); c.beginPath(); c.moveTo(x - 4 * Z, y - 30 * Z); c.lineTo(x + 4 * Z, y - 30 * Z); c.lineTo(x + 2.5 * Z, y - 27 * Z); c.lineTo(x - 2.5 * Z, y - 27 * Z); c.closePath(); c.fill();
+      c.fillStyle = W[1]; c.fillRect(x - 1.4 * Z, y - 34 * Z, 2.8 * Z, 5 * Z); break; }
+    case 'lamp': { stLine(c, o.x, o.y, 0, o.x, o.y, 52, W[1], 3); const [hx, hy] = at(8, 0); stLine(c, o.x, o.y, 51, hx, hy, 51, W[2], 2.2);
+      const [x, y] = toScreen(hx, hy); c.fillStyle = Ir[2]; c.fillRect(x - 3.5 * Z, y - 50 * Z, 7 * Z, 2 * Z); c.fillStyle = o.lit ? (COLOUR ? '#ffd890' : '#f0f0e8') : (COLOUR ? '#8a7a58' : '#7a7a74'); c.fillRect(x - 3 * Z, y - 48 * Z, 6 * Z, 8 * Z); c.fillStyle = Ir[2]; c.fillRect(x - 3.5 * Z, y - 40 * Z, 7 * Z, 1.6 * Z); break; }
+    case 'brazier': { for (let k = 0; k < 3; k++) { const t = a + k * 2.0944, [lx, ly] = [o.x + Math.cos(t) * 7, o.y + Math.sin(t) * 7]; stLine(c, lx, ly, 0, (lx + o.x) / 2, (ly + o.y) / 2, 10, Ir[2], 2); }
+      const [x, y] = toScreen(o.x, o.y); c.fillStyle = St[1]; c.beginPath(); c.ellipse(x, y - 12 * Z, 10 * Z, 5 * Z, 0, 0, Math.PI); c.lineTo(x - 10 * Z, y - 12 * Z); c.fill(); c.beginPath(); c.moveTo(x - 10 * Z, y - 12 * Z); c.lineTo(x - 7 * Z, y - 7 * Z); c.lineTo(x + 7 * Z, y - 7 * Z); c.lineTo(x + 10 * Z, y - 12 * Z); c.closePath(); c.fill();
+      c.fillStyle = St[0]; c.beginPath(); c.ellipse(x, y - 12 * Z, 10 * Z, 5 * Z, 0, 0, 7); c.fill(); c.fillStyle = o.lit ? (COLOUR ? '#e26a2a' : '#c8c8c0') : (COLOUR ? '#3a2a20' : '#3a3a38'); c.beginPath(); c.ellipse(x, y - 12.5 * Z, 7.5 * Z, 3.6 * Z, 0, 0, 7); c.fill(); break; }
+    case 'candles': for (const [f, r, h] of [[-3, -2, 9], [2, 1, 12], [-1, 3, 7]]) { const [x, y] = toScreen(...at(f, r)); c.fillStyle = Bo[0]; c.fillRect(x - 1.4 * Z, y - h * Z, 2.8 * Z, h * Z); c.fillStyle = COLOUR ? 'rgba(220,210,190,0.7)' : 'rgba(210,210,206,0.7)'; c.fillRect(x - 2 * Z, y - 1.2 * Z, 4 * Z, 1.2 * Z); } break;
+    case 'bed': {
+      isoBox(c, o.x, o.y, a, 40, 24, 5, faceB, T[1], T[2]);
+      const t = isoBox(c, o.x + ux * 3, o.y + uy * 3, a, 34, 20, 4, COLOUR ? '#8a5a4a' : '#7a7a74', COLOUR ? '#6e4438' : '#5e5e58', COLOUR ? '#55342a' : '#4a4a46', 5);
+      const mid = (p, q, f) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f], [px, py] = mid(mid(t[0], t[1], 0.16), mid(t[3], t[2], 0.16), 0.5);
+      c.fillStyle = COLOUR ? '#efe6d2' : '#dcdcd6'; c.beginPath(); c.ellipse(px, py, 8 * Z, 4.5 * Z, 0, 0, 7); c.fill(); break; }
+    case 'table': { for (const [i, j] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const [lx, ly] = at(i * 13, j * 8); stLine(c, lx, ly, 0, lx, ly, 14 * rise, T[2], 2.4); }
+      isoBox(c, o.x, o.y, a, 32, 20, 3, faceA, faceB, T[2], 14 * rise); const [mx, my] = toScreen(...at(-5, 2)); c.fillStyle = COLOUR ? '#c8b07a' : '#bcbcb6'; c.beginPath(); c.ellipse(mx, my - 17.5 * Z, 3 * Z, 1.6 * Z, 0, 0, 7); c.fill(); break; }
+    case 'stool': { for (let k = 0; k < 3; k++) { const t = a + k * 2.0944, lx = o.x + Math.cos(t) * 5, ly = o.y + Math.sin(t) * 5; stLine(c, lx, ly, 0, o.x + (lx - o.x) * 0.6, o.y + (ly - o.y) * 0.6, 9 * rise, T[2], 1.8); }
+      const [x, y] = toScreen(o.x, o.y); c.fillStyle = faceB; c.beginPath(); c.ellipse(x, y - 9 * Z, 6.5 * Z, 3.3 * Z, 0, 0, 7); c.fill(); c.fillStyle = faceA; c.beginPath(); c.ellipse(x, y - 10.5 * Z, 6.5 * Z, 3.3 * Z, 0, 0, 7); c.fill(); break; }
+    case 'seat': { for (const i of [-1, 1]) { const [lx, ly] = at(i * 11, 0); isoBox(c, lx, ly, a, 3, 8, 8 * rise, faceB, T[1], T[2]); } isoBox(c, o.x, o.y, a, 30, 9, 3, faceA, faceB, T[2], 8 * rise); break; }
+    case 'shelf': { const [x, y] = toScreen(o.x, o.y), dx = Math.cos(scrAng(a)) * 12 * Z, dy = Math.sin(scrAng(a)) * 12 * Z;
+      for (const h of [16, 28]) { c.strokeStyle = W[1]; c.lineWidth = 2.6 * Z; c.beginPath(); c.moveTo(x - dx, y - dy - h * Z); c.lineTo(x + dx, y + dy - h * Z); c.stroke(); }
+      const jars = [[-0.6, 16, Cl[0], 5], [-0.1, 16, COLOUR ? '#c8b07a' : '#bcbcb6', 4], [0.45, 16, COLOUR ? '#6a8a9a' : '#8a8a86', 6], [-0.4, 28, COLOUR ? '#a0a09a' : '#a0a09c', 4], [0.3, 28, Hi[0], 5]];
+      for (const [f, h, col, jh] of jars) { c.fillStyle = col; c.fillRect(x + dx * f * 2 - 1.8 * Z, y + dy * f * 2 - (h + jh) * Z, 3.6 * Z, jh * Z); } break; }
+    case 'wrack': { stLine(c, ...at(-12, 0), 0, ...at(-12, 0), 30, W[2], 2.4); stLine(c, ...at(12, 0), 0, ...at(12, 0), 30, W[2], 2.4); stLine(c, ...at(-13, 0), 26, ...at(13, 0), 26, W[1], 2.2); stLine(c, ...at(-13, 0), 8, ...at(13, 0), 8, W[1], 2.2);
+      for (let k = -1; k <= 1; k++) { const [bx, by] = at(k * 7, 3); stLine(c, bx, by, 0, bx, by, 38, W[0], 1.6); const [x, y] = toScreen(bx, by); c.fillStyle = Ir[0]; c.beginPath(); c.moveTo(x - 1.8 * Z, y - 37 * Z); c.lineTo(x, y - 44 * Z); c.lineTo(x + 1.8 * Z, y - 37 * Z); c.closePath(); c.fill(); } break; }
+    case 'barrel': { const [x, y] = toScreen(o.x, o.y); c.fillStyle = faceB; c.beginPath(); c.moveTo(x - 7 * Z, y - 1 * Z); c.quadraticCurveTo(x - 9 * Z, y - 9 * Z, x - 7 * Z, y - 17 * Z); c.lineTo(x + 7 * Z, y - 17 * Z); c.quadraticCurveTo(x + 9 * Z, y - 9 * Z, x + 7 * Z, y - 1 * Z); c.closePath(); c.fill();
+      c.strokeStyle = Ir[1]; c.lineWidth = 1.6 * Z; for (const h of [4, 14]) { c.beginPath(); c.moveTo(x - 8.2 * Z, y - h * Z); c.lineTo(x + 8.2 * Z, y - h * Z); c.stroke(); }
+      c.fillStyle = faceA; c.beginPath(); c.ellipse(x, y - 17 * Z, 7 * Z, 3.4 * Z, 0, 0, 7); c.fill(); break; }
+    case 'crate': { const t = isoBox(c, o.x, o.y, a, 16, 16, 14 * rise, faceA, faceB, T[2]); c.strokeStyle = T[2]; c.lineWidth = 1.1 * Z; c.beginPath(); c.moveTo(t[0][0], t[0][1]); c.lineTo(t[2][0], t[2][1]); c.moveTo(t[1][0], t[1][1]); c.lineTo(t[3][0], t[3][1]); c.stroke(); break; }
+    case 'rug': { const pts = [at(-22, -14), at(22, -14), at(22, 14), at(-22, 14)]; stPoly(c, pts, 0.3, Cl[0]); stPoly(c, [at(-17, -9), at(17, -9), at(17, 9), at(-17, 9)], 0.4, null, COLOUR ? '#e2c070' : '#d8d8d2', 1.4); stPoly(c, [at(-9, -4), at(9, -4), at(9, 4), at(-9, 4)], 0.4, Cl[2]); break; }
+    case 'pelt': { const pts = []; for (let k = 0; k < 14; k++) { const t = k / 14 * TAU, r = 15 + (k % 2 ? -3 : 2) + (k % 7 === 0 ? 4 : 0); pts.push(at(Math.cos(t) * r * 1.2, Math.sin(t) * r * 0.8)); } stPoly(c, pts, 0.3, Hi[0]); stPoly(c, [at(-8, -4), at(8, -4), at(8, 4), at(-8, 4)], 0.4, Hi[1]); break; }
+    case 'woodpile': for (const [f, r, z] of [[-6, 0, 0], [0, 0, 0], [6, 0, 0], [-3, 0, 7], [3, 0, 7], [0, 0, 13]]) { const [x, y] = toScreen(...at(f, r)); c.fillStyle = W[1]; c.beginPath(); c.ellipse(x, y - (z + 4) * Z, 4 * Z, 4 * Z, 0, 0, 7); c.fill(); c.fillStyle = COLOUR ? '#c8a870' : '#bcbcb6'; c.beginPath(); c.ellipse(x - 1 * Z, y - (z + 4) * Z, 2.2 * Z, 2.2 * Z, 0, 0, 7); c.fill(); } break;
+    case 'banner': { stLine(c, o.x, o.y, 0, o.x, o.y, 56, W[1], 2.6); const [x, y] = toScreen(o.x, o.y), wv = Math.sin(S.t * 2.3 + o.seed) * 2 * Z, dir = Math.cos(scrAng(a)) >= 0 ? 1 : -1;
+      c.fillStyle = Cl[0]; c.beginPath(); c.moveTo(x, y - 54 * Z); c.lineTo(x + dir * 16 * Z + wv, y - 52 * Z); c.lineTo(x + dir * 12 * Z + wv, y - 44 * Z); c.lineTo(x + dir * 16 * Z + wv, y - 36 * Z); c.lineTo(x, y - 36 * Z); c.closePath(); c.fill();
+      c.fillStyle = COLOUR ? '#e2c070' : '#e0e0da'; c.beginPath(); c.arc(x + dir * 6 * Z + wv * 0.5, y - 45 * Z, 2.4 * Z, 0, 7); c.fill(); break; }
+    case 'trophy': { const [x, y] = toScreen(o.x, o.y); c.fillStyle = W[1]; c.fillRect(x - 4 * Z, y - 32 * Z, 8 * Z, 8 * Z); c.fillStyle = Bo[0]; c.beginPath(); c.ellipse(x, y - 26 * Z, 2.6 * Z, 3.4 * Z, 0, 0, 7); c.fill();
+      c.strokeStyle = Bo[0]; c.lineWidth = 1.5 * Z; c.lineCap = 'round'; c.beginPath(); for (const s of [-1, 1]) { c.moveTo(x + s * 1.5 * Z, y - 30 * Z); c.quadraticCurveTo(x + s * 9 * Z, y - 31 * Z, x + s * 10 * Z, y - 42 * Z); c.moveTo(x + s * 6 * Z, y - 32.5 * Z); c.lineTo(x + s * 4 * Z, y - 38 * Z); c.moveTo(x + s * 9 * Z, y - 37 * Z); c.lineTo(x + s * 13 * Z, y - 39 * Z); } c.stroke(); break; }
+    case 'skulls': { stLine(c, o.x, o.y, 0, o.x, o.y, 40, W[1], 2.6); const [x, y] = toScreen(o.x, o.y);
+      for (const [h, r] of [[40, 4.4], [27, 3.6]]) { c.fillStyle = Bo[0]; c.beginPath(); c.ellipse(x, y - h * Z, r * Z, r * 1.05 * Z, 0, 0, 7); c.fill(); c.fillStyle = '#2a2a28'; for (const s of [-1, 1]) { c.beginPath(); c.arc(x + s * r * 0.38 * Z, y - (h + r * 0.1) * Z, r * 0.24 * Z, 0, 7); c.fill(); } } break; }
+    case 'flowers': { const [x, y] = toScreen(o.x, o.y); c.fillStyle = COLOUR ? '#9a6a4a' : '#8a8a84'; c.beginPath(); c.moveTo(x - 5 * Z, y - 8 * Z); c.lineTo(x + 5 * Z, y - 8 * Z); c.lineTo(x + 3.6 * Z, y); c.lineTo(x - 3.6 * Z, y); c.closePath(); c.fill();
+      c.strokeStyle = COLOUR ? '#5a7a34' : '#6a6a66'; c.lineWidth = 1.1 * Z; c.beginPath(); const fl = [[-4, -15, '#c8507a'], [0, -18, '#e2c070'], [4, -14, '#d87a5a'], [-1.5, -13, '#a070c0']];
+      for (const [fx, fy] of fl) { c.moveTo(x, y - 8 * Z); c.lineTo(x + fx * Z, y + fy * Z); } c.stroke(); for (const [fx, fy, col] of fl) { c.fillStyle = COLOUR ? col : '#d8d8d2'; c.beginPath(); c.arc(x + fx * Z, y + fy * Z, 1.9 * Z, 0, 7); c.fill(); } break; }
+    case 'ring': for (let k = 0; k < 8; k++) { const t = k / 8 * TAU + o.seed, [x, y] = toScreen(o.x + Math.cos(t) * 14, o.y + Math.sin(t) * 14); c.fillStyle = k % 2 ? St[0] : St[1]; c.beginPath(); c.ellipse(x, y - 2 * Z, 4.2 * Z, 3 * Z, 0, 0, 7); c.fill(); } break;
+  }
+}
+function stDraw(o, c, sx, sy, ghost) {
+  const P = PC(o.id), done = o.done, T = stTone(P.m).slice();
+  const rise = done ? (o.rise === undefined ? 1 : 0.6 + 0.4 * o.rise) : 1;
+  const hurt = o.hitT > 0 ? 0.5 : 0, sh = o.shakeT !== undefined && S.t - o.shakeT < 0.3 ? Math.sin((S.t - o.shakeT) * 60) * (1 - (S.t - o.shakeT) / 0.3) * 2.5 * Z : 0;
+  const drop = o.dropT !== undefined && S.t - o.dropT < 0.25 ? (1 - (S.t - o.dropT) / 0.25) * 8 * Z : 0;   // a fresh blueprint drops into place
+  c.save(); if (sh || drop) c.translate(sh, -drop);
+  const tall = P.lay === 'edge' || P.lay === 'post' || (P.lay === 'free' && (P.H || 0) > 26);
+  if (!ghost && tall && o.y + o.x > S.p.y + S.p.x + 10 && Math.abs((o.x - o.y) - (S.p.x - S.p.y)) < 120 && (o.x + o.y) - (S.p.x + S.p.y) < 170 && stDistTo(o, S.p.x, S.p.y) < 110) c.globalAlpha *= 0.4;   // a wall between you and the camera turns to glass, so you can see yourself indoors
+  if (ghost) c.globalAlpha *= 0.5;
+  else if (!done) { const f = 1 - stNeedLeft(o) / Object.values(P.cost).reduce((a, n) => a + n, 0); c.globalAlpha *= 0.5 + 0.4 * f;
+    if (!o.put) { const t = `rgba(255,${200 + 15 * Math.sin(S.t * 3)},140,`; T[0] = t + '0.55)'; T[1] = t + '0.42)'; T[2] = t + '0.8)'; } }   // a bare blueprint glows like a plan; once wood goes in it shows its stuff
+  if (ghost) { const t = o.ok ? 'rgba(150,235,140,' : 'rgba(240,95,75,'; c.globalAlpha *= 0.9; T[0] = t + '0.9)'; T[1] = t + '0.75)'; T[2] = t + '1)'; }
+  else if (o.del) { T[0] = '#e88a74'; T[1] = '#c8604c'; T[2] = '#8a3a2a'; }
+  const faceA = hurt ? '#efe0d4' : T[0], faceB = hurt ? '#d8cabc' : T[1];
+  if (P.sh === 'sq' || P.sh === 'tri') { if (P.lay === 'roof') stDrawRoof(o, c, P, T, rise); else stDrawFloor(o, c, P, T); }
+  else if (P.sh === 'edge') stDrawEdge(o, c, P, T, rise, faceA, faceB);
+  else stDrawThing(o, c, P, T, rise, faceA, faceB);
   c.restore();
+  const lab = (tx, y, col) => { c.font = `600 ${Math.round(10 * Math.min(1.4, Z))}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.textBaseline = 'bottom'; const w = c.measureText(tx).width + 10; c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(sx - w / 2, y - 13, w, 14); c.fillStyle = col; c.fillText(tx, sx, y); };
+  const topZ = (P.lay === 'roof' ? ROOF_H + 20 : P.H || (P.lay === 'flat' || P.sh === 'sq' || P.sh === 'tri' ? 6 : 30)) + 14;
   if (!done && !ghost) {                          // a blueprint: its outline, and what it still wants
     const left = Object.entries(o.need).filter(([, n]) => n > 0);
     c.save(); c.strokeStyle = `rgba(255,207,138,${0.5 + 0.2 * Math.sin(S.t * 4)})`; c.lineWidth = 1.6; c.setLineDash([5, 4]);
-    const R = (o.k === 'floor' || o.k === 'bed' ? 30 : 28) * K();
+    const R = (P.sh === 'sq' ? 30 : P.sh === 'edge' ? (P.L || GRID) / 2 : (P.r || 10) + 6) * K();
     c.beginPath(); c.ellipse(sx, sy, R, R / 2, 0, 0, 7); c.stroke(); c.setLineDash([]); c.restore();
-    if (left.length) {
-      const tx = `${left[0][1]} ${DIT[left[0][0]].n.toLowerCase()}`;
-      c.font = `600 ${Math.round(10 * Math.min(1.4, Z))}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.textBaseline = 'bottom';
-      const w = c.measureText(tx).width + 10; c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(sx - w / 2, sy - 50 * Z - 13, w, 14);
-      c.fillStyle = dayHave(left[0][0]) ? 'rgba(255,215,160,0.95)' : 'rgba(240,150,130,0.95)'; c.fillText(tx, sx, sy - 50 * Z);
-    }
+    if (left.length && Math.hypot(o.x - S.p.x, o.y - S.p.y) < 260) lab(`${left[0][1]} ${DIT[left[0][0]].n.toLowerCase()}${left.length > 1 ? ' +' : ''}`, sy - topZ * Z, dayHave(left[0][0]) ? 'rgba(255,215,160,0.95)' : 'rgba(240,150,130,0.95)');
   }
-  if (done && o.hp < o.max) {                     // a battered piece shows how much is left in it
-    const f = o.hp / o.max, w = 28 * Math.min(1.6, Z);
-    c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(sx - w / 2 - 1, sy - 46 * Z - 1, w + 2, 5);
-    c.fillStyle = f < 0.35 ? '#e2543c' : '#c8b07a'; c.fillRect(sx - w / 2, sy - 46 * Z, w * f, 3);
+  if (done && o.hp < o.max && !ghost) {           // a battered piece shows how much is left in it
+    const f = o.hp / o.max, w = 28 * Math.min(1.6, Z), y = sy - topZ * Z;
+    c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(sx - w / 2 - 1, y - 1, w + 2, 5);
+    c.fillStyle = f < 0.35 ? '#e2543c' : '#c8b07a'; c.fillRect(sx - w / 2, y, w * f, 3);
   }
   if (ghost) {
-    const R = (o.k === 'floor' || o.k === 'bed' ? 32 : 30) * K(), pulse = 0.65 + 0.35 * Math.sin(S.t * 6);
-    c.fillStyle = o.ok ? `rgba(150,230,140,${0.1 + 0.05 * Math.sin(S.t * 6)})` : 'rgba(230,90,70,0.12)';
-    c.beginPath(); c.ellipse(sx, sy, R, R / 2, 0, 0, 7); c.fill();
-    c.strokeStyle = o.ok ? `rgba(160,235,150,${pulse})` : `rgba(235,95,75,${pulse})`; c.lineWidth = 2.5 * Math.min(2, Z);
-    c.setLineDash([6 * Z, 5 * Z]); c.lineDashOffset = -S.t * 18; c.beginPath(); c.ellipse(sx, sy, R, R / 2, 0, 0, 7); c.stroke(); c.setLineDash([]); c.lineDashOffset = 0;
-    if (!o.ok) {
-      c.font = `600 ${Math.round(9 * Math.min(1.4, Z))}px "IBM Plex Mono", monospace`; c.textAlign = 'center'; c.textBaseline = 'bottom';
-      const w = c.measureText(o.why).width + 10; c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(sx - w / 2, sy - 30 * Z - 13, w, 14);
-      c.fillStyle = 'rgba(240,150,130,0.95)'; c.fillText(o.why, sx, sy - 30 * Z);
-    }
+    if (o.snap) { const pulse = 0.6 + 0.4 * Math.sin(S.t * 8); c.fillStyle = `rgba(190,255,180,${pulse})`; c.beginPath(); c.moveTo(sx, sy - 4 * Z); c.lineTo(sx + 4 * Z, sy); c.lineTo(sx, sy + 4 * Z); c.lineTo(sx - 4 * Z, sy); c.closePath(); c.fill(); }
+    lab(o.ok ? P.n.toLowerCase() + (o.snap ? ' · snapped' : '') : o.why, sy - topZ * Z, o.ok ? 'rgba(190,240,180,0.95)' : 'rgba(240,150,130,0.95)');
   }
+}
+function stDrawFlat() {                          // floors, rugs and traps go down first, under everything that stands on them
+  const D = S.day; if (!D) return;
+  const R = viewR() + 60, g = stGhost();
+  for (const o of D.bld.values()) { const P = PC(o.id); if (P.lay !== 'floor' && P.lay !== 'flat') continue; if (Math.abs(o.x - S.cam.x) > R || Math.abs(o.y - S.cam.y) > R) continue; o.del = D.bdel && stDelAim === o; const [sx, sy] = toScreen(o.x, o.y); stDraw(o, ctx, sx, sy, false); }
+  if (g) { const P = PC(g.id); if (P.lay === 'floor' || P.lay === 'flat') { const [sx, sy] = toScreen(g.x, g.y); stDraw(g, ctx, sx, sy, true); } }
+}
+let stDelAim = null, stRoofFade = 0;
+function stDrawRoofs() {                         // roofs go on last, over everything; they fade away while you're under them
+  const D = S.day; if (!D) return;
+  const under = stRoofOver(S.p.x, S.p.y); stRoofFade += ((under ? 1 : 0) - stRoofFade) * Math.min(1, frameDt * 6);
+  const R = viewR() + 80, g = stGhost();
+  for (const o of D.bld.values()) {
+    const P = PC(o.id); if (P.lay !== 'roof') continue; if (Math.abs(o.x - S.cam.x) > R || Math.abs(o.y - S.cam.y) > R) continue;
+    const near = Math.hypot(o.x - S.p.x, o.y - S.p.y) < 190;
+    ctx.save(); if (near) ctx.globalAlpha *= 1 - 0.9 * stRoofFade; o.del = D.bdel && stDelAim === o; const [sx, sy] = toScreen(o.x, o.y); stDraw(o, ctx, sx, sy, false); ctx.restore();
+  }
+  if (g && PC(g.id).lay === 'roof') { const [sx, sy] = toScreen(g.x, g.y); stDraw(g, ctx, sx, sy, true); }
 }
 // ---- v153 stage 3 (Joe): the night, and what the body needs. Every day ends in a dark night: the only light is the fires you
 // build and a torch you carry, and the cold comes with it, so warmth is a need like food and water. Wounds bleed until you bind
@@ -9303,9 +9754,10 @@ const dayNight = () => dayLight() < 0.35;
 const dayClock2 = () => { const f = dayT(), h = Math.floor(((f * 24) + 6) % 24); return h; };
 // ---- warmth, bleeding and sickness ----
 const dayCoats = () => ['head', 'body', 'legs'].filter(k => S.day.gear[k]).length;
-function dayFireHere() { return dayFireNear(S.p.x, S.p.y) || S.rg.inCamp; }
-function dayIndoors() {                          // four or more pieces of your own building close by counts as under cover
-  return stNear(S.p.x, S.p.y, 80).filter(o => o.done).length >= 4;
+function dayFireHere() { return dayFireNear(S.p.x, S.p.y) || S.rg.inCamp || stWarmNear(S.p.x, S.p.y); }
+function dayIndoors() {                          // under a roof you built (or, as before, four or more pieces of your own close by)
+  const r = stRoofOver(S.p.x, S.p.y); if (r && r.done) return true;
+  return stNear(S.p.x, S.p.y, 80).filter(o => o.done && PC(o.id).lay === 'edge').length >= 4;
 }
 function dayWarmStep(dt) {
   const D = S.day, rg = S.rg;
@@ -10027,7 +10479,7 @@ function drawSunShadows(items) {
     else if (o.kind === 'post') sil('post', (hash(o.x * 0.53, o.y * 0.29) * 50 | 0) % SPRITE_KINDS.post[0], sx, sy, Z);
     else if (o.kind === 'shade' || o.kind === 'searcher') col(sx, sy, 5 * Z, ((FOES[o.type] || {}).h || 38) * Z);
     else if (o.kind === 'beast') col(sx, sy, BEAST[o.k].w * 0.45 * Z, BEAST[o.k].h * 0.8 * Z);
-    else if (o.kind === 'dst' && (o.k === 'wall' || o.k === 'door' || o.k === 'window') && (o.done || o.put)) { const ux = Math.cos(o.a) * GRID / 2, uy = Math.sin(o.a) * GRID / 2; slab(o.x - ux, o.y - uy, o.x + ux, o.y + uy, (o.k === 'window' ? 30 : 36) * Z * (o.done ? 1 : 0.4)); }
+    else if (o.kind === 'dst' && (o.done || o.put)) { const P = PC(o.id); if (P.sh === 'edge') { const L = (P.L || GRID) / 2, ux = Math.cos(o.a) * L, uy = Math.sin(o.a) * L; slab(o.x - ux, o.y - uy, o.x + ux, o.y + uy, (P.k === 'window' ? 30 : P.H || 36) * Z * (o.done ? 1 : 0.4)); } else if (P.H && P.lay !== 'mount') col(sx, sy, (P.r || 6) * 0.7 * Z, P.H * Z * (o.done ? 1 : 0.4)); }
     else if (o.kind === 'dbuild') col(sx, sy, (o.sub === 'signal' ? 18 : o.sub === 'chest' || o.sub === 'bench' ? 10 : 5) * Z, (o.sub === 'signal' ? 60 : o.sub === 'tpost' ? 46 : o.sub === 'effigy' ? 44 : o.sub === 'furnace' ? 30 : 16) * Z);
     else if (o.kind === 'dcamp' && (o.sub === 'stake' || o.sub === 'relic' || o.sub === 'tent')) col(sx, sy, (o.sub === 'tent' ? 12 : 4) * Z, (o.sub === 'relic' ? 70 : o.sub === 'tent' ? 26 : 38) * Z);
     else if (o.camp) col(sx, sy, 5 * Z, 26 * Z);
@@ -10395,6 +10847,7 @@ function dayDawn() {                                       // first light: whate
 }
 function dayHoles(hole) {                                  // the fires, posts and torches you have, cut out of the dark
   const D = S.day, vr = viewR() + 200;
+  stHoles(hole);   // v186: lamps, sconces, braziers and candles
   for (const B of D.builds) {
     if (Math.abs(B.x - S.cam.x) > vr || Math.abs(B.y - S.cam.y) > vr) continue;
     if (B.t === 'fire') hole(B.x, B.y, 165 * (1 + 0.05 * Math.sin(S.t * 7 + B.x)), 0.85);
@@ -10586,16 +11039,20 @@ function padPoll() {
   if (down(0) || down(7)) attack();                     // A or RT
   if (down(1)) dodge();                                 // B
   if (down(2)) { if (S.day) dayUse(); else if (S.mode === 'expedition') padKey('e'); }   // X: use, take, open
-  if (down(3) && typeof wpSpecial === 'function') wpSpecial();   // Y: the weapon's special
+  const hb = S.day && dayTool() === 'build';           // v186: with the hammer the d-pad turns and picks pieces
+  if (hb) { if (down(14)) stRot(-1); if (down(15)) stRot(1); if (down(12)) stCycle(-1); if (down(13)) stCycle(1); if (down(3)) stCatCycle(1); if (down(11)) stDelToggle(); if (down(6)) stSnapToggle(); }
+  if (down(3) && !hb && typeof wpSpecial === 'function') wpSpecial();   // Y: the weapon's special
   if (down(4)) { if (S.day) daySelect((S.day.hot + HOTN - 1) % HOTN); else if (typeof wpSwap === 'function' && wpOn()) wpSwap(); }   // LB
   if (down(5)) { if (S.day) daySelect((S.day.hot + 1) % HOTN); }   // RB
+  if (!hb) {
   if (down(6)) padKey('h');                             // LT: a flask
   if (down(12)) padKey('h');                            // d-pad up: a flask
   if (down(13)) padKey('g');                            // d-pad down: the recall flare
   if (down(14)) padKey('t');                            // d-pad left: plant a lantern
   if (down(15) || (down(10) && !S.day)) toggleAutoRun();   // d-pad right or L3: auto run
+  }
   if (down(10) && S.day) dayCrouch();                   // v178: in Daylight L3 crouches
-  if (down(11)) padKey('f');                            // R3: the torch switch (where there is one)
+  if (down(11) && !hb) padKey('f');                     // R3: the torch switch (where there is one)
   if (down(8)) { if (S.day) openCraft(); else if (S.mode === 'expedition') padKey('e'); }   // View / Share: the pack
   if (down(9)) padKey('Escape');                        // Menu / Options: pause
   PAD.prev = B;
@@ -12000,6 +12457,14 @@ function wpUi(force) {
 wspecBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSpecial(); });
 wswapBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSwap(); });
 addEventListener('keydown', e => { if (!e.repeat && S && S.day && S.running && (e.key === 'q' || e.key === 'Q' || e.key === 'Control')) dayCrouch(); });   // v178: crouch
+addEventListener('keydown', e => {                // v186: with the hammer in hand: Z/X turn the piece, V snapping, B pull down, [ ] pieces, N kinds
+  if (!S || !S.day || !S.running || dayTool() !== 'build' || !craftEl.hidden || !overlay.hidden) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z') stRot(-1); else if (k === 'x') stRot(1);
+  else if (e.repeat) return;
+  else if (k === 'v') stSnapToggle(); else if (k === 'b') stDelToggle(); else if (k === '[') stCycle(-1); else if (k === ']') stCycle(1); else if (k === 'n') stCatCycle(1);
+});
+cv.addEventListener('wheel', e => { if (S && S.day && S.running && dayTool() === 'build') { e.preventDefault(); stRot(e.deltaY > 0 ? 1 : -1); } }, { passive: false });   // v186: the wheel turns the piece
 addEventListener('keydown', e => {
   if (e.repeat || !(wpOn() || dArmOn()) || !S.running) return;
   const k = e.key.toLowerCase();
