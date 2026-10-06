@@ -594,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 191</p>
+      <p class="small" id="verLbl">Version 192</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -11288,15 +11288,15 @@ function dayDrawRelease() {                       // let go: it flies
   const D = S.day; if (!D || !D.draw) return;
   const W = D.draw, R = RNG[W.kind]; D.draw = null;
   const p = S.p; if (p.wact && p.wact.hold) p.wact = { pose: W.kind === 'bow' ? WPP.bow0 : WPP.lnS, t: W.kind === 'bow' ? 0.12 : 0.17, dur: 0.3, a: W.a };
-  const c = Math.max(0.25, Math.min(1, W.t / R.full));
+  const c = Math.max(0.2, Math.min(1, W.t / R.full));   // v192: a tap is a weak flick; the full draw is what pays
   const s = dayAmmo(W.kind); if (!s) return;
   D.st = Math.max(0, D.st - R.st); D.stT = 0;
   dayLoose(W.kind, s, c, W.a, 0, 1);
-  dayWear(); S.rg.rngCd = W.kind === 'bow' ? 0.18 : 0.14;
+  dayWear(); S.rg.rngCd = W.kind === 'bow' ? 0.3 : 0.25;
 }
 function dayLoose(kind, s, c, a, spread, kk) {   // one arrow or one stone, from the stack s, drawn to c (0..1)
   const T = heldIt(), A = DIT[s.id], R = RNG[kind], p = S.p;
-  const am = s.id === 'stones' ? 0.8 : A.am || 1, dmg = R.base * (T ? T.dmg * dayFgDmg() : 1) * am * (0.4 + 0.6 * c) * kk * (1 + 0.12 * sr('might'));
+  const am = s.id === 'stones' ? 0.8 : A.am || 1, dmg = R.base * (T ? T.dmg * dayFgDmg() : 1) * am * (0.25 + 0.75 * c * c) * kk * (1 + 0.12 * sr('might'));
   const sp = R.sp[0] + (R.sp[1] - R.sp[0]) * c, max = R.rng[0] + (R.rng[1] - R.rng[0]) * c, b = a + spread;
   (S.rg.dshots = S.rg.dshots || []).push({ kind: kind === 'bow' ? 'arrow' : 'stone', id: s.id, x: p.x + Math.cos(b) * 12, y: p.y + Math.sin(b) * 12, z: 22, a: b, d: 0, max, sp, dmg, c,
     inf: dayInf(), named: T === DIT.nbow, pierce: T === DIT.nbow && c >= 0.95 ? 99 : A.pierce ? 1 : 0, fire: !!A.fire, bleed: !!A.bleed, stun: kind === 'sling' ? (0.25 + 0.4 * c) * kk : 0, knock: kind === 'sling' ? 10 + 22 * c * kk : 6 + 8 * c, hit: new Set(), t: 0, tr: [] });
@@ -11769,6 +11769,41 @@ function dayDrawRack(o, c, C) {                    // a camp's weapon rack: two 
     if (i % 2) { c.beginPath(); c.moveTo(x1, y1 - 30 * Z); c.lineTo(x1 + 5 * Z, y1 - 27 * Z); c.lineTo(x1 + 4 * Z, y1 - 22 * Z); c.lineTo(x1, y1 - 25 * Z); c.closePath(); c.fill(); }
     else { c.beginPath(); c.moveTo(x1, y1 - 36 * Z); c.lineTo(x1 + 2 * Z, y1 - 30 * Z); c.lineTo(x1 - 2 * Z, y1 - 30 * Z); c.closePath(); c.fill(); }
   }
+}
+// ---- v192 (Joe): weapons stage 5, the feel pass. Every Daylight blow now sounds like what it's made of (wood thunks, stone cracks,
+// flint bites, bone clacks, iron rings, and a named weapon chimes over the top), heavier weapons shake and freeze the screen a little
+// more than light ones, and an infused or named weapon's swing trails in its own colour. Bows were rebalanced so a tapped shot is a
+// weak flick and the full draw is what pays.
+const DJ = { axe: [1.3, 1.45, 1.3], sword: [1.45, 1.7, 1.5] };   // Daylight's own weight for the families Expedition leaves at 1
+const INF_TINT = { ember: ['120,50,15', '255,140,60', '255,225,170'], fang: ['90,20,20', '232,92,80', '255,205,195'], antler: ['90,70,40', '214,186,140', '250,240,215'],
+  ash: ['70,66,96', '214,208,240', '255,255,255'], wisp: ['60,30,110', '178,136,255', '238,224,255'], bell: ['110,80,20', '230,190,90', '255,242,205'] };
+function dayTintNow() {                           // the colour a Daylight swing trails in: its infusion, or a named weapon's own
+  const s = S && S.day && heldSlot(); if (!s) return null;
+  if (s.inf) return INF_TINT[s.inf];
+  return s.id === 'nlant' ? INF_TINT.ember : s.id === 'nash' ? INF_TINT.ash : s.id === 'nbell' ? INF_TINT.bell : s.id === 'nfang' ? INF_TINT.fang : s.id === 'nglaive' ? INF_TINT.antler : null;
+}
+function dayMat(T) {                              // what the business end is made of
+  const c = T.fam === 'club' ? T.spikes || T.bc : T.hc || T.c;
+  if (c === IRON_HEAD || c === '#9aa0a6' || c === '#d8dce0' || c === '#dfe6ee') return 'iron';
+  if (c === '#e6dfcc' || c === '#e2cc9e' || c === '#f4ecd8' || c === '#e6e0f8') return 'bone';
+  if (c === FLINT_HEAD) return 'flint';
+  if (c === STONE_HEAD || c === '#8d8b85') return 'stone';
+  if (c === '#d8b050' || c === '#ffb050') return 'iron';
+  return 'wood';
+}
+function dayMatSnd(n, D) {                        // the blow lands: the sound of the material, under the family's own impact
+  const T = heldIt(); if (!T || !actx || !n) return;
+  const t = actx.currentTime, m = dayMat(T), g = Math.min(1.3, 0.8 + 0.12 * n) * (D && D.fin ? 1.25 : 1), r = Math.random();
+  if (m === 'iron') { toneAt(t, 1900 + r * 400, 0.3, 0.032 * g, 'sine', sfxGain); toneAt(t, 2950 + r * 500, 0.18, 0.018 * g, 'sine', sfxGain); noiseAt(t, 6200, 2600, 0.05, 0.28 * g, sfxGain); }
+  else if (m === 'bone') { noiseAt(t, 2700, 900, 0.045, 0.38 * g, sfxGain); toneAt(t, 760 + r * 120, 0.05, 0.03 * g, 'square', sfxGain); }
+  else if (m === 'flint') { noiseAt(t, 4300, 1800, 0.05, 0.34 * g, sfxGain); boomAt(t, 240, 110, 0.06, 0.3 * g, sfxGain); }
+  else if (m === 'stone') { boomAt(t, 170, 70, 0.1, 0.5 * g, sfxGain); noiseAt(t, 1300, 500, 0.06, 0.3 * g, sfxGain); }
+  else { boomAt(t, 140, 80, 0.12, 0.45 * g, sfxGain); noiseAt(t, 800, 300, 0.07, 0.28 * g, sfxGain); }
+  if (T.named) toneAt(t + 0.02, 1320 + r * 60, 0.45, 0.018 * g, 'triangle', sfxGain);
+  const inf = dayInf();
+  if (inf === 'ember') noiseAt(t + 0.03, 1700, 900, 0.18, 0.18, sfxGain);
+  else if (inf === 'ash' || inf === 'wisp') toneAt(t + 0.03, inf === 'ash' ? 2640 : 1980, 0.35, 0.014, 'sine', sfxGain);
+  padRumble(Math.min(0.7, 0.2 + 0.18 * (T.dmg - 0.8)), 55 + 25 * T.dmg);
 }
 // ---- v172 (Joe): controller support. Any gamepad the browser sees (Xbox, PlayStation, Switch Pro, most others in the standard layout).
 // In play: left stick runs that way, right stick aims the torch, RT or A attacks, B dodges, X uses, Y is the weapon's special,
@@ -12509,7 +12544,7 @@ function wpHit(D, a) {                            // the blow goes through atkHi
   if (back && n) wpBackstab();
   if (D.stun && n) for (const o of hit) o.frozen = Math.max(o.frozen || 0, D.stun);   // v170: the quake leaves them reeling
   if (S.day && A && !A.worn && n) { A.worn = true; dayWear(); }   // v170: a blow that lands wears the weapon, once a swing
-  if (S.day && n) dayNamedHit(hit, a);   // v191: named weapons' rules
+  if (S.day && n) { dayNamedHit(hit, a); dayMatSnd(n, D); }   // v191: named weapons' rules (v192: and the sound of what it's made of)
   if (D.charge) return n;
   (WHIT[w] || WHIT.axe)(D, n, a, hit);
   if (WJ[w]) wjHit(w, D2, n, a, hit);   // v146
@@ -12604,8 +12639,8 @@ const WPOW = { torch: 1, axe: 1, hook: 1.12, twin: 1.25, knife: 1.38, club: 1.5,
 const WJ = { hook: [1.5, 1.7, 1.6], twin: [1.6, 2.2, 1.6], knife: [1.6, 1.9, 1.8], club: [1.25, 1.35, 1.3], glaive: [1.6, 1.7, 1.5], fists: [1.7, 1.8, 1.6], lance: [1.7, 1.9, 1.7] };   // shake, hit-stop, camera kick
 const wjPow = w => S && S.day ? 1 : WPOW[w] || 1;   // v170: in Daylight the weapon's own tier sets its power
 function wjFeel(w, D2) {                          // the weapon's weight goes into the blow's shake, freeze and kick
-  const J = WJ[w]; if (!J) return;
-  const f = D2.fin ? 1.15 : 1;
+  const J = WJ[w] || (S && S.day && DJ[w]); if (!J) return;
+  const f = (D2.fin ? 1.15 : 1) * (S && S.day && heldIt() ? 0.85 + 0.2 * Math.max(0, heldIt().dmg - 1) : 1);   // v192: in Daylight a heavier weapon lands heavier
   D2.shake = Math.min(0.95, (D2.shake || 0) * J[0] * f); D2.stop = Math.min(0.22, (D2.stop || 0) * J[1] * f); D2.kick = (D2.kick || 0) * J[2];
 }
 function wjSpray(o, a, rgb, n, sp = 1) {         // hot sparks thrown out the far side of whatever you hit, in the weapon's colour
@@ -13281,7 +13316,7 @@ const WP_ICONS = {
 };
 // ---- drawing: everything over the dark ----
 function drawAxeSlash(s) {                        // a weapon's smear: heavy steel for the axe, each other weapon in its own colours
-  const p = s.o || S.p, k = s.t / s.life, fade = 1 - k * k, lift = ((s.cleave ? 4 : s.whirl ? 14 : 9) + (s.o ? 0 : S.p.hopZ || 0)) * Z, n = 22, T = s.tint || STEEL;
+  const p = s.o || S.p, k = s.t / s.life, fade = 1 - k * k, lift = ((s.cleave ? 4 : s.whirl ? 14 : 9) + (s.o ? 0 : S.p.hopZ || 0)) * Z, n = 22, T = (!s.o && S.day && dayTintNow()) || s.tint || STEEL;
   const sweep = Math.min(1, s.t / (s.whirl ? 0.12 : s.cleave ? 0.04 : 0.07));
   const a0 = s.a - s.side * s.arc / 2, a1 = a0 + s.side * s.arc * sweep, R0 = s.whirl ? 0.62 : s.cleave ? 0.05 : 0.45, pts = [];
   if (s.cleave) {                                 // a blade of light straight down the line, wide at the hilt
