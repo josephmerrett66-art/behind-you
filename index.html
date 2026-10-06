@@ -296,6 +296,18 @@ body.pkopen #hotbar, body.pkopen #buildbar { display: none !important; }
 #craft .need1 svg { width: 16px; height: 16px; }
 #craft .need1 i { font-style: normal; font-size: 0.6rem; }
 #craft .need1.no { background: rgba(226,84,60,0.16); color: #f0a090; }
+#craft .fgdet { padding: 0 0.7rem 0.75rem; display: grid; gap: 0.4rem; }   /* v190: the forge */
+#craft .fgline { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.5rem; align-items: center; padding: 0.45rem 0.6rem; border-radius: 9px; border: 1px solid rgba(239,239,234,0.1); background: rgba(0,0,0,0.12); }
+#craft .fgline.ready { border-color: rgba(159,210,122,0.45); }
+#craft .fgline .rneed { padding: 0; }
+#craft .fgline:not(.ready) .rgo1 { opacity: 0.45; }
+#craft .fgline .rgo1 { flex: none; padding: 0.45rem 0.7rem; font-size: 0.66rem; }
+#craft .fgpips { display: flex; gap: 3px; flex: none; }
+#craft .fgpips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(239,239,234,0.35); }
+#craft .fgpips i.on { background: #ffc46a; border-color: #ffc46a; box-shadow: 0 0 5px rgba(255,196,106,0.6); }
+#craft .fgh { margin: 0.3rem 0.1rem 0; font: 600 0.6rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ash); }
+@media (max-width: 600px) { #craft .fgline { grid-template-columns: minmax(0, 1fr) auto; } #craft .fgline .rneed { grid-column: 1 / -1; grid-row: 2; } }
+#hotbar .fgb, #craft .slot .fgb { position: absolute; right: 5px; top: 3px; font: 700 9px var(--mono); color: #ffc46a; text-shadow: 0 1px 2px #000; pointer-events: none; }
 #craft .rlong { margin: 0; font-size: 0.74rem; color: var(--bone); line-height: 1.45; }
 #craft .rlong em { font-style: normal; color: #f0a090; }
 #craft .pkinfo { display: grid; gap: 0.3rem; padding: 0.55rem 0.7rem; border-radius: 9px; background: rgba(239,239,234,0.05); }
@@ -582,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 189</p>
+      <p class="small" id="verLbl">Version 190</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1785,6 +1797,7 @@ function atkHit(D, a) {                          // everything in reach takes th
     if (o.dead || A.hit.has(o) || !inReach(o, (FOES[o.type] ? FOES[o.type].w : 12))) continue;
     A.hit.add(o); hits++; o.swung = true; o.kHit = D.kh || (D.slam ? 'slam' : D.dash ? 'dash' : 'swing'); o.kHitT = S.t; stkTouch();
     o.hp -= D.dmg * (1 + 0.1 * tu('heat')) * (1 + 0.12 * sr('might')) * dayK(); o.jit = 1;
+    if (S.day) dayInfHit(o, dayInf());   // v190: an infused weapon
     foeSwBreak(o);   // v183
     if (o.type !== 'tall' && (o.type !== 'brute' || D.slam || D.dash)) push(o, D.knock);   // v123: brutes have poise; only the slam or the dash strike moves them
     spark(o, FOES[o.type] ? FOES[o.type].h : 30, D.slam ? 14 : 9);
@@ -1845,7 +1858,7 @@ function atkStep(dt) {                           // called from update, before y
   const A = p.atk; if (!A) { p.hopZ = 0; return; }
   if (A.wd) return wpStep(dt, A);                // v141: a boss weapon's swing
   const D = A.ov ? Object.assign({}, ATK[A.i], A.ov) : ATK[A.i];
-  A.t += dt;
+  A.t += dt * dayFgSp();   // v190: balanced at the forge
   const air = D.slam ? D.hitAt : D.dur * 0.6, moveT = D.slam ? D.hitAt : D.dur * 0.45;
   p.hopZ = A.t < air ? D.hop * Math.sin(Math.PI * A.t / air) : 0;   // up and over, landing as the blow lands
   const rooted = S.rg.recall;                    // a burning recall flare holds you in place: swing, but don't leap
@@ -5177,6 +5190,7 @@ function killFoe(e) {
   if (lv('feast')) { const n = [20, 20, 14, 10][Math.min(3, lv('feast'))]; if (rg.kills % n === 0 && rg.hp < rg.maxHp) { rg.hp = Math.min(rg.maxHp, Math.floor(rg.hp) + 1); rg.pop = { t: 0, gained: rg.hp - 1 }; } }
   stkKill(e);
   dropWisps(e);
+  if (S.day) { dayRareDrop(e); dayInfKill(e); }   // v190
 }
 // ---- v134 the Streak (Joe: fighting should feel arcadey and intense; every kill goes bzing, numbers climbing, multipliers, bonuses) ----
 // Kills close together build a streak: each one pops its points out of the body in that enemy's colour and flies them into a counter
@@ -7782,7 +7796,7 @@ const DREC = [
 ];
 const DCATS = [{ id: 'tool', n: 'Tools', icon: 'pick1' }, { id: 'wpn', n: 'Weapons', icon: 'spear2' }, { id: 'gear', n: 'Gear', icon: 'vest' },
   { id: 'food', n: 'Food', icon: 'cooked' }, { id: 'stn', n: 'Stations', icon: 'bench' }, { id: 'build', n: 'Build', icon: 'wall' }, { id: 'mat', n: 'Materials', icon: 'rope' }];
-const AT_NAME = { hand: 'By hand', fire: 'At a fire', bench: 'At a workbench', furnace: 'At a furnace', rack: 'At a drying rack' };
+const AT_NAME = { hand: 'By hand', fire: 'At a fire', bench: 'At a workbench', furnace: 'At a furnace', rack: 'At a drying rack', anvil: 'At a forge' };
 const recName = r => r.name || DIT[r.out].n, recBlurb = r => r.sh || DIT[r.out].b;
 const BEAST = {   // health, run speed, size, how close you get before it reacts, what it leaves
   deer: { hp: 2.4, sp: 150, w: 14, h: 30, scare: 210, drop: { meat: 2, hide: 1 } },
@@ -7823,7 +7837,7 @@ const heldSlot = () => S.day && S.day.inv[S.day.hot];
 const heldIt = () => { const s = heldSlot(); return s ? DIT[s.id] : null; };
 function dayTool() { const T = heldIt(); return T && T.tool ? T.tool : 'hand'; }   // what a swing does: 'axe', 'pick', 'weapon' or 'hand'
 const dayWpn = () => { const T = heldIt(); return T && T.wpn || null; };
-const dayK = () => S && S.day ? (dayTool() === 'hand' ? 0.6 : heldIt().dmg) : 1;
+const dayK = () => S && S.day ? (dayTool() === 'hand' ? 0.6 : heldIt().dmg * dayFgDmg()) : 1;   // v190: sharpened at the forge
 const dayR = () => S && S.day && dayTool() === 'weapon' && !heldIt().fam ? heldIt().r : 0;   // v170: a family's moves carry their own reach
 function newSlot(id, n, extra) {
   const T = DIT[id], s = { id, n };
@@ -7877,7 +7891,7 @@ function dayConts(R = CONT_R) {                 // [{ name, inv, x, y }], neares
   if (Math.hypot(p.x - CAMP_BOX.x, p.y - CAMP_BOX.y) < R) out.push({ name: 'Camp box', inv: D.box, x: CAMP_BOX.x, y: CAMP_BOX.y, box: true });
   for (const B of D.builds) if (B.t === 'chest' && Math.hypot(p.x - B.x, p.y - B.y) < R) out.push({ name: 'Storage chest', inv: B.inv, x: B.x, y: B.y, B });
   if (R === CONT_R) {                            // v179 (Joe): a station you're working at reaches into the chests set up round it
-    const stR = { fire: FIRE_R, bench: BENCH_R, furnace: FURN_R, rack: RACK_R }, at = D.builds.filter(B => stR[B.t] && Math.hypot(p.x - B.x, p.y - B.y) < stR[B.t]);
+    const stR = { fire: FIRE_R, bench: BENCH_R, furnace: FURN_R, rack: RACK_R, anvil: 90 }, at = D.builds.filter(B => stR[B.t] && Math.hypot(p.x - B.x, p.y - B.y) < stR[B.t]);
     if (at.length) for (const B of D.builds) if (B.t === 'chest' && !out.some(c => c.B === B) && at.some(A => Math.hypot(A.x - B.x, A.y - B.y) < STN_CHEST_R)) out.push({ name: 'Storage chest', inv: B.inv, x: B.x, y: B.y, B, far: true });
     if (S.rg.inCamp && !out.some(c => c.box)) out.push({ name: 'Camp box', inv: D.box, x: CAMP_BOX.x, y: CAMP_BOX.y, box: true, far: true });   // anywhere in camp, the box is to hand
   }
@@ -7897,7 +7911,7 @@ function dayWear(n = 1) {                      // the tool in your hand loses a 
   const D = S.day, s = heldSlot(); if (!s || s.d === undefined) return;
   if (Math.random() < 0.1 * sr('tough')) return;   // v164: Steady Hands
   s.d -= n;
-  if (s.d === Math.round(DIT[s.id].dur * 0.15)) dayNote('worn' + s.id, `your ${DIT[s.id].n.toLowerCase()} is nearly worn through`, 20);
+  if (s.d === Math.round(slotDur(s) * 0.15)) dayNote('worn' + s.id, `your ${DIT[s.id].n.toLowerCase()} is nearly worn through`, 20);
   if (s.d <= 0) {
     D.inv[D.hot] = null; exNote(`your ${DIT[s.id].n.toLowerCase()} broke`, true); addShake(0.25); hitStop(0.06);
     dayChips(S.p.x + Math.cos(S.aimW || 0) * 16, S.p.y + Math.sin(S.aimW || 0) * 16, 14, DIT[s.id].tool === 'weapon' && s.id !== 'spear1' && s.id !== 'spear2' ? 'wood' : 'stone', 10);
@@ -8080,13 +8094,13 @@ function dayUseTarget() {                        // the nearest thing in reach y
   if (dayTool() === 'build') for (const o of stNear(p.x, p.y, 60)) if (stNeedsWork(o)) { const d = stDistTo(o, p.x, p.y) - 4; if (d < bd) { bd = d; best = o; } }   // v186: Use works your blueprints up
   return best;
 }
-const STN_N = { bench: 'Workbench', furnace: 'Furnace', rack: 'Drying rack', fire: 'Fire' };   // v163: walk up to a station and Use opens its recipes
+const STN_N = { bench: 'Workbench', furnace: 'Furnace', rack: 'Drying rack', fire: 'Fire', anvil: 'Forge' };   // v163: walk up to a station and Use opens its recipes
 const useLabel = o => o === EX_FIRE ? 'Wisps' : STN_N[o.t] ? 'Use' : o.kind === 'dcamp' ? (dayCampLive(o.ci) ? 'Guarded' : 'Take') : o.t === 'signal' ? (S.day.siege ? 'Burning' : 'Light it') : o.t === 'tpost' ? 'Feed' : o.t === 'plot' ? (o.grown ? 'Pick' : o.crop ? 'Growing' : 'Sow') : o.kind === 'dlake' ? (S.day.inv.some(s => s && s.id === 'skin' && s.w < SKIN_SIPS) ? 'Fill' : 'Drink') : o === CAMP_BARREL ? 'Drink' : o === CAMP_BOX || o.t === 'chest' || (o.kind !== 'dday' && o.kind !== 'dnode') ? 'Open' : 'Take';
 function openStation(t) {                         // v163: the craft tab, opened on what this station makes (ready ones first)
   const D = S.day, at = t === 'fire' ? 'fire' : t, known = DREC.filter(r => D.known.has(r.id) && r.at === at);
   const pick = known.find(r => canCraft(r) === true) || known[0];
   PK.tab = 'craft'; PK.open = null; if (pick) PK.cat = pick.g;
-  PK.at = at; PK.atLock = true;   // v171: straight onto this station's own list
+  PK.at = at; PK.atLock = true; PK.fsel = undefined;   // v171: straight onto this station's own list
   openCraft();
 }
 function dayUse() {
@@ -8151,19 +8165,19 @@ function dayHarvest(Dk, a, inReach, spark) {
   if (best.kind === 'tree') {
     if (tool !== 'axe') { dayNote('axe', owns('axe') ? 'hold your axe to chop' : 'you need an axe · craft one', 3); if (actx) noiseAt(actx.currentTime, 500, 200, 0.12, 0.3, sfxGain); return hits; }
     if (!dayStam(STA_CHOP)) return hits;
-    const c = (D.cut.get(best.key) || 0) + 1, need = T.tier > 1 ? 3 : 5; D.cut.set(best.key, c); chips('wood');
+    const c = (D.cut.get(best.key) || 0) + 1, need = T.tier > 3 ? 1 : T.tier > 1 ? 3 : 5; D.cut.set(best.key, c); chips('wood');
     if (actx) { const t = actx.currentTime; boomAt(t, 180, 90, 0.12, 0.45, sfxGain); noiseAt(t, 1500, 500, 0.1, 0.35, sfxGain); }
     if (c >= need) dayFell(best);
     else exNote(`chop · ${need - c} more`);
   } else if (best.kind === 'rock') {
     if (tool !== 'pick') { dayNote('pick', owns('pick') ? 'hold your pick to break rock' : 'you need a pick · craft one', 3); if (actx) noiseAt(actx.currentTime, 3500, 1500, 0.08, 0.3, sfxGain); return hits; }
     if (!dayStam(STA_CHOP)) return hits;
-    const key = 'r' + best.key, c = (D.cut.get(key) || 0) + 1, need = T.tier > 1 ? 2 : 4; D.cut.set(key, c); chips('stone');
+    const key = 'r' + best.key, c = (D.cut.get(key) || 0) + 1, need = T.tier > 3 ? 1 : T.tier > 1 ? 2 : 4; D.cut.set(key, c); chips('stone');
     if (actx) { const t = actx.currentTime; noiseAt(t, 4200, 1800, 0.12, 0.5, sfxGain); boomAt(t, 260, 140, 0.08, 0.3, sfxGain); }
     if (c >= need) {
       D.felled.add(best.key); ashBurst(best.x, best.y, 14, 14); addShake(0.25);
       dayGive('stones', 3, best.x, best.y); dayGive('flint', T.tier > 1 ? 3 : 2, best.x, best.y); pickSnd();   // v169: straight into the pack
-      if (Math.hypot(best.x, best.y) > IRON_FROM && T.tier > 1) { const n = (T.tier > 2 ? 2 : 1) + (Math.random() < 0.4 ? 1 : 0); dayGive('ironore', n, best.x, best.y, true); exNote(`iron in the rock · ${n}`, true); }
+      if (Math.hypot(best.x, best.y) > IRON_FROM && T.tier > 1) { const n = (T.tier > 3 ? 3 : T.tier > 2 ? 2 : 1) + (Math.random() < 0.4 ? 1 : 0); dayGive('ironore', n, best.x, best.y, true); exNote(`iron in the rock · ${n}`, true); }
     } else exNote(`crack · ${need - c} more`);
   } else if (best.t === 'grass') {
     best.gone = true; dayGive('fibre', tool === 'hand' ? 2 : 3, best.x, best.y); chips('leaf');
@@ -8270,6 +8284,7 @@ function beastScare(b) {
 function beastDie(b) {
   b.dead = true; b.dieT = 0; addShake(0.2); hitStop(0.06); ashBurst(b.x, b.y, 6, BEAST[b.k].h * 0.6); dayKillLog(b.k);
   const drop = Object.assign({}, BEAST[b.k].drop); if (drop.hide && Math.random() < 0.3 * sr('skinner')) drop.hide++;   // v164: Skinner
+  if (b.k === 'wolf' && Math.random() < 0.6) drop.fang = 1; else if (b.k === 'bear') drop.fang = 2; else if (b.k === 'deer' && Math.random() < 0.4) drop.antler = 1;   // v190: for the forge
   for (const [k, n] of Object.entries(drop)) dayGive(k, n, b.x, b.y, true);   // v169: straight into the pack
   exNote(`a ${b.k} · ${Object.entries(drop).map(([k, n]) => `${n} ${DIT[k].n.toLowerCase()}`).join(' · ')}`, true);
 }
@@ -8362,7 +8377,7 @@ const ICON = (() => {
     cooked: '<path d="M14 4.5c4.2 0 6.5 3.2 5.5 7.4s-5.2 6.3-9.3 5.3l-3.3 3.1-2.3-2.3 3.1-3.3c-1-4.2 2-10.2 6.3-10.2z" fill="#8a4a28"/><path d="M11 9l5 5M13.5 6.8l4.5 4.5" stroke="#5a2c14" stroke-width="1.2"/><circle cx="4.8" cy="19.2" r="2.1" fill="#efe6d2"/>',
     stew: '<path d="M3 11.5h18c0 5-4 8.5-9 8.5s-9-3.5-9-8.5z" fill="#7a5232"/><ellipse cx="12" cy="11.5" rx="9" ry="2.5" fill="#b0783a"/><circle cx="9" cy="11.2" r="1" fill="#c23a4a"/><circle cx="14" cy="11.6" r="1.2" fill="#8a4a28"/><path d="M9 7.5c0-2 2-2 1-4M14 7.5c0-2 2-2 1-4" stroke="#ccc" stroke-width="1" fill="none" opacity=".6"/>',
     skin: '<path d="M9 4.5h6v2.8c3.2 1 5.2 4 5.2 8 0 4-3.2 6.2-8.2 6.2s-8.2-2.2-8.2-6.2c0-4 2-7 5.2-8z" fill="#7a5a3a"/><rect x="9" y="2.5" width="6" height="2.6" rx="1" fill="#3a2a1a"/><path d="M6.5 15c2.5 2.2 8.5 2.2 11 0" stroke="#6eaae6" stroke-width="1.6" fill="none"/>',
-    axe1: axe(STONE_HEAD), axe2: axe(FLINT_HEAD), axe3: axe(IRON_HEAD), pick1: pick(STONE_HEAD), pick2: pick(FLINT_HEAD), pick3: pick(IRON_HEAD),
+    axe1: axe(STONE_HEAD), axe2: axe(FLINT_HEAD), axe3: axe(IRON_HEAD), pick1: pick(STONE_HEAD), pick2: pick(FLINT_HEAD), pick3: pick(IRON_HEAD), axe4: axe('#dfe6ee'), pick4: pick('#dfe6ee'),
     spear1: spear(STONE_HEAD), spear2: spear(FLINT_HEAD), spear3: spear(IRON_HEAD), club: club('#6e5235'),
     spear0: spear('#b89a6a'), spearB: spear('#e6dfcc'), waxe1: waxe(STONE_HEAD), waxe2: waxe(FLINT_HEAD), waxe3: waxe('#e6dfcc'), waxe4: waxe(IRON_HEAD),   // v170
     sclub: club('#5e4630') + '<g fill="#4d5560"><path d="M14 3.2l1.2-2 .6 2.3zM20 7l2.2-.4-1.6 1.8zM19.5 12l1.8 1.3-2.3.1zM10.6 6l-2-.8 2.1-.6z"/></g>',
@@ -8443,7 +8458,7 @@ function isoBox(c, cx, cy, a, w, d, h, top, sideA, sideB, z0 = 0) {   // a box s
 }
 function dayDrawBuild(o, c, sx, sy) {          // a workbench, a chest, and v154's furnace, drying rack and plot
   const C = (col, grey) => COLOUR ? col : grey, B = o.build, a = B.a || 0;
-  if (o.sub === 'furnace' || o.sub === 'rack' || o.sub === 'plot') return dayDrawDeep(o, c, sx, sy);
+  if (o.sub === 'furnace' || o.sub === 'rack' || o.sub === 'plot' || o.sub === 'anvil') return dayDrawDeep(o, c, sx, sy);
   if (o.sub === 'tpost' || o.sub === 'effigy' || o.sub === 'signal') return dayDrawWar(o, c, sx, sy);
   if (o.sub === 'bench') {
     const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
@@ -8573,13 +8588,13 @@ function dayBar(px, py) {                      // stamina, food and water over y
     dayTag(x, ty, tx, 'rgba(255,214,150,0.95)'); ctx.font = '600 10px "IBM Plex Mono", monospace'; padGlyph(0, x - (ctx.measureText(tx).width + 8) / 2 - 13, ty - 7); break;
   }
   { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (PAD.on || COARSE() ? '' : 'E · ') + useLabel(o).toUpperCase() + (STN_N[o.t] ? ' ' + STN_N[o.t].toUpperCase() : o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : o === EX_FIRE ? ` · ${stPool().w} TO SPEND` : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); padGlyph(2, x - w / 2 - 13, y - 34 * Z - 7); } }
-  { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
+  { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / slotDur(s); if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
   if (say) { ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)'; ctx.fillText(say, px, y0 - 9); }
 }
 // ---- v129 building, v151 as items: hold a wall, a trap, a fire, a workbench or a chest and the button puts it down in front of you ----
 const WALL_HP = 14, SPIKE_USES = 10, FIRE_R = 90, BENCH_R = 90;
 function dayPlaceSpot(t) {                     // where it would go, and whether there's room
-  const p = S.p, a = S.aimW || 0, far = t === 'wall' ? 46 : t === 'bench' || t === 'furnace' ? 38 : t === 'rack' || t === 'plot' ? 44 : 34, x = p.x + Math.cos(a) * far, y = p.y + Math.sin(a) * far;
+  const p = S.p, a = S.aimW || 0, far = t === 'wall' ? 46 : t === 'bench' || t === 'furnace' || t === 'anvil' ? 38 : t === 'rack' || t === 'plot' ? 44 : 34, x = p.x + Math.cos(a) * far, y = p.y + Math.sin(a) * far;
   const fake = dayMakeBuild(t, x, y, a, true), pad = t === 'spikes' ? 8 : 12;
   let ok = true;
   for (const q of fake.parts) {
@@ -8617,8 +8632,8 @@ function dayMakeBuild(t, cx, cy, a, fake) {
   } else if (t === 'chest') {
     B.inv = Array(CHEST_SLOTS).fill(null);
     B.parts.push({ kind: 'dbuild', sub: 'chest', x: cx, y: cy, r: 11, s: 1, build: B });
-  } else if (t === 'furnace' || t === 'rack') {
-    B.parts.push({ kind: 'dbuild', sub: t, x: cx, y: cy, r: t === 'furnace' ? 15 : 17, s: 1, build: B });
+  } else if (t === 'furnace' || t === 'rack' || t === 'anvil') {
+    B.parts.push({ kind: 'dbuild', sub: t, x: cx, y: cy, r: t === 'furnace' ? 15 : t === 'anvil' ? 14 : 17, s: 1, build: B });
   } else if (t === 'tpost' || t === 'effigy') {
     if (t === 'tpost') B.fuel = DAY_LEN * 0.5;
     B.parts.push({ kind: 'dbuild', sub: t, x: cx, y: cy, r: 7, s: 1, build: B });
@@ -8682,12 +8697,13 @@ function daySelect(i) {
   if (S.p.atk && S.p.atk.ov) S.p.atk = null;     // a new tool in hand starts its own swing
   dayChanged();
 }
+const fgBadge = s => fgOk(s) && (fgN(s) || s.inf) ? `<b class="fgb"${s.inf ? ` style="color:rgb(${INF[s.inf].col})"` : ''}>${fgN(s) ? '+' + fgN(s) : '◆'}</b>` : '';   // v190: forge work shows on the slot
 function slotInner(s) {
   if (!s) return '';
   const T = DIT[s.id];
-  if (T.rng && S && S.day) return iconSvg(s.id) + `<span class="n">${dayAmmoN(T.rng)}</span>` + (s.d !== undefined ? `<i class="dur${s.d / T.dur < 0.25 ? ' low' : ''}" style="--f:${Math.max(0.02, s.d / T.dur).toFixed(3)}"></i>` : '');   // v189: a bow shows the arrows you carry
+  if (T.rng && S && S.day) return iconSvg(s.id) + `<span class="n">${dayAmmoN(T.rng)}</span>` + (s.d !== undefined ? `<i class="dur${s.d / slotDur(s) < 0.25 ? ' low' : ''}" style="--f:${Math.max(0.02, s.d / slotDur(s)).toFixed(3)}"></i>` : '') + fgBadge(s);   // v189: a bow shows the arrows you carry
   return iconSvg(s.id) + (s.n > 1 ? `<span class="n">${s.n}</span>` : '') + (T.k === 'drink' ? `<span class="n">${s.w}/${SKIN_SIPS}</span>` : '')
-    + (s.d !== undefined ? `<i class="dur${s.d / T.dur < 0.25 ? ' low' : ''}" style="--f:${Math.max(0.02, s.d / T.dur).toFixed(3)}"></i>` : '');
+    + (s.d !== undefined ? `<i class="dur${s.d / slotDur(s) < 0.25 ? ' low' : ''}" style="--f:${Math.max(0.02, s.d / slotDur(s)).toFixed(3)}"></i>` : '') + fgBadge(s);
 }
 function renderHotbar() {
   const bar = document.getElementById('hotbar'), D = S && S.day; if (!D) { bar.hidden = true; return; }
@@ -8801,10 +8817,11 @@ function pkCard() {                             // the card for the selected ite
   if (!s) return null;
   const T = DIT[s.id], card = el('div', 'pkcard');
   const head = el('div', 'pkchead'), ic = el('span', 'pkcicon'); ic.innerHTML = iconSvg(s.id);
-  const tx = el('div', 'pkctext'); tx.append(el('b', '', T.n + (s.n > 1 ? ` ×${s.n}` : '')), el('span', 'sh', T.b));
+  const tx = el('div', 'pkctext'); tx.append(el('b', '', (fgOk(s) ? fgName(s) : T.n) + (s.n > 1 ? ` ×${s.n}` : '')), el('span', 'sh', T.b));
   const stat = [];
   if (T.eat) stat.push(eatLine(T.eat));
-  if (s.d !== undefined) stat.push(`${s.d} of ${T.dur} uses left`);
+  if (s.d !== undefined) stat.push(`${s.d} of ${slotDur(s)} uses left`);
+  if (fgOk(s) && (fgN(s) || s.inf)) stat.push(`upgrade ${fgN(s)} of ${FG_MAX}` + (fgLv(s, 'sh') ? ` · sharpened ${fgLv(s, 'sh')}` : '') + (fgLv(s, 'rf') ? ` · reinforced ${fgLv(s, 'rf')}` : '') + (fgLv(s, 'bl') ? ` · balanced ${fgLv(s, 'bl')}` : '') + (s.inf ? ` · ${INF[s.inf].n.toLowerCase()}: ${INF[s.inf].b}` : ''));   // v190
   if (T.k === 'drink') stat.push(`${s.w} of ${SKIN_SIPS} drinks${s.dirty ? ' · murky, boil it' : ''}`);
   if (T.k === 'light') stat.push(`${s.d}s of burning left`);
   if (T.k === 'med') stat.push('hold it, then Bind');
@@ -8839,9 +8856,9 @@ function pkSlot(s, w, i, extra) {
   b.addEventListener('click', () => pkTap(w, i));
   return b;
 }
-function stationHere(at) { return at === 'hand' || (at === 'fire' && (S.rg.inCamp || dayFireNear(S.p.x, S.p.y))) || (at === 'bench' && dayBenchNear(S.p.x, S.p.y)) || (at === 'furnace' && dayFurnNear(S.p.x, S.p.y)) || (at === 'rack' && dayRackNear(S.p.x, S.p.y)); }
+function stationHere(at) { return at === 'hand' || (at === 'fire' && (S.rg.inCamp || dayFireNear(S.p.x, S.p.y))) || (at === 'bench' && dayBenchNear(S.p.x, S.p.y)) || (at === 'furnace' && dayFurnNear(S.p.x, S.p.y)) || (at === 'rack' && dayRackNear(S.p.x, S.p.y)) || (at === 'anvil' && dayAnvilNear(S.p.x, S.p.y)); }
 function canCraft(r) {
-  if (!stationHere(r.at)) return r.at === 'fire' ? 'needs a fire' : r.at === 'furnace' ? 'needs a furnace' : r.at === 'rack' ? 'needs a rack' : 'needs a workbench';
+  if (!stationHere(r.at)) return r.at === 'fire' ? 'needs a fire' : r.at === 'anvil' ? 'needs a forge' : r.at === 'furnace' ? 'needs a furnace' : r.at === 'rack' ? 'needs a rack' : 'needs a workbench';
   if (r.ok && !r.ok()) return 'not now';
   for (const [k, n] of Object.entries(r.cost)) if (dayHave(k) < n) return '';
   if (r.out && roomIn(S.day.inv, r.out) < (r.n || 1) && !(PK.cont && roomIn(PK.cont.inv, r.out) >= (r.n || 1))) return 'pack full';   // nowhere to put it
@@ -8990,15 +9007,15 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) daySa
 
 // ---- v171 (Joe): crafting you can read at a glance. One list per place (by hand, fire, workbench, furnace, rack), every
 // material shown with have/need on the row, ready things first, and a line saying how to get a station you haven't got ----
-const PLACES = [{ at: 'hand', n: 'Hand', ic: 'hand' }, { at: 'fire', n: 'Fire', ic: 'campfire' }, { at: 'bench', n: 'Workbench', ic: 'bench' }, { at: 'furnace', n: 'Furnace', ic: 'furnace' }, { at: 'rack', n: 'Rack', ic: 'rack' }];
-const PLACE_BUILD = { bench: 'bench', furnace: 'furnace', rack: 'rack', fire: 'campfire' };   // the recipe that makes each station
+const PLACES = [{ at: 'hand', n: 'Hand', ic: 'hand' }, { at: 'fire', n: 'Fire', ic: 'campfire' }, { at: 'bench', n: 'Workbench', ic: 'bench' }, { at: 'furnace', n: 'Furnace', ic: 'furnace' }, { at: 'rack', n: 'Rack', ic: 'rack' }, { at: 'anvil', n: 'Forge', ic: 'anvil' }];
+const PLACE_BUILD = { bench: 'bench', furnace: 'furnace', rack: 'rack', fire: 'campfire', anvil: 'anvil' };   // the recipe that makes each station
 function craftPlaceNow() {   // the station you're standing at, if any: the best one first
-  for (const at of ['furnace', 'bench', 'rack', 'fire']) if (stationHere(at) && DREC.some(r => r.at === at && S.day.known.has(r.id))) return at;
+  for (const at of ['anvil', 'furnace', 'bench', 'rack', 'fire']) if (stationHere(at) && (at === 'anvil' || DREC.some(r => r.at === at && S.day.known.has(r.id)))) return at;
   return 'hand';
 }
 function placeHint(at) {   // you're not at it: how to get there
   if (at === 'fire') return 'Stand by a campfire, or in camp, to cook';
-  const n = { bench: 'workbench', furnace: 'furnace', rack: 'drying rack' }[at];
+  const n = { bench: 'workbench', furnace: 'furnace', rack: 'drying rack', anvil: 'forge' }[at];
   if (S.day.builds.some(B => B.t === at)) return `Walk up to your ${n} and press Use`;
   const r = DREC.find(x => x.id === PLACE_BUILD[at]), where = r ? AT_NAME[r.at].toLowerCase() : '';
   return `You haven't built a ${n} yet · make one ${where}, under Stations`;
@@ -9006,7 +9023,7 @@ function placeHint(at) {   // you're not at it: how to get there
 function craftHtml() {
   const D = S.day, el = pkEl, out = [], known = DREC.filter(r => D.known.has(r.id));
   if (!known.length) return [el('p', 'small none', 'Nothing yet. Pick up sticks, stones and fibre to learn your first recipes.')];
-  const places = PLACES.filter(P => known.some(r => r.at === P.at));
+  const places = PLACES.filter(P => known.some(r => r.at === P.at) || (P.at === 'anvil' && (D.builds.some(B => B.t === 'anvil') || D.known.has('anvil'))));
   if (!places.some(P => P.at === PK.at)) PK.at = places[0].at;
   const bar = el('div', 'pkplaces');
   for (const P of places) {
@@ -9019,6 +9036,7 @@ function craftHtml() {
   const at = PK.at, here = stationHere(at), P = PLACES.find(x => x.at === at);
   out.push(el('p', 'pkwhere' + (here ? ' ok' : ''), here ? (at === 'hand' ? 'Made anywhere, from what you carry' : `You're at the ${P.n.toLowerCase()}`) : placeHint(at)));
   { const C = dayConts(); if (C.length) { const nc = C.filter(c => !c.box).length; out.push(el('p', 'pkwhere ok', 'Also using ' + [C.some(c => c.box) ? 'the camp box' : '', nc ? `${nc} storage chest${nc > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ') + ' nearby')); } }   // v179
+  if (at === 'anvil') out.push(...forgeHtml(here));   // v190: the forge works what you carry
   const rank = r => { const c = canCraft(r); return c === true ? 0 : c === '' ? 1 + craftShort(r) / 100 : 3; };
   for (const C of DCATS) {
     const list = known.filter(r => r.at === at && r.g === C.id).sort((x, y) => rank(x) - rank(y));
@@ -10094,9 +10112,27 @@ function dayPlotStep(dt) {
   const D = S.day;
   for (const B of D.builds) if (B.t === 'plot' && B.crop && !B.grown && D.t - B.sown >= GROW_T) { B.grown = true; if (dist2(B, S.p) < 700) exNote('your plot is ripe', true); }
 }
+function dayDrawAnvil(o, c, C) {                // v190: the forge. A stump with an iron anvil on it, and a grindstone in its frame beside
+  const a = (o.build && o.build.a) || 0, ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+  const gx = o.x - vx * 17 + ux * 4, gy = o.y - vy * 17 + uy * 4;
+  for (const k of [-1, 1]) isoBox(c, gx + ux * k * 6, gy + uy * k * 6, a, 2.5, 3, 15, C('#8a6a44', '#76766f'), C('#6a4e30', '#5e5e58'), C('#4a3620', '#4a4a46'));   // the grindstone's frame
+  { const [x, y] = toScreen(gx, gy), h = 13 * Z, [ex, ey] = toScreen(gx + ux, gy + uy), dx = ex - x, dy = ey - y, l = Math.hypot(dx, dy) || 1, sp = (S.t * 3) % (Math.PI * 2);
+    c.save(); c.translate(x, y - h); c.rotate(Math.atan2(dy, dx)); c.fillStyle = EDGE_C; c.beginPath(); c.ellipse(0, 0, 3.4 * Z, 9.6 * Z, 0, 0, 7); c.fill();
+    c.fillStyle = C('#9a968c', '#8e8e88'); c.beginPath(); c.ellipse(0, 0, 2.6 * Z, 8.8 * Z, 0, 0, 7); c.fill();
+    c.strokeStyle = C('#77736a', '#6e6e68'); c.lineWidth = 0.8 * Z; c.beginPath(); c.ellipse(0, 0, 1.4 * Z, 5 * Z, 0, 0, 7); c.stroke(); c.restore(); }
+  isoBox(c, o.x, o.y, a, 15, 15, 11, C('#a5835a', '#8a8a84'), C('#7a5a3a', '#6a6a64'), C('#5a4028', '#4c4c48'));   // the stump
+  isoBox(c, o.x, o.y, a, 11, 7, 4, C('#4c5056', '#4c4c4c'), C('#3a3d42', '#3c3c3c'), C('#2c2e32', '#2e2e2e'), 11);   // the anvil's waist
+  isoBox(c, o.x - ux * 1.5, o.y - uy * 1.5, a, 19, 9, 5, C('#6a6e75', '#68686a'), C('#4c5056', '#4c4c4c'), C('#3a3d42', '#3c3c3c'), 15);   // its face
+  { const [x0, y0] = toScreen(o.x + ux * 8, o.y + uy * 8), [x1, y1] = toScreen(o.x + ux * 17, o.y + uy * 17), [xa, ya] = toScreen(o.x + ux * 8 + vx * 3.5, o.y + uy * 8 + vy * 3.5), [xb, yb] = toScreen(o.x + ux * 8 - vx * 3.5, o.y + uy * 8 - vy * 3.5);
+    c.fillStyle = C('#5a5e64', '#5a5a5a'); c.beginPath(); c.moveTo(xa, ya - 20 * Z); c.lineTo(x1, y1 - 19 * Z); c.lineTo(xb, yb - 20 * Z); c.lineTo(xb, yb - 16 * Z); c.lineTo(x0, y0 - 15.5 * Z); c.lineTo(xa, ya - 16 * Z); c.closePath(); c.fill();   // the horn
+    const [hx, hy] = toScreen(o.x - ux * 4, o.y - uy * 4); c.strokeStyle = 'rgba(220,226,234,0.5)'; c.lineWidth = 0.8 * Z; c.beginPath(); c.moveTo(hx - 7 * Z, hy - 20.5 * Z); c.lineTo(hx + 5 * Z, hy - 20.5 * Z); c.stroke(); }
+  { const [x, y] = toScreen(o.x + vx * 6, o.y + vy * 6); c.strokeStyle = C('#7a5a3a', '#6a6a64'); c.lineWidth = 1.6 * Z; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 5 * Z, y - 21 * Z); c.lineTo(x + 2 * Z, y - 22 * Z); c.stroke();   // a hammer resting on it
+    c.fillStyle = C('#3a3d42', '#3c3c3c'); c.fillRect(x + 1 * Z, y - 24.5 * Z, 3 * Z, 5 * Z); }
+}
 // ---- drawing: a furnace of stone, a rack of split poles, a dug plot ----
 function dayDrawDeep(o, c, sx, sy) {
   const C = (col, grey) => COLOUR ? col : grey, B = o.build;
+  if (o.sub === 'anvil') return dayDrawAnvil(o, c, C);   // v190
   if (o.sub === 'furnace') {
     isoBox(c, o.x, o.y, 0.6, 30, 26, 6, C('#6e6c67', '#67675f'), C('#54524e', '#4c4c48'), C('#403e3a', '#3a3a36'));
     isoBox(c, o.x, o.y, 0.6, 24, 20, 22, C('#8e8c86', '#8a8a86'), C('#6e6c67', '#67675f'), C('#54524e', '#4c4c48'), 6);
@@ -11232,7 +11268,7 @@ function dayDrawStart() {                         // press: nock an arrow, or st
 function dayDrawTick(dt) {                        // held: the draw builds; the bow creaks, the sling hums faster and faster
   const D = S.day, p = S.p, W = D.draw; if (!W) return;
   if (dayRngId() !== W.kind || p.act || S.rg.phase !== 'fight') { D.draw = null; if (p.wact && p.wact.hold) p.wact = null; return; }
-  const R = RNG[W.kind]; W.t += dt; W.a = S.aimW || 0;
+  const R = RNG[W.kind]; W.t += dt * dayFgSp(); W.a = S.aimW || 0;
   const c = Math.min(1, W.t / R.full); W.spin = (W.spin || 0) + dt * (9 + 15 * c);
   if (p.wact && p.wact.hold) { p.wact.a = W.a; p.wact.t = W.kind === 'bow' ? 0.04 + 0.36 * c : 0.1 + 0.08 * Math.sin(W.t * (10 + 16 * c)); }
   if (W.kind === 'sling' && actx && (W.hum = (W.hum || 0) - dt) <= 0) { W.hum = 0.42 - 0.26 * c; noiseAt(actx.currentTime, 600 + 900 * c, 300, 0.1, 0.06 + 0.08 * c, sfxGain); }
@@ -11250,10 +11286,10 @@ function dayDrawRelease() {                       // let go: it flies
 }
 function dayLoose(kind, s, c, a, spread, kk) {   // one arrow or one stone, from the stack s, drawn to c (0..1)
   const T = heldIt(), A = DIT[s.id], R = RNG[kind], p = S.p;
-  const am = s.id === 'stones' ? 0.8 : A.am || 1, dmg = R.base * (T ? T.dmg : 1) * am * (0.4 + 0.6 * c) * kk * (1 + 0.12 * sr('might'));
+  const am = s.id === 'stones' ? 0.8 : A.am || 1, dmg = R.base * (T ? T.dmg * dayFgDmg() : 1) * am * (0.4 + 0.6 * c) * kk * (1 + 0.12 * sr('might'));
   const sp = R.sp[0] + (R.sp[1] - R.sp[0]) * c, max = R.rng[0] + (R.rng[1] - R.rng[0]) * c, b = a + spread;
   (S.rg.dshots = S.rg.dshots || []).push({ kind: kind === 'bow' ? 'arrow' : 'stone', id: s.id, x: p.x + Math.cos(b) * 12, y: p.y + Math.sin(b) * 12, z: 22, a: b, d: 0, max, sp, dmg, c,
-    pierce: A.pierce ? 1 : 0, fire: !!A.fire, bleed: !!A.bleed, stun: kind === 'sling' ? (0.25 + 0.4 * c) * kk : 0, knock: kind === 'sling' ? 10 + 22 * c * kk : 6 + 8 * c, hit: new Set(), t: 0, tr: [] });
+    inf: dayInf(), pierce: A.pierce ? 1 : 0, fire: !!A.fire, bleed: !!A.bleed, stun: kind === 'sling' ? (0.25 + 0.4 * c) * kk : 0, knock: kind === 'sling' ? 10 + 22 * c * kk : 6 + 8 * c, hit: new Set(), t: 0, tr: [] });
   dayAmmoUse(s);
   camKick(a, kind === 'bow' ? -2 - 3 * c : -2); addShake(0.04 + 0.08 * c);
   if (actx) { const t = actx.currentTime;
@@ -11292,6 +11328,7 @@ function dayShotHit(q, o, beast) {               // a shot lands on something al
   else {
     o.hp -= q.dmg; o.jit = 1; o.flash = 1; o.kHit = q.kind; o.kHitT = S.t; o.swung = true; stkTouch();
     if (q.stun) o.frozen = Math.max(o.frozen || 0, q.stun);
+    dayInfHit(o, q.inf);   // v190
     if (q.fire) { o.wburn = Math.max(o.wburn || 0, 3); o.wburnK = 1; wpEmbers(o.x, o.y, 26, 8, '255,150,60'); }
     if (q.bleed) { o.wbleed = Math.min(4, (o.wbleed || 0) + 1); o.wbleedT = 3; o.wbleedK = 1; }
     if (o.type !== 'tall' && (o.type !== 'brute' || q.kind === 'taxe' || q.stun > 1)) { o.x += Math.cos(q.a) * q.knock; o.y += Math.sin(q.a) * q.knock; }
@@ -11444,6 +11481,147 @@ addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') dayRngUp(); 
 addEventListener('pointercancel', () => dayRngUp());
 addEventListener('keyup', e => { if (e.key.toLowerCase() === 'j') dayRngUp(); });
 addEventListener('blur', () => dayRngUp());
+// ---- v190 (Joe): weapons stage 3, the forge. An anvil and a grindstone, made at a furnace. Walk up to it and Use: everything you carry
+// that can be worked is listed, and each takes up to five upgrades, split however you like between Sharpen (damage), Reinforce (more uses)
+// and Balance (quicker swings and draws). A weapon also takes one infusion, for good, from what the woods rarely give up: ember shards
+// and grave ash from the night's dead, wolf fangs, antlers, or sixty wisps. The steel axe and the steel pick are made here too.
+const FG_MAX = 5, ANVIL_R = 90;
+const FG = [
+  { k: 'sh', n: 'Sharpen', cost: [{ flint: 3 }, { flint: 4, stones: 2 }, { iron: 1, flint: 2 }, { iron: 2, flint: 2 }, { iron: 3, flint: 3 }] },
+  { k: 'rf', n: 'Reinforce', cost: [{ rope: 2 }, { rope: 2, hide: 1 }, { hide: 2, iron: 1 }, { hide: 1, iron: 2 }, { hide: 2, iron: 3 }] },
+  { k: 'bl', n: 'Balance', cost: [{ bone: 2 }, { bone: 3 }, { bone: 2, iron: 1 }, { bone: 2, iron: 2 }, { bone: 3, iron: 3 }] },
+];
+const INF = {
+  ember: { n: 'Ember', b: 'every hit sets them alight', cost: { ember: 3, iron: 1 }, col: '255,140,60' },
+  fang: { n: 'Wolf fang', b: 'every hit makes them bleed', cost: { fang: 3, bone: 2 }, col: '232,92,80' },
+  antler: { n: 'Antler', b: 'hits throw them back and stun them', cost: { antler: 2, rope: 2 }, col: '214,186,140' },
+  ash: { n: 'Ash', b: 'a kill at night bursts into light that burns those near', cost: { ash: 4, bone: 1 }, col: '214,208,240' },
+  wisp: { n: 'Night wisp', b: 'kills at night leave half as many wisps again', cost: { wisps: 60 }, col: '178,136,255' },
+};
+const WISP_IC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4 5.5 7 5.5 10.5a5.5 5.5 0 0 1-11 0C6.5 10 9 7 12 3z" fill="#b288ff"/><path d="M12 10c1.4 1.6 2.6 3 2.6 4.6a2.6 2.6 0 0 1-5.2 0c0-1.6 1.2-3 2.6-4.6z" fill="#efe2ff"/></svg>';
+Object.assign(ICON, {
+  anvil: '<path d="M2.5 7.5h13.5c.3 2.4 2.4 3.6 5.5 3.6-2 1.7-4.3 2.4-7.4 2.4l-.9 2.6h2.6v3.4H4.6v-3.4h2.6l-.9-2.6C4.6 13 3 11 2.5 7.5z" fill="#62666c"/><path d="M2.5 7.5h13.5" stroke="#b4bac2" stroke-width="1.3"/><path d="M4.6 19.5h11.2" stroke="#3a3c40" stroke-width="1.2"/>',
+  ember: '<path d="M12 2.5c2.2 3.2 6 5.4 6 10.4a6 6 0 0 1-12 0c0-3 1.8-4.4 2.2-6.4 1.4 1 2 2.2 2 3.2 1.2-2.2 2-4.2 1.8-7.2z" fill="#ff8a3c"/><path d="M12 11c1.3 1.5 3 2.5 3 4.5a3 3 0 0 1-6 0c0-1.5 1.3-2.6 3-4.5z" fill="#ffe08a"/>',
+  fang: '<path d="M8.5 3h7c0 6.5-1.6 12.4-3.5 18-1.9-5.6-3.5-11.5-3.5-18z" fill="#efe6d2"/><path d="M8.5 3h7v2.4h-7z" fill="#c89a7a"/><path d="M12.6 7c.2 4-.3 8-1 11" stroke="#cfc4ac" stroke-width=".9" fill="none"/>',
+  antler: '<path d="M8 21c1-6 .3-10.5-3-15M6.6 13.6C4.8 12.8 3.8 11 3.6 8.8M6.2 9.6c1-2 1.1-4 .3-6M8 21c2.6-5 6-7.4 10.6-8.2M13.8 14.4c1.2-2.8 1.2-5.4.2-8.4M17.4 13c2-1 3.2-3 3.2-5.4" stroke="#d6ba8c" stroke-width="2" fill="none" stroke-linecap="round"/>',
+  ash: '<path d="M4.5 19c1.2-4.4 4.2-5.8 7.5-5.8s6.3 1.4 7.5 5.8z" fill="#8e8a9c"/><path d="M7.5 17.5c1-2 2.6-2.8 4.5-2.8" stroke="#c8c4dc" stroke-width="1" fill="none"/><circle cx="9" cy="10.2" r="1.2" fill="#c8c4dc"/><circle cx="14.2" cy="8" r="1" fill="#c8c4dc"/><circle cx="11.6" cy="4.6" r=".8" fill="#c8c4dc"/>',
+});
+Object.assign(DIT, {
+  anvil: { n: 'Forge', c: '#62666c', st: 2, k: 'place', build: 'anvil', b: 'An anvil and a grindstone · sharpen, reinforce, balance and infuse what you carry' },
+  axe4: { n: 'Steel axe', c: '#dfe6ee', st: 1, k: 'tool', tool: 'axe', tier: 4, dmg: 1.45, dur: 420, b: 'Fells a tree in one chop' },
+  pick4: { n: 'Steel pick', c: '#dfe6ee', st: 1, k: 'tool', tool: 'pick', tier: 4, dmg: 1.3, dur: 420, b: 'Breaks rock in one blow, and more ore from it' },
+  ember: { n: 'Ember shard', c: '#ff8a3c', st: 10, k: 'mat', b: 'A coal that never goes out · rare, from the night\'s burning dead' },
+  fang: { n: 'Wolf fang', c: '#efe6d2', st: 10, k: 'mat', b: 'From wolves, and always from a bear' },
+  antler: { n: 'Antler', c: '#d6ba8c', st: 10, k: 'mat', b: 'From deer, now and then' },
+  ash: { n: 'Grave ash', c: '#9a96a8', st: 20, k: 'mat', b: 'What the tall ones leave when they burn at night · rarer from the rest' },
+});
+DREC.push(
+  { id: 'anvil', g: 'stn', out: 'anvil', at: 'furnace', cost: { iron: 3, stones: 10, logs: 2 } },
+  { id: 'axe4', g: 'tool', out: 'axe4', at: 'anvil', cost: { iron: 5, planks: 2, hide: 1 } },
+  { id: 'pick4', g: 'tool', out: 'pick4', at: 'anvil', cost: { iron: 5, planks: 2, hide: 1 } },
+);
+Object.assign(MAT_GET, { ember: 'kill things at night: now and then one leaves a shard that still glows (brutes and tall ones more often)',
+  fang: 'hunt wolves (a bear always has them)', antler: 'hunt deer', ash: 'kill the tall ones at night; others leave it more rarely' });
+BOOK.push({ id: 'rare', n: 'Rare finds', icon: 'ember', blurb: 'For infusing a weapon at the forge.', items: ['ember', 'fang', 'antler', 'ash'] });
+const fgOk = s => { const T = s && DIT[s.id]; return !!(T && T.dur && T.k === 'tool' && (T.tool === 'weapon' || T.rng || T.tool === 'axe' || T.tool === 'pick')); };
+const fgN = s => s && s.fg ? (s.fg.sh || 0) + (s.fg.rf || 0) + (s.fg.bl || 0) : 0;
+const fgLv = (s, k) => s && s.fg ? s.fg[k] || 0 : 0;
+const slotDur = s => s.dm || DIT[s.id].dur;
+const fgName = s => DIT[s.id].n + (fgN(s) ? ` +${fgN(s)}` : '');
+const dayFgDmg = () => S && S.day ? 1 + 0.12 * fgLv(heldSlot(), 'sh') : 1;
+const dayFgSp = () => S && S.day ? 1 + 0.08 * fgLv(heldSlot(), 'bl') : 1;
+const dayInf = () => { const s = S && S.day && heldSlot(); return s && s.inf || null; };
+const dayAnvilNear = (x, y) => S.day && S.day.builds.some(B => B.t === 'anvil' && Math.hypot(B.x - x, B.y - y) < ANVIL_R);
+const fgHave = k => k === 'wisps' ? stPool().w : dayHave(k);
+const fgCan = cost => Object.entries(cost).every(([k, n]) => fgHave(k) >= n);
+function fgSpend(cost) { const c = Object.assign({}, cost); if (c.wisps) { const P = stPool(); P.w -= c.wisps; poolSave(); delete c.wisps; } daySpend(c); }
+function fgAnvil() { let best = null, bd = 1e9; for (const B of S.day.builds) if (B.t === 'anvil') { const d = Math.hypot(B.x - S.p.x, B.y - S.p.y); if (d < bd) { bd = d; best = B; } } return best || S.p; }
+function fgFx(k, col) {                          // the work itself: the grindstone's hiss, or three rings of the hammer, and sparks off the anvil
+  const B = fgAnvil(); dayAct(10, 0.8); padRumble(0.35, 90);
+  if (k === 'sh') { wpEmbers(B.x, B.y, 22, 22, '255,220,150'); if (actx) { const t = actx.currentTime; noiseAt(t, 5200, 2600, 0.55, 0.3, sfxGain); noiseAt(t + 0.3, 6400, 3000, 0.35, 0.22, sfxGain); } }
+  else for (let i = 0; i < 3; i++) setTimeout(() => { if (!S.day) return; wpEmbers(B.x, B.y, 20, 9, col || '255,200,120'); addShake(0.06);
+    if (actx) { const t = actx.currentTime; toneAt(t, 1180 + i * 90, 0.35, 0.05, 'triangle', sfxGain); toneAt(t, 2740 + i * 140, 0.22, 0.025, 'sine', sfxGain); noiseAt(t, 4000, 1500, 0.04, 0.35, sfxGain); } }, i * 170);
+  if (col) { wpRing(B.x, B.y, 60, col, 0.6); if (actx) toneAt(actx.currentTime + 0.5, 660, 0.9, 0.04, 'sine', sfxGain); }
+}
+function fgDo(s, k) {                             // one upgrade, on one thing you carry
+  const n = fgN(s), F = FG.find(f => f.k === k);
+  if (!stationHere('anvil') || n >= FG_MAX || !fgCan(F.cost[n])) return;
+  fgSpend(F.cost[n]); s.fg = s.fg || {}; s.fg[k] = (s.fg[k] || 0) + 1;
+  if (k === 'rf') { const T = DIT[s.id], old = slotDur(s); s.dm = Math.round(T.dur * (1 + 0.35 * s.fg.rf)); s.d = Math.min(s.dm, (s.d ?? old) + (s.dm - old)); }   // the extra uses come with it
+  fgFx(k);
+  pkSay(`${F.n.toLowerCase()} · ${DIT[s.id].n.toLowerCase()} · upgrade ${n + 1} of ${FG_MAX}`); exNote(`${F.n.toLowerCase()} · upgrade ${n + 1} of ${FG_MAX}`, true);
+  dayChanged();
+}
+function fgInfuse(s, id) {                        // one infusion, for good
+  const I = INF[id]; if (!stationHere('anvil') || s.inf || !fgCan(I.cost)) return;
+  fgSpend(I.cost); s.inf = id; fgFx('inf', I.col); wjFlash(I.col, 0.12);
+  pkSay(`${DIT[s.id].n.toLowerCase()} · infused with ${I.n.toLowerCase()}`); exNote(`infused · ${I.n.toLowerCase()}`, true);
+  dayChanged();
+}
+function fgNow(s, k) {                            // what it is now, and what the next upgrade makes it
+  const T = DIT[s.id], l = fgLv(s, k), more = fgN(s) < FG_MAX;
+  if (k === 'sh') { const v = l => `×${(T.dmg * (1 + 0.12 * l)).toFixed(2)}`; return `damage ${v(l)}` + (more ? ` → ${v(l + 1)}` : ''); }
+  if (k === 'rf') return `${slotDur(s)} uses` + (more ? ` → ${Math.round(T.dur * (1 + 0.35 * (l + 1)))}` : '');
+  const v = l => `×${(1 + 0.08 * l).toFixed(2)}`; return `${T.rng ? 'draw' : 'swing'} speed ${v(l)}` + (more ? ` → ${v(l + 1)}` : '');
+}
+function fgLine(name, sub, cost, here, verb, fn) {
+  const el = pkEl, ok = !!cost && here && fgCan(cost), r = el('div', 'fgline' + (ok ? ' ready' : ''));
+  const t = el('span', 'rtext'); t.append(el('b', '', name), el('span', 'sh', sub)); r.append(t);
+  if (cost) { const c = el('div', 'rneed'); for (const [k, n] of Object.entries(cost)) { const h = fgHave(k), q = el('span', 'need1' + (h < n ? ' no' : '')); q.title = k === 'wisps' ? 'Wisps' : DIT[k].n; q.innerHTML = (k === 'wisps' ? WISP_IC : iconSvg(k)) + (h < n ? `<span>${h}/${n}</span>` : `<span>${n}</span><i>✓</i>`); c.append(q); } r.append(c); }
+  const b = el('button', 'act main rgo1', cost ? verb : 'Done'); b.disabled = !ok; b.addEventListener('click', e => { e.stopPropagation(); fn(); }); r.append(b);
+  return r;
+}
+function forgeRow(s, i, here) {
+  const el = pkEl, open = PK.fsel === i, n = fgN(s);
+  const row = el('div', 'rec fgrow' + (open ? ' open' : '') + (here ? '' : ' away'));
+  const top = el('div', 'rtop'), ic = el('span', 'ricon'); ic.innerHTML = iconSvg(s.id);
+  if (s.inf) ic.style.boxShadow = `inset 0 0 0 1.5px rgba(${INF[s.inf].col},0.8)`;
+  const tx = el('span', 'rtext'); tx.append(el('b', '', fgName(s)), el('span', 'sh', `Upgrade ${n} of ${FG_MAX}` + (s.inf ? ` · ${INF[s.inf].n}` : '') + (i === S.day.hot ? ' · in your hand' : '')));
+  const pips = el('span', 'fgpips'); for (let k = 0; k < FG_MAX; k++) pips.append(el('i', k < n ? 'on' : ''));
+  top.append(ic, tx, pips);
+  top.addEventListener('click', () => { PK.fsel = open ? null : i; renderPack(); });
+  row.append(top);
+  if (open) {
+    const det = el('div', 'fgdet');
+    for (const F of FG) det.append(fgLine(F.n, fgNow(s, F.k), n < FG_MAX ? F.cost[n] : null, here, F.n, () => fgDo(s, F.k)));
+    if (s.inf) det.append(el('p', 'fgh', `Infused with ${INF[s.inf].n.toLowerCase()} · ${INF[s.inf].b}`));
+    else { det.append(el('p', 'fgh', 'Infuse it · one infusion to a weapon, for good')); for (const [id, I] of Object.entries(INF)) det.append(fgLine(I.n, I.b, I.cost, here, 'Infuse', () => fgInfuse(s, id))); }
+    row.append(det);
+  }
+  return row;
+}
+function forgeHtml(here) {
+  const D = S.day, el = pkEl, items = D.inv.map((s, i) => [s, i]).filter(([s]) => fgOk(s));
+  if (!items.length) return [el('p', 'small none', 'Nothing to work on · carry a weapon, a bow or a sling, an axe or a pick')];
+  if (PK.fsel === undefined || (PK.fsel !== null && !items.some(([, i]) => i === PK.fsel))) PK.fsel = fgOk(heldSlot()) ? D.hot : items[0][1];
+  const list = el('div', 'pkrecs');
+  for (const [s, i] of items) list.append(forgeRow(s, i, here));
+  return pkFold('forge', 'Upgrade what you carry', `${items.length}`, [list], true, 'anvil');
+}
+function dayInfHit(o, inf) {                      // an infused weapon's blow, on top of the blow itself
+  if (!inf) return; o.kInf = inf; o.kInfT = S.t;
+  if (inf === 'ember') { o.wburn = Math.max(o.wburn || 0, 2.5); o.wburnK = 1; wpEmbers(o.x, o.y, 24, 5, '255,150,60'); }
+  else if (inf === 'fang') { o.wbleed = Math.min(4, (o.wbleed || 0) + 1); o.wbleedT = 3; o.wbleedK = 1; }
+  else if (inf === 'antler' && o.type !== 'tall') { const p = S.p, d = Math.hypot(o.x - p.x, o.y - p.y) || 1; o.x += (o.x - p.x) / d * 16; o.y += (o.y - p.y) / d * 16; o.frozen = Math.max(o.frozen || 0, 0.45); }
+}
+function dayInfKill(e) {                          // ash and wisp: what a night kill with them does
+  if (!e.kInf || S.t - e.kInfT > 4 || !dayDark()) return;
+  const rg = S.rg;
+  if (e.kInf === 'ash') {
+    rg.flares.push({ x: e.x, y: e.y, r: 95, life: 1.1, t: 0 }); wpRing(e.x, e.y, 95, '230,226,255', 0.5); ashBurst(e.x, e.y, 18, 20);
+    for (const o of rg.enemies) if (!o.dead && o !== e && Math.hypot(o.x - e.x, o.y - e.y) < 95) { o.hp -= 0.6; o.wburn = Math.max(o.wburn || 0, 1.5); o.wburnK = 1; o.jit = 1; }
+    addShake(0.12); if (actx) { const t = actx.currentTime; toneAt(t, 1760, 0.4, 0.035, 'sine', sfxGain); noiseAt(t, 6000, 2400, 0.2, 0.3, sfxGain); }
+  } else if (e.kInf === 'wisp') {
+    const n = Math.max(1, Math.round((WISP[e.type] || 1) * 0.5)), L = rg.wisps || (rg.wisps = []);
+    L.push({ x: e.x + (Math.random() - 0.5) * 12, y: e.y + (Math.random() - 0.5) * 12, z: FOES[e.type].h * 0.5, t: 0, n, life: 12 + 4 * sr('linger'), seed: Math.random() * 9, v: 0 });
+  }
+}
+function dayRareDrop(e) {                         // now and then the night's dead leave something worth keeping
+  if (!S.day || !dayDark()) return;
+  const big = e.type === 'tall' ? 2 : e.type === 'brute' ? 1 : 0;
+  if (Math.random() < [0.05, 0.18, 0.4][big]) dayDrop(e.x, e.y, 'ember', 1);
+  if (Math.random() < [0.06, 0.25, 0.6][big]) dayDrop(e.x, e.y, 'ash', big > 1 ? 2 : 1);
+}
 // ---- v172 (Joe): controller support. Any gamepad the browser sees (Xbox, PlayStation, Switch Pro, most others in the standard layout).
 // In play: left stick runs that way, right stick aims the torch, RT or A attacks, B dodges, X uses, Y is the weapon's special,
 // LB/RB step along the hotbar (Expedition: LB swaps weapons), d-pad up drinks a flask, down lights the recall flare, left plants a lantern,
@@ -12114,7 +12292,7 @@ function wpSwing(i, D, dash, k = 1, key) {
   const p = S.p, rg = S.rg, a = S.aimW !== undefined ? S.aimW : 0, w = curW(), W = ARMS[w];
   if (dash) p.roll = 0;                           // the roll turns into the dash strike
   lifeAdd('swings');
-  const sp = w === 'club' ? 1 / (1 - 0.1 * Math.min(3, rg.wclub || 0)) : 1;   // a chipped club swings quicker
+  const sp = (w === 'club' ? 1 / (1 - 0.1 * Math.min(3, rg.wclub || 0)) : 1) * dayFgSp();   // a chipped club swings quicker (v190: and a balanced weapon)
   p.atk = { i, t: 0, dur: D.dur, a, side: D.side || (i % 2 ? -1 : 1), hit: new Set(), done: false, queued: false, pose: D.pose, wd: D, hi: 0, w, key: key || w, k, sp };
   rg.atkHist = (rg.atkHist || []).filter(h => S.t - h.t < 1.6).concat([{ i: dash ? 3 : Math.min(2, i), side: p.atk.side, t: S.t }]);
   camKick(a, D.charge ? 6 : D.thrust ? 2 : -3); addShake(D.charge ? 0.12 : 0.04);   // heavy: the wind-up pulls you back before it throws you forward
