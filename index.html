@@ -569,7 +569,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 180</p>
+      <p class="small" id="verLbl">Version 181</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -8125,7 +8125,7 @@ function dayChest(c) {                         // a cache: food and a few useful
   if (rg.flask < FLASK_MAX && Math.random() < 0.25) { rg.flask++; exNote('+1 flask', true); }
 }
 function dayRaid() {
-  const rg = S.rg, D = S.day, ring = Math.min(3, exRing(Math.hypot(S.p.x, S.p.y)) + (D.n > 3 ? 1 : 0) + ((D.heat || 0) > 2 ? 1 : 0)), n = dayRaidSize();
+  const rg = S.rg, D = S.day, ring = Math.min(3, exRing(Math.hypot(S.p.x, S.p.y)) + (D.n > 6 ? 1 : 0) + ((D.heat || 0) > 2 ? 1 : 0)), n = dayRaidSize();
   for (let i = 0; i < n; i++) exSpawn(exPickFoe(ring));
   if ((D.heat || 0) >= 2) { const e = rg.enemies[rg.enemies.length - 1]; if (e) { e.cap = 1; e.hp = e.maxHp = e.maxHp * 1.4; } }   // v155: once they are hunting you, one of them leads
   D.raidSeen = 1;
@@ -9595,7 +9595,10 @@ function dayHeatStep(dt) {
     exNote('someone is watching the trees'); sfx(0.6, 0.6, 'bandpass', 300, 0.18);
   }
 }
-function dayRaidSize() { const D = S.day; return Math.min(22, 3 + 2 * D.n + 2 * (D.heat || 0)); }
+function dayRaidSize() { const D = S.day; return Math.min(16, 3 + D.n + 2 * (D.heat || 0)); }   // v181 (Joe: too steep): one more a day, not two, and never past 16
+// v181: the day-by-day climb, gentler and levelling off (was +0.6 toughness and +15% numbers every day, with no ceiling)
+const dayTough = () => Math.min(3, 0.3 * (S.day.n - 1));                // day 5 +1.2, day 11 on +3 (was day 5 +2.4, day 11 +6)
+const dayCrowd = () => Math.min(1.4, 0.6 + 0.08 * (S.day.n - 1));       // day 1 0.6, day 5 0.92, day 11 on 1.4 (was 3.45 by day 20)
 // ---- the signal fire: four relics, a pyre at your camp, and one long night to live through ----
 function daySignalLight(B) {
   const D = S.day;
@@ -12304,7 +12307,7 @@ function exStep(dt) {
   if (portalStep(dt)) return;                 // opening, warping, or out in the other world
   weatherStep(dt);                            // v126: forest weather
   const rg = S.rg, p = S.p, d0 = Math.hypot(p.x, p.y), ring = exRing(d0), inCamp = d0 < CAMP_R;
-  rg.wave = Math.min(13, 1 + d0 / 800 + (S.day ? 0.6 * (S.day.n - 1) : 0));   // Daylight: tougher each day
+  rg.wave = Math.min(13, 1 + d0 / 800 + (S.day ? dayTough() : 0));   // Daylight: tougher each day (v181: gentler, levels off)
   if (S.day) { dayTorchOn(); dayStep(dt, inCamp); }   // v166: the torch follows the sun      // enemy toughness follows distance
   for (const n of rg.notes) n.t += dt;
   rg.notes = rg.notes.filter(n => n.t < 2.4);
@@ -12342,7 +12345,7 @@ function exStep(dt) {
   } else if (!bossLive() && !miniLive() && !rg.cleared && (!srchOn() || rg.alarm)) {   // v135 trial: with Searchers on, nothing comes until one spots you   // nothing else comes into the mist while the Woodwarden fights, nor on the walk home after he falls
     rg.spawnT -= dt;
     const bait = rg.carryOrb || rg.carryDorb ? 5 : 0;         // a carried orb draws them in from all round
-    const cap = Math.round((EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1) * (S.day ? (0.45 + 0.15 * S.day.n) * dayCapK() : 1));   // v166: fewer by day, far more by night   // Horde: twice as many   // and so does a heavy pack
+    const cap = Math.round((EX_CAP[ring] + bait + Math.floor(packUsed(rg.pack) / packMax() * 3)) * (pact('horde') ? 2 : 1) * (S.day ? dayCrowd() * dayCapK() : 1));   // v166: fewer by day, far more by night   // Horde: twice as many   // and so does a heavy pack
     if (rg.spawnT <= 0) {
       rg.spawnT = EX_GAP[ring] * (rg.carryOrb || rg.carryDorb ? 0.55 : 1) * (pact('horde') ? 0.5 : 1) * (0.6 + Math.random() * 0.8);
       if (rg.enemies.length < cap) { if (ring > 0 && Math.random() < 0.25 && cap - rg.enemies.length >= 3) exPack(ring, Math.min(cap - rg.enemies.length, 3 + (Math.random() < 0.5 ? 1 : 0))); else exSpawn(exPickFoe(ring)); }   // v123: sometimes a pack
