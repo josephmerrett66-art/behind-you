@@ -199,6 +199,18 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #craft .pkcat b { position: absolute; top: 3px; right: 6px; font: 600 0.6rem var(--mono); color: #9fd27a; }
 #craft .new { position: absolute; top: 6px; left: 6px; width: 7px; height: 7px; border-radius: 50%; background: #ffcf8a; box-shadow: 0 0 6px #ffcf8a; }
 #craft .pkrecs { display: grid; gap: 0.45rem; }
+#craft .pkfold { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 0.55rem; width: 100%; padding: 0.6rem 0.5rem; margin-top: 0.2rem; border-top: 1px solid rgba(239,239,234,0.14); font: 600 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone); }
+#craft .pkfold svg { width: 1.15rem; height: 1.15rem; flex: none; }
+#craft .pkfold em { font-style: normal; flex: 1; }
+#craft .pkfold span { color: var(--ash); font-weight: 400; letter-spacing: 0.04em; text-transform: none; }
+#craft .pkfold .chev { width: 0.5rem; height: 0.5rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; flex: none; margin: 0 0.15rem; }
+#craft .pkfold.open .chev { transform: rotate(45deg); }
+#craft .pkfold:hover, #craft .pkfold:focus-visible { background: rgba(239,239,234,0.05); }
+#craft .pkfoldbody { display: grid; gap: 0.45rem; padding-bottom: 0.4rem; }
+#craft .bkrow { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.55rem 0.6rem; border: 1px solid rgba(239,239,234,0.14); border-radius: 10px; }
+#craft .bkrow.unseen { opacity: 0.5; }
+#craft .bktext { display: grid; gap: 0.2rem; font-size: 0.72rem; } #craft .bktext b { font-size: 0.8rem; color: var(--bone); }
+#craft .bktext p { margin: 0; color: var(--ash); line-height: 1.35; } #craft .bktext p.use { color: #c9b48a; }
 #craft .rec { border: 1px solid rgba(239,239,234,0.16); border-radius: 11px; background: rgba(239,239,234,0.03); }
 #craft .rec.ready { border-color: rgba(159,210,122,0.5); }
 #craft .rec.open { background: rgba(239,239,234,0.06); }
@@ -450,7 +462,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
   <div class="pk">
     <div class="pkhead"><div><p class="eyebrow">Daylight · <span id="pkDay"></span></p><h2>Pack</h2></div><button id="craftGo" class="alt">Close</button></div>
     <div class="pkneeds" id="pkNeeds"></div>
-    <div class="pktabs"><button class="pktab" data-tab="pack" aria-pressed="true">Pack</button><button class="pktab" data-tab="craft" aria-pressed="false">Craft<span></span></button><button class="pktab" data-tab="log" aria-pressed="false">Journal</button></div>
+    <div class="pktabs"><button class="pktab" data-tab="pack" aria-pressed="true">Pack</button><button class="pktab" data-tab="craft" aria-pressed="false">Craft<span></span></button><button class="pktab" data-tab="book" aria-pressed="false">Book</button><button class="pktab" data-tab="log" aria-pressed="false">Journal</button></div>
     <div id="pkBody" class="pkbody"></div>
   </div>
   <div id="pkCard" hidden></div>
@@ -539,7 +551,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 178</p>
+      <p class="small" id="verLbl">Version 179</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -7694,8 +7706,14 @@ function dayConts(R = CONT_R) {                 // [{ name, inv, x, y }], neares
   const D = S.day, p = S.p, out = [];
   if (Math.hypot(p.x - CAMP_BOX.x, p.y - CAMP_BOX.y) < R) out.push({ name: 'Camp box', inv: D.box, x: CAMP_BOX.x, y: CAMP_BOX.y, box: true });
   for (const B of D.builds) if (B.t === 'chest' && Math.hypot(p.x - B.x, p.y - B.y) < R) out.push({ name: 'Storage chest', inv: B.inv, x: B.x, y: B.y, B });
+  if (R === CONT_R) {                            // v179 (Joe): a station you're working at reaches into the chests set up round it
+    const stR = { fire: FIRE_R, bench: BENCH_R, furnace: FURN_R, rack: RACK_R }, at = D.builds.filter(B => stR[B.t] && Math.hypot(p.x - B.x, p.y - B.y) < stR[B.t]);
+    if (at.length) for (const B of D.builds) if (B.t === 'chest' && !out.some(c => c.B === B) && at.some(A => Math.hypot(A.x - B.x, A.y - B.y) < STN_CHEST_R)) out.push({ name: 'Storage chest', inv: B.inv, x: B.x, y: B.y, B, far: true });
+    if (S.rg.inCamp && !out.some(c => c.box)) out.push({ name: 'Camp box', inv: D.box, x: CAMP_BOX.x, y: CAMP_BOX.y, box: true, far: true });   // anywhere in camp, the box is to hand
+  }
   return out.sort((a, b) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(p.x - b.x, p.y - b.y));
 }
+const STN_CHEST_R = 240;   // v179: how far from a station its chests can stand
 const dayHave = k => countIn(S.day.inv, k) + dayConts().reduce((a, c) => a + countIn(c.inv, k), 0);
 function daySpend(cost) {                      // chests and the box first, then your pockets, the hotbar last
   const D = S.day, order = [...Array(D.inv.length).keys()].reverse();
@@ -8494,6 +8512,17 @@ function dayChanged() { if (!S || !S.day) return; renderHotbar(); renderBuildBar
 const craftEl = document.getElementById('craft'), craftBtn = document.getElementById('craftBtn'), useBtn = document.getElementById('useBtn'), sneakBtn = document.getElementById('sneakBtn');
 sneakBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); dayCrouch(); });
 const PK = { tab: 'pack', sel: null, cat: null, open: null, cont: null, flash: null, at: 'hand', atLock: false };
+// v179 (Joe): every section of the pack folds up under its heading, so the one you want is never a long scroll away. Remembered on this device.
+let PK_FOLD = {}; try { PK_FOLD = JSON.parse(localStorage.getItem('behind-you-folds') || '{}') || {}; } catch (e) {}
+function pkFold(key, title, side, kids, defOpen, icon) {   // [header, body]: the header button opens and closes the body
+  const open = PK_FOLD[key] ?? defOpen, h = pkEl('button', 'pkfold' + (open ? ' open' : ''));
+  h.setAttribute('aria-expanded', open ? 'true' : 'false'); h.dataset.fold = key;
+  h.innerHTML = '<i class="chev"></i>' + (icon ? iconSvg(icon) : '') + '<em></em><span></span>';
+  h.querySelector('em').textContent = title; h.querySelector('span').textContent = side || '';
+  h.addEventListener('click', () => { PK_FOLD[key] = !open; try { localStorage.setItem('behind-you-folds', JSON.stringify(PK_FOLD)); } catch (e) {} renderPack(); });
+  const body = pkEl('div', 'pkfoldbody'); if (open) body.append(...kids); else body.hidden = true;
+  return [h, body];
+}
 function openCraft(target) {
   const rg = S && S.rg; if (!S || !S.day || !rg || rg.phase !== 'fight' || !S.running) return;
   const conts = dayConts(70);
@@ -8662,9 +8691,9 @@ function renderPack() {
   if (PK.flash && performance.now() - PK.flash.at < 2600) out.push(el('p', 'pkflash', PK.flash.t));
   if (PK.tab === 'pack') {
     if (PK.cont) {   // the chest or box you opened sits at the top, where you're looking
-      const h2 = el('h3', '', PK.cont.name); h2.append(el('span', '', PK.cont.box ? `${PK.cont.inv.filter(Boolean).length} used · no limit` : `${PK.cont.inv.filter(Boolean).length} of ${PK.cont.inv.length}`)); out.push(h2);
-      const g = el('div', 'pkgrid cont'); PK.cont.inv.forEach((s, i) => g.append(pkSlot(s, 'cont', i))); out.push(g);
-      const sa = el('button', 'alt pkstore', 'Store all materials'); sa.addEventListener('click', () => { for (let i = HOTN; i < D.inv.length; i++) if (D.inv[i] && DIT[D.inv[i].id].k === 'mat') pkQuick('inv', i); }); out.push(sa);
+      const g = el('div', 'pkgrid cont'); PK.cont.inv.forEach((s, i) => g.append(pkSlot(s, 'cont', i)));
+      const sa = el('button', 'alt pkstore', 'Store all materials'); sa.addEventListener('click', () => { for (let i = HOTN; i < D.inv.length; i++) if (D.inv[i] && DIT[D.inv[i].id].k === 'mat') pkQuick('inv', i); });
+      out.push(...pkFold('p:cont', PK.cont.name, PK.cont.box ? `${PK.cont.inv.filter(Boolean).length} used · no limit` : `${PK.cont.inv.filter(Boolean).length} of ${PK.cont.inv.length}`, [g, sa], true, PK.cont.box ? 'chest' : 'chest'));
     }
     const gear = el('div', 'pkgear');
     for (const [k, name, ic] of [['head', 'Head', 'head'], ['body', 'Body', 'body'], ['legs', 'Legs', 'legsE'], ['back', 'Back', 'back']]) {
@@ -8672,12 +8701,12 @@ function renderPack() {
       if (!D.gear[k]) b.innerHTML = iconSvg(ic);
       w.append(b, el('span', '', D.gear[k] ? DIT[D.gear[k].id].n : name)); gear.append(w);
     }
-    out.push(gear);
-    out.push(el('h3', '', 'Hotbar'));
-    const hot = el('div', 'pkgrid'); for (let i = 0; i < HOTN; i++) hot.append(pkSlot(D.inv[i], 'inv', i)); out.push(hot);
+    out.push(...pkFold('p:gear', 'Wearing', Object.values(D.gear).filter(Boolean).length + ' of 4', [gear], true, 'vest'));
+    const hot = el('div', 'pkgrid'); for (let i = 0; i < HOTN; i++) hot.append(pkSlot(D.inv[i], 'inv', i));
+    out.push(...pkFold('p:hot', 'Hotbar', D.inv.slice(0, HOTN).filter(Boolean).length + ' of ' + HOTN, [hot], true, 'hand'));
     const used = D.inv.filter(Boolean).length;
-    const h = el('h3', '', 'Pockets'); h.append(el('span', '', `${used} of ${D.inv.length} slots${D.gear.back ? '' : ' · wear a bag for more'}`)); out.push(h);
-    const pk = el('div', 'pkgrid'); for (let i = HOTN; i < D.inv.length; i++) pk.append(pkSlot(D.inv[i], 'inv', i, i >= BASE_SLOTS ? 'bag' : '')); out.push(pk);
+    const pk = el('div', 'pkgrid'); for (let i = HOTN; i < D.inv.length; i++) pk.append(pkSlot(D.inv[i], 'inv', i, i >= BASE_SLOTS ? 'bag' : ''));
+    out.push(...pkFold('p:pockets', 'Pockets', `${used} of ${D.inv.length} slots${D.gear.back ? '' : ' · wear a bag for more'}`, [pk], true, 'back'));
     const wHere = dayWaterHere();
     if (wHere) {
       const r = el('div', 'pkwater'); r.append(el('span', '', `Water · ${wHere}`));
@@ -8687,6 +8716,8 @@ function renderPack() {
     }
   } else if (PK.tab === 'log') {
     out.push(...dayJournalHtml());
+  } else if (PK.tab === 'book') {
+    out.push(...bookHtml());   // v179
   } else out.push(...craftHtml());   // v171: one list per place
   root.replaceChildren(...out);
   const card = PK.tab === 'pack' ? pkCard() : null, cw = document.getElementById('pkCard');
@@ -8782,14 +8813,15 @@ function craftHtml() {
   out.push(bar);
   const at = PK.at, here = stationHere(at), P = PLACES.find(x => x.at === at);
   out.push(el('p', 'pkwhere' + (here ? ' ok' : ''), here ? (at === 'hand' ? 'Made anywhere, from what you carry' : `You're at the ${P.n.toLowerCase()}`) : placeHint(at)));
+  { const C = dayConts(); if (C.length) { const nc = C.filter(c => !c.box).length; out.push(el('p', 'pkwhere ok', 'Also using ' + [C.some(c => c.box) ? 'the camp box' : '', nc ? `${nc} storage chest${nc > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ') + ' nearby')); } }   // v179
   const rank = r => { const c = canCraft(r); return c === true ? 0 : c === '' ? 1 + craftShort(r) / 100 : 3; };
   for (const C of DCATS) {
     const list = known.filter(r => r.at === at && r.g === C.id).sort((x, y) => rank(x) - rank(y));
     if (!list.length) continue;
-    out.push(el('h3', '', C.n));
     const box = el('div', 'pkrecs');
     for (const r of list) box.append(craftRow(r, here));
-    out.push(box);
+    const ready = list.filter(r => canCraft(r) === true).length, nw = list.some(r => D.fresh.has(r.id));
+    out.push(...pkFold('c:' + at + ':' + C.id, C.n, (ready ? `${ready} ready · ` : '') + `${list.length}` + (nw ? ' · new' : ''), [box], ready > 0 || nw, C.icon));
   }
   const left = DREC.length - known.length;
   if (left) out.push(el('p', 'small none', `${left} more recipe${left > 1 ? 's' : ''} to find · new things you pick up teach you more`));
@@ -8822,6 +8854,43 @@ function craftRow(r, here) {
 const MAT_GET = { sticks: 'pick them up off the ground, or chop down a tree', stones: 'pick them up off the ground, or break a rock', fibre: 'hit tall grass',
   logs: 'chop down a tree with an axe', flint: 'break a rock with a pick', hide: 'hunt deer, boar, wolves or bears', bone: 'hunt boar, wolves or bears',
   ironore: 'break rock in the deep woods with a flint pick or better', meat: 'hunt animals', fish: 'fish at a pond with a rod', berries: 'pick them from bushes' };
+// ---- v179 (Joe): the Book. Every material, food and relic in the woods, where each one comes from, and what it goes into.
+// Things you've never held still show, dimmed, so you know what to look for.
+Object.assign(MAT_GET, { mushroom: 'pick them up off the woodland floor', rope: '', planks: '', iron: '', rbell: 'take it from a raider camp, once its guards are dead',
+  rskull: 'take it from a raider camp, once its guards are dead', rcrown: 'take it from a raider camp, once its guards are dead' });
+const BOOK = [
+  { id: 'raw', n: 'Gathered', icon: 'sticks', blurb: 'Found lying about, or knocked loose with the right tool.', items: ['sticks', 'stones', 'fibre', 'logs', 'flint', 'ironore'] },
+  { id: 'hunt', n: 'Hunted and fished', icon: 'meat', blurb: 'From the animals of the woods. Crouch (Sneak) to get close to deer.', items: ['meat', 'hide', 'bone', 'fish'] },
+  { id: 'forage', n: 'Foraged', icon: 'berries', items: ['berries', 'mushroom'] },
+  { id: 'made', n: 'Worked materials', icon: 'rope', blurb: 'Made from the others, at a station.', items: ['rope', 'planks', 'iron'] },
+  { id: 'cook', n: 'Cooked and kept', icon: 'cooked', items: ['cooked', 'roast', 'stew', 'fishC', 'jerky', 'tea'] },
+  { id: 'relic', n: 'Relics', icon: 'rskull', blurb: 'Each raider camp guards one. Bring all three home for the signal fire.', items: ['rbell', 'rskull', 'rcrown'] },
+];
+function bookWhere(id) {                         // every way to come by it, known recipe or not
+  const bits = [], r = DREC.filter(x => x.out === id);
+  if (MAT_GET[id]) bits.push(MAT_GET[id]);
+  for (const q of r) bits.push(`make it ${AT_NAME[q.at].toLowerCase()} from ` + Object.entries(q.cost).map(([k, n]) => `${n} ${DIT[k].n.toLowerCase()}`).join(', '));
+  return bits.join('; or ') || 'not found in these woods';
+}
+function bookHtml() {
+  const D = S.day, el = pkEl, out = [el('p', 'pkwhere', 'Where everything comes from. Tap a heading to open it.')];
+  for (const G of BOOK) {
+    const ids = G.items.filter(id => DIT[id]), seen = ids.filter(id => D.seen.has(id)).length, kids = [];
+    if (G.blurb) kids.push(el('p', 'small none', G.blurb));
+    for (const id of ids) {
+      const T = DIT[id], has = D.seen.has(id), row = el('div', 'bkrow' + (has ? '' : ' unseen'));
+      const ic = el('span', 'ricon'); ic.innerHTML = iconSvg(id);
+      const tx = el('div', 'bktext'); tx.append(el('b', '', T.n + (has ? '' : ' · not found yet')));
+      tx.append(el('p', '', 'Where: ' + bookWhere(id)));
+      const uses = DREC.filter(r => r.cost[id]), kn = uses.filter(r => D.known.has(r.id));
+      if (uses.length) tx.append(el('p', 'use', 'Goes into: ' + (kn.length ? kn.slice(0, 6).map(recName).join(', ') + (kn.length > 6 ? ` and ${kn.length - 6} more` : '') : '') + (uses.length > kn.length ? `${kn.length ? ' · ' : ''}${uses.length - kn.length} recipe${uses.length - kn.length > 1 ? 's' : ''} still to learn` : '')));
+      if (T.eat) tx.append(el('p', 'use', eatLine(T.eat)));
+      row.append(ic, tx); kids.push(row);
+    }
+    out.push(...pkFold('b:' + G.id, G.n, `${seen} of ${ids.length} found`, kids, false, G.icon));
+  }
+  return out;
+}
 function itemGet(id) {   // where more of this comes from
   const r = DREC.find(x => x.out === id && S.day.known.has(x.id)), bits = [];
   if (MAT_GET[id]) bits.push(MAT_GET[id]);
@@ -9594,13 +9663,14 @@ function dayJournal() {                            // [{ n, icon, rows: [[key, v
 }
 function dayJournalHtml() {
   const D = S.day, el = pkEl, out = [], secs = dayJournal();
-  for (const sec of secs) {
-    const h = el('h3', '', sec.n); h.innerHTML = iconSvg(sec.icon) + `<em>${sec.n}</em>`; out.push(h);
-    if (sec.blurb) out.push(el('p', 'small none', sec.blurb));
+  secs.forEach((sec, si) => {
+    const kids = [];
+    if (sec.blurb) kids.push(el('p', 'small none', sec.blurb));
     const dl = document.createElement('dl'); dl.className = 'jdl';
     for (const [k, v, c] of sec.rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; if (c) dd.className = c; dl.append(dt, dd); }
-    out.push(dl);
-  }
+    kids.push(dl);
+    out.push(...pkFold('j:' + sec.n, sec.n, sec.rows.length ? String(sec.rows.length) : '', kids, si === 0, sec.icon));   // v179: folds
+  });
   if ((D.jlog || []).length) {
     out.push(el('h3', '', 'Lately'));
     const ul = el('div', 'jlog');
