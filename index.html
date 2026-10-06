@@ -582,7 +582,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 187</p>
+      <p class="small" id="verLbl">Version 188</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1952,7 +1952,8 @@ function update(dt) {
   const ck = 1 - Math.exp(-3 * dt), fc = bossCam();
   if (fc) {                                    // a boss fight: the camera frames the whole arena and holds still
     const k2 = 1 - Math.exp(-2.5 * dt);
-    camZv += (fc.z - camZv) * k2; S.cam.x += (fc.x - S.cam.x) * k2; S.cam.y += (fc.y - S.cam.y) * k2;
+    camZv += (fc.z - camZv) * k2; if (Math.abs(fc.z - camZv) < 0.002) camZv = fc.z;   // v188: and then it settles, so what's kept painted can stay
+    S.cam.x += (fc.x - S.cam.x) * k2; S.cam.y += (fc.y - S.cam.y) * k2;
   } else {
     if (camZv !== 1) { camZv += (1 - camZv) * (1 - Math.exp(-2.5 * dt)); if (Math.abs(camZv - 1) < 0.002) camZv = 1; }
     S.cam.x += (p.x + lx - S.cam.x) * ck; S.cam.y += (p.y + ly - S.cam.y) * ck;
@@ -2088,9 +2089,9 @@ let SPRITES = {};
 function sprRand(seed) { let a = seed * 2654435761 >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 let SPR_EDGE = false, EDGE_PASSING = false;   // v168: outlines round the world, like the animals
 const EDGE_C = '#1f1d1a', NO_EDGE = new Set(['grass', 'flowerY', 'flowerB', 'flowerR', 'flowerW', 'tuft', 'drift', 'dGrass']);
-function spriteEdge(cv, R = 0.9 * SPR) {   // v168: bake a dark outline round a painted picture, under its own pixels
+function spriteEdge(cv, R = 0.9 * SPR, src) {   // v168: bake a dark outline round a painted picture, under its own pixels
   const w = cv.width, h = cv.height; if (!w || !h) return;
-  const g = cv.getContext('2d'), src = g.getImageData(0, 0, w, h).data, sil = new ImageData(w, h), d = sil.data;
+  const g = cv.getContext('2d'), sil = new ImageData(w, h), d = sil.data; src = src || g.getImageData(0, 0, w, h).data;   // v188: the pixels can come from where they were painted
   for (let i = 3; i < src.length; i += 4) if (src[i] > 115) { d[i - 3] = 31; d[i - 2] = 29; d[i - 1] = 26; d[i] = 255; }
   const t = document.createElement('canvas'); t.width = w; t.height = h; t.getContext('2d').putImageData(sil, 0, 0);
   const r = Math.max(1, Math.round(R)), q = Math.max(1, Math.round(R * 0.71));
@@ -2123,7 +2124,9 @@ function edgeWant(o) {   // v168: shapes that get the outline pass (sprites carr
   return true;
 }
 // v168: things drawn as shapes that never change are painted once, outlined, and kept, so the outline costs nothing per frame
-const PCACHE = new Map(); let pcZ = 0, pcCol = null, pcT = -1, pcBudget = 0;
+const PCACHE = new Map(); let pcCol = null, pcBudget = 0;
+let cacheT = -1, cacheZ = 0, zMoving = false, sprBudget = 0;   // v188: once a frame: is the camera zooming, and how much repainting this frame may do
+function cacheFrame() { const t = S ? S.t : 0; if (cacheT === t) return; cacheT = t; zMoving = Z !== cacheZ; cacheZ = Z; pcBudget = 10; sprBudget = 2; }
 const PCV = document.createElement('canvas'), PCX = PCV.getContext('2d', { willReadFrequently: true });
 function pcKey(o) {   // what a cached picture depends on; null when it moves or changes and must be drawn fresh
   const k = o.kind;
@@ -2133,42 +2136,47 @@ function pcKey(o) {   // what a cached picture depends on; null when it moves or
   if (k === 'dnode') return (o.t === 'sticks' || o.t === 'stones' || o.t === 'shroom' || o.t === 'bush') && !(o.shakeT !== undefined && S.t - o.shakeT < 0.4) ? o.t + (o.ber ? 1 : 0) + ':' + (o.n || 0) : null;
   if (k === 'dcamp') return o.sub === 'stake' || o.sub === 'bones' || o.sub === 'tent' ? 1 : null;
   if (k === 'dbuild') return o.sub === 'bench' || (o.sub === 'chest' && !(o.build.openT > 0)) ? 1 : null;
+  if (k === 'dst') return stPicKey(o);   // v188: what you build
   return null;
 }
-function pcGet(o, key, sx, sy) {
-  if (pcZ !== Z || pcCol !== COLOUR) { PCACHE.clear(); pcZ = Z; pcCol = COLOUR; }
-  if (pcT !== S.t) { pcT = S.t; pcBudget = 10; }
+function pcGet(o, key, sx, sy, edge = 1) {   // edge: 1 the baked sprite outline, 2 the shape outline pass (built pieces), 0 none (floors, roofs)
+  if (pcCol !== COLOUR) { PCACHE.clear(); pcCol = COLOUR; }
+  cacheFrame();
   let e = PCACHE.get(o);
-  if (e && e.key === key) { PCACHE.delete(o); PCACHE.set(o, e); return e; }   // keep the most recent at the end
+  if (e && e.key === key && e.edge === edge && ((e.z === Z && e.d === DPR) || zMoving || pcBudget <= 0)) { PCACHE.delete(o); PCACHE.set(o, e); return e; }   // keep the most recent at the end   // v188: after a zoom it is stretched until it can be repainted, a few a frame, once the camera holds still
   if (pcBudget <= 0) return null;
   pcBudget--;
   const HW = 100 * Z, UP = 160 * Z, DN = 40 * Z, w = Math.ceil(2 * HW * DPR), h = Math.ceil((UP + DN) * DPR);
   if (PCV.width < w || PCV.height < h) { PCV.width = Math.max(PCV.width, w); PCV.height = Math.max(PCV.height, h); }
-  PCX.setTransform(1, 0, 0, 1, 0, 0); PCX.clearRect(0, 0, w, h);
+  PCX.setTransform(1, 0, 0, 1, 0, 0); PCX.clearRect(0, 0, PCV.width, PCV.height);
   PCX.setTransform(DPR, 0, 0, DPR, (HW - sx) * DPR, (UP - sy) * DPR); PCX.lineCap = 'butt'; PCX.lineJoin = 'miter';
-  drawPropFlat(o, PCX, false);
+  if (edge === 2) edgePass(PCX, cc => drawPropFlat(o, cc, false)); else drawPropFlat(o, PCX, false);
   const px = PCX.getImageData(0, 0, w, h).data;
   let x0 = w, y0 = h, x1 = -1, y1 = -1;
   for (let y = 0; y < h; y++) for (let x = 0, i = y * w * 4 + 3; x < w; x++, i += 4) if (px[i]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  if (x1 < 0) e = { key, cv: null };
+  if (x1 < 0) e = { key, edge, z: Z, d: DPR, cv: null };
   else {
-    const R = 0.9 * Z * DPR, p = Math.ceil(R) + 1, cw = x1 - x0 + 1 + 2 * p, ch = y1 - y0 + 1 + 2 * p, cv = document.createElement('canvas');
+    const R = 0.9 * Z * DPR, p = edge === 1 ? Math.ceil(R) + 1 : 0, cw = x1 - x0 + 1 + 2 * p, ch = y1 - y0 + 1 + 2 * p, cv = document.createElement('canvas');
     cv.width = cw; cv.height = ch; cv.getContext('2d').drawImage(PCV, x0, y0, x1 - x0 + 1, y1 - y0 + 1, p, p, x1 - x0 + 1, y1 - y0 + 1);
-    spriteEdge(cv, R);
-    e = { key, cv, ox: (x0 - p) / DPR - HW, oy: (y0 - p) / DPR - UP, w: cw / DPR, h: ch / DPR };
+    if (edge === 1) spriteEdge(cv, R, PCX.getImageData(x0 - p, y0 - p, cw, ch).data);   // v188: the outline reads the pixels where they were painted, never back off the graphics chip
+    e = { key, edge, z: Z, d: DPR, cv, ox: (x0 - p) / DPR - HW, oy: (y0 - p) / DPR - UP, w: cw / DPR, h: ch / DPR };
   }
   PCACHE.set(o, e);
   if (PCACHE.size > 600) PCACHE.delete(PCACHE.keys().next().value);
   return e;
 }
+function pcBlit(c, e, sx, sy) {                    // v188: a cached picture, stretched if the zoom has moved since it was painted
+  if (!e.cv) return;
+  const k = Z / e.z; c.drawImage(e.cv, sx + e.ox * k, sy + e.oy * k, e.w * k, e.h * k);
+}
 function propDraw(o, c, mask, maskCol) {   // v168: draw a prop with its dark outline
   if (mask) return drawPropFlat(o, c, mask, maskCol);
   const key = pcKey(o);
   if (key !== null) {
-    const [sx, sy] = toScreen(o.x, o.y), s = o.s * Z;
+    const [sx, sy] = toScreen(o.x, o.y), s = (o.s || 1) * Z;
     if (sx < -110 * s || sx > W + 110 * s || sy < -20 * s || sy - 200 * s > H) return;
-    const e = pcGet(o, key, sx, sy);
-    if (e) { if (e.cv) c.drawImage(e.cv, sx + e.ox, sy + e.oy, e.w, e.h); return; }
+    const e = pcGet(o, key, sx, sy, o.kind === 'dst' ? 2 : 1);
+    if (e) { pcBlit(c, e, sx, sy); return; }
     return drawPropFlat(o, c, mask, maskCol);
   }
   if (edgeWant(o)) return edgePass(c, cc => drawPropFlat(o, cc, mask, maskCol));
@@ -2189,13 +2197,14 @@ let LEAF_K = COLOUR ? LEAF_COL : LEAF_BW;                                  // ho
 const pineG = v => tint(1 - 0.16 * LEAF_K, 1 + 0.05 * LEAF_K, 1 - 0.1 * LEAF_K)(v);   // pine needles: a dark blue-green
 const oakG = v => tint(1 - 0.1 * LEAF_K, 1 + 0.06 * LEAF_K, 1 - 0.24 * LEAF_K)(v);    // oak and bush leaves: a soft olive
 function makeSprite(key, w, h, ax, ay, paint, post) { // w, h, ax, ay in world units; (ax, ay) is where it meets the ground
-  const cv = document.createElement('canvas'); cv.width = Math.ceil(w * SPR); cv.height = Math.ceil(h * SPR);
-  const g = cv.getContext('2d'); g.scale(SPR, SPR); g.translate(ax, ay); g.lineCap = 'round'; g.lineJoin = 'round';
-  paint(g); if (post) post(cv);
-  if (SPR_EDGE) spriteEdge(cv);   // v168
+  const pv = document.createElement('canvas'); pv.width = Math.ceil(w * SPR); pv.height = Math.ceil(h * SPR);   // v188: painted where reading its pixels back is cheap (the outline and the snow read them), not on the graphics chip, where every read stalled the frame
+  const g = pv.getContext('2d', { willReadFrequently: true }); g.scale(SPR, SPR); g.translate(ax, ay); g.lineCap = 'round'; g.lineJoin = 'round';
+  paint(g); if (post) post(pv);
+  if (SPR_EDGE) spriteEdge(pv);   // v168
+  const cv = document.createElement('canvas'); cv.width = pv.width; cv.height = pv.height; cv.getContext('2d').drawImage(pv, 0, 0);   // then copied once to an ordinary canvas to be stamped from
   const mk = document.createElement('canvas'); mk.width = cv.width; mk.height = cv.height;   // a solid silhouette of it, for cutting light
-  const m = mk.getContext('2d'); m.drawImage(cv, 0, 0); m.globalCompositeOperation = 'source-in'; m.fillStyle = '#000'; m.fillRect(0, 0, mk.width, mk.height);
-  return SPRITES[key] = { cv, mk, ax, ay, h };
+  const m = mk.getContext('2d'); m.drawImage(pv, 0, 0); m.globalCompositeOperation = 'source-in'; m.fillStyle = '#000'; m.fillRect(0, 0, mk.width, mk.height);
+  return SPRITES[key] = { cv, mk, ax, ay, h, s: SPR };
 }
 // bark: a tapered trunk with a root flare, streaked, the right side catching light
 function paintTrunk(g, R, base, top, wb, wt, tone, Ld) {
@@ -2635,8 +2644,10 @@ const SPRITE_KINDS = {                           // kind: [variants, w, h, ax, a
 };
 function sprite(kind, v, Ld = 1) {
   const want = Math.max(0.75, Math.min(3, Math.round(Z * DPR * 1.3 * 4) / 4));
-  if (want !== SPR) { SPR = want; SPRITES = {}; }   // zoom or quality changed: repaint at the new size
-  const key = kind + v + (Ld > 0 ? 'r' : 'l'); if (SPRITES[key]) return SPRITES[key];
+  SPR = want;   // zoom or quality changed: repaint at the new size
+  const key = kind + v + (Ld > 0 ? 'r' : 'l'), old = SPRITES[key];
+  if (old && (old.s === SPR || (cacheFrame(), zMoving || sprBudget <= 0))) return old;   // v188: not all at once, and not while the camera is still zooming: the old picture, stretched, stands in for a frame or two
+  if (old) sprBudget--;
   const [, w, h, ax, ay, paint, snow] = SPRITE_KINDS[kind];
   MATK = COLOUR ? KIND_MAT[kind] || null : null; SPR_EDGE = !NO_EDGE.has(kind);   // v168
   try { return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld), snow ? cv => snowify(cv, ax, Ld, snow) : null); } finally { MATK = null; SPR_EDGE = false; }
@@ -3311,8 +3322,8 @@ function withXf(c, a, cc, d, e, f, draw) {
 }
 function stamp(c, spr, sx, sy, s, flip, sway, mask) {  // draw a sprite with its foot at (sx, sy), leaning with the wind
   if (EDGE_PASSING) return;   // v168: sprites carry their own outline
-  const k = s / SPR;
-  withXf(c, flip * k, -sway / (spr.h * s) * k, k, sx, sy, () => c.drawImage(mask ? spr.mk : spr.cv, -spr.ax * SPR, -spr.ay * SPR));
+  const k = s / spr.s;   // v188: each sprite knows the scale it was painted at
+  withXf(c, flip * k, -sway / (spr.h * s) * k, k, sx, sy, () => c.drawImage(mask ? spr.mk : spr.cv, -spr.ax * spr.s, -spr.ay * spr.s));
 }
 function drawTree(o, c, mask, sx, sy, s) {
   const sway = Math.sin(S.t * 0.7 + o.seed * 20) * 1.6 * s + Math.sin(S.t * 1.9 + o.seed * 7) * 0.5 * s;
@@ -3383,11 +3394,11 @@ function decorInView(lights) {   // ground cover only shows where some light rea
   return out;
 }
 function drawDecor(o) {   // sets the transform directly (no save/restore): there are a lot of these each frame
-  const s = o.s * Z, spr = sprite(o.dk, o.v), k = s / SPR, f = o.seed > 0.5 ? k : -k;
+  const s = o.s * Z, spr = sprite(o.dk, o.v), k = s / spr.s, f = o.seed > 0.5 ? k : -k;
   const sh = o.dk === 'grass' || o.dk === 'fern' || o.dk === 'reeds' || o.dk === 'tuft' || o.dk === 'dGrass' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
   if (o.dk === 'bush' || o.dk === 'stump') shadow(o.sx, o.sy, 9 * s);
   const [l, hy] = lean(o.sx, o.sy);   // combined lean and wind sway, applied as one transform
-  withXf(ctx, f, sh * k - l * k, hy * k, o.sx, o.sy, () => ctx.drawImage(spr.cv, -spr.ax * SPR, -spr.ay * SPR));
+  withXf(ctx, f, sh * k - l * k, hy * k, o.sx, o.sy, () => ctx.drawImage(spr.cv, -spr.ax * spr.s, -spr.ay * spr.s));
 }
 
 // ---- torch shadows ----
@@ -9120,7 +9131,7 @@ const PIECES = [
   { id: 'flowers', cat: 'decor', sh: 'free', lay: 'free', k: 'flowers', m: 'stone', r: 6, H: 10, s: 'Flowers', n: 'Flower pot', b: 'Something living', cost: { stones: 2, berries: 1 }, hp: 4 },
   { id: 'firepit', cat: 'decor', sh: 'free', lay: 'flat', k: 'ring', m: 'stone', r: 16, s: 'Stone ring', n: 'Stone ring', b: 'A ring of stones · a place to gather', cost: { stones: 5 }, hp: 30 },
 ];
-const PC = id => PIECES.find(p => p.id === id) || PIECES[1];
+const PC_BY = new Map(PIECES.map(p => [p.id, p])), PC = id => PC_BY.get(id) || PIECES[1];   // v188: looked up many times a frame per piece
 const LEGACY_POS = sv => sv.s === undefined || sv.s < 0 ? { x: (sv.i + 0.5) * GRID, y: (sv.j + 0.5) * GRID, a: 0 }   // v152 saves sat on the old grid
   : sv.s ? { x: (sv.i + 0.5) * GRID, y: (sv.j + 1) * GRID, a: 0 } : { x: (sv.i + 1) * GRID, y: (sv.j + 0.5) * GRID, a: Math.PI / 2 };
 let stUid = 1;
@@ -9255,7 +9266,7 @@ function stPlace() {
   if (!stKnown(P)) return;
   if (why !== true) { dayNote('nost', why, 1.2); if (actx) noiseAt(actx.currentTime, 600, 300, 0.1, 0.25, sfxGain); return; }
   const o = { kind: 'dst', key: 'b' + (stUid++), id: P.id, k: P.k, x: sp.x, y: sp.y, a: sp.a, r: 10, need: Object.assign({}, P.cost), hp: P.hp, max: P.hp, done: false, open: 0, put: 0, seed: Math.random() * 9 };
-  D.bld.set(o.key, o);
+  D.bld.set(o.key, o); stGen++;
   dayAct(10, 0.45); ashBurst(sp.x, sp.y, 6, 6); o.dropT = S.t;
   exNote(`blueprint · ${P.n.toLowerCase()}`, true); dayNote('bphint', 'Use (E) on a blueprint to build it', 30);
   if (actx) { const t = actx.currentTime; noiseAt(t, 900, 400, 0.12, 0.25, sfxGain); if (sp.snap) setTimeout(() => sfx(2.4, 0.08, 'bandpass', 3200, 0.12), 40); }
@@ -9294,7 +9305,7 @@ function stFinish(o) {
   else exNote(`built · ${PC(o.id).n.toLowerCase()}`, true);
   if (actx) { const t = actx.currentTime; boomAt(t, 150, 70, 0.3, 0.5, sfxGain); setTimeout(() => sfx(1.6, 0.35, 'bandpass', 1600, 0.3), 90); }
 }
-function stGone(o) { const D = S.day; D.bld.delete(o.key); if (o.k === 'bed' && D.bed && Math.abs(D.bed.x - o.x) < 1 && Math.abs(D.bed.y - o.y) < 1) D.bed = null; for (const q of D.bld.values()) if (q.on === o.key) stGone(q); }
+function stGone(o) { const D = S.day; D.bld.delete(o.key); stGen++; if (o.k === 'bed' && D.bed && Math.abs(D.bed.x - o.x) < 1 && Math.abs(D.bed.y - o.y) < 1) D.bed = null; for (const q of D.bld.values()) if (q.on === o.key) stGone(q); }
 function stRemove(o) {                           // pull it down: half the materials come back (all of them from a blueprint)
   const P = PC(o.id);
   for (const [k, n] of Object.entries(P.cost)) { const back = o.done ? Math.floor(n / 2) : n - (o.need[k] || 0); if (back > 0) dayGive(k, back, o.x, o.y, true); }
@@ -9308,7 +9319,7 @@ function stMake(sv) {                            // a piece read back out of a s
   const pos = sv.x !== undefined ? sv : LEGACY_POS(sv);
   const o = { kind: 'dst', key: 'b' + (stUid++), id: sv.id, k: P.k, x: pos.x, y: pos.y, a: sv.a !== undefined ? sv.a : pos.a, r: 10,
     need: Object.assign({}, P.cost, sv.need || {}), hp: sv.hp !== undefined ? sv.hp : P.hp, max: P.hp, done: !!sv.done, open: 0, put: 0, seed: Math.random() * 9, rise: 1, fuel: sv.fuel };
-  S.day.bld.set(o.key, o);
+  S.day.bld.set(o.key, o); stGen++;
   if (o.done && o.k === 'bed') S.day.bed = { x: o.x, y: o.y };
   return o;
 }
@@ -9682,14 +9693,29 @@ function stDrawThing(o, c, P, T, rise, faceA, faceB) {   // posts, lights, furni
     case 'ring': for (let k = 0; k < 8; k++) { const t = k / 8 * TAU + o.seed, [x, y] = toScreen(o.x + Math.cos(t) * 14, o.y + Math.sin(t) * 14); c.fillStyle = k % 2 ? St[0] : St[1]; c.beginPath(); c.ellipse(x, y - 2 * Z, 4.2 * Z, 3 * Z, 0, 0, 7); c.fill(); } break;
   }
 }
+function stGlass(o, P) {                         // a tall piece between you and the camera
+  const tall = P.lay === 'edge' || P.lay === 'post' || (P.lay === 'free' && (P.H || 0) > 26);
+  return tall && o.y + o.x > S.p.y + S.p.x + 10 && Math.abs((o.x - o.y) - (S.p.x - S.p.y)) < 120 && (o.x + o.y) - (S.p.x + S.p.y) < 170 && stDistTo(o, S.p.x, S.p.y) < 110;
+}
+let stGen = 0;                                    // v188: goes up whenever a piece goes up or comes down (a roof's shape depends on its neighbours)
+function stPicKey(o) {                            // v188: a finished piece standing still is painted once and kept; null while it moves, glows, is hit or is see-through
+  if (!o.done || o.del || o.hp < o.max || o.hitT > 0 || (o.rise !== undefined && o.rise < 1)) return null;
+  if ((o.shakeT !== undefined && S.t - o.shakeT < 0.3) || (o.dropT !== undefined && S.t - o.dropT < 0.25)) return null;
+  const P = PC(o.id);
+  if (P.k === 'chimes' || P.k === 'banner' || ((P.k === 'door' || P.k === 'gate') && o.open) || stGlass(o, P)) return null;
+  return P.lay === 'roof' ? 'r' + stGen : P.k === 'lamp' || P.k === 'brazier' ? (o.lit ? 'L' : 'D') : 1;
+}
+function stDrawC(o, c, sx, sy) {                  // v188: a floor or roof from its kept picture when it can
+  const key = stPicKey(o), e = key !== null && c === ctx ? pcGet(o, key, sx, sy, 0) : null;
+  if (e) pcBlit(c, e, sx, sy); else stDraw(o, c, sx, sy, false);
+}
 function stDraw(o, c, sx, sy, ghost) {
   const P = PC(o.id), done = o.done, T = stTone(P.m).slice();
   const rise = done ? (o.rise === undefined ? 1 : 0.6 + 0.4 * o.rise) : 1;
   const hurt = o.hitT > 0 ? 0.5 : 0, sh = o.shakeT !== undefined && S.t - o.shakeT < 0.3 ? Math.sin((S.t - o.shakeT) * 60) * (1 - (S.t - o.shakeT) / 0.3) * 2.5 * Z : 0;
   const drop = o.dropT !== undefined && S.t - o.dropT < 0.25 ? (1 - (S.t - o.dropT) / 0.25) * 8 * Z : 0;   // a fresh blueprint drops into place
   c.save(); if (sh || drop) c.translate(sh, -drop);
-  const tall = P.lay === 'edge' || P.lay === 'post' || (P.lay === 'free' && (P.H || 0) > 26);
-  if (!ghost && tall && o.y + o.x > S.p.y + S.p.x + 10 && Math.abs((o.x - o.y) - (S.p.x - S.p.y)) < 120 && (o.x + o.y) - (S.p.x + S.p.y) < 170 && stDistTo(o, S.p.x, S.p.y) < 110) c.globalAlpha *= 0.4;   // a wall between you and the camera turns to glass, so you can see yourself indoors
+  if (!ghost && stGlass(o, P)) c.globalAlpha *= 0.4;   // a wall between you and the camera turns to glass, so you can see yourself indoors
   if (ghost) c.globalAlpha *= 0.5;
   else if (!done) { const f = 1 - stNeedLeft(o) / Object.values(P.cost).reduce((a, n) => a + n, 0); c.globalAlpha *= 0.5 + 0.4 * f;
     if (!o.put) { const t = `rgba(255,${200 + 15 * Math.sin(S.t * 3)},140,`; T[0] = t + '0.55)'; T[1] = t + '0.42)'; T[2] = t + '0.8)'; } }   // a bare blueprint glows like a plan; once wood goes in it shows its stuff
@@ -9722,7 +9748,7 @@ function stDraw(o, c, sx, sy, ghost) {
 function stDrawFlat() {                          // floors, rugs and traps go down first, under everything that stands on them
   const D = S.day; if (!D) return;
   const R = viewR() + 60, g = stGhost();
-  for (const o of D.bld.values()) { const P = PC(o.id); if (P.lay !== 'floor' && P.lay !== 'flat') continue; if (Math.abs(o.x - S.cam.x) > R || Math.abs(o.y - S.cam.y) > R) continue; o.del = D.bdel && stDelAim === o; const [sx, sy] = toScreen(o.x, o.y); stDraw(o, ctx, sx, sy, false); }
+  for (const o of D.bld.values()) { const P = PC(o.id); if (P.lay !== 'floor' && P.lay !== 'flat') continue; if (Math.abs(o.x - S.cam.x) > R || Math.abs(o.y - S.cam.y) > R) continue; o.del = D.bdel && stDelAim === o; const [sx, sy] = toScreen(o.x, o.y); stDrawC(o, ctx, sx, sy); }   // v188: kept as a picture
   if (g) { const P = PC(g.id); if (P.lay === 'floor' || P.lay === 'flat') { const [sx, sy] = toScreen(g.x, g.y); stDraw(g, ctx, sx, sy, true); } }
 }
 let stDelAim = null, stRoofFade = 0;
@@ -9733,7 +9759,7 @@ function stDrawRoofs() {                         // roofs go on last, over every
   for (const o of D.bld.values()) {
     const P = PC(o.id); if (P.lay !== 'roof') continue; if (Math.abs(o.x - S.cam.x) > R || Math.abs(o.y - S.cam.y) > R) continue;
     const near = Math.hypot(o.x - S.p.x, o.y - S.p.y) < 190;
-    ctx.save(); if (near) ctx.globalAlpha *= 1 - 0.9 * stRoofFade; o.del = D.bdel && stDelAim === o; const [sx, sy] = toScreen(o.x, o.y); stDraw(o, ctx, sx, sy, false); ctx.restore();
+    ctx.save(); const fade = near && stRoofFade > 0.0005; if (fade) ctx.globalAlpha *= 1 - 0.9 * stRoofFade; o.del = D.bdel && stDelAim === o; const [sx, sy] = toScreen(o.x, o.y); if (fade) stDraw(o, ctx, sx, sy, false); else stDrawC(o, ctx, sx, sy); ctx.restore();   // v188: kept as a picture unless it's fading over you
   }
   if (g && PC(g.id).lay === 'roof') { const [sx, sy] = toScreen(g.x, g.y); stDraw(g, ctx, sx, sy, true); }
 }
@@ -10468,8 +10494,8 @@ function drawSunShadows(items) {
     c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.lineTo(bx + Dx * h, by + Dy * h); c.lineTo(ax + Dx * h, ay + Dy * h); c.closePath(); c.fill();
   };
   const sil = (kind, v, sx, sy, s) => {          // the thing's own silhouette, laid over away from the sun
-    const spr = sprite(kind, v, 1), k = s / SPR;
-    c.setTransform(Px * k, Py * k, -Dx * k, -Dy * k, sx, sy); c.drawImage(spr.mk, -spr.ax * SPR, -spr.ay * SPR); c.setTransform(1, 0, 0, 1, 0, 0);   // v177: no save/restore
+    const spr = sprite(kind, v, 1), k = s / spr.s;
+    c.setTransform(Px * k, Py * k, -Dx * k, -Dy * k, sx, sy); c.drawImage(spr.mk, -spr.ax * spr.s, -spr.ay * spr.s); c.setTransform(1, 0, 0, 1, 0, 0);   // v177: no save/restore
   };
   const R = 260 * Z;
   for (const { o } of items) {
