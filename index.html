@@ -536,7 +536,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 175</p>
+      <p class="small" id="verLbl">Version 176</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -10368,11 +10368,20 @@ function padCands() {
   }
   return out;
 }
+const padSig = el => el.tagName + '|' + el.className.toString().replace(/\bpadfocus\b/, '').trim() + '|' + (el.textContent || '').trim().slice(0, 40) + '|' + ((el.parentElement && el.parentElement.querySelector('b') || {}).textContent || '') + '|' + [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name + '=' + a.value).join(',');
+function padRefind() {   // the highlighted button was redrawn: find its twin (same kind, words and data) nearest where it was, else the nearest button
+  const old = PAD.focus, sig = PAD.sig, fx = PAD.fx, fy = PAD.fy; PAD.focus = null;
+  const C = padCands(); if (!C.length) return;
+  const d = c => Math.hypot(c.x - fx, c.y - fy), same = C.filter(c => padSig(c.el) === sig);
+  const pick = (same.length ? same : C).reduce((a, b) => d(b) < d(a) ? b : a);
+  if (same.length || d(pick) < 120) padFocus(pick.el);
+}
 function padFocus(el) {
   if (PAD.focus === el) return;
   padBlur(); PAD.focus = el; el.classList.add('padfocus');
   try { el.focus({ preventScroll: true }); } catch (e) {}
   el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const r = el.getBoundingClientRect(); PAD.fx = r.left + r.width / 2; PAD.fy = r.top + r.height / 2; PAD.sig = padSig(el);
 }
 // v175 (Joe): with a pad in hand, the button to press shows beside whatever it would do, drawn as that pad's own button
 // (Xbox letters and colours, PlayStation shapes, Switch letters). b: standard-layout index, 0 bottom (attack), 2 left (use).
@@ -10413,6 +10422,7 @@ function padMove(dx, dy) {
   if (best) { padFocus(best.el); if (typeof playTick === 'function') playTick(); }
 }
 function padMenu(g, B, down) {
+  if (PAD.focus && !PAD.focus.isConnected) padRefind();   // v176 (Joe): a menu that redraws (Craft, Eat, Take) keeps your place
   if (PAD.focus && (!PAD.focus.isConnected || PAD.focus.closest('[hidden]'))) padBlur();
   let dx = 0, dy = 0;
   if (B[12]) dy = -1; else if (B[13]) dy = 1; else if (B[14]) dx = -1; else if (B[15]) dx = 1;
