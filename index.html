@@ -99,7 +99,8 @@ button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .fov output { color: var(--ash); text-align: right; font-variant-numeric: tabular-nums; }
 .audio { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
 .audio h2 { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash); font-weight: 600; }
-body.pad #craftBtn, body.pad #useBtn { display: none !important; }
+body.pad #craftBtn, body.pad #useBtn, body.pad #sneakBtn { display: none !important; }
+#sneakBtn[aria-pressed="true"] { background: rgba(239,239,234,0.88); color: #050505; }
 #padToast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -20px); z-index: 99; padding: 0.55rem 1rem; border-radius: 99px; background: rgba(10,10,10,0.88); border: 1px solid rgba(239,239,234,0.3); color: var(--bone); font: 600 0.72rem var(--mono); letter-spacing: 0.06em; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; }
 #padToast.on { opacity: 1; transform: translate(-50%, 0); }
 .padfocus { outline: 3px solid #ffcf8a !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(255,190,120,0.25), 0 0 18px rgba(255,190,120,0.35) !important; }
@@ -425,6 +426,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 <button id="flaskBtn" class="exuse" hidden>Flask</button>
 <button id="craftBtn" hidden>Pack</button>
 <button id="useBtn" class="exuse" hidden>Take</button>
+<button id="sneakBtn" class="exuse" hidden aria-pressed="false">Sneak</button>
 <div id="hotbar" hidden></div>
 <div id="buildbar" hidden></div>
 <button id="menu" hidden>Menu</button>
@@ -537,7 +539,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 177</p>
+      <p class="small" id="verLbl">Version 178</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1646,7 +1648,8 @@ function rollLand(p) {                           // you come up out of the roll 
 function dodge() {
   if (!S || !S.running || !isRg() || !S.rg || S.rg.phase !== 'fight' || S.rg.recall) return;
   const p = S.p; if ((p.roll || 0) > 0) return;
-  if (S.rg.drink) return;                        // v123: mid-drink you're committed
+  if (S.rg.drink) return;
+  if (S.day && S.day.crouch) dayCrouch(false);   // v178: a roll brings you up out of the crouch                        // v123: mid-drink you're committed
   if (p.atk && !p.atk.wd && ATK[p.atk.i].slam) { p.atk.rollQ = true; return; }   // v123: once you leap for the slam you land it; the roll comes out after
   let burn = false;
   if (S.day && !dayStam(STA_ROLL)) return;   // v128: Daylight rolls cost stamina, not charges
@@ -3522,6 +3525,7 @@ function drawPlayer() {                           // v143: hidden under the sand
   ctx.save(); ctx.globalAlpha *= v; drawPlayer0(); ctx.restore();
 }
 function drawPlayer0() {
+  const CRK = S.day && S.running ? S.day.crK || 0 : 0;   // v178: crouched low and leaning in
   const p = S.p, [bx, by0] = toScreen(p.x, p.y), by = by0 - (p.hopZ || 0) * Z;   // up off the ground mid-leap
   const RU = S.rollGU ?? rollU(), AIM = S.aimR ?? S.aim;   // v142: mid-roll (or an after-image of one)
   let RL = null;
@@ -3536,7 +3540,7 @@ function drawPlayer0() {
   // local frame: forward and right lie on the ground (squashed like the iso floor), height goes straight up
   const Fx = Math.cos(a), Fy = Math.sin(a),   // forward is not squashed, so strides match on-screen movement in every direction
     Rx = -Math.sin(a), Ry = Math.cos(a) * 0.5;
-  const P = (f, r, h) => { if (RL) { const dh = h - RL.hc, f2 = f * RL.c + dh * RL.s; h = RL.hc + dh * RL.c - f * RL.s + RL.lift; f = f2; } return [bx + (f * Fx + r * Rx) * Z, by + (f * Fy + r * Ry - h) * Z]; };   // v142: the roll turns every point over
+  const P = (f, r, h) => { if (RL) { const dh = h - RL.hc, f2 = f * RL.c + dh * RL.s; h = RL.hc + dh * RL.c - f * RL.s + RL.lift; f = f2; } if (CRK) { h *= 1 - 0.3 * CRK; f += h * 0.14 * CRK; } return [bx + (f * Fx + r * Rx) * Z, by + (f * Fy + r * Ry - h) * Z]; };   // v142: the roll turns every point over
   const rightNear = Ry > 0;                                     // is the right side toward the camera?
   const facingUs = Fy > 0.1;
 
@@ -7627,7 +7631,7 @@ function dayStam(cost) {                       // spend stamina, or say you're s
   if (D.st < cost) { dayNote('tired', 'too tired', 1.5); sfx(0.6, 0.25, 'lowpass', 300, 0.2); return false; }
   D.st -= cost; D.stT = 0; return true;
 }
-const dayMoveK = () => S.day && S.day.st < 15 ? 0.78 : 1;
+const dayMoveK = () => (S.day && S.day.st < 15 ? 0.78 : 1) * (S.day && S.day.crouch ? SNEAK_SPEED : 1);   // v178: crouched, you creep
 
 // ---- slots: { id, n } and, for things that wear, d (uses left); a waterskin keeps w (drinks in it) ----
 const invSize = (D = S.day) => BASE_SLOTS + (D.gear.back ? DIT[D.gear.back.id].bag : 0);
@@ -7729,6 +7733,7 @@ function dayCanUnbag(D) { return D.inv.slice(BASE_SLOTS).every(s => !s); }
 function dayStep(dt, inCamp) {
   const D = S.day, rg = S.rg, p = S.p;
   D.t += dt;
+  D.crK = (D.crK || 0) + ((D.crouch ? 1 : 0) - (D.crK || 0)) * Math.min(1, dt * 10);   // v178: ease down into the crouch and back up
   if ((D.saveT = (D.saveT || 0) + dt) > DAY_SAVE_T) { D.saveT = 0; daySave(); } D.sick = Math.max(0, D.sick - dt);
   const n = 1 + Math.floor(D.t / DAY_LEN);
   if (n > D.n) { D.n = n; rg.ringMsg = { text: `day ${n}`, sub: 'A new morning', t: 0 }; }
@@ -7932,7 +7937,7 @@ function dayNodesNear(x, y, R) {
 function dayHarvest(Dk, a, inReach, spark) {
   const D = S.day, p = S.p, A = p.atk, tool = dayTool(), T = heldIt(); let hits = 0;
   for (const b of D.beasts) if (!b.dead && !A.hit.has(b) && inReach(b, BEAST[b.k].w)) {
-    A.hit.add(b); hits++; b.hp -= Dk.dmg * dayK() * 1.4; b.flash = 1; spark(b, BEAST[b.k].h, 7);
+    A.hit.add(b); hits++; b.hp -= Dk.dmg * dayK() * 1.4 * sneakHit(b); b.flash = 1; spark(b, BEAST[b.k].h, 7);
     const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy) || 1; b.x += dx / d * Dk.knock * 0.5; b.y += dy / d * Dk.knock * 0.5;
     if (b.hp <= 0) beastDie(b); else beastScare(b);
   }
@@ -7985,6 +7990,31 @@ function dayFell(t) {                          // the tree goes over, away from 
 }
 // ---- animals: deer graze in herds and bolt, rabbits dart, boars charge back ----
 const BC = 900;
+// ---- v178 (Joe): crouch to sneak up on game. Crouched you creep at under half speed, and a grazing animal only notices you about
+// a third as far off (less again if you come at it from behind). Strike one that hasn't seen you and it's a sneak kill: deer and
+// rabbits drop in one blow, the fighters (boar, wolf, bear) take triple. Q or Ctrl, L3 on a pad, or the Sneak button; dodging stands you up.
+const SNEAK_SPEED = 0.45;
+function sneakHide(b, dx, dy) {                  // how much of its usual notice range is left: 1 standing, ~0.35 crouched, ~0.2 crouched behind it
+  if (!S.day || !S.day.crouch) return 1;
+  if (S.p.atk) return 0;                         // the strike itself is what gives you away, and by then it's too late
+  const facing = Math.abs(angDiff(b.dir || 0, Math.atan2(-dy, -dx)));   // 0: you're right in front of it
+  return (Math.hypot(S.p.vx, S.p.vy) > 10 ? 0.3 : 0.22) * (facing > 1.9 ? 0.55 : 1);
+}
+function sneakHit(b) {                           // an unaware animal, struck while you're crouched
+  if (!S.day || !S.day.crouch || b.st !== 'graze' || b.tame) return 1;
+  const B = BEAST[b.k], prey = !B.angry && !B.pack;
+  addShake(0.3); hitStop(0.09); padRumble(0.6, 160);
+  if (actx) { const t = actx.currentTime; boomAt(t, 120, 50, 0.18, 0.5, sfxGain); noiseAt(t, 2600, 600, 0.12, 0.35, sfxGain); }
+  exNote('sneak kill', true);
+  if (prey) { b.hp = Math.min(b.hp, 0.0001); return 1e6; }
+  return 3;
+}
+function dayCrouch(on) {
+  const D = S.day; if (!D || !S.running || !S.rg || S.rg.phase !== 'fight') return;
+  D.crouch = on ?? !D.crouch;
+  sneakBtn.setAttribute('aria-pressed', D.crouch ? 'true' : 'false');
+  sfx(D.crouch ? 1.2 : 1.6, 0.08, 'bandpass', 900, 0.1);
+}
 function beastStep(dt) {
   const D = S.day, p = S.p, Rr = viewR() + 300;
   for (let ci = Math.floor((p.x - Rr) / BC); ci <= Math.floor((p.x + Rr) / BC); ci++)
@@ -8009,7 +8039,7 @@ function beastStep(dt) {
     if (B.pack || b.tame) { wolfPack(b, dt, d, dx, dy); }
     else if (b.st === 'graze') {
       if (b.t <= 0) { b.t = 1.5 + Math.random() * 3; b.dir = Math.random() * 7; b.sp = Math.random() < 0.5 ? 0 : 18; }
-      if (d < B.scare * (Math.hypot(p.vx, p.vy) > 60 ? 1 : 0.6)) beastScare(b);
+      if (d < (S.day.crouch ? B.scare * sneakHide(b, dx, dy) : B.scare * (Math.hypot(p.vx, p.vy) > 60 ? 1 : 0.6))) beastScare(b);
     } else if (b.st === 'flee') {
       b.dir = Math.atan2(dy, dx) + (b.k === 'rabbit' ? Math.sin(D.t * 9 + b.ph) * 0.9 : 0);
       b.sp = B.sp * (b.t < 1.2 ? 0.55 : 1);       // they tire
@@ -8327,8 +8357,12 @@ function dayBar(px, py) {                      // stamina, food and water over y
   bar(x0, y0, tw / 2 - 1, D.food / FOOD_MAX, 'rgba(226,150,80,0.9)', D.food < 30);
   bar(x0 + tw / 2 + 1, y0, tw / 2 - 1, D.water / FOOD_MAX, 'rgba(110,170,230,0.9)', D.water < 30);
   if (D.warm < 92 || dayNight()) bar(x0, y0 + 6, tw, D.warm / WARM_MAX, 'rgba(150,200,215,0.9)', D.warm < 30);
-  const say = D.bleed > 0 ? 'BLEEDING' : D.warm <= 0 ? 'FREEZING' : D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.warm < 30 ? 'COLD' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : '';
+  const say = D.bleed > 0 ? 'BLEEDING' : D.warm <= 0 ? 'FREEZING' : D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.warm < 30 ? 'COLD' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : D.crouch ? 'SNEAKING' : '';
   drawPickHints(px, py);   // v156
+  if (D.crouch) for (const b of D.beasts) if (!b.dead && !b.tame && b.st === 'graze' && Math.hypot(b.x - S.p.x, b.y - S.p.y) < 44 + BEAST[b.k].w) {   // v178: one you could take unawares
+    const [x, y] = toScreen(b.x, b.y), tx = (PAD.on || COARSE() ? '' : 'CLICK · ') + 'SNEAK KILL', ty = y - (BEAST[b.k].h + 14) * Z;
+    dayTag(x, ty, tx, 'rgba(255,214,150,0.95)'); ctx.font = '600 10px "IBM Plex Mono", monospace'; padGlyph(0, x - (ctx.measureText(tx).width + 8) / 2 - 13, ty - 7); break;
+  }
   { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (PAD.on || COARSE() ? '' : 'E · ') + useLabel(o).toUpperCase() + (STN_N[o.t] ? ' ' + STN_N[o.t].toUpperCase() : o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : o === EX_FIRE ? ` · ${stPool().w} TO SPEND` : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); padGlyph(2, x - w / 2 - 13, y - 34 * Z - 7); } }
   { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
   if (say) { ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)'; ctx.fillText(say, px, y0 - 9); }
@@ -8457,7 +8491,8 @@ function renderHotbar() {
 }
 function dayChanged() { if (!S || !S.day) return; renderHotbar(); renderBuildBar(); if (!craftEl.hidden) renderPack(); }
 // ---- the pack screen: Pack (your slots, your gear, a chest or the box beside you) and Craft (the recipe book) ----
-const craftEl = document.getElementById('craft'), craftBtn = document.getElementById('craftBtn'), useBtn = document.getElementById('useBtn');
+const craftEl = document.getElementById('craft'), craftBtn = document.getElementById('craftBtn'), useBtn = document.getElementById('useBtn'), sneakBtn = document.getElementById('sneakBtn');
+sneakBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); dayCrouch(); });
 const PK = { tab: 'pack', sel: null, cat: null, open: null, cont: null, flash: null, at: 'hand', atLock: false };
 function openCraft(target) {
   const rg = S && S.rg; if (!S || !S.day || !rg || rg.phase !== 'fight' || !S.running) return;
@@ -10258,7 +10293,7 @@ function daySpearStep(dt) {
         if (actx) { const t = actx.currentTime; boomAt(t, 150, 50, 0.12, 0.5, sfxGain); noiseAt(t, 4200, 1400, 0.06, 0.3, sfxGain); }
       }
       for (const b of D.beasts) if (!b.dead && !q.hit.has(b) && Math.hypot(b.x - q.x, b.y - q.y) < BEAST[b.k].w + 6) {
-        q.hit.add(b); b.hp -= dmg * 1.4; b.flash = 1; if (b.hp <= 0) beastDie(b); else beastScare(b);
+        q.hit.add(b); b.hp -= dmg * 1.4 * sneakHit(b); b.flash = 1; if (b.hp <= 0) beastDie(b); else beastScare(b);
       }
       if (q.d >= q.max || wpSolidAt(q.x, q.y, 2)) q.done = true;
     }
@@ -10351,7 +10386,8 @@ function padPoll() {
   if (down(12)) padKey('h');                            // d-pad up: a flask
   if (down(13)) padKey('g');                            // d-pad down: the recall flare
   if (down(14)) padKey('t');                            // d-pad left: plant a lantern
-  if (down(15) || down(10)) toggleAutoRun();            // d-pad right or L3: auto run
+  if (down(15) || (down(10) && !S.day)) toggleAutoRun();   // d-pad right or L3: auto run
+  if (down(10) && S.day) dayCrouch();                   // v178: in Daylight L3 crouches
   if (down(11)) padKey('f');                            // R3: the torch switch (where there is one)
   if (down(8)) { if (S.day) openCraft(); else if (S.mode === 'expedition') padKey('e'); }   // View / Share: the pack
   if (down(9)) padKey('Escape');                        // Menu / Options: pause
@@ -11756,6 +11792,7 @@ function wpUi(force) {
 }
 wspecBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSpecial(); });
 wswapBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSwap(); });
+addEventListener('keydown', e => { if (!e.repeat && S && S.day && S.running && (e.key === 'q' || e.key === 'Q' || e.key === 'Control')) dayCrouch(); });   // v178: crouch
 addEventListener('keydown', e => {
   if (e.repeat || !(wpOn() || dArmOn()) || !S.running) return;
   const k = e.key.toLowerCase();
@@ -12175,7 +12212,7 @@ function exStep(dt) {
   if (inCamp !== rg.inCamp) { rg.inCamp = inCamp; inCamp ? exHome() : exLeave(); }
   if (!rg.beyond) lifeMax('far', Math.round(d0));
   tipStep(rg, inCamp, d0);
-  campBtn.hidden = !inCamp; if (campBtn.textContent !== (S.day ? 'Wisps' : 'Shop')) campBtn.textContent = S.day ? 'Wisps' : 'Shop'; craftBtn.hidden = !S.day; useBtn.hidden = !S.day || !dayUseTarget(); dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
+  campBtn.hidden = !inCamp; if (campBtn.textContent !== (S.day ? 'Wisps' : 'Shop')) campBtn.textContent = S.day ? 'Wisps' : 'Shop'; craftBtn.hidden = !S.day; useBtn.hidden = !S.day || !dayUseTarget(); sneakBtn.hidden = !S.day || inCamp; dodgeBtn.hidden = inCamp; attackBtn.hidden = false;   // the attack is always there
   recallBtn.hidden = inCamp || !XS.recall; lampBtn.hidden = inCamp || !XS.lanterns; flaskBtn.hidden = inCamp;
   rg.lamps = exPathLamps();
   if (rg.carryOrb && dist2(p, TELE) < 46) exDeposit();                       // the green shrine, out on the portal ring
@@ -16086,7 +16123,7 @@ function drawTitleEyes() {
 let last = performance.now();
 // ---- v145: phone held upright, the buttons lay themselves out: one main column up the right edge, a second column of
 // small ones just inside it, each stacked from whatever is showing right now so nothing ever lands on top of anything ----
-const BTN_A = ['attack', 'wspec', 'dodge', 'campBtn', 'craftBtn', 'autorun', 'torch'], BTN_B = ['wswap', 'flaskBtn', 'recallBtn', 'lampBtn', 'useBtn'];
+const BTN_A = ['attack', 'wspec', 'dodge', 'campBtn', 'craftBtn', 'autorun', 'torch'], BTN_B = ['wswap', 'flaskBtn', 'recallBtn', 'lampBtn', 'useBtn', 'sneakBtn'];
 let btnKey = '';
 const COARSE_MQ = matchMedia('(pointer: coarse)'); let coarseOn = COARSE_MQ.matches;   // v177: asked once, not several times a frame
 try { COARSE_MQ.addEventListener('change', e => { coarseOn = e.matches; }); } catch (e) {}
