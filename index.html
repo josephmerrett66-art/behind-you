@@ -569,7 +569,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 181</p>
+      <p class="small" id="verLbl">Version 182</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -4443,6 +4443,9 @@ const MUS = {"parts":["music/backing/0.mp3","music/backing/1.mp3","music/backing
 // ---- Dunes music (v147, Joe): his "jungle game" song plays the whole time you're in the Dunes, boss fights too, and crossfades back to
 // the backing track when you come home. 10 pieces of ~47 s, built the same way; the last piece's tail pads wrap round to the start so it loops.
 const DUNE_MUS = {"parts":["music/dunes/0.mp3","music/dunes/1.mp3","music/dunes/2.mp3","music/dunes/3.mp3","music/dunes/4.mp3","music/dunes/5.mp3","music/dunes/6.mp3","music/dunes/7.mp3","music/dunes/8.mp3","music/dunes/9.mp3"],"lens":[2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320],"P":11025};
+// v182 (Joe): his song "fresh start" is the Daylight song, on its own loop the whole run (9 pieces of ~47 s, built the same way;
+// the last 3 s fade out so the loop back to the quiet intro doesn't jump).
+const DAY_MUS = {"parts":["music/daylight/0.mp3","music/daylight/1.mp3","music/daylight/2.mp3","music/daylight/3.mp3","music/daylight/4.mp3","music/daylight/5.mp3","music/daylight/6.mp3","music/daylight/7.mp3","music/daylight/8.mp3"],"lens":[2090509,2090509,2090509,2090509,2090509,2090509,2090509,2090509,2090514],"P":11025};
 const MUS_PAD = MUS.P / 44100, MUS_XF = 0.012, MUS_FADE = 2.5;
 // v149 (Joe): five more of his songs, shuffled with backing track 2 everywhere except the Dunes (music/songs/). Each ends in 1.5 s of quiet.
 const SONGS = {"yeh":{"parts":["music/songs/yeh/0.mp3","music/songs/yeh/1.mp3","music/songs/yeh/2.mp3","music/songs/yeh/3.mp3"],"lens":[2040026,2040025,2040025,2040026],"P":11025},"quest":{"parts":["music/songs/quest/0.mp3","music/songs/quest/1.mp3","music/songs/quest/2.mp3","music/songs/quest/3.mp3","music/songs/quest/4.mp3"],"lens":[1997896,1997895,1997896,1997895,1997896],"P":11025},"just-wont-do":{"parts":["music/songs/just-wont-do/0.mp3","music/songs/just-wont-do/1.mp3","music/songs/just-wont-do/2.mp3","music/songs/just-wont-do/3.mp3","music/songs/just-wont-do/4.mp3"],"lens":[1967252,1967253,1967252,1967253,1967252],"P":11025},"untitled":{"parts":["music/songs/untitled/0.mp3","music/songs/untitled/1.mp3","music/songs/untitled/2.mp3","music/songs/untitled/3.mp3","music/songs/untitled/4.mp3"],"lens":[2130145,2130145,2130146,2130145,2130145],"P":11025},"crow-game-theme":{"parts":["music/songs/crow-game-theme/0.mp3","music/songs/crow-game-theme/1.mp3","music/songs/crow-game-theme/2.mp3","music/songs/crow-game-theme/3.mp3","music/songs/crow-game-theme/4.mp3","music/songs/crow-game-theme/5.mp3","music/songs/crow-game-theme/6.mp3","music/songs/crow-game-theme/7.mp3","music/songs/crow-game-theme/8.mp3","music/songs/crow-game-theme/9.mp3","music/songs/crow-game-theme/10.mp3","music/songs/crow-game-theme/11.mp3","music/songs/crow-game-theme/12.mp3","music/songs/crow-game-theme/13.mp3","music/songs/crow-game-theme/14.mp3","music/songs/crow-game-theme/15.mp3"],"lens":[2103438,2103439,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103439,2103438],"P":11025}};
@@ -4465,7 +4468,7 @@ function plShuffle() {                         // the playlist: every song once 
   for (const i of ord) { def.parts.push(...list[i].parts); def.lens.push(...list[i].lens); }
   return def;
 }
-const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop)
+const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS), mkTrack(DAY_MUS)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop), 2 fresh start (Daylight)
 TRACKS[0].shuffle = true;
 const mus = { gain: null, on: false, cur: 0 };
 function musLoad(url) {                        // v148: the music lives as separate files next to the game (the browser caches them)
@@ -4541,6 +4544,7 @@ function trTick(T) {
 function musWant() {                           // which track should be playing: the Dunes song from the moment you step into the desert portal
   try {
     if (!S || S.mode !== 'expedition' || !S.rg) return 0;
+    if (S.day) return 2;                         // v182: Daylight has its own song
     const w = S.rg.warp;
     if (w) return w.dir === 'out' ? 1 : 0;
     return S.rg.beyond && !S.rg.next ? 1 : 0;
@@ -4550,7 +4554,7 @@ function musicPlay() {
   if (!actx || mus.on) return;
   musSetup(); mus.on = true;
   mus.cur = musWant(); const T = TRACKS[mus.cur];
-  if (mus.cur === 1) T.pos = 0;
+  if (mus.cur) T.pos = 0;
   trPlay(T, 0.05);
   ambStart();
 }
@@ -4575,7 +4579,7 @@ function musTick() {
   if (want !== mus.cur) {                      // crossfade: the old one fades out and stops, the new one fades in
     const old = TRACKS[mus.cur], T = TRACKS[want];
     if (old.on) { trFade(old, 0, MUS_FADE); old.offAt = actx.currentTime + MUS_FADE + 0.1; }
-    if (want === 1 && !T.on) T.pos = 0;        // the Dunes song starts from the top each time you go in; the backing picks up where it left off
+    if (want && !T.on) T.pos = 0;        // the Dunes song starts from the top each time you go in; the backing picks up where it left off
     trPlay(T, MUS_FADE); mus.cur = want;
   }
   for (const T of TRACKS) trTick(T);
