@@ -516,6 +516,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <label class="fov"><span>Field of view</span><input id="fov" type="range" min="0.75" max="1.4" step="0.05"><output id="fovOut"></output></label>
     <div class="audio"><h2>Screen</h2>
       <button id="fsBtn" class="alt">Full screen: on</button>
+      <button id="fpsBtn" class="alt">Frame rate: hidden</button>
       <p class="small" id="fsTip">On: the game fills the whole screen when you start, hiding the browser's bars. Swiping down or pressing Esc gets them back.</p>
     </div>
     <div class="audio"><h2>Look</h2>
@@ -536,7 +537,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 176</p>
+      <p class="small" id="verLbl">Version 177</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -4026,8 +4027,10 @@ function drawFilm() {
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   // exposure flicker, like an uneven old projector
   film.flick += (Math.random() - 0.5) * 0.01; film.flick *= 0.85;
-  ctx.fillStyle = film.flick > 0 ? `rgba(255,255,250,${film.flick * 0.6})` : `rgba(0,0,0,${-film.flick * 1.5})`;
-  ctx.fillRect(0, 0, W, H);
+  if (film.flick * 0.6 > 0.5 / 255 || -film.flick * 1.5 > 0.5 / 255) {   // v177: most frames it's under half a shade, so it would change no pixel
+    ctx.fillStyle = film.flick > 0 ? `rgba(255,255,250,${film.flick * 0.6})` : `rgba(0,0,0,${-film.flick * 1.5})`;
+    ctx.fillRect(0, 0, W, H);
+  }
   ctx.drawImage(vig, 0, 0, W, H);
   // dust and hairs: one-frame specks
   if (Math.random() < 0.12) {
@@ -7671,7 +7674,7 @@ function daySee(id, quiet) {                   // the first time you hold someth
   if (!found.length) return;
   for (const r of found) { D.known.add(r.id); D.fresh.add(r.id); }
   if (quiet) return;
-  S.rg.ringMsg = { text: found.length > 1 ? `${found.length} new recipes` : 'new recipe', sub: found.slice(0, 3).map(recName).join(' · ') + (matchMedia('(pointer: coarse)').matches ? ' · open your Pack' : ' · press C'), t: 0 };
+  S.rg.ringMsg = { text: found.length > 1 ? `${found.length} new recipes` : 'new recipe', sub: found.slice(0, 3).map(recName).join(' · ') + (COARSE() ? ' · open your Pack' : ' · press C'), t: 0 };
   if (actx) { const t = actx.currentTime; boomAt(t, 520, 760, 0.18, 0.18, sfxGain); setTimeout(() => sfx(2.2, 0.25, 'bandpass', 2600, 0.3), 120); }
 }
 function dayGive(k, n, x, y, quiet, extra) {   // into the pack; what doesn't fit is left lying there
@@ -8326,7 +8329,7 @@ function dayBar(px, py) {                      // stamina, food and water over y
   if (D.warm < 92 || dayNight()) bar(x0, y0 + 6, tw, D.warm / WARM_MAX, 'rgba(150,200,215,0.9)', D.warm < 30);
   const say = D.bleed > 0 ? 'BLEEDING' : D.warm <= 0 ? 'FREEZING' : D.food <= 0 ? 'STARVING' : D.water <= 0 ? 'PARCHED' : D.warm < 30 ? 'COLD' : D.st < 15 ? 'TIRED' : D.food < 30 ? 'HUNGRY' : D.water < 30 ? 'THIRSTY' : D.sick > 0 ? 'SICK' : '';
   drawPickHints(px, py);   // v156
-  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (PAD.on || matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + useLabel(o).toUpperCase() + (STN_N[o.t] ? ' ' + STN_N[o.t].toUpperCase() : o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : o === EX_FIRE ? ` · ${stPool().w} TO SPEND` : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); padGlyph(2, x - w / 2 - 13, y - 34 * Z - 7); } }
+  { const o = dayUseTarget(); if (o) { const [x, y] = toScreen(o.x, o.y); ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; const tx = (PAD.on || COARSE() ? '' : 'E · ') + useLabel(o).toUpperCase() + (STN_N[o.t] ? ' ' + STN_N[o.t].toUpperCase() : o.kind === 'dday' ? ' ' + DIT[o.it].n.toUpperCase() : o.kind === 'dnode' ? ' ' + DIT[o.t === 'shroom' ? 'mushroom' : o.t].n.toUpperCase() : o === CAMP_BOX ? ' BOX' : o === EX_FIRE ? ` · ${stPool().w} TO SPEND` : ''); const w = ctx.measureText(tx).width + 8; ctx.fillRect(x - w / 2, y - 34 * Z - 14, w, 14); ctx.fillStyle = 'rgba(239,239,234,0.92)'; ctx.fillText(tx, x, y - 34 * Z - 2); padGlyph(2, x - w / 2 - 13, y - 34 * Z - 7); } }
   { const s = heldSlot(); if (s && s.d !== undefined) { const f = s.d / DIT[s.id].dur; if (f < 0.25) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 1, y0 + 12, tw + 2, 4); ctx.fillStyle = `rgba(226,120,60,${0.6 + 0.4 * Math.sin(S.t * 8)})`; ctx.fillRect(x0, y0 + 13, tw * f, 2); } } }   // a tool about to break: its wear shows under your bars
   if (say) { ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = 'rgba(239,239,234,0.85)'; ctx.fillText(say, px, y0 - 9); }
 }
@@ -9715,7 +9718,7 @@ function drawPickHints(px, py) {
   }
   if (!tgt) {                                    // nothing to take: name the grass or bush a swing would gather from
     const h = dayHitTarget();
-    if (h) { const [x, y] = toScreen(h.x, h.y); dayTag(x, y - 20 * Z, (PAD.on || matchMedia('(pointer: coarse)').matches ? '' : 'CLICK · ') + 'HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES'), 'rgba(200,235,180,0.92)'); if (PAD.on) { ctx.font = '600 10px "IBM Plex Mono", monospace'; padGlyph(0, x - (ctx.measureText('HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES')).width + 8) / 2 - 13, y - 20 * Z - 7); } }
+    if (h) { const [x, y] = toScreen(h.x, h.y); dayTag(x, y - 20 * Z, (PAD.on || COARSE() ? '' : 'CLICK · ') + 'HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES'), 'rgba(200,235,180,0.92)'); if (PAD.on) { ctx.font = '600 10px "IBM Plex Mono", monospace'; padGlyph(0, x - (ctx.measureText('HIT FOR ' + (h.t === 'grass' ? 'FIBRE' : 'BERRIES')).width + 8) / 2 - 13, y - 20 * Z - 7); } }
   }
   drawPickGuide(px, py);
 }
@@ -9770,7 +9773,7 @@ function drawSunShadows(items) {
   };
   const sil = (kind, v, sx, sy, s) => {          // the thing's own silhouette, laid over away from the sun
     const spr = sprite(kind, v, 1), k = s / SPR;
-    c.save(); c.transform(Px * k, Py * k, -Dx * k, -Dy * k, sx, sy); c.drawImage(spr.mk, -spr.ax * SPR, -spr.ay * SPR); c.restore();
+    c.setTransform(Px * k, Py * k, -Dx * k, -Dy * k, sx, sy); c.drawImage(spr.mk, -spr.ax * SPR, -spr.ay * SPR); c.setTransform(1, 0, 0, 1, 0, 0);   // v177: no save/restore
   };
   const R = 260 * Z;
   for (const { o } of items) {
@@ -15559,7 +15562,7 @@ function drawExFx() {
   } else if (S.running) {
     ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = `rgba(239,239,234,${0.55 + 0.15 * Math.sin(S.t * 2.5)})`;
-    ctx.fillText(PAD.on ? 'SHOP' : matchMedia('(pointer: coarse)').matches ? 'TAP SHOP TO SPEND' : 'E · SHOP', px, py - 50 * Z - 4);
+    ctx.fillText(PAD.on ? 'SHOP' : COARSE() ? 'TAP SHOP TO SPEND' : 'E · SHOP', px, py - 50 * Z - 4);
     if (PAD.on) padGlyph(2, px - ctx.measureText('SHOP').width / 2 - 15, py - 50 * Z - 4);
   }
   // notes rising over your head: loot taken, embers banked, pack full
@@ -16085,6 +16088,10 @@ let last = performance.now();
 // small ones just inside it, each stacked from whatever is showing right now so nothing ever lands on top of anything ----
 const BTN_A = ['attack', 'wspec', 'dodge', 'campBtn', 'craftBtn', 'autorun', 'torch'], BTN_B = ['wswap', 'flaskBtn', 'recallBtn', 'lampBtn', 'useBtn'];
 let btnKey = '';
+const COARSE_MQ = matchMedia('(pointer: coarse)'); let coarseOn = COARSE_MQ.matches;   // v177: asked once, not several times a frame
+try { COARSE_MQ.addEventListener('change', e => { coarseOn = e.matches; }); } catch (e) {}
+function COARSE() { return coarseOn; }
+let btnTick = 0;
 function layoutBtns() {
   const portrait = innerHeight > 520, els = id => document.getElementById(id);
   const shown = id => { const e = els(id); return e && !e.hidden && getComputedStyle(e).display !== 'none' ? e : null; };
@@ -16102,8 +16109,23 @@ function layoutBtns() {
   for (const [e, yy] of colA) { e.style.bottom = `calc(${yy + ring(e)}px${safe}`; e.style.right = `${Math.round(54 - (e.offsetWidth || 64) / 2)}px`; }
 }
 addEventListener('resize', () => { btnKey = ''; });
+// v177: Settings > Screen > Frame rate shows frames per second at the top of the screen, averaged over half a second
+const FPS = { on: false, n: 0, t: 0, v: 0 };
+try { FPS.on = localStorage.getItem('behind-you-fps') === 'on'; } catch (e) {}
+function fpsSync() { const b = document.getElementById('fpsBtn'); if (b) { b.textContent = 'Frame rate: ' + (FPS.on ? 'shown' : 'hidden'); b.setAttribute('aria-pressed', FPS.on ? 'true' : 'false'); } }
+document.getElementById('fpsBtn').addEventListener('click', () => { FPS.on = !FPS.on; try { localStorage.setItem('behind-you-fps', FPS.on ? 'on' : 'off'); } catch (e) {} fpsSync(); });
+fpsSync();
+function fpsDraw(raw) {
+  FPS.n++; FPS.t += raw; if (FPS.t >= 0.5) { FPS.v = FPS.n / FPS.t; FPS.n = 0; FPS.t = 0; }
+  if (!FPS.on || !FPS.v) return;
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const tx = Math.round(FPS.v) + ' FPS', w = ctx.measureText(tx).width + 10;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(W / 2 - w / 2, SAFE_TOP + 4, w, 16);
+  ctx.fillStyle = FPS.v >= 55 ? 'rgba(170,230,140,0.95)' : FPS.v >= 40 ? 'rgba(240,210,120,0.95)' : 'rgba(240,120,100,0.95)'; ctx.fillText(tx, W / 2, SAFE_TOP + 6);
+  ctx.restore();
+}
 function frame(now) {
-  layoutBtns();   // v145
+  if (btnKey === '' || ++btnTick % 3 === 0) layoutBtns();   // v145; v177: every third frame, it reads the buttons' styles
   padPoll();   // v172: a controller
   const raw = Math.max(0, (now - last) / 1000);   // v111: rAF's stamp can come before a resume's performance.now(); a negative step once froze the game
   const dt = Math.min(0.05, raw); last = now; frameDt = dt;
@@ -16117,6 +16139,7 @@ function frame(now) {
   hotbarEl.hidden = !(S && S.day && S.running && S.rg && S.rg.phase === 'fight');   // v131: the hotbar only while you play
   buildbarEl.hidden = hotbarEl.hidden || !(S.day && dayTool() === 'build') || !craftEl.hidden;   // v152: the pieces, only with the hammer in hand
   if (titleLive()) drawTitleEyes();
+  fpsDraw(raw);
   requestAnimationFrame(frame);
 }
 reset(); S.running = false; showPanel(null);
