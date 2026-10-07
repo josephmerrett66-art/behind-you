@@ -597,7 +597,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 201</p>
+      <p class="small" id="verLbl">Version 202</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -701,7 +701,8 @@ let COLOUR = true; try { COLOUR = localStorage.getItem('behind-you-colour') !== 
 try { const f = parseFloat(localStorage.getItem('behind-you-fov')); if (f >= 0.75 && f <= 1.4) FOV = f; } catch (e) {}
 const ZOOM = () => 1 / FOV; // camera zoom: bigger is closer
 let camZv = 1;                 // extra zoom for a framed boss arena (1 = normal)
-const CAMZ = () => camZv;
+let jfZoom = 0;   // v202: the camera leans in for the last kill
+const CAMZ = () => camZv * (1 + jfZoom);
 // big laptop screens have 4x the pixels of a phone; past about 1080p the extra sharpness costs smoothness,
 // so the canvas renders at most this many pixels and the browser scales it up
 const PIXEL_BUDGET = 2.2e6;
@@ -1069,13 +1070,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   fsSync();
 });
-let actx = null, stepBuf = null, sfxGain = null, noiseBuf = null;
+let actx = null, stepBuf = null, sfxGain = null, noiseBuf = null, OUT = null;   // v202: OUT, a low-pass over everything, for one-heart muffling
 function initAudio() {
   if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   actx = new AC();
-  sfxGain = actx.createGain(); sfxGain.gain.value = soundOn ? volK('sfx') : 0; sfxGain.connect(actx.destination);
+  OUT = actx.createBiquadFilter(); OUT.type = 'lowpass'; OUT.frequency.value = 20000; OUT.Q.value = 0.5; OUT.connect(actx.destination);
+  sfxGain = actx.createGain(); sfxGain.gain.value = soundOn ? volK('sfx') : 0; sfxGain.connect(OUT);
   decodeWav(STEP_WAV, b => { stepBuf = b; });
   for (const k in MON_WAV) decodeWav(MON_WAV[k], b => { mon[k] = b; });
   noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
@@ -1556,9 +1558,9 @@ function drawQuarry(q, c = ctx, red = false, opt = null) {
   if (q.state === 'gone') alpha = 0;
   if (alpha <= 0) return;
   const [bx0, by] = toScreen(q.x, q.y), a = q.dir, ph = q.phase;
-  const Zs = Z * (opt ? opt.scale : 1), bx = bx0 + (opt ? opt.jx : 0), pal = opt && opt.pal;
+  const Zs = Z * (opt ? opt.scale : 1), bx = bx0 + (opt ? opt.jx : 0), pal = opt && opt.pal, sq = opt && opt.sq || 0, sqW = 1 + sq * 0.7, sqH = 1 - sq;   // v202: sq, squashed by a hit
   const Fx = Math.cos(a), Fy = Math.sin(a), Rx = -Math.sin(a), Ry = Math.cos(a) * 0.5;
-  const P = (f, r, h) => [bx + (f * Fx + r * Rx) * Zs, by + (f * Fy + r * Ry - h) * Zs];
+  const P = (f, r, h) => [bx + (f * Fx + r * Rx) * Zs * sqW, by + ((f * Fy + r * Ry) * sqW - h * sqH) * Zs];
   const rightNear = Ry > 0, facingUs = Fy > 0.1;
   const pain = opt ? opt.pain || 0 : 0, reach = opt ? opt.reach || 0 : 0, kneel = opt ? opt.kneel || 0 : 0;
   const now = performance.now() / 1000, thr = pain * (Math.sin(now * 31 + ph * 7) + 0.6 * Math.sin(now * 53 + ph * 3));   // thrashing in the light
@@ -1708,7 +1710,7 @@ function rollBeam() {                            // where the tumbling torch's l
 }
 function rollLand(p) {                           // you come up out of the roll in a scuff of dust
   if (S.rg && S.rg.ash) for (let i = 0; i < 8; i++) { const a = p.rollA + (Math.random() - 0.5) * 2.4, v = 25 + Math.random() * 50; S.rg.ash.push({ x: p.x, y: p.y, z: 1, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 10 + Math.random() * 25, life: 0.35 + Math.random() * 0.25 }); }
-  addShake(0.07);
+  addShake(0.07); jfSquash(0.16); jfDust(p.x, p.y, 8, Math.cos(p.rollA), Math.sin(p.rollA), 50, 0.3, true);   // v202
   if (actx && noiseBuf) noiseAt(actx.currentTime, 420, 110, 0.14, 0.32, sfxGain);
 }
 function dodge() {
@@ -1931,6 +1933,7 @@ function update(dt) {
   S.t += dt;
   const p = S.p;
   const [mx, my, speed] = moveInput();
+  jfSkid(p, mx * speed, my * speed, dt);   // v202
   const k = 1 - Math.exp(-ACCEL * dt);
   p.vx += (mx * speed - p.vx) * k; p.vy += (my * speed - p.vy) * k;
   if (p.rollCool > 0) { p.rollCool -= dt; if (p.rollCool <= 0) dodgeBtn.dataset.cool = '0'; }
@@ -1991,7 +1994,7 @@ function update(dt) {
   const landed = v > 8 && Math.floor((p.phase - Math.PI / 2) / Math.PI) > before;
   if (landed) {
     p.side *= -1;
-    playStep(v > WALK + 20, p.side);
+    playStep(v > WALK + 20, p.side); jfStep(p);   // v202: dust
     const wv = Math.hypot(p.vx, p.vy) || 1, nx = -p.vy / wv, ny = p.vx / wv;
     p.prints.push({ x: p.x + nx * 4 * p.side, y: p.y + ny * 4 * p.side, a: Math.atan2(p.vy, p.vx), age: 0 });
   }
@@ -3078,6 +3081,7 @@ function breathStep(dt) {
   const k = breathCold(), moving = Math.hypot(p.vx || 0, p.vy || 0) > WALK * 0.3, busy = p.atk || rollU() >= 0;
   const ph0 = BR.ph; BR.ph = (S.t * 1.8) % (Math.PI * 2);
   BR.idle = moving || busy ? 0 : BR.idle + dt;
+  jfIdle(dt);   // v202
   if (k > 0) {
     if (!moving && !busy) { if (ph0 < 2.1 && BR.ph >= 2.1 && Math.random() < 0.85) breathPuff(k, true); }   // the chest falls: breathe out
     else if (moving && (BR.runT -= dt) <= 0) { BR.runT = 0.55 + Math.random() * 0.35; breathPuff(k, false); }
@@ -3101,6 +3105,177 @@ function drawBreath() {
   }
   ctx.restore();
 }
+// v202 (Joe: juice pass) ---- the little things that make it feel alive ----
+// dust kicked up by your boots (earth, sand or snow), a skid when you stop dead or cut back hard, grass and ferns that bend away as
+// you push through and spring back, a slow beat on the last kill of a wave or a boss, squash and stretch on landings and hits, one-heart
+// danger (muffled sound, the edges closing in with your heartbeat, a limp), smoke off fires, and pickups that swoop into you.
+const JF = { dust: [], spr: {}, skT: 0, slow: null, lowK: 0, beatT: 0, pulse: 0, lpF: 20000, sqA: 0, sqT: 9, hz: 0, gl: null, glT: 6, hb: null, hbT: 5, fly: [], pops: [], smoke: [], pp: null, svx: 0, svy: 0 };
+const smooth01 = x => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+function jfGround() { if (inNext()) return '240,244,250'; if (inBeyond()) return '236,218,182'; return S.day ? '226,214,190' : '206,192,168'; }
+function jfSpr(c) {                               // a soft round puff in one colour, drawn once
+  if (JF.spr[c]) return JF.spr[c];
+  const cv = document.createElement('canvas'); cv.width = cv.height = 48; const g = cv.getContext('2d'), gr = g.createRadialGradient(24, 24, 0, 24, 24, 24);
+  gr.addColorStop(0, `rgba(${c},1)`); gr.addColorStop(0.5, `rgba(${c},0.5)`); gr.addColorStop(1, `rgba(${c},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 48, 48); return (JF.spr[c] = cv);
+}
+function jfDust(x, y, n, dx, dy, sp, a, big, ring) {   // dx,dy: the way it's thrown; ring: all the way round
+  const c = jfGround(), soft = inBeyond() ? 1.4 : 1;    // sand and snow throw up more
+  if (LOWFX) n = Math.ceil(n / 2);
+  for (let i = 0; i < n; i++) {
+    const s = sp * (0.5 + Math.random() * 0.7), r = ring ? i / n * Math.PI * 2 + Math.random() * 0.4 : (Math.random() - 0.5) * 1.6, ca = Math.cos(r), sa = Math.sin(r);
+    const ux = ring ? ca : dx * ca - dy * sa, uy = ring ? sa : dy * ca + dx * sa;
+    JF.dust.push({ x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, z: 0.5 + Math.random() * 1.5, vx: ux * s, vy: uy * s, vz: 5 + Math.random() * 9 * soft,
+      r: (big ? 3 : 2) + Math.random(), gr: (big ? 15 : 8) * soft, t: 0, life: (big ? 0.85 : 0.55) + Math.random() * 0.3, a: a * Math.min(1.3, soft), c });
+  }
+  if (JF.dust.length > 100) JF.dust.splice(0, JF.dust.length - 100);
+}
+function jfStep(p) {                              // a foot comes down: a little scuff of dust behind it
+  if ((p.hopZ || 0) > 0 || (S.day && S.day.crK > 0.3)) return;   // sneaking leaves nothing
+  const sp = Math.hypot(p.vx, p.vy) || 1, fx = p.vx / sp, fy = p.vy / sp;
+  jfDust(p.x - fy * 3 * p.side, p.y + fx * 3 * p.side, 2, -fx, -fy, 16, 0.26);
+}
+function jfSkid(p, wx, wy, dt) {                  // wx,wy: where you're asking to go; stop dead or cut back hard and the boots dig in
+  JF.skT -= dt;
+  const sp = Math.hypot(p.vx, p.vy);
+  if (JF.skT > 0 || sp < RUN * 0.7 || p.roll > 0 || p.atk || (p.hopZ || 0) > 0) return;
+  const want = Math.hypot(wx, wy), stop = want < 5, cut = !stop && Math.hypot(wx - p.vx, wy - p.vy) > sp * 1.3;
+  if (!stop && !cut) return;
+  JF.skT = 0.45;
+  const fx = p.vx / sp, fy = p.vy / sp;
+  jfDust(p.x + fx * 3, p.y + fy * 3, 8, fx, fy, 60, 0.42, true);
+  if (actx && noiseBuf) noiseAt(actx.currentTime, inBeyond() ? 2600 : 1700, 500, 0.16, 0.1, sfxGain);
+}
+function jfSquash(k) { if (Math.abs(k) >= Math.abs(jfSq()) * 0.8) { JF.sqA = k; JF.sqT = 0; } }   // + squash, - stretch; a bounce that settles
+function jfSq() { return JF.sqT > 0.6 ? 0 : JF.sqA * Math.exp(-JF.sqT * 9) * Math.cos(JF.sqT * 22); }
+function foeSq(e) { const u = S.t - (e.kHitT ?? -9); return u >= 0 && u < 0.4 ? 0.2 * Math.exp(-u * 10) * Math.cos(u * 26) : 0; }   // struck: it squashes and pops back
+function jfSlow(big) {                            // the last one falls: time drags for a beat, the camera leans in, a white flash
+  JF.slow = { t: 0, f: 0, big: big ? 1 : 0.7 };
+  if (actx) { const t = actx.currentTime; boomAt(t, 64, 28, 1.3, 0.55 * JF.slow.big, sfxGain); noiseAt(t, 900, 120, 1.1, 0.12, sfxGain); }
+}
+function jfTimeK() { const s = JF.slow; if (!s) return 1; return s.t < 0.4 ? 0.22 : 0.22 + 0.78 * smooth01((s.t - 0.4) / 0.45); }
+function jfLow() { const rg = S.rg; return !!(S.running && isRg() && rg && rg.phase === 'fight' && rg.hp > 0 && rg.hp <= 1 && (rg.maxHp || 3) > 1); }
+function jfTick(raw) {                            // once a frame, in real time; returns how fast the game should run
+  const s = JF.slow;
+  if (s) { s.f += raw; if (!(S.hitstop > 0)) s.t += raw; if (s.t > 0.85) JF.slow = null; }
+  jfZoom = s ? 0.075 * s.big * Math.sin(Math.PI * Math.min(1, s.t / 0.85)) : 0;
+  const run = S && S.running;
+  if (S && S.p) JF.svx += (((S.p.vx || 0) - (S.p.vy || 0)) - JF.svx) * (1 - Math.exp(-8 * raw));   // how fast you cross the screen, for the torch flame
+  JF.lowK = Math.max(0, Math.min(1, JF.lowK + (jfLow() ? raw * 1.5 : -raw * 2)));
+  JF.pulse = Math.max(0, JF.pulse - raw * 2.4);
+  if (run && JF.lowK > 0.5 && (JF.beatT -= raw) <= 0) { JF.beatT = 0.92; JF.pulse = 1; if (!(S.rg.beatFx > 0.1)) playHeartbeat(0.3); }
+  if (run && S.p) {
+    const p = S.p, hz = p.hopZ || 0;
+    if (JF.hz > 3 && hz <= 0.01) { jfSquash(0.24); jfDust(p.x, p.y, 12, 0, 0, 55, 0.32, true, true); }   // down from a leap
+    JF.hz = hz;
+    JF.sqT += raw * jfTimeK();
+  }
+  if (OUT && actx) {                              // one heart: the world goes muffled; the slow beat dulls it too
+    const f = Math.min(20000 * Math.pow(900 / 20000, JF.lowK * 0.95), s ? 1400 + 18600 * smooth01((s.t - 0.3) / 0.55) : 20000);
+    if (Math.abs(Math.log(f / JF.lpF)) > 0.03) { JF.lpF = f; OUT.frequency.setTargetAtTime(f, actx.currentTime, 0.05); }
+  }
+  return run ? jfTimeK() : 1;
+}
+function jfScreen() {                             // over the world, under the HUD: the danger edges and the flash
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (JF.lowK > 0.01) {
+    const k = JF.lowK * (0.7 + 0.3 * JF.pulse), g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * (0.4 - 0.07 * JF.pulse), W / 2, H / 2, Math.hypot(W, H) / 2);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.55, `rgba(24,0,0,${0.4 * k})`); g.addColorStop(1, `rgba(8,0,0,${0.85 * k})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  const s = JF.slow;
+  if (s && s.f < 0.3) { ctx.fillStyle = `rgba(255,251,240,${0.42 * s.big * Math.pow(1 - s.f / 0.3, 2)})`; ctx.fillRect(0, 0, W, H); }
+}
+function jfDrawDust() {                           // after the dark, so it shows round you; it thins away from you
+  const dt = frameDt, p = S.p; if (!p || !JF.dust.length) return;
+  for (const b of JF.dust) { b.t += dt; const d = Math.exp(-5 * dt); b.vx *= d; b.vy *= d; b.vz *= Math.exp(-2 * dt); b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt; b.r += b.gr * dt * Math.max(0.2, 1 - b.t / b.life); }
+  JF.dust = JF.dust.filter(b => b.t < b.life);
+  ctx.save();
+  for (const b of JF.dust) {
+    const u = b.t / b.life, near = Math.max(0, Math.min(1, (130 - Math.hypot(b.x - p.x, b.y - p.y)) / 60)), al = b.a * near * Math.min(1, u * 8) * (1 - u) * (1 - u);
+    if (al < 0.01) continue;
+    const [x, y] = toScreen(b.x, b.y), r = b.r * Z * 2;
+    ctx.globalAlpha = al; ctx.drawImage(jfSpr(b.c), x - r, y - b.z * Z - r * 0.8, r * 2, r * 1.6);
+  }
+  ctx.restore();
+}
+function jfFires(lights) {                        // smoke curling off every fire; run past one and it throws up sparks
+  const dt = frameDt, p = S.p, mv = Math.hypot(p.vx || 0, p.vy || 0);
+  const list = lights.filter(L => L.kind === 'fire');
+  if (S.day) for (const B of S.day.builds) if (B.t === 'fire' && Math.abs(B.x - S.cam.x) < 900 && Math.abs(B.y - S.cam.y) < 900) list.push(B);
+  for (const L of list) {
+    if (Math.random() < dt * (LOWFX ? 1.4 : 2.6) && JF.smoke.length < 70)
+      JF.smoke.push({ x: L.x + (Math.random() - 0.5) * 6, y: L.y + (Math.random() - 0.5) * 6, z: 20, vz: 15 + Math.random() * 8, t: 0, life: 3.2 + Math.random() * 1.6, r: 3 + Math.random() * 2, ph: Math.random() * 9 });
+    const d = Math.hypot(L.x - p.x, L.y - p.y);
+    if (d < 55 && mv > 30 && Math.random() < dt * 28 && AIR.sparks.length < 130) {
+      const ax = (L.x - p.x) / (d || 1), ay = (L.y - p.y) / (d || 1);
+      AIR.sparks.push({ x: L.x + (Math.random() - 0.5) * 6, y: L.y + (Math.random() - 0.5) * 6, z: 8 + Math.random() * 6, vz: 60 + Math.random() * 80, vx: ax * 25 + (p.vx || 0) * 0.35 + (Math.random() - 0.5) * 30, vy: ay * 25 + (p.vy || 0) * 0.35 + (Math.random() - 0.5) * 30, t: 0, life: 0.6 + Math.random() * 0.9, ph: Math.random() * 9 });
+      if (Math.random() < 0.15 && actx && noiseBuf) noiseAt(actx.currentTime, 6000, 2600, 0.035, 0.05, sfxGain);   // a crackle
+    }
+  }
+  for (const m of JF.smoke) { m.t += dt; m.z += m.vz * dt; m.vz *= Math.exp(-0.25 * dt); m.x += (5 + Math.sin(m.ph + m.t * 1.3) * 9) * dt; m.y += (Math.cos(m.ph * 1.7 + m.t * 1.1) * 6 - 2) * dt; m.r += 5.5 * dt; }
+  JF.smoke = JF.smoke.filter(m => m.t < m.life);
+}
+function jfDrawSmoke() {                          // under the dark: you see it where the fire lights it, and it rises out of the light
+  if (!JF.smoke.length) return;
+  const spr = jfSpr(inNext() ? '150,152,158' : '128,122,116');
+  ctx.save();
+  for (const m of JF.smoke) {
+    const u = m.t / m.life, al = 0.2 * Math.min(1, u * 5) * (1 - u); if (al < 0.01) continue;
+    const [x, y] = toScreen(m.x, m.y), r = m.r * Z * 2;
+    ctx.globalAlpha = al; ctx.drawImage(spr, x - r, y - m.z * Z - r, r * 2, r * 2);
+  }
+  ctx.restore();
+}
+// pickups that swoop: things you gather arc up off where they were and into you, with a little pop when they land
+function jfFly(x, y, it, col) {
+  if (!S.p || JF.fly.length > 14) return;
+  const d = Math.hypot(x - S.p.x, y - S.p.y); if (d > 400) return;
+  JF.fly.push({ x, y, it, col: col || (it && DIT[it] && DIT[it].c) || '#e8dcc0', t: -JF.fly.filter(f => f.t < 0.1).length * 0.07, dur: 0.38 + Math.min(0.25, d / 600), side: Math.random() < 0.5 ? -1 : 1 });
+}
+function jfPop(col) { JF.pops.push({ t: 0, col }); jfSquash(0.07); }
+function jfDrawTop() {                            // over the player: things flying in, and the pops where they land
+  const p = S.p; if (!p) return;
+  const dt = frameDt, [px, py] = toScreen(p.x, p.y);
+  if (JF.fly.length) {
+    ctx.save();
+    for (const f of JF.fly) {
+      f.t += dt; if (f.t < 0) continue;
+      const u = Math.min(1, f.t / f.dur), e = u * u * (3 - 2 * u) * 0.35 + u * u * 0.65, dx = p.x - f.x, dy = p.y - f.y, L = Math.hypot(dx, dy) || 1;
+      const bul = Math.sin(Math.PI * u) * Math.min(40, L * 0.5) * f.side, wx = f.x + dx * e - dy / L * bul, wy = f.y + dy * e + dx / L * bul;
+      const [x, y0] = toScreen(wx, wy), y = y0 - (6 + 18 * e + 22 * Math.sin(Math.PI * u)) * Z, s = (1 - 0.5 * u) * Z;
+      ctx.globalAlpha = Math.min(1, f.t / 0.06);
+      const im = f.it && DIT[f.it] ? iconImg(f.it) : null;
+      if (im && im.complete && im.naturalWidth) { const q = 15 * s; if (!COLOUR) ctx.filter = 'grayscale(1)'; ctx.drawImage(im, x - q / 2, y - q / 2, q, q); ctx.filter = 'none'; }
+      else { ctx.fillStyle = COLOUR ? f.col : '#d8d8d2'; ctx.beginPath(); ctx.arc(x, y, 3.2 * s, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(20,16,12,0.6)'; ctx.lineWidth = 1; ctx.stroke(); }
+      if (u >= 1) { f.done = true; jfPop(f.col); if (actx) boomAt(actx.currentTime, 760, 260, 0.06, 0.06, sfxGain); }
+    }
+    ctx.restore(); JF.fly = JF.fly.filter(f => !f.done);
+  }
+  if (JF.pops.length) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const q of JF.pops) {
+      q.t += dt; const k = Math.min(1, q.t / 0.28), cy = py - 24 * Z;
+      ctx.strokeStyle = `rgba(255,240,210,${0.55 * (1 - k)})`; ctx.lineWidth = (2.5 - 2 * k) * Z;
+      ctx.beginPath(); ctx.ellipse(px, cy, (5 + 16 * k) * Z, (3 + 9 * k) * Z, 0, 0, 7); ctx.stroke();
+    }
+    ctx.restore(); JF.pops = JF.pops.filter(q => q.t < 0.28);
+  }
+}
+// idle: stand a while and you glance back over your shoulder; in the hard cold you cup your free hand and blow into it
+function jfIdle(dt) {
+  if (BR.idle <= 0) { JF.gl = null; JF.hb = null; JF.glT = 6 + Math.random() * 3; JF.hbT = 4 + Math.random() * 3; return; }
+  if (JF.gl && (JF.gl.t += dt) > JF.gl.dur) JF.gl = null;
+  if (JF.hb) { const t0 = JF.hb.t; JF.hb.t += dt; for (const at of [0.6, 1.25]) if (t0 < at && JF.hb.t >= at) jfBlow(); if (JF.hb.t > 1.95) JF.hb = null; }
+  if (JF.gl || JF.hb) return;
+  if (breathCold() >= 0.75 && BR.idle > 3.5 && (JF.hbT -= dt) <= 0) { JF.hbT = 9 + Math.random() * 5; JF.hb = { t: 0 }; }
+  else if (BR.idle > 5 && (JF.glT -= dt) <= 0) { JF.glT = 7 + Math.random() * 4; JF.gl = { t: 0, dur: 1.8, side: Math.random() < 0.5 ? -1 : 1 }; }
+}
+function jfBlow() {                               // warm breath into the cupped glove
+  breathPuff(1, true);
+  if (actx && noiseBuf) noiseAt(actx.currentTime, 1300, 500, 0.45, 0.035, sfxGain);
+}
+function jfGlance() { const g = JF.gl; if (!g) return 0; const u = g.t / g.dur; return g.side * 1.75 * (u < 0.2 ? smooth01(u / 0.2) : u > 0.68 ? smooth01((1 - u) / 0.32) : 1); }
+function jfHandK() { const h = JF.hb; if (!h) return 0; return h.t < 0.35 ? smooth01(h.t / 0.35) : h.t > 1.55 ? smooth01((1.95 - h.t) / 0.4) : 1; }
 // the dunes: one big height field (1536 units square, repeating), shaded once by the moon and laid over the sand.
 // Each ridge rises gently on the windward side and drops steeply on the slip face, with a pale crest along the top.
 const DUNE_P = 1536;
@@ -3468,7 +3643,13 @@ function drawDecor(o) {   // sets the transform directly (no save/restore): ther
   const sh = o.dk === 'grass' || o.dk === 'fern' || o.dk === 'reeds' || o.dk === 'tuft' || o.dk === 'dGrass' ? -Math.sin(S.t * 1.3 + o.seed * 30) * 0.8 / spr.h : 0;
   if (o.dk === 'bush' || o.dk === 'stump') shadow(o.sx, o.sy, 9 * s);
   const [l, hy] = lean(o.sx, o.sy);   // combined lean and wind sway, applied as one transform
-  withXf(ctx, f, sh * k - l * k, hy * k, o.sx, o.sy, () => ctx.drawImage(spr.cv, -spr.ax * spr.s, -spr.ay * spr.s));
+  let bn = 0;
+  if ((sh || o.dk === 'flowers' || o.dk === 'bush') && JF.pp) {   // v202: you push through it and it bends away, then springs back
+    const dx = o.sx - JF.pp[0], dy = (o.sy - JF.pp[1]) * 2, d = Math.hypot(dx, dy), R = 26 * Z, dt = Math.min(0.05, frameDt);
+    const tg = d < R ? Math.max(-1, Math.min(1, dx / (8 * Z))) * (o.dk === 'bush' ? 0.22 : 0.7) * (1 - d / R) : 0;
+    if (tg || o.bn || o.bv) { o.bv = (o.bv || 0) + ((tg - (o.bn || 0)) * 170 - (o.bv || 0) * 9) * dt; o.bn = (o.bn || 0) + o.bv * dt; if (!tg && Math.abs(o.bn) < 0.002 && Math.abs(o.bv) < 0.02) o.bn = o.bv = 0; bn = o.bn || 0; }
+  }
+  withXf(ctx, f, sh * k - l * k - bn * hy * k, hy * k * (1 - 0.3 * Math.abs(bn)), o.sx, o.sy, () => ctx.drawImage(spr.cv, -spr.ax * spr.s, -spr.ay * spr.s));
 }
 
 // ---- torch shadows ----
@@ -3724,7 +3905,8 @@ function drawPlayer0() {
   // local frame: forward and right lie on the ground (squashed like the iso floor), height goes straight up
   const Fx = Math.cos(a), Fy = Math.sin(a),   // forward is not squashed, so strides match on-screen movement in every direction
     Rx = -Math.sin(a), Ry = Math.cos(a) * 0.5;
-  const P = (f, r, h) => { if (RL) { const dh = h - RL.hc, f2 = f * RL.c + dh * RL.s; h = RL.hc + dh * RL.c - f * RL.s + RL.lift; f = f2; } if (CRK) { h *= 1 - 0.3 * CRK; f += h * 0.14 * CRK; } return [bx + (f * Fx + r * Rx) * Z, by + (f * Fy + r * Ry - h) * Z]; };   // v142: the roll turns every point over
+  const SQ = jfSq(), LMP = moving && !RL ? JF.lowK * Math.max(0, -Math.cos(ph)) : 0;   // v202: squash and stretch; at one heart, a limp that dips onto the bad leg
+  const P = (f, r, h) => { if (RL) { const dh = h - RL.hc, f2 = f * RL.c + dh * RL.s; h = RL.hc + dh * RL.c - f * RL.s + RL.lift; f = f2; } if (CRK) { h *= 1 - 0.3 * CRK; f += h * 0.14 * CRK; } if (LMP) { const q = LMP * h / 36; h -= q * 2.6; r += q * 1.1; } if (SQ) { h *= 1 - SQ; f *= 1 + SQ * 0.7; r *= 1 + SQ * 0.7; } return [bx + (f * Fx + r * Rx) * Z, by + (f * Fy + r * Ry - h) * Z]; };   // v142: the roll turns every point over
   const rightNear = Ry > 0;                                     // is the right side toward the camera?
   const facingUs = Fy > 0.1;
 
@@ -3780,6 +3962,9 @@ function drawPlayer0() {
     lHa = mix3(lHa, lH, aw); lEl = mix3(lEl, lE, aw);
   }
 
+  { const hk = !AP && !RL && wpHand() !== 'fists' ? jfHandK() : 0;   // v202: in the hard cold, the free glove cupped to your mouth
+    if (hk > 0) { const m3 = (q0, q1) => q0.map((v0, i) => v0 + (q1[i] - v0) * hk), rub = Math.sin(S.t * 9) * 0.35;
+      lHa = m3(lHa, [lean * 0.5 + 4.4, -0.8, headH - 2 + rub]); lEl = m3(lEl, [lSh[0] + 2.6, -6.4, shH - 6.5]); } }
   let OUT = false;   // outline pass: everything drawn a little fatter in a faint light tone, then the body on top
   const RIM = EDGE_C;
   const G = (v, near, m) => { v += near ? 7 : 0; return COLOUR && m ? KITC[m](v) : `rgb(${v},${v},${v - 2})`; };   // v124: in colour each part is its own material   // the near side of the body sits a shade lighter
@@ -3878,8 +4063,9 @@ function drawPlayer0() {
   const [hx, hy] = P(lt + 0.6, 0, headH);
   ctx.beginPath(); ctx.ellipse(hx, hy, 3.8 * Z, 4.2 * Z, 0, 0, 7);
   if (OUT) { ctx.strokeStyle = RIM; ctx.lineWidth = 1.6 * Z; ctx.stroke(); } else { ctx.fillStyle = G(24, false, 'hair'); ctx.fill(); }
-  if (!OUT && (facingUs || Math.abs(Fx) > 0.6)) {
-    const [fx2, fy2] = P(lt + 3.1, 0, headH - 0.4), fw = (1.2 + 1.8 * Math.max(0, Fy)) * Z;
+  const GL = RL || AP ? 0 : jfGlance(), hFx = Math.cos(a + GL), hFy = Math.sin(a + GL);   // v202: a glance back over the shoulder
+  if (!OUT && (hFy > 0.1 || Math.abs(hFx) > 0.6)) {
+    const [fx2, fy2] = P(lt + 0.6 + 2.5 * Math.cos(GL), 2.5 * Math.sin(GL), headH - 0.4), fw = (1.2 + 1.8 * Math.max(0, hFy)) * Z;
     ctx.fillStyle = COLOUR ? '#8a6650' : '#56544f'; ctx.beginPath(); ctx.ellipse(fx2, fy2, fw, 2.1 * Z, 0, 0, 7); ctx.fill();           // face
     ctx.fillStyle = 'rgba(25,25,23,0.75)'; ctx.beginPath(); ctx.ellipse(fx2, fy2 + 1.1 * Z, fw * 0.95, 1.1 * Z, 0, 0, Math.PI); ctx.fill();   // stubble and beard
     ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(fx2 - fw * 0.6, fy2 - 1.6 * Z, fw * 1.2, 0.9 * Z);                    // the shadow of the brim over the eyes
@@ -4388,11 +4574,12 @@ function renderScene() {
   const items = propsNear(S.cam.x, S.cam.y, viewR()).concat(decorInView(lights), lights.filter(L => L.kind !== 'flies'), S.rabbits, S.q ? [S.q] : [], S.mode === 'survive' && S.rg ? S.rg.enemies : [], S.mode === 'expedition' && S.rg ? S.rg.enemies.concat(exItems()) : []).map(o => ({ o, k: o.x + o.y }));
   items.sort((a, b) => a.k - b.k);
   if (S.day) { stDrawFlat(); drawSunShadows(items); }   // v186: floors under everything   // v158: the sun's shadows, on the floor before anything stands on it
+  JF.pp = toScreen(S.p.x, S.p.y);   // v202: where the grass gets pushed from
   for (const it of items) it.o.kind === 'decor' ? drawDecor(it.o) : it.o.kind === 'rabbit' ? drawRabbit(it.o) : it.o.kind === 'quarry' ? drawQuarry(it.o) : it.o.kind === 'shade' ? drawShade(it.o) : it.o.kind === 'searcher' ? drawSearcher(it.o) : drawProp(it.o);
   if (S.day) stDrawRoofs();   // v186: roofs over everything
   drawBirds(1);
   { const [px0, py0] = toScreen(S.p.x, S.p.y); shadow(px0, py0, 12 * Z); }
-  airStep(); snowStep(frameDt); sparkFires(lights); drawMistLow(); drawMoths(); drawSnowfall();
+  airStep(); snowStep(frameDt); sparkFires(lights); jfFires(lights); drawMistLow(); jfDrawSmoke(); drawMoths(); drawSnowfall();
   if (S.mode === 'expedition' && inWoods()) { drawFog(true); drawRain(true); }   // v126: weather in the light
 
   // darkness
@@ -4523,9 +4710,10 @@ function renderScene() {
     for (const g of p.ghosts) { p.x = g.x; p.y = g.y; S.rollGU = g.u ?? null; ctx.save(); ctx.globalAlpha = Math.max(0, g.a); drawPlayer(); ctx.restore(); }   // v142: each one caught at its own point in the turn
     p.x = x0; p.y = y0; S.rollGU = null; S.tip = t0; S.tipNow = t1;
   }
+  jfDrawDust();   // v202
   drawLensGlow();
   drawPlayerBehind(items); // drawn over the dark so the whole figure stays readable   // v197: hidden by what stands in front, a faint ghost shows through
-  drawBreath();
+  drawBreath(); jfDrawTop();
   drawTorchWarmth();
   drawWarmth();
   if (isRg()) { drawDodgeFx(); drawFoeTells(); }   // v183: enemy wind-ups
@@ -4544,6 +4732,7 @@ function renderScene() {
     q.aimed = d < fullBr * 0.95 && Math.abs(angDiff(Math.atan2(qy - 10 * Z - by, qx - bx), S.aim)) < HALF;
     q.fall = Math.min(1, (br * 0.95 - d) / (br * 0.25));
   }
+  jfScreen();   // v202
   drawTargetFlash();
   if (isRg() && !S.day) drawReadFx();   // v144
   stkDraw();
@@ -4639,8 +4828,8 @@ function musLoad(url) {                        // v148: the music lives as separ
 }
 function musSetup() {
   if (mus.gain || !actx) return;
-  mus.gain = actx.createGain(); mus.gain.connect(actx.destination);
-  mus.aGain = actx.createGain(); mus.aGain.connect(actx.destination);
+  mus.gain = actx.createGain(); mus.gain.connect(OUT || actx.destination);
+  mus.aGain = actx.createGain(); mus.aGain.connect(OUT || actx.destination);
   for (const T of TRACKS) { T.g = actx.createGain(); T.g.gain.value = 0; T.g.connect(mus.gain); }
   applyVolumes();
 }
@@ -5293,6 +5482,7 @@ function killFoe(e) {
   if (e.type === 'splitter') splitApart(e);
   if (S.day && Math.random() < (e.type === 'brute' || e.type === 'tall' ? 0.8 : 0.3)) dayDrop(e.x, e.y, 'meat', e.type === 'brute' || e.type === 'tall' ? 2 : 1);   // Daylight: some leave meat
   e.dead = true; rg.kills++; rg.waveKills++; lifeAdd('kills'); lifeTally('kt', e.type);
+  if (S.mode === 'survive' && rg.phase === 'fight' && rg.toSpawn <= 0 && !rg.enemies.some(o => !o.dead)) jfSlow(false);   // v202: the last of the wave
   rg.dying.push({ x: e.x, y: e.y, type: e.type, dir: e.dirFace ?? foeDir(e), phase: e.phase, t: 0, segs: e.type === 'centi' ? centiSegs(e).filter((q, i) => centiOut(e, i)) : null, hz: e.hz, k: e.k });
   if (e.guard) { rg.guardDone = true; addShake(0.6); hitStop(0.1); }   // the orb's keeper is dead: it stays dead this trip
   if (e.type === 'centi') for (const q of centiSegs(e)) ashBurst(q.x, q.y, 3, 8);   // it drops to its knees and crumbles
@@ -5400,6 +5590,7 @@ function stkTouch() {                             // a swing that lands but does
 }
 function stkBossDown(o, h, kind, big) {           // a boss or mini-boss falls: his own big number, and the streak cashes out on it
   const rg = S.rg; if (!rg) return;
+  jfSlow(big);   // v202
   stkAdd(o.x, o.y, h * 0.6, big ? 2500 : 1000, FOE_TINT[kind] ? FOE_TINT[kind].join(',') : '255,200,120', false);
   stkWord('boss', 0);
   if (rg.stkNoHit) stkWord('nohit');
@@ -6347,7 +6538,7 @@ function drawShade(e) {
     return [sh, el, ha]; } : gear.arms;
   const sjx = swp && swp.shake ? (Math.random() - 0.5) * 1.6 * Z : 0;
   drawQuarry({ x: e.x, y: e.y, dir: e.dirFace, phase: e.gPh || 0, state: 'run', t: 0 }, ctx, false,
-    { scale: sc * (fuse ? 1 + 0.08 * Math.sin(S.t * 40) : 1), jx: jx + sjx, pal, pain, reach: swp ? 0 : e.reach || 0, leanAdd, kit: KIT[e.type], arms: swArms, prop: gear.prop, gait: swp ? 0 : gsf, stride: Math.max(6, gstride * 1.15) });
+    { scale: sc * (fuse ? 1 + 0.08 * Math.sin(S.t * 40) : 1), sq: foeSq(e), jx: jx + sjx, pal, pain, reach: swp ? 0 : e.reach || 0, leanAdd, kit: KIT[e.type], arms: swArms, prop: gear.prop, gait: swp ? 0 : gsf, stride: Math.max(6, gstride * 1.15) });
   const h = f.h * Z, w = f.w * Z, fc = e.face || 1;
   ctx.fillStyle = ctx.strokeStyle = pal.near; ctx.lineCap = 'round';
   if (e.type === 'laser' && e.ai !== 'move') {                    // arm raised, pointing down its line of fire
@@ -7486,10 +7677,12 @@ function wispStep(dt) {
     const dx = p.x - w.x, dy = p.y - w.y, d = Math.hypot(dx, dy) || 1;
     if (w.fly || d < mag) {                  // close enough: it streams into you
       w.fly = true; w.v = Math.min(560, w.v + 1000 * dt); w.life = Math.max(w.life, 0.6);
-      const st = Math.min(d, w.v * dt); w.x += dx / d * st; w.y += dy / d * st;
+      if (w.cs === undefined) w.cs = (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 0.4);   // v202: it swoops in on a curve
+      const st = Math.min(d, w.v * dt), tn = w.cs * Math.min(1.1, d / 70), c = Math.cos(tn), sn = Math.sin(tn);
+      w.x += (dx * c - dy * sn) / d * st; w.y += (dy * c + dx * sn) / d * st;
       (w.tr = w.tr || []).push([w.x, w.y]); if (w.tr.length > 10) w.tr.shift();   // a violet trail behind it
     }
-    if (Math.hypot(p.x - w.x, p.y - w.y) < 16) { w.got = true; gainWisps(w.n); (rg.wispFx = rg.wispFx || []).push({ t: 0 }); }
+    if (Math.hypot(p.x - w.x, p.y - w.y) < 16) { w.got = true; gainWisps(w.n); (rg.wispFx = rg.wispFx || []).push({ t: 0 }); jfPop(`rgb(${WISP_COL})`); }
   }
   rg.wisps = L.filter(w => !w.got && w.life > 0);
 }
@@ -7999,7 +8192,7 @@ function daySee(id, quiet) {                   // the first time you hold someth
 }
 function dayGive(k, n, x, y, quiet, extra) {   // into the pack; what doesn't fit is left lying there
   const D = S.day, left = addTo(D.inv, k, n, extra, slotOrder(D, k)), take = n - left;
-  if (take > 0) { daySee(k); if (!quiet) exNote(`+${take} ${DIT[k].n.toLowerCase()}`); }
+  if (take > 0) { daySee(k); if (!quiet) exNote(`+${take} ${DIT[k].n.toLowerCase()}`); if (x !== undefined && S.running) jfFly(x, y, k); }   // v202: it swoops into you
   if (left > 0) { dayDrop(x ?? S.p.x, y ?? S.p.y, k, left, extra); dayNote('full', 'pack full', 3); }
   dayChanged(); return take;
 }
@@ -10707,6 +10900,24 @@ function daySun() {                              // { th, L, a } while the sun i
   const f = (D.t % DAY_LEN) / DAY_LEN, u = Math.max(0, Math.min(1, ((f - 0.96 + 1) % 1) / 0.56));   // 0 sunrise, 0.5 noon, 1 sunset
   return { u, th: Math.PI * (1 - u), L: 0.5 + 1.5 * Math.pow(1 - Math.sin(Math.PI * u), 1.6), a: 0.44 * Math.min(1, lt * 1.6) };
 }
+// v202 (Joe: your shadow was a barrel, not you): you're drawn once more into a side canvas, filled black, and laid over on the
+// ground away from the sun exactly like the trees, so your shadow walks, swings and chops when you do.
+const PSH = document.createElement('canvas'), PSHx = PSH.getContext('2d');
+function playerShadow(c, q, px, py, Dx, Dy, Px, Py) {
+  if (wpVeil() <= 0) return true;
+  const x0 = px - 70 * Z, y0 = py - 80 * Z, cw = Math.ceil(140 * Z * DPR), ch = Math.ceil(100 * Z * DPR);
+  if (PSH.width !== cw || PSH.height !== ch) { PSH.width = cw; PSH.height = ch; }
+  const P = PSHx; P.setTransform(1, 0, 0, 1, 0, 0); P.globalAlpha = 1; P.globalCompositeOperation = 'source-over'; P.clearRect(0, 0, cw, ch);
+  P.setTransform(DPR, 0, 0, DPR, -x0 * DPR, -y0 * DPR);
+  const real = ctx, p = S.p, keep = [S.tip, S.tipNow, S.wpHead, p.trailT, p.tTrail && p.tTrail.slice()]; ctx = P;   // drawing you sets where the torch tip is; put all that back after
+  try { drawPlayer0(); } catch (e) { return false; } finally { ctx = real; [S.tip, S.tipNow, S.wpHead, p.trailT] = keep; if (keep[4]) p.tTrail = keep[4]; }
+  P.setTransform(1, 0, 0, 1, 0, 0); P.globalCompositeOperation = 'source-in'; P.fillStyle = '#000'; P.fillRect(0, 0, cw, ch); P.globalCompositeOperation = 'source-over';
+  { const l = Math.hypot(Px, Py) || 1, k = Math.max(0.85, l) / l; Px *= k; Py *= k; }   // a touch wider than a tree's, so it reads as a person
+  const u0 = x0 - px, v0 = y0 - py;   // image pixel (i, j) sits at screen (x0 + i / DPR, y0 + j / DPR); across goes along P, up goes along the sun's way D
+  c.setTransform(Px / DPR * q, Py / DPR * q, -Dx / DPR * q, -Dy / DPR * q, (px + u0 * Px - v0 * Dx) * q, (py + u0 * Py - v0 * Dy) * q);
+  c.drawImage(PSH, 0, 0); c.setTransform(q, 0, 0, q, 0, 0);
+  return true;
+}
 const sunCv = document.createElement('canvas'), sunCx = sunCv.getContext('2d');   // drawn at screen-point size, not device pixels: a shadow wants no fine detail, and it costs a ninth as much on a phone
 function drawSunShadows(items) {
   const sun = daySun(); if (!sun) return;
@@ -10744,7 +10955,7 @@ function drawSunShadows(items) {
     else if (o.kind === 'dcamp' && (o.sub === 'stake' || o.sub === 'relic' || o.sub === 'tent' || o.sub === 'wrack')) col(sx, sy, (o.sub === 'tent' ? 12 : o.sub === 'wrack' ? 10 : 4) * Z, (o.sub === 'relic' ? 70 : o.sub === 'tent' ? 26 : 38) * Z);
     else if (o.camp) col(sx, sy, 5 * Z, 26 * Z);
   }
-  { const [px, py] = toScreen(S.p.x, S.p.y); col(px, py, 5.5 * Z, 34 * Z); }   // you
+  { const [px, py] = toScreen(S.p.x, S.p.y); if (LOWFX || !playerShadow(c, q, px, py, Dx, Dy, Px, Py)) col(px, py, 5.5 * Z, 34 * Z); }   // you: v202 your own shape (the column on Smooth graphics)
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = sun.a; ctx.imageSmoothingEnabled = true; ctx.drawImage(sunCv, 0, 0, W * DPR, H * DPR); ctx.restore();
 }
 // ---- v159 (Joe): light that fades out softly instead of stopping at a hard line, and a camp yard where you can see what's in it.
@@ -12223,9 +12434,10 @@ function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the t
     const [ex, ey] = at(9), k = Z;
     ctx.fillStyle = C('#4a3a24', '#5a5a56'); ctx.beginPath(); ctx.ellipse(ex, ey, 2.4 * k, 3 * k, 0, 0, 7); ctx.fill();
     if (s.d > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < 3; i++) { const h = (7 + 3 * Math.sin(S.t * 11 + i * 2)) * k, w = (3.4 - i) * k, ox = Math.sin(S.t * 7 + i * 1.6) * 1.2 * k;
+      const bnd = Math.max(-1, Math.min(1, -JF.svx / 160));   // v202: the flame streams back as you run
+      for (let i = 0; i < 3; i++) { const h = (7 + 3 * Math.sin(S.t * 11 + i * 2)) * k * (1 - 0.25 * Math.abs(bnd)), w = (3.4 - i) * k, ox = Math.sin(S.t * 7 + i * 1.6) * 1.2 * k, tx = bnd * h * 1.1;
         ctx.fillStyle = ['rgba(255,120,40,0.8)', 'rgba(255,180,70,0.75)', 'rgba(255,240,190,0.7)'][i];
-        ctx.beginPath(); ctx.moveTo(ex - w + ox, ey - 2 * k); ctx.quadraticCurveTo(ex + ox, ey - 2 * k - h * 1.5, ex + w + ox, ey - 2 * k); ctx.closePath(); ctx.fill(); }
+        ctx.beginPath(); ctx.moveTo(ex - w + ox, ey - 2 * k); ctx.quadraticCurveTo(ex + ox + tx, ey - 2 * k - h * 1.5, ex + w + ox, ey - 2 * k); ctx.closePath(); ctx.fill(); }
       ctx.restore(); }
   } else if (T.tool === 'build') {              // the hammer: a stone head lashed to a short handle
     seg(-1.5, 10, 1.7, C('#7a5a3a', '#6a6a66'));
@@ -13777,6 +13989,7 @@ function exFull() {
 function exGot(x, y, took) {
   const rg = S.rg, best = took.includes('r') ? 3 : took.includes('c') ? 2 : 1;
   exNote('+ ' + exItemsText(took));
+  for (const it of took) jfFly(x, y, null, it === 'r' ? '#ffb070' : it === 'c' ? '#f0d070' : '#c8bca8');   // v202
   for (let i = 0; i < 10 + 8 * best; i++) rg.embers.push({ x: x + (Math.random() - 0.5) * 10, y: y + (Math.random() - 0.5) * 10, z: 4, vz: 40 + Math.random() * 60, vx: (Math.random() - 0.5) * 50, vy: (Math.random() - 0.5) * 50, life: 0.5 + Math.random() * 0.5, ember: true });
   sfx(1.6 + 0.3 * best, 0.45, 'bandpass', 1800 + 500 * best, 0.25);
   if (best === 3) { hitStop(0.05); addShake(0.2); }
@@ -14370,7 +14583,7 @@ const bm = { g: null, osc: null, at: 0 };
 function bossMusic(on, k2) {                    // placeholder fight music: a low drone under slow war drums, faster in the second phase
   if (!actx) return;
   if (!bm.g) {
-    bm.g = actx.createGain(); bm.g.gain.value = 0; bm.g.connect(actx.destination);
+    bm.g = actx.createGain(); bm.g.gain.value = 0; bm.g.connect(OUT || actx.destination);
     bm.osc = actx.createOscillator(); bm.osc.type = 'sawtooth'; bm.osc.frequency.value = 55;
     const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 240;
     const dg = actx.createGain(); dg.gain.value = 0.25; bm.osc.connect(lp); lp.connect(dg); dg.connect(bm.g); bm.osc.start();
@@ -17849,7 +18062,7 @@ function frame(now) {
   if (btnKey === '' || ++btnTick % 3 === 0) layoutBtns();   // v145; v177: every third frame, it reads the buttons' styles
   padPoll();   // v172: a controller
   const raw = Math.max(0, (now - last) / 1000);   // v111: rAF's stamp can come before a resume's performance.now(); a negative step once froze the game
-  const dt = Math.min(0.05, raw); last = now; frameDt = dt;
+  const dt0 = Math.min(0.05, raw), tk = jfTick(dt0), dt = dt0 * tk; last = now; frameDt = dt;   // v202: tk, the last-kill slow motion
   watchSpeed(raw);
   if (S.running) { if (S.hitstop > 0) S.hitstop -= raw; else update(dt); } else S.t += dt;
   burnAudio();
