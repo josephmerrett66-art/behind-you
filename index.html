@@ -594,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 194</p>
+      <p class="small" id="verLbl">Version 195</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -3442,6 +3442,21 @@ function shadowPoly(c, lx, ly, o, r, len, extra) {
 
 // c: canvas to draw on; mask: draw a solid silhouette (used to cut lit shapes out of the dark)
 // a sprite lit on the side facing the player, the light sliding across as they pass (both versions share one outline)
+function drawIronVein(o, c, sx, sy, s) {        // v195 (Joe couldn't find iron): rusty seams and a glint on the deep-woods rocks that give ore
+  const k = s, R = n => hash(o.x * 0.13 + n * 1.7, o.y * 0.29 - n * 2.3);
+  c.save(); c.lineCap = 'round';
+  for (let v = 0; v < 3; v++) {
+    let x = sx + (R(v) - 0.5) * 11 * k, y = sy - (5 + R(v + 5) * 6) * k;
+    c.strokeStyle = COLOUR ? (v ? '#a4552e' : '#c26a38') : '#7a7a76'; c.lineWidth = (v ? 1.1 : 1.6) * k;
+    c.beginPath(); c.moveTo(x, y);
+    for (let t = 0; t < 3; t++) { x += (R(v * 3 + t + 9) - 0.5) * 4 * k; y += (0.8 + R(v * 3 + t + 20) * 1.2) * k; c.lineTo(x, y); }
+    c.stroke();
+  }
+  const gl = 0.45 + 0.35 * Math.sin(S.t * 2.2 + R(30) * 6);   // a slow glint so it catches the eye in the beam
+  c.fillStyle = COLOUR ? `rgba(240,160,100,${gl})` : `rgba(220,220,214,${gl})`;
+  c.beginPath(); c.arc(sx + (R(31) - 0.5) * 8 * k, sy - (6 + R(32) * 5) * k, 0.9 * k, 0, 7); c.fill();
+  c.restore();
+}
 function litStamp(c, kind, v, sx, sy, s, mask, sw = 0) {
   const wR = Math.max(0, Math.min(1, 0.5 - (sx - toScreen(S.p.x, S.p.y)[0]) / (60 * Z)));
   if (mask || wR <= 0.02 || wR >= 0.98) { stamp(c, sprite(kind, v, wR >= 0.5 ? 1 : -1), sx, sy, s, 1, sw, mask); return; }
@@ -3479,6 +3494,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   } else if (o.kind === 'rock') {
     if (!mask) shadow(sx, sy, 13 * s);
     litStamp(c, 'rock', (hash(o.x * 0.37, o.y * 0.91) * 50 | 0) % SPRITE_KINDS.rock[0], sx, sy, s * 0.95, mask);
+    if (!mask && S.day && Math.hypot(o.x, o.y) > IRON_FROM) drawIronVein(o, c, sx, sy, s * 0.95);   // v195 (Joe): the rocks that hold iron show it
   } else if (o.kind === 'fire') {
     stamp(c, sprite('firepit', 0), sx, sy, Z, 1, 0, mask);
   } else if (o.camp) { drawCampPiece(o, c, sx, sy, col, mask);
@@ -8178,6 +8194,7 @@ function dayHarvest(Dk, a, inReach, spark) {
     if (c >= need) {
       D.felled.add(best.key); ashBurst(best.x, best.y, 14, 14); addShake(0.25);
       dayGive('stones', 3, best.x, best.y); dayGive('flint', T.tier > 1 ? 3 : 2, best.x, best.y); pickSnd();   // v169: straight into the pack
+      if (Math.hypot(best.x, best.y) > IRON_FROM && T.tier < 2) dayNote('iron', 'there was iron in that rock · a flint pick gets it out', 4);   // v195
       if (Math.hypot(best.x, best.y) > IRON_FROM && T.tier > 1) { const n = (T.tier > 3 ? 3 : T.tier > 2 ? 2 : 1) + (Math.random() < 0.4 ? 1 : 0); dayGive('ironore', n, best.x, best.y, true); exNote(`iron in the rock · ${n}`, true); }
     } else exNote(`crack · ${need - c} more`);
   } else if (best.t === 'grass') {
