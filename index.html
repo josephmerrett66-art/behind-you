@@ -574,6 +574,8 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <div class="audio"><h2>Screen</h2>
       <button id="fsBtn" class="alt">Full screen: on</button>
       <button id="fpsBtn" class="alt">Frame rate: hidden</button>
+      <button id="gfxBtn" class="alt">Graphics: auto</button>
+      <p class="small" id="gfxTip"></p>
       <p class="small" id="fsTip">On: the game fills the whole screen when you start, hiding the browser's bars. Swiping down or pressing Esc gets them back.</p>
     </div>
     <div class="audio"><h2>Look</h2>
@@ -594,7 +596,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 197</p>
+      <p class="small" id="verLbl">Version 198</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -703,10 +705,16 @@ const CAMZ = () => camZv;
 // so the canvas renders at most this many pixels and the browser scales it up
 const PIXEL_BUDGET = 2.2e6;
 let QUALITY = 1;   // lowered automatically if frames still come too slowly (see watchSpeed)
+// v198 (Joe: a Galaxy Tab A9 ran at 14 fps, his phone at 60): Smooth graphics for slow tablets. Fewer pixels, no film grain,
+// moving things drawn once without their outline pass, softer sun shadows, no tiny ground bits. Auto switches to it by itself
+// when a device can't keep up even at the lowest sharpness, and remembers that on this device. Settings > Screen > Graphics.
+let GFX = 'auto'; try { GFX = localStorage.getItem('behind-you-gfx') || 'auto'; } catch (e) {}
+let GFX_SLOW = false; try { GFX_SLOW = localStorage.getItem('behind-you-gfx-slow') === '1'; } catch (e) {}
+let LOWFX = GFX === 'smooth' || (GFX === 'auto' && GFX_SLOW);
 
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
-  DPR = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(PIXEL_BUDGET / (W * H))) * QUALITY;
+  DPR = Math.min(window.devicePixelRatio || 1, LOWFX ? 1 : 2, Math.sqrt(PIXEL_BUDGET / (W * H))) * QUALITY;
   cv.width = dark.width = Math.round(W * DPR); cv.height = dark.height = Math.round(H * DPR);
   SAFE_TOP = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0;
   shA.width = shB.width = lA.width = lAcc.width = lB.width = wA.width = wT.width = wH.width = Math.ceil(W / SH) + 2;
@@ -2124,6 +2132,7 @@ function edgeProxy(c) {   // v168: the context as the outline pass sees it: anyt
   EDGE_PX.set(c, p); return p;
 }
 function edgePass(c, draw) {   // v168: an outline for things drawn as shapes: four solid shadows of it, offset, under it
+  if (LOWFX && c !== PCX) { draw(c); return; }   // v198: Smooth graphics: moving things drawn once (cached pictures keep theirs)
   const m = c.getTransform(), r = Math.max(1, 0.9 * Z * DPR), F = 20000, p = edgeProxy(c);
   c.save(); c.shadowColor = EDGE_C; c.shadowBlur = 0; c.setTransform(m.a, m.b, m.c, m.d, m.e - F, m.f); EDGE_PASSING = true;
   try { for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) { c.shadowOffsetX = F + dx; c.shadowOffsetY = dy; draw(p); } }
@@ -3400,7 +3409,7 @@ function decorInView(lights) {   // ground cover only shows where some light rea
   const reach = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * (isRg() ? rgRange() : 1) / K() + 60;   // how far the torch beam can reach
   const out = [], near = lights.filter(L => Math.hypot(L.x - S.p.x, L.y - S.p.y) < viewR() + 200);
   for (const o of decorNear(S.cam.x, S.cam.y, viewR())) {
-    if (QUALITY < 0.75 && (o.dk === 'grass' || o.dk === 'shrooms' || o.dk === 'pebbles')) continue;   // a slow machine drops the smallest bits first
+    if ((QUALITY < 0.75 || LOWFX) && (o.dk === 'grass' || o.dk === 'shrooms' || o.dk === 'pebbles')) continue;   // a slow machine drops the smallest bits first
     const [sx, sy] = toScreen(o.x, o.y);
     if (sx < -60 || sx > W + 60 || sy < -10 || sy - 50 * Z > H) continue;
     if (Math.hypot(o.x - S.p.x, o.y - S.p.y) < reach || near.some(L => Math.hypot(o.x - L.x, o.y - L.y) < 170)) { o.sx = sx; o.sy = sy; out.push(o); }
@@ -4149,6 +4158,7 @@ function drawFilm() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   // grain: a fresh noise tile at a random offset every frame
   const pat = grainPats[(Math.random() * 4) | 0];
+  if (!LOWFX) {   // v198: Smooth graphics skips the grain and flicker, two full-screen passes
   ctx.translate(-Math.random() * 192, -Math.random() * 192);
   ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.16;
   ctx.fillStyle = pat; ctx.fillRect(0, 0, W + 192, H + 192);
@@ -4159,6 +4169,7 @@ function drawFilm() {
   if (film.flick * 0.6 > 0.5 / 255 || -film.flick * 1.5 > 0.5 / 255) {   // v177: most frames it's under half a shade, so it would change no pixel
     ctx.fillStyle = film.flick > 0 ? `rgba(255,255,250,${film.flick * 0.6})` : `rgba(0,0,0,${-film.flick * 1.5})`;
     ctx.fillRect(0, 0, W, H);
+  }
   }
   ctx.drawImage(vig, 0, 0, W, H);
   // dust and hairs: one-frame specks
@@ -10640,9 +10651,9 @@ function drawSunShadows(items) {
   const sun = daySun(); if (!sun) return;
   const Dx = Math.cos(sun.th) * sun.L, Dy = Math.sin(sun.th) * sun.L * 0.5;   // on the ground, seen from above at our angle
   let Px = -Math.sin(sun.th), Py = Math.cos(sun.th) * 0.5; const pl = Math.hypot(Px, Py) || 1, pk = Math.max(0.55, pl) / pl; Px *= pk; Py *= pk;
-  const c = sunCx, cw = Math.ceil(W), ch = Math.ceil(H);
+  const q = LOWFX ? 0.5 : 1, c = sunCx, cw = Math.ceil(W * q), ch = Math.ceil(H * q);   // v198: Smooth graphics: half size, a softer edge
   if (sunCv.width !== cw || sunCv.height !== ch) { sunCv.width = cw; sunCv.height = ch; }
-  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cw, ch); c.fillStyle = '#000'; c.strokeStyle = '#000'; c.lineCap = 'round';
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cw, ch); c.setTransform(q, 0, 0, q, 0, 0); c.fillStyle = '#000'; c.strokeStyle = '#000'; c.lineCap = 'round';
   const col = (sx, sy, w, h) => {                // a soft standing column: foot, top, and the body between
     const tx = sx + Dx * h, ty = sy + Dy * h;
     c.beginPath(); c.ellipse(sx, sy, w, w * 0.5, 0, 0, 7); c.fill();
@@ -10655,7 +10666,7 @@ function drawSunShadows(items) {
   };
   const sil = (kind, v, sx, sy, s) => {          // the thing's own silhouette, laid over away from the sun
     const spr = sprite(kind, v, 1), k = s / spr.s;
-    c.setTransform(Px * k, Py * k, -Dx * k, -Dy * k, sx, sy); c.drawImage(spr.mk, -spr.ax * spr.s, -spr.ay * spr.s); c.setTransform(1, 0, 0, 1, 0, 0);   // v177: no save/restore
+    c.setTransform(Px * k * q, Py * k * q, -Dx * k * q, -Dy * k * q, sx * q, sy * q); c.drawImage(spr.mk, -spr.ax * spr.s, -spr.ay * spr.s); c.setTransform(q, 0, 0, q, 0, 0);   // v177: no save/restore
   };
   const R = 260 * Z;
   for (const { o } of items) {
@@ -17641,7 +17652,10 @@ function watchSpeed(raw) {
   if (speed.wait > 0) { speed.wait -= raw; return; }          // let things settle after starting or a change
   speed.sum += raw; speed.n++;
   if (speed.sum < 1.5) return;
-  if (speed.sum / speed.n > 1 / 45 && QUALITY > 0.55) { QUALITY = Math.max(0.55, QUALITY * 0.8); resize(); speed.wait = 1; }
+  if (speed.sum / speed.n > 1 / 40 && QUALITY <= 0.56 && GFX === 'auto' && !LOWFX) {   // v198: still too slow at the softest: Smooth graphics, remembered here
+    LOWFX = GFX_SLOW = true; try { localStorage.setItem('behind-you-gfx-slow', '1'); } catch (e) {} gfxSync(); QUALITY = 0.8; resize(); speed.wait = 2;
+  }
+  else if (speed.sum / speed.n > 1 / 45 && QUALITY > 0.55) { QUALITY = Math.max(0.55, QUALITY * 0.8); resize(); speed.wait = 1; }
   else if (speed.sum / speed.n < 1 / 57 && QUALITY < 1) { QUALITY = Math.min(1, QUALITY * 1.12); resize(); speed.wait = 6; }   // v111: smooth again (left a heavy scene), sharpen back up
   speed.sum = speed.n = 0;
 }
@@ -17707,6 +17721,22 @@ try { FPS.on = localStorage.getItem('behind-you-fps') === 'on'; } catch (e) {}
 function fpsSync() { const b = document.getElementById('fpsBtn'); if (b) { b.textContent = 'Frame rate: ' + (FPS.on ? 'shown' : 'hidden'); b.setAttribute('aria-pressed', FPS.on ? 'true' : 'false'); } }
 document.getElementById('fpsBtn').addEventListener('click', () => { FPS.on = !FPS.on; try { localStorage.setItem('behind-you-fps', FPS.on ? 'on' : 'off'); } catch (e) {} fpsSync(); });
 fpsSync();
+// v198: Graphics: Auto (sharp, switching to Smooth by itself on a device that can't keep up), Sharp (always full detail), Smooth (for slow tablets)
+function gfxSync() {
+  const b = document.getElementById('gfxBtn'), t = document.getElementById('gfxTip'); if (!b) return;
+  b.textContent = 'Graphics: ' + (GFX === 'auto' ? (LOWFX ? 'auto (smooth here)' : 'auto') : GFX);
+  t.textContent = GFX === 'sharp' ? 'Sharp: full detail always, even if this device slows down.'
+    : GFX === 'smooth' ? 'Smooth: for slower tablets. A softer picture, no film grain and simpler outlines on moving things, for a steadier frame rate.'
+    : LOWFX ? 'Auto: this device was struggling, so it switched to Smooth graphics for a steadier frame rate. Tap to choose Sharp or Smooth yourself.'
+    : 'Auto: full detail, switching to Smooth by itself if this device can\'t keep up.';
+}
+document.getElementById('gfxBtn').addEventListener('click', () => {
+  GFX = GFX === 'auto' ? 'sharp' : GFX === 'sharp' ? 'smooth' : 'auto';
+  if (GFX === 'auto') { GFX_SLOW = false; try { localStorage.removeItem('behind-you-gfx-slow'); } catch (e) {} }   // auto starts sharp again and judges afresh
+  try { localStorage.setItem('behind-you-gfx', GFX); } catch (e) {}
+  LOWFX = GFX === 'smooth'; QUALITY = 1; resize(); speed.sum = speed.n = 0; speed.wait = 2; gfxSync();
+});
+gfxSync();
 function fpsDraw(raw) {
   FPS.n++; FPS.t += raw; if (FPS.t >= 0.5) { FPS.v = FPS.n / FPS.t; FPS.n = 0; FPS.t = 0; }
   if (!FPS.on || !FPS.v) return;
