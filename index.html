@@ -154,8 +154,8 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 @media (min-width: 760px) { #craft .pk { max-width: 62rem; } }
 #craft .pkcols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 1.4rem; align-items: start; }
 #craft .pkcol { display: grid; gap: 0.3rem; min-width: 0; align-content: start; }
-#craft .pkduo { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 0 0.9rem; }
-@media (max-width: 759px) { #craft .pkduo { grid-template-columns: minmax(0, 1fr); } }
+#craft .pkduo { display: flex; flex-wrap: wrap; align-items: start; gap: 0 0.9rem; }   /* v199 (Joe, on the TV): the hotbar drops under Wearing when the column is too narrow, never over the box */
+@media (max-width: 759px) { #craft .pkduo { display: grid; grid-template-columns: minmax(0, 1fr); } }
 #craft .pkduo > div { min-width: 0; }
 #craft .pkcard.inline { margin-top: 0.4rem; padding: 0.8rem; border: 1px solid rgba(255,207,138,0.35); border-radius: 12px; background: rgba(16,14,12,0.9); }
 #craft .pkcard.inline .pkchead { display: flex; gap: 0.7rem; align-items: center; } #craft .pkcard.inline .pkcicon { width: 44px; height: 44px; flex: none; border-radius: 10px; background: rgba(239,239,234,0.08); display: grid; place-items: center; } #craft .pkcard.inline .pkcicon svg { width: 72%; height: 72%; }
@@ -456,6 +456,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
 .panel .board { border-top: 0; padding-top: 0; }
 .howto { display: grid; gap: 0.4rem; }
 .devtools { display: grid; gap: 0.5rem; margin-top: 1.2rem; }
+.devtools > button { display: block; }
 .devtools summary { cursor: pointer; font: 600 0.62rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(138,138,138,0.6); list-style: none; }
 .devtools summary::-webkit-details-marker { display: none; }
 .devtools[open] summary { color: var(--ash); margin-bottom: 0.4rem; }
@@ -596,7 +597,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 198</p>
+      <p class="small" id="verLbl">Version 199</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -650,7 +651,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
     <div class="controls">
       <span>Touch</span><span>Right thumb aims. Left thumb runs. Tap Attack to swing (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps. In Daylight, Pack opens your pack, Take or Use works what's in front of you, and Sneak crouches.</span>
       <span>Desktop</span><span>Mouse aims<br>W or Space runs<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch (not in Expedition)<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern, H drinks a flask<br>Daylight: E uses or takes, C or Tab opens the pack, 1 to 6 or the wheel picks from the hotbar, Q crouches (right-click rolls)</span>
-      <span>Controller</span><span>Left stick runs, right stick aims<br>A or RT attacks, B dodges<br>X uses, Y is your weapon's special<br>LB and RB change what's in your hand (Expedition: LB swaps weapon)<br>D-pad: up or LT drinks a flask, down lights a recall flare, left plants a lantern, right toggles auto run<br>View opens the pack, Menu pauses<br>In menus, the d-pad or left stick moves, A presses, B goes back</span>
+      <span>Controller</span><span>Left stick runs, right stick aims<br>A or RT attacks, B dodges<br>X uses, Y is your weapon's special<br>LB and RB change what's in your hand (Expedition: LB swaps weapon)<br>D-pad: up or LT drinks a flask, down lights a recall flare, left plants a lantern, right toggles auto run<br>View opens the pack, Menu pauses<br>In menus, the d-pad or left stick moves, the right stick scrolls, A presses, B goes back</span>
     </div>
   </section>
 </div>
@@ -3621,6 +3622,7 @@ const KITC = { jacket: mat(0.95, 1.2, 0.72, 1.7), pants: mat(1.3, 1.18, 0.88, 1.
 const OCC = { a: document.createElement('canvas'), b: document.createElement('canvas'), m: document.createElement('canvas') };
 OCC.ax = OCC.a.getContext('2d'); OCC.bx = OCC.b.getContext('2d'); OCC.mx = OCC.m.getContext('2d');
 const OCC_GHOST = 0.42;
+const OCC_IN = 3, OCC_FADE = 16;   // v199 (Joe: tree animations): level with a trunk you stay solid, and stepping behind one fades you to the ghost instead of snapping
 function occBlocks(o) {                          // things tall enough to stand between you and the camera
   const k = o.kind;
   if (k === 'tree' || k === 'rock' || k === 'dprop' || k === 'sprop') return true;
@@ -3631,9 +3633,9 @@ function drawPlayerBehind(items) {
   const p = S.p, pk = p.x + p.y, [px, py] = toScreen(p.x, p.y);
   const x0 = px - 110 * Z, y0 = py - 120 * Z, w = 220 * Z, h = 150 * Z;   // room for the figure, a raised weapon and a swing
   const occ = [];
-  for (const it of items) if (it.k > pk && occBlocks(it.o)) {
+  for (const it of items) if (it.k > pk + OCC_IN && occBlocks(it.o)) {
     const [sx, sy] = toScreen(it.o.x, it.o.y);
-    if (sy > py - 4 * Z && sy < y0 + h + 260 * Z && Math.abs(sx - px) < 200 * Z) occ.push(it.o);
+    if (sy > py - 4 * Z && sy < y0 + h + 260 * Z && Math.abs(sx - px) < 200 * Z) { it.o.occF = Math.min(1, (it.k - pk - OCC_IN) / OCC_FADE); occ.push(it.o); }
   }
   if (!occ.length) return drawPlayer();
   const cw = Math.ceil(w * DPR), ch = Math.ceil(h * DPR);
@@ -3642,7 +3644,8 @@ function drawPlayerBehind(items) {
   xf(OCC.ax); xf(OCC.mx);
   const real = ctx; ctx = OCC.ax;
   try { drawPlayer(); } finally { ctx = real; }
-  for (const o of occ) { if (o.kind === 'dst') { const [sx, sy] = toScreen(o.x, o.y); stDraw(o, OCC.mx, sx, sy, false); } else drawProp(o, OCC.mx, true); }
+  for (const o of occ) { OCC.mx.globalAlpha = o.occF; if (o.kind === 'dst') { const [sx, sy] = toScreen(o.x, o.y); stDraw(o, OCC.mx, sx, sy, false); } else drawProp(o, OCC.mx, true); }
+  OCC.mx.globalAlpha = 1;
   const B = OCC.bx; B.setTransform(1, 0, 0, 1, 0, 0); B.globalAlpha = 1; B.globalCompositeOperation = 'source-over'; B.clearRect(0, 0, cw, ch);
   B.drawImage(OCC.a, 0, 0);
   B.globalCompositeOperation = 'destination-in'; B.drawImage(OCC.m, 0, 0);   // the part of you that's hidden
@@ -11952,13 +11955,21 @@ function padCands() {
   const out = [];
   for (const el of document.querySelectorAll(PAD_SEL)) {
     if (el.disabled || el.hidden || el.closest('[hidden]') || el.closest('#hotbar, #buildbar') || el.offsetParent === null && getComputedStyle(el).position !== 'fixed') continue;
-    const r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4 || r.bottom < -400 || r.top > innerHeight + 2400) continue;
+    const r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4 || r.bottom < -6000 || r.top > innerHeight + 6000) continue;
     const cx = Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), cy = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2));
-    if (r.top >= 0 && r.bottom <= innerHeight) { const top = document.elementFromPoint(cx, cy); if (top && top !== el && !el.contains(top) && !top.contains(el)) continue; }   // under another layer
+    if (r.top >= 0 && r.bottom <= innerHeight && padShown(el, cx, cy)) { const top = document.elementFromPoint(cx, cy); if (top && top !== el && !el.contains(top) && !top.contains(el)) continue; }   // under another layer
     if (getComputedStyle(el).visibility === 'hidden' || getComputedStyle(el).pointerEvents === 'none') continue;
-    out.push({ el, r, x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    const lb = el.tagName === 'INPUT' && el.closest('label'), g = lb ? lb.getBoundingClientRect() : r;   // a slider steers by its whole row, label and all
+    out.push({ el, r: g, x: g.left + g.width / 2, y: g.top + g.height / 2 });
   }
   return out;
+}
+function padShown(el, x, y) {   // v199 (Joe, on the TV): a button scrolled out of its list is still there, just not hit-testable; only test what's in view
+  for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+    const o = getComputedStyle(a); if (!/(auto|scroll|hidden)/.test(o.overflowY + o.overflowX)) continue;
+    const q = a.getBoundingClientRect(); if (x < q.left || x > q.right || y < q.top || y > q.bottom) return false;
+  }
+  return true;
 }
 const padSig = el => el.tagName + '|' + el.className.toString().replace(/\bpadfocus\b/, '').trim() + '|' + (el.textContent || '').trim().slice(0, 40) + '|' + ((el.parentElement && el.parentElement.querySelector('b') || {}).textContent || '') + '|' + [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name + '=' + a.value).join(',');
 function padRefind() {   // the highlighted button was redrawn: find its twin (same kind, words and data) nearest where it was, else the nearest button
@@ -11973,6 +11984,7 @@ function padFocus(el) {
   padBlur(); PAD.focus = el; el.classList.add('padfocus');
   try { el.focus({ preventScroll: true }); } catch (e) {}
   el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  { const q = el.getBoundingClientRect(), m = innerHeight * 0.18; if (q.top < m || q.bottom > innerHeight - m) el.scrollIntoView({ block: 'center', inline: 'nearest' }); }   // v199: keep it off the screen's edge so you can see what's next
   const r = el.getBoundingClientRect(); PAD.fx = r.left + r.width / 2; PAD.fy = r.top + r.height / 2; PAD.sig = padSig(el);
 }
 // v175 (Joe): with a pad in hand, the button to press shows beside whatever it would do, drawn as that pad's own button
@@ -12001,15 +12013,19 @@ function padMove(dx, dy) {
   const C = padCands(); if (!C.length) return;
   const cur = PAD.focus && C.find(c => c.el === PAD.focus);
   if (!cur) {   // start on the obvious one: Resume, Begin, the open tab, the main action, else the top-left
-    let first = null; for (const q of [resumeBtn && '#' + resumeBtn.id, '.begin', '[aria-pressed="true"]', '.main']) if (q && !first) first = C.find(c => c.el.matches(q));
+    let first = null; for (const q of [resumeBtn && '#' + resumeBtn.id, '.begin', '.tab[aria-pressed="true"], .pktab[aria-pressed="true"]', '.main']) if (q && !first) first = C.find(c => c.el.matches(q));
     return padFocus((first || C.sort((a, b) => a.y - b.y || a.x - b.x)[0]).el);
   }
-  let best = null, bs = 1e9;
+  // v199 (Joe: the highlight skipped buttons): measured edge to edge, not centre to centre, so a wide button straight below
+  // isn't passed over for a narrow one further down. Anything sharing your column wins; ties go to the nearest centre.
+  let best = null, bs = 1e9; const a = cur.r;
   for (const c of C) {
     if (c === cur) continue;
-    const vx = c.x - cur.x, vy = c.y - cur.y, along = vx * dx + vy * dy, side = Math.abs(vx * dy - vy * dx);
-    if (along < 4) continue;
-    const s = along + side * 2.2; if (s < bs) { bs = s; best = c; }
+    const b = c.r, vx = c.x - cur.x, vy = c.y - cur.y;
+    if (vx * dx + vy * dy < 4) continue;
+    const gap = dy ? Math.max(0, dy > 0 ? b.top - a.bottom : a.top - b.bottom) : Math.max(0, dx > 0 ? b.left - a.right : a.left - b.right);
+    const side = dy ? Math.max(0, b.left - a.right, a.left - b.right) : Math.max(0, b.top - a.bottom, a.top - b.bottom);
+    const s = gap + side * 3 + Math.abs(dy ? vx : vy) * 0.05; if (s < bs) { bs = s; best = c; }
   }
   if (best) { padFocus(best.el); if (typeof playTick === 'function') playTick(); }
 }
@@ -12025,6 +12041,11 @@ function padMenu(g, B, down) {
     if (F && F.type === 'range' && dx) { if (dir !== PAD.navDir || now > PAD.navT) { F.value = +F.value + dx * (+F.step || 1) * Math.max(1, Math.round((F.max - F.min) / (F.step || 1) / 20)); F.dispatchEvent(new Event('input', { bubbles: true })); F.dispatchEvent(new Event('change', { bubbles: true })); PAD.navT = now + (dir !== PAD.navDir ? 380 : 90); PAD.navDir = dir; } }
     else if (dir !== PAD.navDir || now > PAD.navT) { padMove(dx, dy); PAD.navT = now + (dir !== PAD.navDir ? 380 : 140); PAD.navDir = dir; }
   } else PAD.navDir = '';
+  if (Math.abs(PAD.ry) > 0.2) {   // v199: the right stick scrolls whatever list you're in, for reading the long pages
+    let a = PAD.focus || document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    for (; a && a !== document.documentElement; a = a.parentElement) { const o = getComputedStyle(a).overflowY; if ((o === 'auto' || o === 'scroll') && a.scrollHeight > a.clientHeight + 2) break; }
+    (a && a !== document.documentElement ? a : document.scrollingElement).scrollBy(0, PAD.ry * Math.abs(PAD.ry) * 22);
+  }
   if (!PAD.focus && !(dx || dy) && (down(0) || down(1))) padMove(0, 1);   // the first press just shows where you are
   else if (down(0) && PAD.focus) { const F = PAD.focus; if (F.tagName === 'SUMMARY' || F.tagName === 'BUTTON' || F.tagName === 'A' || F.getAttribute('role') === 'button') { F.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); F.click(); } else if (F.type === 'checkbox') F.click(); }
   else if (down(1)) padBack();
