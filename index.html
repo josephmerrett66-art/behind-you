@@ -594,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 195</p>
+      <p class="small" id="verLbl">Version 196</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -4503,6 +4503,9 @@ const DUNE_MUS = {"parts":["music/dunes/0.mp3","music/dunes/1.mp3","music/dunes/
 // v182 (Joe): his song "fresh start" is the Daylight song, on its own loop the whole run (9 pieces of ~47 s, built the same way;
 // the last 3 s fade out so the loop back to the quiet intro doesn't jump).
 const DAY_MUS = {"parts":["music/daylight/0.mp3","music/daylight/1.mp3","music/daylight/2.mp3","music/daylight/3.mp3","music/daylight/4.mp3","music/daylight/5.mp3","music/daylight/6.mp3","music/daylight/7.mp3","music/daylight/8.mp3"],"lens":[2090509,2090509,2090509,2090509,2090509,2090509,2090509,2090509,2090514],"P":11025};
+// v196 (Joe): his "break the beat" is Daylight's second song: fresh start, then break the beat (1.5 s of quiet in, last 3 s faded), round again.
+const DAY2_MUS = {"parts":["music/daylight2/0.mp3","music/daylight2/1.mp3","music/daylight2/2.mp3","music/daylight2/3.mp3","music/daylight2/4.mp3","music/daylight2/5.mp3","music/daylight2/6.mp3","music/daylight2/7.mp3","music/daylight2/8.mp3"],"lens":[1967214,1967214,1967214,1967214,1967214,1967214,1967214,1967214,1967218],"P":11025};
+const DAY_LIST = { parts: DAY_MUS.parts.concat(DAY2_MUS.parts), lens: DAY_MUS.lens.concat(DAY2_MUS.lens), P: DAY_MUS.P };
 const MUS_PAD = MUS.P / 44100, MUS_XF = 0.012, MUS_FADE = 2.5;
 // v149 (Joe): five more of his songs, shuffled with backing track 2 everywhere except the Dunes (music/songs/). Each ends in 1.5 s of quiet.
 const SONGS = {"yeh":{"parts":["music/songs/yeh/0.mp3","music/songs/yeh/1.mp3","music/songs/yeh/2.mp3","music/songs/yeh/3.mp3"],"lens":[2040026,2040025,2040025,2040026],"P":11025},"quest":{"parts":["music/songs/quest/0.mp3","music/songs/quest/1.mp3","music/songs/quest/2.mp3","music/songs/quest/3.mp3","music/songs/quest/4.mp3"],"lens":[1997896,1997895,1997896,1997895,1997896],"P":11025},"just-wont-do":{"parts":["music/songs/just-wont-do/0.mp3","music/songs/just-wont-do/1.mp3","music/songs/just-wont-do/2.mp3","music/songs/just-wont-do/3.mp3","music/songs/just-wont-do/4.mp3"],"lens":[1967252,1967253,1967252,1967253,1967252],"P":11025},"untitled":{"parts":["music/songs/untitled/0.mp3","music/songs/untitled/1.mp3","music/songs/untitled/2.mp3","music/songs/untitled/3.mp3","music/songs/untitled/4.mp3"],"lens":[2130145,2130145,2130146,2130145,2130145],"P":11025},"crow-game-theme":{"parts":["music/songs/crow-game-theme/0.mp3","music/songs/crow-game-theme/1.mp3","music/songs/crow-game-theme/2.mp3","music/songs/crow-game-theme/3.mp3","music/songs/crow-game-theme/4.mp3","music/songs/crow-game-theme/5.mp3","music/songs/crow-game-theme/6.mp3","music/songs/crow-game-theme/7.mp3","music/songs/crow-game-theme/8.mp3","music/songs/crow-game-theme/9.mp3","music/songs/crow-game-theme/10.mp3","music/songs/crow-game-theme/11.mp3","music/songs/crow-game-theme/12.mp3","music/songs/crow-game-theme/13.mp3","music/songs/crow-game-theme/14.mp3","music/songs/crow-game-theme/15.mp3"],"lens":[2103438,2103439,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103439,2103438],"P":11025}};
@@ -4525,7 +4528,7 @@ function plShuffle() {                         // the playlist: every song once 
   for (const i of ord) { def.parts.push(...list[i].parts); def.lens.push(...list[i].lens); }
   return def;
 }
-const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS), mkTrack(DAY_MUS)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop), 2 fresh start (Daylight)
+const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS), mkTrack(DAY_LIST)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop), 2 fresh start then break the beat (Daylight)
 TRACKS[0].shuffle = true;
 const mus = { gain: null, on: false, cur: 0 };
 function musLoad(url) {                        // v148: the music lives as separate files next to the game (the browser caches them)
