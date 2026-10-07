@@ -149,7 +149,7 @@ body.mouse #wspec, body.mouse #wswap, body.mouse #torch, body.mouse #dodge, body
 #buildbar .bpname { font: 600 0.58rem var(--mono); letter-spacing: 0.04em; color: var(--ash); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 560px) and (min-height: 521px) { #buildbar { left: 8px; right: 8px; width: auto; max-width: none; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); gap: 3px; padding: 4px; } #buildbar .bprow { flex-wrap: nowrap; gap: 2px; } #buildbar .bp { width: 41px; padding: 4px 0 3px; font-size: 0.42rem; } #buildbar .bp svg { width: 20px; height: 20px; } #buildbar .bc, #buildbar .bt { width: 26px; height: 27px; } #buildbar .bc svg, #buildbar .bt svg { width: 17px; height: 17px; } #buildbar .bptools { gap: 2px; margin-left: 3px; padding-left: 3px; } }
 @media (max-height: 520px) { #buildbar { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); gap: 2px; padding: 3px; max-width: calc(100vw - 170px); } #buildbar .bp { width: 42px; padding: 3px 1px 2px; } #buildbar .bp svg { width: 19px; height: 19px; } #buildbar .bc, #buildbar .bt { width: 27px; height: 24px; } #buildbar .bc svg, #buildbar .bt svg { width: 17px; height: 17px; } #buildbar .bpname { display: none; } }
-#craft .pk { margin-block: auto; width: 100%; max-width: 34rem; display: grid; gap: 0.6rem; }
+#craft .pk { margin-block: 0 auto;   /* v193: held at the top, so the tabs never jump when a section opens or shuts */ width: 100%; max-width: 34rem; display: grid; gap: 0.6rem; }
 #craft.carded .pk { padding-bottom: 12rem; }   /* v180: room under the item card only while it's up */
 @media (min-width: 760px) { #craft .pk { max-width: 62rem; } }
 #craft .pkcols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 1.4rem; align-items: start; }
@@ -586,7 +586,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <button id="srchBtn" class="alt">Woods enemies: Searchers</button>
       <p class="small">Searchers: the woods stay empty until a searcher's beam finds you, then the swarm comes until you're back inside the fence. Classic brings back the old hunters.</p>
       <button id="wpnBtn" class="alt">Weapons: on (trial)</button>
-      <p class="small">Boss weapons: beat a boss and take its weapon, carry two and swap between them. So far: the Woodcutter's Felling Axe. Off: the torch only, as before.</p>
+      <p class="small">Boss weapons: beat a boss and take its weapon, carry two and swap between them. Every boss has one. Off: the torch only, as before.</p>
     </div>
     <div class="audio"><h2>Audio</h2>
       <label class="fov"><span>Music</span><input id="volMusic" type="range" min="0" max="100" step="5"><output id="volMusicOut"></output></label>
@@ -594,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 192</p>
+      <p class="small" id="verLbl">Version 193</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -640,13 +640,14 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-8 17h16z"/><path d="M12 3v17M9 20l3-6 3 6"/></svg></span>Expedition<span class="sh">Loot, camp, orbs</span></summary><p>Live in a walled camp and head out for loot. Carry it home to bank it and buy upgrades that last. Your torch burns oil and loot weighs you down. The further out, the worse it gets. Three green orbs wait in the deep; bring them home to the shrine. Die out there and you lose what you carried.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.6 0-6-2.6-6-5.8C6 11 12 3 12 3s6 8 6 12.2c0 3.2-2.4 5.8-6 5.8z"/><circle cx="12" cy="15.5" r="2"/></svg></span>Wisps<span class="sh">Spent at the camp shop</span></summary><p>Everything you burn in Nightfall and Expedition leaves a violet wisp. Grab it before it fades, then spend wisps at the shop by the camp fire on upgrades that last. In Expedition, wisps only count once you carry them home. Stats on the title menu keeps your record: distance walked, enemies burned, bosses felled and more.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/><circle cx="16.5" cy="6" r=".6"/><circle cx="19.5" cy="9.5" r=".5"/></svg></span>Nightfall<span class="sh">Waves, upgrades</span></summary><p>Shades only move in the dark and freeze in your light. Hold the beam on them and they burn. Burn every shade to reach dawn, then pick an upgrade. Each wave brings more, and new kinds.</p></details>
+      <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></span>Daylight<span class="sh">Survive, build, get out</span></summary><p>No torch by day: gather, craft, hunt and build, and keep yourself fed, watered and warm. Nights are pitch black and the raiders come with them. Four raider camps each guard a relic; bring all four home, build the signal fire and hold out by it to walk out of the woods. Nothing happens for you: you choose when to pick up, eat, drink and heal.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16c-1.6 0-2.6-1.4-2.4-3.2C4.9 10.6 6 9 7.3 9.3c1.3.3 1.5 2.3 1.2 4-.2 1.6-.6 2.7-1.5 2.7zM16 10c-1.6 0-2.6-1.4-2.4-3.2.3-2.2 1.4-3.8 2.7-3.5 1.3.3 1.5 2.3 1.2 4-.2 1.6-.6 2.7-1.5 2.7z"/><path d="M5.5 18.5h3M14.5 12.5h3"/></svg></span>Chase<span class="sh">Search, then run</span></summary><p>Stop to search with a fading torch, then run blind for eight seconds while they flee. Two red trails show where they went. Miss them once and they're gone.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span>Blink<span class="sh">No running</span></summary><p>Two seconds of dark, then the torch comes on somewhere new with them hidden nearby. Find them before the light fades.</p></details>
       <details><summary><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l-5 7h3l-4 6h12l-4-6h3z"/><path d="M12 16v5"/></svg></span>Free roam<span class="sh">No goals</span></summary><p>Walk the woods with rabbits, birds and fireflies.</p></details>
     </div>
     <div class="controls">
-      <span>Phone</span><span>Right thumb aims. Left thumb runs. Tap Attack to swing the torch (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps.</span>
-      <span>Desktop</span><span>Mouse aims<br>W or Space runs<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch (not in Expedition)<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern</span>
+      <span>Touch</span><span>Right thumb aims. Left thumb runs. Tap Attack to swing (tap again to chain three hits). Tap Dodge to roll. Tap Shop at the fire to spend embers and wisps. In Daylight, Pack opens your pack, Take or Use works what's in front of you, and Sneak crouches.</span>
+      <span>Desktop</span><span>Mouse aims<br>W or Space runs<br>Left-click or J attacks (three in a row chain, attack out of a roll to lunge)<br>Right-click or Q dodges<br>F switches the torch (not in Expedition)<br>R toggles auto run<br>E opens the shop at the fire<br>G lights a recall flare, T plants a lantern, H drinks a flask<br>Daylight: E uses or takes, C or Tab opens the pack, 1 to 6 or the wheel picks from the hotbar, Q crouches (right-click rolls)</span>
       <span>Controller</span><span>Left stick runs, right stick aims<br>A or RT attacks, B dodges<br>X uses, Y is your weapon's special<br>LB and RB change what's in your hand (Expedition: LB swaps weapon)<br>D-pad: up or LT drinks a flask, down lights a recall flare, left plants a lantern, right toggles auto run<br>View opens the pack, Menu pauses<br>In menus, the d-pad or left stick moves, A presses, B goes back</span>
     </div>
   </section>
@@ -742,7 +743,7 @@ function worldMatrix(c, scale) {
 
 // ---- input ----
 const keys = {};
-addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; if (e.key.toLowerCase() === 'r' && !e.repeat && S && S.running) toggleAutoRun(); keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat) dodge(); if (e.key.toLowerCase() === 'j' && !e.repeat) attack(); });
+addEventListener('keydown', e => { if (!e.repeat && S && S.autoRun && ['w', 'arrowup', ' '].includes(e.key.toLowerCase())) S.autoRun = false; if (e.key.toLowerCase() === 'r' && !e.repeat && S && S.running) toggleAutoRun(); keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f' && !e.repeat && S && S.running) toggleTorch(); if (e.key.toLowerCase() === 'q' && !e.repeat && !(S && S.day)) dodge(); if (e.key.toLowerCase() === 'j' && !e.repeat) attack(); });   // v193: in Daylight Q crouches (it used to roll and crouch at once)
 // a mouse in hand hides the thumb buttons; the first touch brings them back
 if (matchMedia('(pointer: fine)').matches && !matchMedia('(pointer: coarse)').matches) document.body.classList.add('mouse');
 addEventListener('pointermove', e => { if (e.pointerType === 'mouse') document.body.classList.add('mouse'); }, { passive: true });
@@ -7818,7 +7819,7 @@ function dayBegin() {
     warm: WARM_MAX, bleed: 0, bleedT: 0, froze: 0, fish: null, ph: 'day',
     camps: new Map(), heat: 0, raids: 0, caught: 0, away: 0, jlog: [], bag: {}, siege: null, won: 0, scout: null, scoutT: 55 };   // v155: the raider camps, the heat and the journal   // v153: the cold, your wounds and the night   // v152: what you've built on the grid, and where your bed is
   S.rg = exNewRun(); exPlaceHome(); wpInit(); S.day.baseHp = S.rg.maxHp;
-  S.msg = { text: 'daylight', sub: 'Sticks and stones lie on the ground · walk up to them and Take', t: 0 };
+  S.msg = { text: 'daylight', sub: 'Sticks and stones lie on the ground · walk up to them and press Take', t: 0 };
   dayChanged();
 }
 function dayNote(k, text, gap = 4) { const D = S.day; if ((D.told[k] || -99) > D.t - gap) return; D.told[k] = D.t; exNote(text, true); }
@@ -8727,12 +8728,19 @@ sneakBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropag
 const PK = { tab: 'pack', sel: null, cat: null, open: null, cont: null, flash: null, at: 'hand', atLock: false };
 // v179 (Joe): every section of the pack folds up under its heading, so the one you want is never a long scroll away. Remembered on this device.
 let PK_FOLD = {}; try { PK_FOLD = JSON.parse(localStorage.getItem('behind-you-folds') || '{}') || {}; } catch (e) {}
+let PK_ONE = {};                                  // v193 (Joe): the Craft, Book and Journal lists start shut each time the pack opens, and only one section is open at a time
+const pkGroup = key => key === 'forge' ? 'c:anvil' : /^c:/.test(key) ? key.slice(0, key.lastIndexOf(':')) : /^[bj]:/.test(key) ? key[0] : null;
 function pkFold(key, title, side, kids, defOpen, icon) {   // [header, body]: the header button opens and closes the body
-  const open = PK_FOLD[key] ?? defOpen, h = pkEl('button', 'pkfold' + (open ? ' open' : ''));
+  const grp = pkGroup(key), open = grp ? PK_ONE[grp] === key : PK_FOLD[key] ?? defOpen, h = pkEl('button', 'pkfold' + (open ? ' open' : ''));
   h.setAttribute('aria-expanded', open ? 'true' : 'false'); h.dataset.fold = key;
   h.innerHTML = '<i class="chev"></i>' + (icon ? iconSvg(icon) : '') + '<em></em><span></span>';
   h.querySelector('em').textContent = title; h.querySelector('span').textContent = side || '';
-  h.addEventListener('click', () => { PK_FOLD[key] = !open; try { localStorage.setItem('behind-you-folds', JSON.stringify(PK_FOLD)); } catch (e) {} renderPack(); });
+  h.addEventListener('click', () => {
+    if (grp) PK_ONE[grp] = open ? null : key;   // opening one closes the rest
+    else { PK_FOLD[key] = !open; try { localStorage.setItem('behind-you-folds', JSON.stringify(PK_FOLD)); } catch (e) {} }
+    renderPack();
+    if (grp && !open) { const nh = craftEl.querySelector(`[data-fold="${CSS.escape(key)}"]`); if (nh) nh.scrollIntoView({ block: 'nearest' }); }   // the one you opened stays in sight
+  });
   const body = pkEl('div', 'pkfoldbody'); if (open) body.append(...kids); else body.hidden = true;
   return [h, body];
 }
@@ -8743,7 +8751,7 @@ function openCraft(target) {
   if (PK.cont && PK.cont.B) { PK.cont.B.openT = 9e9; if (actx) { const t = actx.currentTime; noiseAt(t, 700, 300, 0.25, 0.3, sfxGain); } }
   PK.sel = null; if (target) PK.tab = 'pack';
   if (!target && PK.tab === 'craft' && !PK.atLock) PK.at = craftPlaceNow();   // v171: the Craft tab opens on where you're standing
-  PK.atLock = false; document.body.classList.add('pkopen');
+  PK.atLock = false; PK_ONE = {}; document.body.classList.add('pkopen');
   S.running = false; menuBtn.hidden = true; craftBtn.hidden = true; craftEl.hidden = false; renderPack();
   sfx(0.9, 0.3, 'bandpass', 520, 0.3);
 }
@@ -9092,7 +9100,7 @@ const BOOK = [
   { id: 'forage', n: 'Foraged', icon: 'berries', items: ['berries', 'mushroom'] },
   { id: 'made', n: 'Worked materials', icon: 'rope', blurb: 'Made from the others, at a station.', items: ['rope', 'planks', 'iron'] },
   { id: 'cook', n: 'Cooked and kept', icon: 'cooked', items: ['cooked', 'roast', 'stew', 'fishC', 'jerky', 'tea'] },
-  { id: 'relic', n: 'Relics', icon: 'rskull', blurb: 'Each raider camp guards one. Bring all three home for the signal fire.', items: ['rbell', 'rskull', 'rcrown'] },
+  { id: 'relic', n: 'Relics', icon: 'rskull', blurb: 'Each raider camp guards one. Bring all four home for the signal fire.', items: ['rhorn', 'rbell', 'rskull', 'rcrown'] },
 ];
 function bookWhere(id) {                         // every way to come by it, known recipe or not
   const bits = [], r = DREC.filter(x => x.out === id);
@@ -13271,7 +13279,7 @@ function wpUi(force) {
 }
 wspecBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSpecial(); });
 wswapBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wpSwap(); });
-addEventListener('keydown', e => { if (!e.repeat && S && S.day && S.running && (e.key === 'q' || e.key === 'Q' || e.key === 'Control')) dayCrouch(); });   // v178: crouch
+addEventListener('keydown', e => { if (!e.repeat && S && S.day && S.running && (e.key === 'q' || e.key === 'Q')) dayCrouch(); });   // v178: crouch   // v193: not Ctrl, which with W held closes the browser tab
 addEventListener('keydown', e => {                // v186: with the hammer in hand: Z/X turn the piece, V snapping, B pull down, [ ] pieces, N kinds
   if (!S || !S.day || !S.running || dayTool() !== 'build' || !craftEl.hidden || !overlay.hidden) return;
   const k = e.key.toLowerCase();
