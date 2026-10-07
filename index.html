@@ -594,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 193</p>
+      <p class="small" id="verLbl">Version 194</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -1122,10 +1122,10 @@ const MON_PITCH = { shade: 1, stalker: 1.15, brute: 0.84, tall: 0.68, bomber: 1.
 const burnVoices = new Set(), monLast = { death: 0, small: 0 };
 let hann = null;
 function monOut(x, y, gain) {       // a gain node panned toward where the monster is on screen
-  const g = actx.createGain(); g.gain.value = gain;
+  const g = actx.createGain(); g.gain.value = Number.isFinite(gain) ? gain : 0;
   if (actx.createStereoPanner) {
     const [sx] = toScreen(x, y), [px] = toScreen(S.p.x, S.p.y), pan = actx.createStereoPanner();
-    pan.pan.value = Math.max(-0.7, Math.min(0.7, (sx - px) / (W * 0.5) * 0.7));
+    const pv = (sx - px) / (W * 0.5) * 0.7; pan.pan.value = Number.isFinite(pv) ? Math.max(-0.7, Math.min(0.7, pv)) : 0;
     g.connect(pan); pan.connect(sfxGain); g.pan = pan;
   } else g.connect(sfxGain);
   return g;
@@ -17658,6 +17658,7 @@ function fpsDraw(raw) {
   ctx.restore();
 }
 function frame(now) {
+  requestAnimationFrame(frame);   // v194: asked first, so one bad frame can't stop the game for good
   if (btnKey === '' || ++btnTick % 3 === 0) layoutBtns();   // v145; v177: every third frame, it reads the buttons' styles
   padPoll();   // v172: a controller
   const raw = Math.max(0, (now - last) / 1000);   // v111: rAF's stamp can come before a resume's performance.now(); a negative step once froze the game
@@ -17673,7 +17674,6 @@ function frame(now) {
   buildbarEl.hidden = hotbarEl.hidden || !(S.day && dayTool() === 'build') || !craftEl.hidden;   // v152: the pieces, only with the hammer in hand
   if (titleLive()) drawTitleEyes();
   fpsDraw(raw);
-  requestAnimationFrame(frame);
 }
 reset(); S.running = false; showPanel(null);
 requestAnimationFrame(frame);
