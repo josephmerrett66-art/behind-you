@@ -597,7 +597,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 199</p>
+      <p class="small" id="verLbl">Version 200</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -3499,6 +3499,7 @@ function drawPropFlat(o, c = ctx, mask = false, maskCol = '#000') {
   if (o.kind === 'tree') {
     drawTree(o, c, mask, sx, sy, s);
   } else if (o.kind === 'felled') { drawFelled(o, c, mask);
+  } else if (o.kind === 'poof') { drawPoof(o, c, mask, sx, sy, s);
   } else if (o.kind === 'dprop') { drawDesertProp(o, c, mask, sx, sy, s);
   } else if (o.kind === 'sprop') { drawSnowProp(o, c, mask, sx, sy, s);
   } else if (o.kind === 'rock') {
@@ -8053,6 +8054,7 @@ function dayStep(dt, inCamp) {
   for (const o of dayNodesNear(p.x, p.y, 900)) if (o.t === 'bush' && !o.ber && (o.berT -= dt) <= 0) o.ber = true;   // berries grow back
   // trees going over, then the logs
   for (const g of D.logs) {
+    if (g.kind === 'poof') { if ((g.t += dt) >= POOF_T) g.done = true; continue; }
     if (g.fall < 1) { g.fall = Math.min(1, g.fall + dt * (0.5 + g.fall * 2.6)); if (g.fall >= 1) { addShake(0.35 * monNear(g, 500)); if (actx) boomAt(actx.currentTime, 70, 40, 0.5, 0.5 * monNear(g, 600), sfxGain); for (let i = 0; i < 5; i++) { ashBurst(g.bx + g.ux * g.len * i / 5, g.by + g.uy * g.len * i / 5, 4, 6); if (i > 1) dayChips(g.bx + g.ux * g.len * i / 5, g.by + g.uy * g.len * i / 5, 8, g.type === 'cherry' ? 'leaf' : 'wood', 4); } } }
     else if ((g.lie += dt) > 0.7 && (g.gone = (g.gone || 0) + dt * 2) >= 1) {
       g.done = true;
@@ -8062,7 +8064,8 @@ function dayStep(dt, inCamp) {
     }
   }
   D.logs = D.logs.filter(g => !g.done);
-  for (const c of D.chips) { c.vz -= 380 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; }
+  for (const c of D.chips) { if (c.fl && c.z > 0) { c.vx *= 1 - 2.2 * dt; c.vy *= 1 - 2.2 * dt; c.vz = Math.max(c.vz, -26); c.x += Math.sin(c.life * 4 + c.ph) * c.fl * dt; c.rot += Math.sin(c.life * 4 + c.ph) * 3 * dt; }   // a leaf sways down
+    c.vz -= 380 * (c.g || 1) * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.rot += c.vr * dt; if (c.z < 0) { c.z = 0; c.vz *= -0.3; c.vx *= 0.5; c.vy *= 0.5; c.vr *= 0.5; } c.life -= dt; }
   D.chips = D.chips.filter(c => c.life > 0);
   beastStep(dt); buildStep(dt); stStep(dt); dayCampStep(dt); dayHeatStep(dt); dayPostStep(dt); daySiegeStep(dt);
   dayWarmStep(dt); dayBleedStep(dt); dayFishStep(dt); dayTorchStep(dt); dayPlotStep(dt);
@@ -8232,7 +8235,9 @@ function dayHarvest(Dk, a, inReach, spark) {
     if (want && best && best.kind !== want) { let m = null, md = 1e9; for (const o of propsNear(p.x, p.y, Dk.reach + 30)) if (o.kind === want && inReach(o, 12) && dist2(o, p) < md) { md = dist2(o, p); m = o; } if (m) best = m; } }
   if (!best) return hits;
   A.hit.add('world'); hits++;
-  const chips = col => dayChips(best.x, best.y, best.kind === 'tree' ? 26 : 10, col, best.kind === 'tree' ? 9 : 7);
+  // v199 (Joe: the chips flew from the wrong spot): they burst from where the blade bites, low on the side facing you, and spray back towards you
+  const hitA = Math.atan2(p.y - best.y, p.x - best.x), hitR = (best.kind === 'tree' ? 4 : 8) * (best.s || 1);
+  const chips = col => dayChips(best.x + Math.cos(hitA) * hitR, best.y + Math.sin(hitA) * hitR, best.kind === 'tree' ? 11 : 7, col, best.kind === 'tree' ? 10 : 7, hitA);
   best.shakeT = S.t;
   const owns = job => D.inv.some(s => s && DIT[s.id].tool === job);
   if (best.kind === 'tree') {
@@ -8263,14 +8268,20 @@ function dayHarvest(Dk, a, inReach, spark) {
   }
   return hits;
 }
-function dayFell(t) {                          // the tree goes over, away from you
-  const D = S.day, a = Math.atan2(t.y - S.p.y, t.x - S.p.x) + (Math.random() - 0.5) * 0.5;
+function dayFell(t) {                          // v199 (Joe: the falling looked terrible): the last chop bursts the tree apart into wood and leaves
+  const D = S.day, a = Math.atan2(t.y - S.p.y, t.x - S.p.x), sc = t.s || 1, h = SPRITE_KINDS[t.type === 'oak' || t.type === 'cherry' ? 'oak' : 'pine'][4] * sc;
   D.felled.add(t.key); D.cut.delete(t.key);
-  const len = treeLen(t);
-  D.logs.push({ kind: 'felled', type: t.type, seed: t.seed, s: t.s, r: 0, bx: t.x, by: t.y, ux: Math.cos(a), uy: Math.sin(a), len, fall: 0, lie: 0, x: t.x + Math.cos(a) * len / 2, y: t.y + Math.sin(a) * len / 2,
-    give: t.type === 'dead' ? { logs: 1, sticks: 3 } : { logs: 2 + (t.s > 1.1 ? 1 : 0), sticks: 2 } });
+  D.logs.push({ kind: 'poof', type: t.type, seed: t.seed, s: t.s, r: 0, x: t.x, y: t.y, t: 0, shakeT: S.t, give: {} });
+  const leaf = t.type === 'pine' ? 'needle' : t.type === 'cherry' ? 'petal' : t.type === 'dead' ? 'twig' : 'crown', crownR = (t.type === 'pine' ? 16 : t.type === 'dead' ? 10 : 24) * sc;
+  dayChips(t.x, t.y, 8, 'wood', 18, a, 1.7);                        // the cut gives way, away from you
+  dayChips(t.x, t.y, 4 + h * 0.25, 'wood', 14, undefined, 1.5);                // the trunk splinters
+  dayLeaves(t.x, t.y, h * 0.3, h * 0.95, crownR, leaf, t.type === 'dead' ? 22 : 80);   // the crown comes down as a shower
+  ashBurst(t.x, t.y, 10, 10); ashBurst(t.x + Math.cos(a) * 12, t.y + Math.sin(a) * 12, 6, 6);
+  addShake(0.32); hitStop(0.06); padRumble(0.55, 160);
+  if (actx) { const t0 = actx.currentTime; noiseAt(t0, 900, 300, 0.35, 0.45, sfxGain); boomAt(t0 + 0.02, 90, 45, 0.35, 0.45, sfxGain); noiseAt(t0 + 0.05, 4500, 1800, 0.9, 0.18, sfxGain); }   // crack, thump, the rustle of leaves
+  const give = t.type === 'dead' ? { logs: 1, sticks: 3 } : { logs: 2 + (sc > 1.1 ? 1 : 0), sticks: 2 };
+  dayGive('logs', give.logs, t.x, t.y); dayGive('sticks', give.sticks, t.x, t.y); pickSnd();   // v169: straight into the pack
   exNote('timber', true);
-  if (actx) { const t0 = actx.currentTime; noiseAt(t0, 400, 120, 0.9, 0.3, sfxGain); }
 }
 // ---- animals: deer graze in herds and bolt, rabbits dart, boars charge back ----
 const BC = 900;
@@ -8651,6 +8662,7 @@ function drawDay() {                           // the sun: a warm wash from the 
   ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * lt; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
   ctx.restore();
   drawNight();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);   // v199 (Joe: chips flew from the wrong spot): these draw in screen points; on a sharp screen (TV, tablet) they were landing up and to the left
   drawDayFires(); stFlames(); drawRoamFx(); drawDayChips(); drawFloat(); drawSiege();
 }
 function dayBar(px, py) {                      // stamina, food and water over your head
@@ -12096,15 +12108,27 @@ POSES[10] = [dk(0, {}), dk(0.15, { ln: 3, cr: 6, st: 2, a: 0.3, R: 9, h: -4, ta:
 const TOOL_SWING = { axe: { pose: 4, dur: 0.44, hitAt: 0.22, hop: 0, lunge: 8 }, pick: { pose: 5, dur: 0.46, hitAt: 0.24, hop: 0, lunge: 6 }, hand: { pose: 6, dur: 0.32, hitAt: 0.1, hop: 2, lunge: 14 } };
 function dayAct(pose, dur, col, item) { S.p.act = { pose, t: 0, dur, col, item }; }
 function dayActStep(dt) { const a = S.p.act; if (a && (a.t += dt) >= a.dur) S.p.act = null; }
-function dayChips(x, y, z, kind, n) {
-  const cols = { wood: ['#c9a26b', '#a07a48', '#5a3e28'], stone: ['#a19f98', '#77756f', '#5d6670'], leaf: ['#5f8a3a', '#7aa04a', '#a8b86a'] }[kind] || ['#999'];
-  const L = S.day.chips; for (let k = 0; k < n; k++) { const a = Math.random() * 7, v = 40 + Math.random() * 110; L.push({ x, y, z, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 60 + Math.random() * 120, rot: Math.random() * 7, vr: (Math.random() - 0.5) * 30, life: 0.7 + Math.random() * 0.5, col: COLOUR ? cols[k % cols.length] : '#9a9a94', w: kind === 'leaf' ? 2.6 : 2 }); }
-  if (L.length > 160) L.splice(0, L.length - 160);
+const POOF_T = 0.32;
+const CHIP_COL = { wood: ['#c9a26b', '#a07a48', '#5a3e28'], stone: ['#a19f98', '#77756f', '#5d6670'], leaf: ['#5f8a3a', '#7aa04a', '#a8b86a'],
+  crown: ['#7aa04a', '#9cc25a', '#5f8a3a', '#c2d27a'], needle: ['#3f6e37', '#4f7a3c', '#2f5a2e', '#6a9448'], petal: ['#f2b8c6', '#e89aae', '#fbd3dc'], twig: ['#6b5138', '#4a3826', '#8a6a48'] };
+function dayChips(x, y, z, kind, n, dir, big = 1) {   // dir: spray that way (in a fan) instead of all round; big: chunkier bits
+  const cols = CHIP_COL[kind] || ['#999'];
+  const L = S.day.chips; for (let k = 0; k < n; k++) { const a = dir === undefined ? Math.random() * 7 : dir + (Math.random() - 0.5) * 2.4, v = 40 + Math.random() * 110; L.push({ x, y, z, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 60 + Math.random() * 120, rot: Math.random() * 7, vr: (Math.random() - 0.5) * 30, life: 0.7 + Math.random() * 0.5, col: COLOUR ? cols[k % cols.length] : '#9a9a94', w: (kind === 'leaf' ? 2.6 : 2) * big * (0.8 + Math.random() * 0.4), hh: 0.8 * big }); }
+  if (L.length > 320) L.splice(0, L.length - 320);
+}
+function dayLeaves(x, y, z0, z1, R, kind, n) {     // v199: leaves or needles shaken loose through a crown, drifting down and swaying as they go
+  const cols = CHIP_COL[kind] || CHIP_COL.leaf, L = S.day.chips;
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * 7, d = Math.sqrt(Math.random()) * R, v = 15 + Math.random() * 45;
+    L.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.7, z: z0 + Math.random() * (z1 - z0), vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 10 + Math.random() * 50, rot: Math.random() * 7, vr: (Math.random() - 0.5) * 8,
+      life: 1.5 + Math.random() * 1.3, col: COLOUR ? cols[k % cols.length] : '#8a8a84', w: (kind === 'needle' ? 3.6 : 4.4) * (0.7 + Math.random() * 0.6), hh: kind === 'needle' ? 1.3 : 2.2, g: 0.14, fl: 22 + Math.random() * 20, ph: Math.random() * 7 });
+  }
+  if (L.length > 320) L.splice(0, L.length - 320);
 }
 function drawDayChips() {
   const L = S.day && S.day.chips; if (!L || !L.length) return;
   ctx.save();
-  for (const c of L) { const [x, y] = toScreen(c.x, c.y); ctx.globalAlpha = Math.min(1, c.life * 3); ctx.fillStyle = c.col; ctx.save(); ctx.translate(x, y - c.z * Z); ctx.rotate(c.rot); ctx.fillRect(-c.w * Z, -0.8 * Z, c.w * 2 * Z, 1.6 * Z); ctx.restore(); }
+  for (const c of L) { const [x, y] = toScreen(c.x, c.y), [l, hy] = lean(x, y), zz = c.z * Z * hy; ctx.globalAlpha = Math.min(1, c.life * 3); ctx.fillStyle = c.col; ctx.save(); ctx.translate(x + l * zz, y - zz); ctx.rotate(c.rot); ctx.fillRect(-c.w * Z, -(c.hh || 0.8) * Z, c.w * 2 * Z, (c.hh || 0.8) * 2 * Z); ctx.restore(); }   // v199: leaning with the trees, so they leave the trunk where you see it
   ctx.restore();
 }
 function dayHeld(P, hand, tip, near, OUT) {   // draw what's in your hand: the tool you hold, or the food or water you're taking
@@ -14837,6 +14861,13 @@ function logBetween(m, a, b) {                   // a fallen log lying across th
     if (d1 * d2 < 0 && d3 * d4 < 0) return g;
   }
   return null;
+}
+function drawPoof(o, c, mask, sx, sy, s) {     // v199: a chopped tree squashes down and fades under its own burst of leaves and wood
+  const k = Math.min(1, o.t / POOF_T), e = k * k;
+  c.save(); c.translate(sx, sy); c.scale(1 + 0.18 * e, 1 - 0.55 * e); c.translate(-sx, -sy);
+  if (!mask) c.globalAlpha *= 1 - e;
+  drawTree(o, c, mask, sx, sy, s);
+  c.restore();
 }
 function drawFelled(o, c, mask) {                // a tree going over, then lying where it fell; same painted sprite, turned down onto the ground
   const [bx, by] = toScreen(o.bx, o.by), k = Math.min(1, o.fall), th = k * k * Math.PI / 2, sn = Math.sin(th), cs = Math.cos(th);
