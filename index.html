@@ -594,7 +594,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 196</p>
+      <p class="small" id="verLbl">Version 197</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -673,7 +673,7 @@ const exKeyOf = id => id === 1 ? 'behind-you-expedition' : 'behind-you-expeditio
 const stKeyOf = id => id === 1 ? 'behind-you-stats' : 'behind-you-stats-' + id;
 const svName = id => 'Save ' + id;
 const cv = document.getElementById('game');
-const ctx = cv.getContext('2d');
+let ctx = cv.getContext('2d');   // v197: let, so the player can be drawn into a side canvas when something stands in front
 const dark = document.createElement('canvas');
 const dctx = dark.getContext('2d');
 // shadows are drawn small then blurred and stretched back up, which softens every edge
@@ -3606,6 +3606,45 @@ function atkPose(p) {                              // the pose to draw, and how 
 const KITC = { jacket: mat(0.95, 1.2, 0.72, 1.7), pants: mat(1.3, 1.18, 0.88, 1.7), pad: mat(1, 1, 0.95, 1.2), boot: mat(1.45, 1.0, 0.68, 1.6), sole: mat(1.1, 1, 0.9),
   glove: mat(1.3, 1.05, 0.8, 1.4), canvas: mat(1.32, 1.16, 0.82, 1.6), roll: mat(1.9, 0.8, 0.62, 1.5), strap: mat(1.2, 1.05, 0.85, 1.25), rig: mat(1.35, 1.17, 0.86, 1.55),
   skin: mat(1.5, 1.12, 0.9, 1.9), scarf: mat(2.0, 0.72, 0.52, 1.6), hat: mat(1.12, 1.15, 0.8, 1.55), hair: mat(1.35, 1.0, 0.75, 1.1) };   // v124: the survivor's kit in colour
+// ---- v197 (Joe): walk behind a tree, a rock or a wall and it hides you; a faint pale ghost of you shows through so you never lose
+// yourself. The player is drawn into a small side canvas round them, cut by the outlines of whatever stands in front (further down
+// the screen in the draw order), and the cut-away part goes back as a see-through silhouette. Nothing in front: drawn as before.
+const OCC = { a: document.createElement('canvas'), b: document.createElement('canvas'), m: document.createElement('canvas') };
+OCC.ax = OCC.a.getContext('2d'); OCC.bx = OCC.b.getContext('2d'); OCC.mx = OCC.m.getContext('2d');
+const OCC_GHOST = 0.42;
+function occBlocks(o) {                          // things tall enough to stand between you and the camera
+  const k = o.kind;
+  if (k === 'tree' || k === 'rock' || k === 'dprop' || k === 'sprop') return true;
+  if (k === 'dst' && o.done !== false) { const P = PC(o.id); return P.lay !== 'floor' && P.lay !== 'flat' && P.lay !== 'roof'; }
+  return false;
+}
+function drawPlayerBehind(items) {
+  const p = S.p, pk = p.x + p.y, [px, py] = toScreen(p.x, p.y);
+  const x0 = px - 110 * Z, y0 = py - 120 * Z, w = 220 * Z, h = 150 * Z;   // room for the figure, a raised weapon and a swing
+  const occ = [];
+  for (const it of items) if (it.k > pk && occBlocks(it.o)) {
+    const [sx, sy] = toScreen(it.o.x, it.o.y);
+    if (sy > py - 4 * Z && sy < y0 + h + 260 * Z && Math.abs(sx - px) < 200 * Z) occ.push(it.o);
+  }
+  if (!occ.length) return drawPlayer();
+  const cw = Math.ceil(w * DPR), ch = Math.ceil(h * DPR);
+  for (const k of ['a', 'b', 'm']) { const c = OCC[k]; if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; } }
+  const xf = c => { c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, cw, ch); c.setTransform(DPR, 0, 0, DPR, -x0 * DPR, -y0 * DPR); };
+  xf(OCC.ax); xf(OCC.mx);
+  const real = ctx; ctx = OCC.ax;
+  try { drawPlayer(); } finally { ctx = real; }
+  for (const o of occ) { if (o.kind === 'dst') { const [sx, sy] = toScreen(o.x, o.y); stDraw(o, OCC.mx, sx, sy, false); } else drawProp(o, OCC.mx, true); }
+  const B = OCC.bx; B.setTransform(1, 0, 0, 1, 0, 0); B.globalAlpha = 1; B.globalCompositeOperation = 'source-over'; B.clearRect(0, 0, cw, ch);
+  B.drawImage(OCC.a, 0, 0);
+  B.globalCompositeOperation = 'destination-in'; B.drawImage(OCC.m, 0, 0);   // the part of you that's hidden
+  B.globalCompositeOperation = 'source-in'; B.fillStyle = COLOUR ? '#f1e6d2' : '#ecebe6'; B.fillRect(0, 0, cw, ch);   // as a pale silhouette
+  B.globalCompositeOperation = 'source-over';
+  const A = OCC.ax; A.setTransform(1, 0, 0, 1, 0, 0); A.globalCompositeOperation = 'destination-out'; A.drawImage(OCC.m, 0, 0); A.globalCompositeOperation = 'source-over';   // the part still in view
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(OCC.a, x0 * DPR, y0 * DPR);
+  ctx.globalAlpha = OCC_GHOST; ctx.drawImage(OCC.b, x0 * DPR, y0 * DPR);
+  ctx.restore();
+}
 function drawPlayer() {                           // v143: hidden under the sand, or a shimmer while vanished
   const v = wpVeil(); if (v <= 0) return; if (v >= 1) return drawPlayer0();
   ctx.save(); ctx.globalAlpha *= v; drawPlayer0(); ctx.restore();
@@ -4424,7 +4463,7 @@ function renderScene() {
     p.x = x0; p.y = y0; S.rollGU = null; S.tip = t0; S.tipNow = t1;
   }
   drawLensGlow();
-  drawPlayer(); // drawn over the dark so the whole figure stays readable
+  drawPlayerBehind(items); // drawn over the dark so the whole figure stays readable   // v197: hidden by what stands in front, a faint ghost shows through
   drawBreath();
   drawTorchWarmth();
   drawWarmth();
