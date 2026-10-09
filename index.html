@@ -597,7 +597,7 @@ button.nav.wisp .ic { color: rgb(215,185,255); border-color: rgba(185,130,255,0.
       <label class="fov"><span>Effects</span><input id="volSfx" type="range" min="0" max="100" step="5"><output id="volSfxOut"></output></label>
       <button id="sound" class="alt">Sound on</button>
     </div>
-      <p class="small" id="verLbl">Version 202</p>
+      <p class="small" id="verLbl">Version 205</p>
       <details class="audio devtools"><summary>Playtest tools</summary>
       <button id="testPortal" class="alt">Test the portal</button>
       <p class="small">Starts Expedition by the shrine with two orbs home and the third in your hands. Nothing from the test is saved.</p>
@@ -693,7 +693,7 @@ const wT = document.createElement('canvas'), wTctx = wT.getContext('2d');
 // in Expedition every other light (flares, candles, fires, blasts, fireflies, lamps) gets the same warm colour
 const wH = document.createElement('canvas'), wHctx = wH.getContext('2d');
 let warmHoles = false, warmHoleBox = null;
-let warmOn = false, warmBox = null, beamGeo = null;
+let warmOn = false, warmBox = null, beamGeo = null, DARK_ON = true, SPB = null;   // v204: DARK_ON, whether the dark is drawn this frame; SPB, the screen box the torch's shadows cover
 let W = 0, H = 0, DPR = 1, Z = 1, ZB = 1, SAFE_TOP = 0;   // ZB: the usual zoom; Z eases away from it when a boss fight frames its arena
 let FOV = 1;   // field of view from the menu slider: above 1 sees more (zoomed out), below 1 is closer
 // v124 (Joe: a full colour pass, with a colour or black and white mode): COLOUR switches every painted material between colour and the original greys
@@ -2679,6 +2679,35 @@ function sprite(kind, v, Ld = 1) {
   MATK = COLOUR ? KIND_MAT[kind] || null : null; SPR_EDGE = !NO_EDGE.has(kind);   // v168
   try { return makeSprite(key, w, h, ax, ay, g => paint(g, sprRand(v * 977 + kind.length * 131 + 7), Ld), snow ? cv => snowify(cv, ax, Ld, snow) : null); } finally { MATK = null; SPR_EDGE = false; }
 }
+// v205 (Joe): a loading screen at the start of a run paints every scenery picture up front at the game's zoom, so none of them is
+// painted mid-play the first time it comes into view (each one cost a phone up to a few frames: a hitch). A slice per frame keeps it alive.
+const WARM = { q: null, n: 0 };
+function warmStart() {
+  const z = ZB * CAMZ(), want = Math.max(0.75, Math.min(3, Math.round(z * DPR * 1.3 * 4) / 4)), q = [];   // the zoom the run plays at (Z may still be the title's)
+  for (const k in SPRITE_KINDS) for (let v = 0; v < SPRITE_KINDS[k][0]; v++) for (const L of [1, -1]) { const o = SPRITES[k + v + (L > 0 ? 'r' : 'l')]; if (!o || o.s !== want) q.push([k, v, L]); }
+  if (!q.length) return;
+  WARM.q = q; WARM.n = q.length; warmVeil(true);
+}
+function warmVeil(on) {
+  let el = document.getElementById('warmVeil');
+  if (on && !el) {
+    el = document.createElement('div'); el.id = 'warmVeil';
+    el.style.cssText = 'position:fixed;inset:0;z-index:98;background:#000;display:grid;place-items:center;color:#8a857c;font:500 13px ui-monospace,monospace;letter-spacing:.3em;text-transform:uppercase;transition:opacity .35s';
+    el.innerHTML = '<span>Lighting the torch <span id="warmPct"></span></span>'; document.body.append(el);
+  }
+  if (!on && el) { el.style.opacity = 0; setTimeout(() => el.remove(), 380); }
+}
+function warmStep() {                             // true while it's still working (the game waits)
+  if (!WARM.q) return false;
+  const t0 = performance.now(), z0 = Z; Z = ZB * CAMZ();
+  try { while (WARM.q.length && performance.now() - t0 < 24) { const [k, v, L] = WARM.q.pop(); delete SPRITES[k + v + (L > 0 ? 'r' : 'l')]; sprite(k, v, L); } }
+  catch (e) { WARM.q.length = 0; }                // never let a bad picture hold the game up (an old size is dropped above so it's painted now, not two a frame)
+  finally { Z = z0; }
+  const p = document.getElementById('warmPct'); if (p) p.textContent = Math.round(100 * (1 - WARM.q.length / WARM.n)) + '%';
+  if (WARM.q.length) return true;
+  WARM.q = null; warmVeil(false); last = performance.now(); speed.sum = speed.n = 0; speed.wait = 2;
+  return false;
+}
 // ================= THE DUNES: the first world through the portal =================
 // Rolling sand under the moon, mostly empty: the odd rock, dry scrub, a dead tree. Now and then an oasis: a small lagoon
 // ringed with reeds and palm trees. Scenery is painted once as sprites, like the forest.
@@ -3671,6 +3700,9 @@ function shadowPoly(c, lx, ly, o, r, len, extra) {
   const a1 = th - half, a2 = th + half;
   const ax = lx + Math.cos(a1) * t, ay = ly + Math.sin(a1) * t, bx = lx + Math.cos(a2) * t, by = ly + Math.sin(a2) * t;
   const L = len + (len < 1000 ? d * 0.5 : 0);   // short objects throw longer shadows further from the light
+  if (SPB) for (const [x, y] of [[ax, ay], [bx, by], [ax + Math.cos(a1) * L, ay + Math.sin(a1) * L], [bx + Math.cos(a2) * L, by + Math.sin(a2) * L]]) {
+    const [u, v] = toScreen(x, y); if (u < SPB[0]) SPB[0] = u; if (v < SPB[1]) SPB[1] = v; if (u > SPB[2]) SPB[2] = u; if (v > SPB[3]) SPB[3] = v;
+  }
   c.beginPath(); c.moveTo(ax, ay);
   c.lineTo(ax + Math.cos(a1) * L, ay + Math.sin(a1) * L);
   c.lineTo(bx + Math.cos(a2) * L, by + Math.sin(a2) * L);
@@ -4243,8 +4275,9 @@ function applyWorldLights(lights, items) {
       warmOn = true;
     }
   }
-  blurSmall(lAcc, lBctx, w, h, U); blurSmall(lB, lAccctx, w, h, U);
   if (warmOn) { blurSmall(wA, lBctx, w, h, U); blurSmall(lB, wActx, w, h, U); }
+  if (!DARK_ON) return;   // v204: the warm colour is still wanted in daylight; the cut through the dark isn't
+  blurSmall(lAcc, lBctx, w, h, U); blurSmall(lB, lAccctx, w, h, U);
   dctx.setTransform(1, 0, 0, 1, 0, 0);
   dctx.globalCompositeOperation = 'destination-out';
   dctx.imageSmoothingEnabled = true; dctx.imageSmoothingQuality = 'low';
@@ -4407,7 +4440,14 @@ function drawFilm() {
     ctx.fillRect(0, 0, W, H);
   }
   }
-  ctx.drawImage(vig, 0, 0, W, H);
+  { // v204: the vignette is fully clear inside a circle round the middle, so a square in there is left out (four strips round it)
+    const r = Math.hypot(W, H) / 2 * 0.35 / Math.SQRT2 - 2, cx = W / 2, cy = H / 2;
+    if (r > 8) {
+      const a = Math.floor(cx - r), b = Math.ceil(cx + r), c = Math.floor(cy - r), d = Math.ceil(cy + r);
+      ctx.drawImage(vig, 0, 0, W, c, 0, 0, W, c); ctx.drawImage(vig, 0, d, W, H - d, 0, d, W, H - d);
+      ctx.drawImage(vig, 0, c, a, d - c, 0, c, a, d - c); ctx.drawImage(vig, b, c, W - b, d - c, b, c, W - b, d - c);
+    } else ctx.drawImage(vig, 0, 0, W, H);
+  }
   // dust and hairs: one-frame specks
   if (Math.random() < 0.12) {
     const dx = Math.random() * W, dy = Math.random() * H, light = Math.random() < 0.5;
@@ -4583,17 +4623,23 @@ function renderScene() {
   if (S.mode === 'expedition' && inWoods()) { drawFog(true); drawRain(true); }   // v126: weather in the light
 
   // darkness
+  // v204: in full Daylight sun the dark goes over the world at nothing, so none of it is painted (every pass of it was work no one saw)
+  const darkA = isRg() ? rgDarkAlpha() : 1; DARK_ON = darkA > 0;
+  if (DARK_ON) {
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   dctx.globalCompositeOperation = 'source-over';
   dctx.fillStyle = '#050505'; dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
+  }
   // beam is drawn in screen space so its width and length never change with direction
   const [bx, by] = S.tip || toScreen(S.p.x, S.p.y), br = Math.max(W, H) * 0.72 * ZOOM() * CAMZ() * flicker() * (0.2 + 0.8 * torchFade()) * (isRg() ? rgRange() : 1) * (S.rollK ? S.rollK.len : 1); // beam starts at the torch lens and reaches most of the way across the screen
   // soft sides: the beam is drawn small as stacked wedges of slightly different widths, blurred, then stretched over the dark,
   // so the light fades out over its edges instead of stopping dead (the shadow canvases are free until the shadow pass below)
   const beamA = S.torchLvl * (0.55 + 0.45 * torchFade()) * (S.rollK ? S.rollK.al : 1), FEATHER = 0.06 + HALF * 0.14, NW = 9;
-  shActx.setTransform(1, 0, 0, 1, 0, 0); shActx.clearRect(0, 0, shA.width, shA.height); shActx.setTransform(1 / SH, 0, 0, 1 / SH, 0, 0);
   const bre = br * 1.15;   // the light trails off a little past where it used to stop
+  S.rollPool = null;
+  if (DARK_ON) {
+  shActx.setTransform(1, 0, 0, 1, 0, 0); shActx.clearRect(0, 0, shA.width, shA.height); shActx.setTransform(1 / SH, 0, 0, 1 / SH, 0, 0);
   const grad = shActx.createRadialGradient(bx, by, 0, bx, by, bre);   // a long, eased fade instead of a short drop
   for (const [t, a] of [[0, 1], [0.35, 0.97], [0.5, 0.88], [0.62, 0.72], [0.72, 0.52], [0.82, 0.3], [0.91, 0.12], [1, 0]]) grad.addColorStop(t, `rgba(0,0,0,${a})`);
   shActx.fillStyle = grad; shActx.globalAlpha = 1 - Math.pow(1 - Math.min(0.995, beamA), 1 / NW);
@@ -4604,7 +4650,6 @@ function renderScene() {
     shActx.closePath(); shActx.fill();
   }
   shActx.globalAlpha = 1;
-  S.rollPool = null;
   if (S.rollK && S.rollK.pool > 0.05 && S.torchLvl > 0.3) {   // v142: torch pointed at the floor mid-roll: a bright pool round your feet
     const [px0, py0] = toScreen(S.p.x, S.p.y), qx = px0 + Math.cos(S.aim) * 14 * Z, qy = py0 + Math.sin(S.aim) * 7 * Z, qr = (26 + 26 * S.rollK.pool) * Z;
     S.rollPool = [qx, qy, qr];
@@ -4628,6 +4673,7 @@ function renderScene() {
       dctx.drawImage(shB, sx0, sy0, sx1 - sx0, sy1 - sy0, sx0 * SH * DPR, sy0 * SH * DPR, (sx1 - sx0) * SH * DPR, (sy1 - sy0) * SH * DPR); dctx.restore();
     }
   }
+  }
   beamGeo = { bx, by, br, a: beamA };
   if (isRg()) cutSurviveLights(bx, by, br);
 
@@ -4640,10 +4686,18 @@ function renderScene() {
   const casters = items.map(it => it.o).filter(o => S.torchLvl > 0.02 && caster(o) && inBeam(o) >= 0)
     .map(o => ({ o, ...caster(o), d: Math.hypot(o.x - lx, o.y - ly), th: Math.atan2(o.y - ly, o.x - lx) }));
   // 1. draw every shadow as one solid shape at low resolution (overlaps merge instead of stacking)
+  // v204: and only the patch of screen the shadows cover is blurred and laid back over the dark (the rest was empty, copied full screen)
+  SPB = [Infinity, Infinity, -Infinity, -Infinity];
+  if (DARK_ON && casters.length) {
   shActx.setTransform(1, 0, 0, 1, 0, 0); shActx.clearRect(0, 0, shA.width, shA.height);
   worldMatrix(shActx, 1 / SH);
   shActx.fillStyle = '#050505';
   for (const c of casters) shadowPoly(shActx, lx, ly, c.o, c.r, c.len, 0.01);
+  }
+  const spb = SPB; SPB = null;
+  const sbx0 = Math.max(0, Math.floor(spb[0] / SH) - 4), sby0 = Math.max(0, Math.floor(spb[1] / SH) - 4);
+  const sbx1 = Math.min(shA.width, Math.ceil(spb[2] / SH) + 4), sby1 = Math.min(shA.height, Math.ceil(spb[3] / SH) + 4);
+  if (sbx1 > sbx0 && sby1 > sby0) {
   // 2. blur it: layer shifted copies (two passes of a small box blur)
   const blur = (src, dst) => {
     dst.setTransform(1, 0, 0, 1, 0, 0); dst.clearRect(0, 0, shA.width, shA.height);
@@ -4657,8 +4711,9 @@ function renderScene() {
   dctx.globalCompositeOperation = 'source-over';
   dctx.imageSmoothingEnabled = true; dctx.imageSmoothingQuality = 'low';
   dctx.globalAlpha = 0.92;
-  dctx.drawImage(shA, 0, 0, shA.width * SH * DPR, shA.height * SH * DPR);
+  dctx.drawImage(shA, sbx0, sby0, sbx1 - sbx0, sby1 - sby0, sbx0 * SH * DPR, sby0 * SH * DPR, (sbx1 - sbx0) * SH * DPR, (sby1 - sby0) * SH * DPR);
   dctx.globalAlpha = 1;
+  }
 
   // the side of each object facing the torch stays lit, unless something else is in the way
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -4675,7 +4730,7 @@ function renderScene() {
     const cur = litMemo.has(key) ? litMemo.get(key) : 0;
     const now = cur + (target - cur) * (1 - Math.exp(-8 * frameDt));
     litMemo.set(key, now); seen.add(key);
-    if (now < 0.01) continue;
+    if (now < 0.01 || !DARK_ON) continue;
     dctx.globalAlpha = now * S.torchLvl;
     drawProp(c.o, dctx, true);
   }
@@ -4695,10 +4750,12 @@ function renderScene() {
     }
   }
   applyWorldLights(lights, items);
+  if (DARK_ON) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = isRg() ? rgDarkAlpha() : 1;
+  ctx.globalAlpha = darkA;
   ctx.drawImage(dark, 0, 0);
   ctx.globalAlpha = 1;
+  }
   if (S.day) drawDay();
   if (S.mode === 'expedition' && inWoods()) { drawRain(false); drawFog(false); drawLightning(); }   // v126: weather over the dark
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -4789,12 +4846,12 @@ const MUS = {"parts":["music/backing/0.mp3","music/backing/1.mp3","music/backing
 // ---- Dunes music (v147, Joe): his "jungle game" song plays the whole time you're in the Dunes, boss fights too, and crossfades back to
 // the backing track when you come home. 10 pieces of ~47 s, built the same way; the last piece's tail pads wrap round to the start so it loops.
 const DUNE_MUS = {"parts":["music/dunes/0.mp3","music/dunes/1.mp3","music/dunes/2.mp3","music/dunes/3.mp3","music/dunes/4.mp3","music/dunes/5.mp3","music/dunes/6.mp3","music/dunes/7.mp3","music/dunes/8.mp3","music/dunes/9.mp3"],"lens":[2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320,2056320],"P":11025};
-// v182 (Joe): his song "fresh start" is the Daylight song, on its own loop the whole run (9 pieces of ~47 s, built the same way;
-// the last 3 s fade out so the loop back to the quiet intro doesn't jump).
-const DAY_MUS = {"parts":["music/daylight/0.mp3","music/daylight/1.mp3","music/daylight/2.mp3","music/daylight/3.mp3","music/daylight/4.mp3","music/daylight/5.mp3","music/daylight/6.mp3","music/daylight/7.mp3","music/daylight/8.mp3"],"lens":[2090509,2090509,2090509,2090509,2090509,2090509,2090509,2090509,2090514],"P":11025};
-// v196 (Joe): his "break the beat" is Daylight's second song: fresh start, then break the beat (1.5 s of quiet in, last 3 s faded), round again.
+// v196 (Joe): his "break the beat" (1.5 s of quiet in, last 3 s faded).
 const DAY2_MUS = {"parts":["music/daylight2/0.mp3","music/daylight2/1.mp3","music/daylight2/2.mp3","music/daylight2/3.mp3","music/daylight2/4.mp3","music/daylight2/5.mp3","music/daylight2/6.mp3","music/daylight2/7.mp3","music/daylight2/8.mp3"],"lens":[1967214,1967214,1967214,1967214,1967214,1967214,1967214,1967214,1967218],"P":11025};
-const DAY_LIST = { parts: DAY_MUS.parts.concat(DAY2_MUS.parts), lens: DAY_MUS.lens.concat(DAY2_MUS.lens), P: DAY_MUS.P };
+// v203 (Joe): "fresh start" is gone; his "break the beat again" follows break the beat, round again (4 pieces of ~43 s, built the same
+// way: 1.5 s of quiet in, last 3 s faded, turned down 4.7 dB to sit at break the beat's level).
+const DAY3_MUS = {"parts":["music/daylight3/0.mp3","music/daylight3/1.mp3","music/daylight3/2.mp3","music/daylight3/3.mp3"],"lens":[1894297,1894297,1894297,1894299],"P":11025};
+const DAY_LIST = { parts: DAY2_MUS.parts.concat(DAY3_MUS.parts), lens: DAY2_MUS.lens.concat(DAY3_MUS.lens), P: DAY2_MUS.P };
 const MUS_PAD = MUS.P / 44100, MUS_XF = 0.012, MUS_FADE = 2.5;
 // v149 (Joe): five more of his songs, shuffled with backing track 2 everywhere except the Dunes (music/songs/). Each ends in 1.5 s of quiet.
 const SONGS = {"yeh":{"parts":["music/songs/yeh/0.mp3","music/songs/yeh/1.mp3","music/songs/yeh/2.mp3","music/songs/yeh/3.mp3"],"lens":[2040026,2040025,2040025,2040026],"P":11025},"quest":{"parts":["music/songs/quest/0.mp3","music/songs/quest/1.mp3","music/songs/quest/2.mp3","music/songs/quest/3.mp3","music/songs/quest/4.mp3"],"lens":[1997896,1997895,1997896,1997895,1997896],"P":11025},"just-wont-do":{"parts":["music/songs/just-wont-do/0.mp3","music/songs/just-wont-do/1.mp3","music/songs/just-wont-do/2.mp3","music/songs/just-wont-do/3.mp3","music/songs/just-wont-do/4.mp3"],"lens":[1967252,1967253,1967252,1967253,1967252],"P":11025},"untitled":{"parts":["music/songs/untitled/0.mp3","music/songs/untitled/1.mp3","music/songs/untitled/2.mp3","music/songs/untitled/3.mp3","music/songs/untitled/4.mp3"],"lens":[2130145,2130145,2130146,2130145,2130145],"P":11025},"crow-game-theme":{"parts":["music/songs/crow-game-theme/0.mp3","music/songs/crow-game-theme/1.mp3","music/songs/crow-game-theme/2.mp3","music/songs/crow-game-theme/3.mp3","music/songs/crow-game-theme/4.mp3","music/songs/crow-game-theme/5.mp3","music/songs/crow-game-theme/6.mp3","music/songs/crow-game-theme/7.mp3","music/songs/crow-game-theme/8.mp3","music/songs/crow-game-theme/9.mp3","music/songs/crow-game-theme/10.mp3","music/songs/crow-game-theme/11.mp3","music/songs/crow-game-theme/12.mp3","music/songs/crow-game-theme/13.mp3","music/songs/crow-game-theme/14.mp3","music/songs/crow-game-theme/15.mp3"],"lens":[2103438,2103439,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103438,2103439,2103438,2103439,2103438],"P":11025}};
@@ -4817,7 +4874,7 @@ function plShuffle() {                         // the playlist: every song once 
   for (const i of ord) { def.parts.push(...list[i].parts); def.lens.push(...list[i].lens); }
   return def;
 }
-const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS), mkTrack(DAY_LIST)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop), 2 fresh start then break the beat (Daylight)
+const TRACKS = [mkTrack(plShuffle()), mkTrack(DUNE_MUS), mkTrack(DAY_LIST)];   // 0 the shuffled playlist, 1 jungle game (the Dunes, on its own loop), 2 break the beat then break the beat again (Daylight)
 TRACKS[0].shuffle = true;
 const mus = { gain: null, on: false, cur: 0 };
 function musLoad(url) {                        // v148: the music lives as separate files next to the game (the browser caches them)
@@ -8898,7 +8955,13 @@ function drawDay() {                           // the sun: a warm wash from the 
   const g = ctx.createLinearGradient(0, 0, W * DPR * 0.4, H * DPR);
   const sun = COLOUR ? `rgba(${255},${Math.round(226 - 60 * set)},${Math.round(160 - 90 * set)}` : 'rgba(255,226,160';
   g.addColorStop(0, sun + ',0.5)'); g.addColorStop(1, sun + ',0)');
-  ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * lt; ctx.fillStyle = g; ctx.fillRect(0, 0, W * DPR, H * DPR);
+  if (lt > 0) {   // v204: at night it was laid over the whole screen at nothing; by day only the part the fade hasn't reached is filled
+    ctx.globalCompositeOperation = COLOUR ? 'soft-light' : 'screen'; ctx.globalAlpha = (COLOUR ? 0.6 : 0.12) * lt; ctx.fillStyle = g;
+    const gx = W * DPR * 0.4, gy = H * DPR, lim = gx * gx + gy * gy + 6 * Math.hypot(gx, gy);   // past this line the gradient is fully clear (a few pixels' margin)
+    const X = W * DPR + 9, Y = H * DPR + 9, pts = [[-9, -9], [X, -9], [X, Y], [-9, Y]], f = ([x, y]) => x * gx + y * gy - lim, poly = [];
+    for (let i = 0; i < 4; i++) { const p = pts[i], q = pts[(i + 1) % 4], fp = f(p), fq = f(q); if (fp <= 0) poly.push(p); if ((fp <= 0) !== (fq <= 0)) { const t = fp / (fp - fq); poly.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); } }
+    ctx.beginPath(); poly.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip(); ctx.fillRect(0, 0, W * DPR, H * DPR);   // the clip only cuts along the fade's clear edge
+  }
   ctx.restore();
   drawNight();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);   // v199 (Joe: chips flew from the wrong spot): these draw in screen points; on a sharp screen (TV, tablet) they were landing up and to the left
@@ -17879,7 +17942,7 @@ statsLabel();
 
 function begin(mode) {
   const day = mode === 'day' || mode === 'daynew', fresh = mode === 'daynew'; if (day) mode = 'expedition';   // v127: Daylight runs on Expedition's woods; v132: 'day' carries on a saved run
-  camZv = 1;                                    // the title's close-up zoom doesn't carry into the game
+  camZv = 1; Z = ZB * CAMZ();                   // the title's close-up zoom doesn't carry into the game (v205: not even for the first frames, which painted every picture twice)
   reset(); S.mode = mode; EX_TEST = false; attackBtn.textContent = 'Attack'; useBtn.textContent = 'Take';
   dayYard(day);   // v159: Daylight's camp box and barrels stand where you can see them
   if (mode === 'free') { S.q = null; }
@@ -17888,6 +17951,7 @@ function begin(mode) {
   else if (mode === 'blink') { S.blinkPhase = 'dark'; S.darkT = BLINK_DARK; S.torchOn = true; spawnQuarry(); S.q.hiddenUntilLit = true; }
   else spawnQuarry();
   overlay.hidden = true; overlay.classList.remove('title'); last = performance.now();
+  warmStart();   // v205
   document.getElementById('deathCard').hidden = true;
   wspecBtn.hidden = wswapBtn.hidden = true; document.body.classList.remove('wp');
   initAudio(); fsAuto(); torchBtn.hidden = mode === 'expedition'; if (mode === 'expedition') S.torchOn = !S.day; document.body.classList.toggle('ex', mode === 'expedition'); dodgeBtn.hidden = mode !== 'survive' && mode !== 'expedition'; attackBtn.hidden = dodgeBtn.hidden; campBtn.hidden = true; campEl.hidden = true; recallBtn.hidden = true; lampBtn.hidden = true; flaskBtn.hidden = true; craftBtn.hidden = true; useBtn.hidden = true; hotbarEl.hidden = true; if (S.day) renderHotbar(); craftEl.hidden = true; dodgeBtn.dataset.cool = '0'; menuBtn.hidden = false; torchBtn.setAttribute('aria-pressed', 'true'); setSound(soundOn);
@@ -18059,6 +18123,7 @@ function fpsDraw(raw) {
 }
 function frame(now) {
   requestAnimationFrame(frame);   // v194: asked first, so one bad frame can't stop the game for good
+  if (warmStep()) { last = now; return; }   // v205: still painting the scenery; the run waits behind the loading screen
   if (btnKey === '' || ++btnTick % 3 === 0) layoutBtns();   // v145; v177: every third frame, it reads the buttons' styles
   padPoll();   // v172: a controller
   const raw = Math.max(0, (now - last) / 1000);   // v111: rAF's stamp can come before a resume's performance.now(); a negative step once froze the game
